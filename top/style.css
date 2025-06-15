@@ -1,3 +1,9 @@
+/* === <a>タグをボタンとして使う場合の補足設定 === */
+a.feature-button {
+  display: inline-block;
+  text-decoration: none;
+}
+
 /* === 全体設定（スマホファースト）=== */
 body, html {
   margin: 0;
