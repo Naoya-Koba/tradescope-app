@@ -179,7 +179,7 @@ h1, h2, h3 {
   white-space: nowrap;
 }
 .month-card input {
-  width: 92%;
+  width: 96%;
   margin: 0 auto 0.6rem;
   display: block;
   padding: 0.5rem 0.4rem;
@@ -197,6 +197,10 @@ input.positive {
 }
 input.negative {
   color: #ff5a5a;
+}
+input.sum {
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* === フッター === */
