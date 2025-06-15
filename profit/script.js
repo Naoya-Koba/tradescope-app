@@ -34,30 +34,29 @@ months.forEach(month => {
   monthContainer.appendChild(card);
 });
 
-// === 通貨フォーマット入力支援 ===
+// === イベント設定 ===
 document.querySelectorAll('.month-card input').forEach(input => {
-  if (!input.disabled) {
-    input.addEventListener('beforeinput', e => {
-      if (input.selectionStart === 0 && e.inputType === 'deleteContentBackward') {
-        e.preventDefault();
-      }
-    });
+  input.addEventListener('focus', () => {
+    const raw = input.value.replace(/[¥,]/g, '').trim();
+    if (raw === "0") {
+      input.value = "";
+    }
+  });
 
-    input.addEventListener('blur', () => {
-      if (input.value.trim() === '') {
-        input.value = '¥0';
-      }
-      formatCurrencyInput(input);
-      updateTotals();
-    });
+  input.addEventListener('blur', () => {
+    if (input.value.trim() === "") {
+      input.value = '¥0';
+    }
+    formatCurrencyInput(input);
+    updateTotals();
+  });
 
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        input.blur();
-      }
-    });
-  }
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    }
+  });
 });
 
 function formatCurrencyInput(input) {
@@ -168,21 +167,6 @@ function updateChart(data) {
   });
 }
 
-// 入力検知
-document.addEventListener("input", (e) => {
-  if (e.target.matches(".realized, .swap, .fee")) {
-    updateTotals();
-  }
-});
-
-document.addEventListener("blur", (e) => {
-  if (e.target.matches(".realized, .swap, .fee")) {
-    const value = parseInput(e.target.value);
-    e.target.value = formatYen(value);
-    applyColorClass(e.target, value);
-  }
-}, true);
-
 // 保存処理
 saveButton.addEventListener("click", () => {
   confirmDialog.classList.add("show");
@@ -225,4 +209,5 @@ function showToast(message) {
   }, 2000);
 }
 
+// 初期化
 updateTotals();
