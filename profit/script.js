@@ -1,4 +1,8 @@
-// === DOM読み込み後の初期化処理 ===
+// TradeScope 損益管理スクリプト
+// =============================
+// スマホ入力での挙動改善・描画先ID対応版
+
+// DOM読み込み後に初期化処理を実行
 document.addEventListener("DOMContentLoaded", () => {
   // === 要素の取得 ===
   const monthContainer = document.getElementById("monthly-cards");
@@ -10,13 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const confirmYes = document.getElementById("confirm-yes");
   const confirmNo = document.getElementById("confirm-no");
 
-  // === 月リスト ===
+  // === 月のラベルを定義 ===
   const months = [
     "1月", "2月", "3月", "4月", "5月", "6月",
     "7月", "8月", "9月", "10月", "11月", "12月"
   ];
 
-  // === 月別カードを動的に生成 ===
+  // === 月別カードを生成 ===
   months.forEach(month => {
     const card = document.createElement("div");
     card.className = "month-card";
@@ -34,24 +38,26 @@ document.addEventListener("DOMContentLoaded", () => {
     monthContainer.appendChild(card);
   });
 
-  // === 数値変換・表示フォーマット関数 ===
+  // === 文字列から数値へ変換（通貨記号など除去） ===
   function parseInput(value) {
     const cleaned = value.replace(/[^\d\.-]/g, '');
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? 0 : parsed;
   }
 
+  // === 数値を円表記に変換 ===
   function formatYen(value) {
     return `¥${value.toLocaleString()}`;
   }
 
+  // === 色クラスの付与 ===
   function applyColorClass(inputEl, value) {
     inputEl.classList.remove("positive", "negative");
     inputEl.classList.add(value >= 0 ? "positive" : "negative");
   }
 
-  // === 合計損益・資金・グラフの更新 ===
-  function updateTotals() {
+  // === 合計損益・チャート更新 ===
+  function updateTotals(applyFormat = true) {
     let total = 0;
     let balance = 1000000;
     const balances = [];
@@ -66,9 +72,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const fee = parseInput(feeInput.value);
       const sum = realized + swap + fee;
 
-      realizedInput.value = formatYen(realized);
-      swapInput.value = formatYen(swap);
-      feeInput.value = formatYen(fee);
+      if (applyFormat) {
+        realizedInput.value = formatYen(realized);
+        swapInput.value = formatYen(swap);
+        feeInput.value = formatYen(fee);
+      }
 
       applyColorClass(realizedInput, realized);
       applyColorClass(swapInput, swap);
@@ -89,7 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateChart(balances);
   }
 
-  // === 資金の折れ線グラフ描画 ===
+  // === チャート描画処理 ===
   function updateChart(data) {
     if (window.myChart) window.myChart.destroy();
     window.myChart = new Chart(balanceChartEl, {
@@ -132,42 +140,39 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // === 入力変更イベントで即時再計算 ===
+  // === 入力イベントで即時再計算（整形なし） ===
   document.addEventListener("input", (e) => {
     if (e.target.matches(".realized, .swap, .fee")) {
-      updateTotals();
+      updateTotals(false);
     }
   });
 
-  // === フォーカスアウト時に数値整形と色クラス適用 ===
+  // === フォーカス離脱時に整形処理 ===
   document.addEventListener("blur", (e) => {
     if (e.target.matches(".realized, .swap, .fee")) {
       const value = parseInput(e.target.value);
       e.target.value = formatYen(value);
       applyColorClass(e.target, value);
+      updateTotals();
     }
   }, true);
 
-  // === 保存ボタン：確認ダイアログ表示 ===
+  // === 保存ボタンの確認表示 ===
   saveButton.addEventListener("click", () => {
     confirmDialog.classList.add("show");
   });
 
-  // === ダイアログキャンセル処理 ===
   confirmNo.addEventListener("click", () => {
     confirmDialog.classList.remove("show");
   });
 
-  // === ダイアログOK時の保存処理（仮） ===
   confirmYes.addEventListener("click", () => {
     confirmDialog.classList.remove("show");
-
-    // 実際の保存処理をここに追加する（GAS連携など）
-
+    // 保存処理を追加する場所（GAS連携など）
     showToast("保存が完了しました");
   });
 
-  // === トースト通知の表示 ===
+  // === トースト通知表示 ===
   function showToast(message) {
     const toast = document.createElement("div");
     toast.textContent = message;
@@ -186,16 +191,13 @@ document.addEventListener("DOMContentLoaded", () => {
     toast.style.transition = "opacity 0.5s ease";
     document.body.appendChild(toast);
 
-    setTimeout(() => {
-      toast.style.opacity = "1";
-    }, 100);
-
+    setTimeout(() => { toast.style.opacity = "1"; }, 100);
     setTimeout(() => {
       toast.style.opacity = "0";
       setTimeout(() => toast.remove(), 500);
     }, 2000);
   }
 
-  // === 初期化（全体更新） ===
+  // 初回更新実行
   updateTotals();
 });
