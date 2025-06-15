@@ -179,7 +179,7 @@ h1, h2, h3 {
   white-space: nowrap;
 }
 .month-card input {
-  width: 96%;
+  width: 100%;
   margin: 0 auto 0.6rem;
   display: block;
   padding: 0.5rem 0.4rem;
