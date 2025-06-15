@@ -58,7 +58,10 @@ h1, h2, h3 {
 .summary-card p {
   font-size: 1.5rem;
   margin-top: 0.5rem;
-  color: gold;
+  color: #f0e8d8;
+}
+.summary-card p.negative {
+  color: #ff5a5a;
 }
 
 /* === チャートの表示エリア === */
@@ -171,10 +174,10 @@ h1, h2, h3 {
   border-radius: 6px;
   border: none;
   background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: #f0e8d8;
 }
 input.positive {
-  color: gold;
+  color: #f0e8d8;
 }
 input.negative {
   color: #ff5a5a;
