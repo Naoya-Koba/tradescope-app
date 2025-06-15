@@ -60,7 +60,7 @@ h1, h2, h3 {
   margin-top: 0.5rem;
 }
 .positive {
-  color: #e6ddc5;
+  color: #f0e8d8;
 }
 .negative {
   color: #ff5a5a;
@@ -200,7 +200,10 @@ input.negative {
 }
 input.sum {
   font-weight: bold;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #e6ddc5 !important;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* === フッター === */
