@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const monthContainer = document.querySelector(".card-container");
+  const monthContainer = document.getElementById("monthly-cards");
   const totalProfitEl = document.getElementById("total-profit");
   const balanceChartEl = document.getElementById("balance-chart");
   const yearSelector = document.getElementById("year");

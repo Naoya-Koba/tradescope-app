@@ -10,9 +10,20 @@
 </head>
 <body>
   <div class="app">
-    <h1>損益</h1>
 
-    <!-- 年セレクター -->
+    <!-- 年間損益と資金：上部カード（2列） -->
+    <div class="summary-section">
+      <div class="summary-card">
+        <h2>年間損益</h2>
+        <p id="total-profit" class="positive">¥0</p>
+      </div>
+      <div class="summary-card">
+        <h2>資金</h2>
+        <p id="total-balance">¥1,000,000</p>
+      </div>
+    </div>
+
+    <!-- 年度セレクター -->
     <div class="year-selector">
       <select id="year">
         <option value="2025" selected>2025</option>
@@ -20,25 +31,13 @@
       </select>
     </div>
 
-    <!-- 年間損益 & 資金カード -->
-    <div class="summary-cards">
-      <div class="card">
-        <h2>年間損益</h2>
-        <p id="total-profit" class="positive">¥0</p>
-      </div>
-      <div class="card">
-        <h2>資金</h2>
-        <p id="total-balance">¥1,000,000</p>
-      </div>
-    </div>
-
-    <!-- 資金の移り変わりグラフ -->
+    <!-- 資金グラフエリア -->
     <div class="chart-area">
       <canvas id="balance-chart"></canvas>
     </div>
 
     <!-- 保存ボタン -->
-    <div class="save-area">
+    <div class="save-button-area">
       <button id="save-button">保存する</button>
     </div>
 
@@ -52,11 +51,14 @@
     <!-- トースト通知 -->
     <div id="toast" class="toast hidden">保存が完了しました</div>
 
-    <!-- 月別損益入力セクション -->
-    <section class="monthly-inputs">
+    <!-- 月別損益欄（3列構成） -->
+    <section class="monthly-section">
       <h2>月別損益</h2>
-      <div class="card-container"></div>
+      <div class="monthly-grid" id="monthly-cards">
+        <!-- JavaScriptでカードが動的に挿入される -->
+      </div>
     </section>
+
   </div>
 
   <footer>

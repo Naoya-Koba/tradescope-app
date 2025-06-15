@@ -1,229 +1,207 @@
-/* Google Fonts: Noto Serif JP を読み込み */
+/* === フォント読み込み === */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
 
-/* 全体のボディスタイルと背景画像設定 */
+/* === 基本設定（モバイルファースト）=== */
 body {
   margin: 0;
+  padding: 0;
   font-family: 'Noto Serif JP', serif;
   background: url('../assets/bright_background_v2.jpg') no-repeat center center fixed;
   background-size: cover;
-  color: #e6ddc5;
+  color: #f0e8d8;
+  overflow-y: auto; /* 縦スクロールを許可 */
 }
 
-/* タイトル文字の共通スタイル */
 h1, h2, h3 {
   font-weight: 700;
-  color: #e6ddc5;
   text-align: center;
+  color: #f0e8d8;
 }
 
-/* アプリ全体のレイアウト設定 */
+/* === アプリ全体のレイアウト === */
 .app {
-  padding: 2rem;
-  max-width: 960px;
-  margin: auto;
-}
-
-/* 年セレクターのレイアウト */
-.year-selector {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-/* 年セレクトボックスのスタイル */
-#year {
-  appearance: none;
-  background-color: rgba(255, 255, 255, 0.1);
-  border: 2px solid #e6ddc5;
-  color: #e6ddc5;
-  padding: 0.4rem 1rem;
-  font-size: 1rem;
-  border-radius: 8px;
-  font-family: 'Noto Serif JP', serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-#year:focus {
-  outline: none;
-  box-shadow: 0 0 10px rgba(230, 221, 197, 0.4);
-}
-
-/* 年間損益と資金カードのレイアウト */
-.summary-cards {
+  padding: 1rem;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-around;
-  margin-bottom: 2rem;
-}
-
-/* 各カード（年間損益、資金）の共通スタイル */
-.card {
-  background: rgba(10, 10, 20, 0.6);
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  padding: 1.5rem;
-  text-align: center;
-  flex: 1 1 280px;
-  margin: 1rem;
-}
-
-/* カード内の金額表示 */
-.card p {
-  font-size: 1.8rem;
-  margin: 0.5rem 0 0;
-  color: #f4e8c1;
-}
-
-/* プラス損益の色 */
-.card p.positive {
-  color: #e6ddc5;
-}
-
-/* マイナス損益の色 */
-.card p.negative {
-  color: #ff6b6b;
-}
-
-/* 月別損益の見出し */
-.monthly-inputs h2 {
-  text-align: center;
-  font-size: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-/* 月別カードの配置用グリッドレイアウト */
-.card-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  flex-direction: column;
   gap: 1.5rem;
 }
 
-/* 各月カードのスタイル */
-.month-card {
-  background: rgba(10, 10, 20, 0.4);
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+/* === 年セレクター === */
+.year-selector {
+  text-align: center;
 }
-
-.month-card h3 {
-  margin-top: 0;
-  font-size: 1.2rem;
-  color: #f4e8c1;
-}
-
-/* 損益入力フィールドのスタイル */
-.month-card input {
-  width: 100%;
-  padding: 0.6rem;
-  margin-top: 0.5rem;
-  font-size: 1rem;
+#year {
+  padding: 0.4rem 1rem;
   border-radius: 6px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fefefe;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #f0e8d8;
+  border: 1px solid #f0e8d8;
+  font-size: 1rem;
+  font-family: inherit;
 }
 
-/* プレースホルダー文字色 */
-input::placeholder {
-  color: #bbb;
+/* === 年間損益と資金のカード（2列）=== */
+.summary-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
-/* 入力欄：プラス／マイナス損益で色分け */
-input.positive {
-  color: #e6ddc5;
+.summary-card {
+  background: rgba(20, 20, 20, 0.5);
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+.summary-card p {
+  font-size: 1.5rem;
+  margin-top: 0.5rem;
+  color: gold;
 }
 
-input.negative {
-  color: #ff6b6b;
+/* === チャートの表示エリア === */
+.chart-area canvas {
+  width: 100%;
+  height: 200px;
 }
 
-/* 保存ボタンのスタイル */
+/* === 保存ボタンエリア === */
+.save-button-area {
+  text-align: center;
+}
 #save-button {
-  display: block;
-  margin: 2rem auto;
-  padding: 0.75rem 2rem;
+  padding: 0.7rem 2rem;
   font-size: 1rem;
   font-weight: bold;
-  border: 2px solid #e6ddc5;
-  border-radius: 12px;
-  background-color: transparent;
-  color: #e6ddc5;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid #f0e8d8;
+  color: #f0e8d8;
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(230, 221, 197, 0.4);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s;
 }
-
 #save-button:hover {
-  background-color: #e6ddc5;
+  background-color: #f0e8d8;
   color: #111;
 }
 
-/* 確認ダイアログのスタイル */
+/* === 保存確認ダイアログ === */
 #confirm-dialog {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: rgba(20, 20, 40, 0.95);
+  background: rgba(10, 10, 10, 0.9);
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  color: #e6ddc5;
-  z-index: 1000;
-  display: none;
   text-align: center;
+  display: none;
+  z-index: 1000;
 }
-
 #confirm-dialog.show {
   display: block;
 }
-
 #confirm-dialog button {
-  margin: 1rem 0.5rem;
-  padding: 0.5rem 1.2rem;
+  margin: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
-  background-color: #e6ddc5;
+}
+#confirm-yes {
+  background-color: #f0e8d8;
   color: #111;
-  border: none;
+}
+#confirm-no {
+  background-color: #999;
+  color: #fff;
 }
 
-#confirm-dialog button:hover {
-  background-color: #fff3b0;
-}
-
-/* 保存完了通知（トースト）のスタイル */
+/* === トースト通知 === */
 .toast {
   position: fixed;
   bottom: 2rem;
   left: 50%;
   transform: translateX(-50%);
-  background: #e6ddc5;
+  background: #f0e8d8;
   color: #111;
   padding: 1rem 2rem;
   border-radius: 6px;
   font-weight: bold;
   opacity: 0;
-  transition: opacity 0.4s ease, transform 0.4s ease;
   z-index: 9999;
+  transition: opacity 0.3s ease;
 }
-
 .toast.show {
   opacity: 1;
-  transform: translateX(-50%) translateY(-20px);
 }
-
 .toast.hidden {
   display: none;
 }
 
-/* モバイル向けレスポンシブ対応 */
-@media (max-width: 600px) {
-  .summary-cards {
-    flex-direction: column;
-    align-items: center;
+/* === 月別損益セクション === */
+.monthly-section h2 {
+  text-align: center;
+  font-size: 1.3rem;
+}
+.monthly-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+.month-card {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 0.8rem;
+  text-align: center;
+}
+.month-card h3 {
+  font-size: 1rem;
+  margin: 0.2rem 0 0.5rem;
+  color: #f7f0d5;
+}
+.month-card input {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+input.positive {
+  color: gold;
+}
+input.negative {
+  color: #ff5a5a;
+}
+
+/* === フッター === */
+footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+/* === PC向け拡張 === */
+@media (min-width: 768px) {
+  .app {
+    padding: 2rem;
+    max-width: 800px;
+    margin: auto;
+  }
+  .monthly-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .summary-section {
+    gap: 2rem;
+  }
+  #save-button {
+    font-size: 1.1rem;
+    padding: 1rem 2.5rem;
   }
 }
