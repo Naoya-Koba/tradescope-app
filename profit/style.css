@@ -179,11 +179,11 @@ h1, h2, h3 {
   white-space: nowrap;
 }
 .month-card input {
-  width: 100%;
+  width: 95%;
   margin: 0 auto 0.6rem;
   display: block;
   padding: 0.5rem 0.4rem;
-  font-size: 0.90rem;
+  font-size: 0.85rem;
   letter-spacing: -0.3px;
   text-align: center;
   border-radius: 6px;
