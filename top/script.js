@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // === ニュースティッカー用アニメーション（requestAnimationFrame方式） ===
   const scrollTicker = (element) => {
     let x = element.offsetWidth;
-    const speed = 0.7;
+    const speed = 1.0;
 
     const animate = () => {
       x -= speed;
