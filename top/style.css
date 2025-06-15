@@ -22,7 +22,7 @@ body, html {
 /* トップ画像（横幅にフィット） */
 .top-image {
   width: 100%;
-  height: 20vh;
+  height: 25vh;
   object-fit: cover;       /* ← contain から cover に変更 */
   object-position: center; /* ← 画像中央を表示 */
   display: block;
