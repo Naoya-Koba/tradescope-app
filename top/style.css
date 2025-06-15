@@ -48,7 +48,7 @@ body, html {
   font-family: "Noto Serif JP", serif;
   height: 100vh;
   overflow: hidden;
-  background: url("../assets/bright_backgroundv3.jpg") no-repeat center center fixed;
+  background: url("../assets/backgroundv3.jpg") no-repeat center center fixed;
   background-size: cover;
   display: flex;
   flex-direction: column;
