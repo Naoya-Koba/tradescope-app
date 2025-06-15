@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="top/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP&display=swap" rel="stylesheet" />
+  <title>TradeScope トップページ</title>
+</head>
+<body>
+  <div class="top-container">
+    <img src="assets/top_visual.png" alt="トップビジュアル" class="top-image" />
+
+    <!-- ニュースティッカー：為替全体 -->
+    <div class="news-section">
+      <div class="news-title">為替注目ニュース</div>
+      <div class="news-ticker">
+        <div class="ticker-content" id="general-news">
+          米CPIの結果を受けてドルが急伸／日銀の政策修正観測強まる／ECBが利下げを示唆
+        </div>
+      </div>
+    </div>
+
+    <!-- ニュースティッカー：国別選択 -->
+    <div class="news-section">
+      <div class="news-title">
+        国別注目ニュース：
+        <select id="country-select" class="custom-select">
+          <option value="TRY">トルコ</option>
+          <option value="USD">アメリカ</option>
+          <option value="JPY">日本</option>
+          <option value="EUR">ユーロ</option>
+          <option value="GBP">イギリス</option>
+          <option value="CHF">スイス</option>
+          <option value="CAD">カナダ</option>
+          <option value="AUD">オーストラリア</option>
+          <option value="NZD">ニュージーランド</option>
+          <option value="ZAR">南アフリカ</option>
+          <option value="MXN">メキシコ</option>
+        </select>
+      </div>
+      <div class="news-ticker">
+        <div class="ticker-content" id="country-news">
+          トルコ中銀が金利据え置き決定／政局不安が再燃／IMFの警告報道も
+        </div>
+      </div>
+    </div>
+
+    <div class="button-grid">
+      <button class="feature-button">トレンド転換シグナル</button>
+      <button class="feature-button">押し目買い／戻り売り分析</button>
+      <button class="feature-button">損益管理</button>
+      <button class="feature-button">取引履歴</button>
+    </div>
+  </div>
+
+  <script src="top/script.js"></script>
+</body>
+</html>

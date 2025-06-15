@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>損益 - TradeScope</title>
+</head>
+<body>
+  <div class="app">
+    <h1>損益</h1>
+
+    <!-- 年セレクター -->
+    <div class="year-selector">
+      <select id="year">
+        <option value="2025" selected>2025</option>
+        <option value="2024">2024</option>
+      </select>
+    </div>
+
+    <!-- 年間損益 & 資金カード -->
+    <div class="summary-cards">
+      <div class="card">
+        <h2>年間損益</h2>
+        <p id="total-profit" class="positive">¥0</p>
+      </div>
+      <div class="card">
+        <h2>資金</h2>
+        <p id="total-balance">¥1,000,000</p>
+      </div>
+    </div>
+
+    <!-- 資金の移り変わりグラフ -->
+    <div class="chart-area">
+      <canvas id="balance-chart"></canvas>
+    </div>
+
+    <!-- 保存ボタン -->
+    <div class="save-area">
+      <button id="save-button">保存する</button>
+    </div>
+
+    <!-- 確認ダイアログ -->
+    <div id="confirm-dialog" class="dialog hidden">
+      <p>保存しますか？</p>
+      <button id="confirm-yes">はい</button>
+      <button id="confirm-no">いいえ</button>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="toast hidden">保存が完了しました</div>
+
+    <!-- 月別損益入力セクション -->
+    <section class="monthly-inputs">
+      <h2>月別損益</h2>
+      <div class="card-container"></div>
+    </section>
+  </div>
+
+  <footer>
+    <p class="footer-text">Powered by TradeScope</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
