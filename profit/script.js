@@ -1,4 +1,6 @@
+// === DOM読み込み後の初期化処理 ===
 document.addEventListener("DOMContentLoaded", () => {
+  // === 要素の取得 ===
   const monthContainer = document.getElementById("monthly-cards");
   const totalProfitEl = document.getElementById("total-profit");
   const balanceChartEl = document.getElementById("balance-chart");
@@ -8,11 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const confirmYes = document.getElementById("confirm-yes");
   const confirmNo = document.getElementById("confirm-no");
 
+  // === 月リスト ===
   const months = [
     "1月", "2月", "3月", "4月", "5月", "6月",
     "7月", "8月", "9月", "10月", "11月", "12月"
   ];
 
+  // === 月別カードを動的に生成 ===
   months.forEach(month => {
     const card = document.createElement("div");
     card.className = "month-card";
@@ -30,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     monthContainer.appendChild(card);
   });
 
+  // === 数値変換・表示フォーマット関数 ===
   function parseInput(value) {
     const cleaned = value.replace(/[^\d\.-]/g, '');
     const parsed = parseFloat(cleaned);
@@ -45,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inputEl.classList.add(value >= 0 ? "positive" : "negative");
   }
 
+  // === 合計損益・資金・グラフの更新 ===
   function updateTotals() {
     let total = 0;
     let balance = 1000000;
@@ -83,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateChart(balances);
   }
 
+  // === 資金の折れ線グラフ描画 ===
   function updateChart(data) {
     if (window.myChart) window.myChart.destroy();
     window.myChart = new Chart(balanceChartEl, {
@@ -125,12 +132,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // === 入力変更イベントで即時再計算 ===
   document.addEventListener("input", (e) => {
     if (e.target.matches(".realized, .swap, .fee")) {
       updateTotals();
     }
   });
 
+  // === フォーカスアウト時に数値整形と色クラス適用 ===
   document.addEventListener("blur", (e) => {
     if (e.target.matches(".realized, .swap, .fee")) {
       const value = parseInput(e.target.value);
@@ -139,15 +148,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }, true);
 
-  // 保存処理
+  // === 保存ボタン：確認ダイアログ表示 ===
   saveButton.addEventListener("click", () => {
     confirmDialog.classList.add("show");
   });
 
+  // === ダイアログキャンセル処理 ===
   confirmNo.addEventListener("click", () => {
     confirmDialog.classList.remove("show");
   });
 
+  // === ダイアログOK時の保存処理（仮） ===
   confirmYes.addEventListener("click", () => {
     confirmDialog.classList.remove("show");
 
@@ -156,6 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("保存が完了しました");
   });
 
+  // === トースト通知の表示 ===
   function showToast(message) {
     const toast = document.createElement("div");
     toast.textContent = message;
@@ -184,5 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 2000);
   }
 
+  // === 初期化（全体更新） ===
   updateTotals();
 });
