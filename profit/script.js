@@ -39,9 +39,7 @@ document.querySelectorAll('.month-card input').forEach(input => {
   formatCurrencyInput(input);
 
   input.addEventListener('beforeinput', e => {
-    if (input.selectionStart === 0 && e.inputType === 'deleteContentBackward') {
-      e.preventDefault();
-    }
+    // バックスペースによる全消去防止を削除（マイナスが入力しづらいため）
   });
 
   input.addEventListener('blur', () => {
@@ -59,7 +57,7 @@ document.querySelectorAll('.month-card input').forEach(input => {
 
 function formatCurrencyInput(input) {
   const raw = input.value.replace(/[¥,]/g, '').trim();
-  const num = parseInt(raw);
+  const num = parseFloat(raw);
   if (!isNaN(num)) {
     input.value = '¥' + num.toLocaleString();
     input.classList.toggle('positive', num > 0);
@@ -166,7 +164,6 @@ function updateChart(data) {
 }
 
 // 入力検知
-
 document.addEventListener("input", (e) => {
   if (e.target.matches(".realized, .swap, .fee")) {
     updateTotals();
