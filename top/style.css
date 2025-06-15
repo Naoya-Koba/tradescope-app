@@ -1,7 +1,44 @@
-/* === <a>タグをボタンとして使う場合の補足設定 === */
-a.feature-button {
-  display: inline-block;
+/* === <a>と<button>を完全に統一する設定（中央揃え対応） === */
+a.feature-button,
+button.feature-button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 4px);
+  aspect-ratio: 3.302 / 1;
+  background-color: #ddc9a4;
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.08) 0px,
+      rgba(255, 255, 255, 0.08) 1px,
+      transparent 1px,
+      transparent 2.5px
+    ),
+    linear-gradient(145deg, #e9d8b7, #c9b38a);
+  border: 1px solid #bfa77c;
+  border-radius: 14px;
+  font-size: 13px;
+  font-family: "Noto Serif JP", serif;
+  color: #111;
+  text-align: center;
+  font-weight: bold;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.1),
+    0 3px 6px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  background-blend-mode: overlay;
   text-decoration: none;
+  box-sizing: border-box;
+}
+
+a.feature-button:hover,
+button.feature-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
 }
 
 /* === 全体設定（スマホファースト）=== */
@@ -29,8 +66,8 @@ body, html {
 .top-image {
   width: 100%;
   height: 25vh;
-  object-fit: cover;       /* ← contain から cover に変更 */
-  object-position: center; /* ← 画像中央を表示 */
+  object-fit: cover;
+  object-position: center;
   display: block;
   margin: 0;
   line-height: 0;
@@ -49,41 +86,6 @@ body, html {
   flex-grow: 1;
   align-content: start;
   justify-items: center;
-}
-
-/* 青銅比のボタン */
-.feature-button {
-  width: calc(100% - 4px);
-  aspect-ratio: 3.302 / 1;
-  background-color: #ddc9a4;
-  background-image:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.08) 0px,
-      rgba(255, 255, 255, 0.08) 1px,
-      transparent 1px,
-      transparent 2.5px
-    ),
-    linear-gradient(145deg, #e9d8b7, #c9b38a);
-  border: 1px solid #bfa77c;
-  border-radius: 14px;
-  font-size: 13px;
-  font-family: "Noto Serif JP", serif;
-  color: #111;
-  text-align: center;
-  font-weight: bold;
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.4),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.1),
-    0 3px 6px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  background-blend-mode: overlay;
-}
-
-.feature-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
 }
 
 /* ニュースセクション全体 */
