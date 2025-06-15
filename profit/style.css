@@ -58,7 +58,13 @@ h1, h2, h3 {
 .summary-card p {
   font-size: 1.5rem;
   margin-top: 0.5rem;
-  color: #f0e8d8;
+  color: #e6ddc5;
+}
+.summary-card p.positive {
+  color: #e6ddc5;
+}
+.summary-card p.negative {
+  color: #ff5a5a;
 }
 
 /* === チャートの表示エリア === */
@@ -154,7 +160,7 @@ h1, h2, h3 {
   padding-bottom: 2rem;
 }
 .month-card {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(20, 20, 20, 0.5);
   border-radius: 10px;
   padding: 0.8rem;
   text-align: center;
@@ -165,23 +171,22 @@ h1, h2, h3 {
   color: #f7f0d5;
 }
 .month-card input {
-  width: 100%;
-  padding: 0.5rem;
+  width: 90%;
+  margin: 0 auto 0.6rem;
+  display: block;
   font-size: 1rem;
   border-radius: 6px;
   border: none;
   background: rgba(255, 255, 255, 0.1);
-  color: #f0e8d8;
+  color: #e6ddc5;
 }
 input.positive {
-  color: #f0e8d8;
+  color: #e6ddc5;
 }
 input.negative {
   color: #ff5a5a;
 }
-input.sum:disabled {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #f0e8d8;
+input.sum {
   opacity: 1;
 }
 
