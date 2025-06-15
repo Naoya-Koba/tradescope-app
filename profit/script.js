@@ -23,11 +23,11 @@ months.forEach(month => {
   card.innerHTML = `
     <h3>${month}</h3>
     <label>決済損益</label>
-    <input type="text" class="realized" value="¥0" />
+    <input type="text" class="realized" placeholder="¥0" />
     <label>スワップ損益</label>
-    <input type="text" class="swap" value="¥0" />
+    <input type="text" class="swap" placeholder="¥0" />
     <label>取引手数料</label>
-    <input type="text" class="fee" value="¥0" />
+    <input type="text" class="fee" placeholder="¥0" />
     <label>合計</label>
     <input type="text" class="sum" value="¥0" disabled />
   `;
@@ -36,28 +36,33 @@ months.forEach(month => {
 
 // === 通貨フォーマット入力支援 ===
 document.querySelectorAll('.month-card input').forEach(input => {
-  formatCurrencyInput(input);
+  if (!input.disabled) {
+    input.addEventListener('beforeinput', e => {
+      if (input.selectionStart === 0 && e.inputType === 'deleteContentBackward') {
+        e.preventDefault();
+      }
+    });
 
-  input.addEventListener('beforeinput', e => {
-    // バックスペースによる全消去防止を削除（マイナスが入力しづらいため）
-  });
+    input.addEventListener('blur', () => {
+      if (input.value.trim() === '') {
+        input.value = '¥0';
+      }
+      formatCurrencyInput(input);
+      updateTotals();
+    });
 
-  input.addEventListener('blur', () => {
-    formatCurrencyInput(input);
-    updateTotals();
-  });
-
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      input.blur();
-    }
-  });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      }
+    });
+  }
 });
 
 function formatCurrencyInput(input) {
   const raw = input.value.replace(/[¥,]/g, '').trim();
-  const num = parseFloat(raw);
+  const num = parseInt(raw);
   if (!isNaN(num)) {
     input.value = '¥' + num.toLocaleString();
     input.classList.toggle('positive', num > 0);
