@@ -3,6 +3,7 @@ const monthContainer = document.getElementById("monthly-cards");
 
 // === 年間損益・チャートなどの要素 ===
 const totalProfitEl = document.getElementById("total-profit");
+const totalBalanceEl = document.getElementById("total-balance");
 const balanceChartEl = document.getElementById("balance-chart");
 const yearSelector = document.getElementById("year");
 const confirmDialog = document.getElementById("confirm-dialog");
@@ -23,13 +24,13 @@ months.forEach(month => {
   card.innerHTML = `
     <h3>${month}</h3>
     <label>決済損益</label>
-    <input type="text" class="realized" placeholder="¥0" />
+    <input type="text" class="realized" placeholder="\u00a50" />
     <label>スワップ損益</label>
-    <input type="text" class="swap" placeholder="¥0" />
+    <input type="text" class="swap" placeholder="\u00a50" />
     <label>取引手数料</label>
-    <input type="text" class="fee" placeholder="¥0" />
+    <input type="text" class="fee" placeholder="\u00a50" />
     <label>合計</label>
-    <input type="text" class="sum" value="¥0" disabled />
+    <input type="text" class="sum" value="\u00a50" disabled />
   `;
   monthContainer.appendChild(card);
 });
@@ -37,7 +38,7 @@ months.forEach(month => {
 // === イベント設定 ===
 document.querySelectorAll('.month-card input').forEach(input => {
   input.addEventListener('focus', () => {
-    const raw = input.value.replace(/[¥,]/g, '').trim();
+    const raw = input.value.replace(/[\u00a5,]/g, '').trim();
     if (raw === "0") {
       input.value = "";
     }
@@ -45,7 +46,7 @@ document.querySelectorAll('.month-card input').forEach(input => {
 
   input.addEventListener('blur', () => {
     if (input.value.trim() === "") {
-      input.value = '¥0';
+      input.value = '\u00a50';
     }
     formatCurrencyInput(input);
     updateTotals();
@@ -60,14 +61,14 @@ document.querySelectorAll('.month-card input').forEach(input => {
 });
 
 function formatCurrencyInput(input) {
-  const raw = input.value.replace(/[¥,]/g, '').trim();
+  const raw = input.value.replace(/[\u00a5,]/g, '').trim();
   const num = parseInt(raw);
   if (!isNaN(num)) {
-    input.value = '¥' + num.toLocaleString();
+    input.value = '\u00a5' + num.toLocaleString();
     input.classList.toggle('positive', num > 0);
     input.classList.toggle('negative', num < 0);
   } else {
-    input.value = '¥0';
+    input.value = '\u00a50';
     input.classList.remove('positive', 'negative');
   }
 }
@@ -79,7 +80,7 @@ function parseInput(value) {
 }
 
 function formatYen(value) {
-  return `¥${value.toLocaleString()}`;
+  return `\u00a5${value.toLocaleString()}`;
 }
 
 function applyColorClass(inputEl, value) {
@@ -89,7 +90,7 @@ function applyColorClass(inputEl, value) {
 
 function updateTotals() {
   let total = 0;
-  let balance = 1000000;
+  let balance = 5649006;
   const balances = [];
 
   document.querySelectorAll(".month-card").forEach(card => {
@@ -122,6 +123,9 @@ function updateTotals() {
   totalProfitEl.textContent = formatYen(total);
   totalProfitEl.className = total >= 0 ? "positive" : "negative";
 
+  totalBalanceEl.textContent = formatYen(balance);
+  totalBalanceEl.className = balance >= 0 ? "positive" : "negative";
+
   updateChart(balances);
 }
 
@@ -148,7 +152,7 @@ function updateChart(data) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: context => `資金の移り変わり: ¥${context.raw.toLocaleString()}`
+            label: context => `資金の移り変わり: \u00a5${context.raw.toLocaleString()}`
           }
         }
       },

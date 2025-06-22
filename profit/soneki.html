@@ -2,7 +2,6 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <!-- ✅ ピンチズーム防止＆iPhone PWA対応 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,7 +14,7 @@
 <body>
   <div class="app">
 
-    <!-- 年間損益と資金：上部カード（2列） -->
+    <!-- 年間損益と資金 -->
     <div class="summary-section">
       <div class="summary-card">
         <h2>年間損益</h2>
@@ -35,7 +34,7 @@
       </select>
     </div>
 
-    <!-- 資金グラフエリア -->
+    <!-- 資金チャート -->
     <div class="chart-area">
       <canvas id="balance-chart"></canvas>
     </div>
@@ -55,16 +54,16 @@
     <!-- トースト通知 -->
     <div id="toast" class="toast hidden">保存が完了しました</div>
 
-    <!-- 月別損益欄（3列構成） -->
+    <!-- 月別損益カード -->
     <section class="monthly-section">
       <h2>月別損益</h2>
       <div class="monthly-grid" id="monthly-cards">
-        <!-- JavaScriptでカードが動的に挿入される -->
+        <!-- JavaScriptが動的に生成 -->
       </div>
     </section>
   </div>
 
-  <!-- ✅ ボトムナビゲーションバー（損益管理が active） -->
+  <!-- ボトムナビゲーション -->
   <footer class="bottom-nav">
     <a href="../index.html" class="nav-item">
       <i class="icon">🏠</i>
