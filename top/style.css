@@ -60,7 +60,7 @@ body, html {
   flex-direction: column;
   height: 100vh;
   box-sizing: border-box;
-  padding-bottom: 90px; /* ← ボトムナビ上浮き対策済み */
+  padding-bottom: 64px;
 }
 
 /* トップ画像（横幅にフィット） */
@@ -149,24 +149,22 @@ body, html {
   background-color: #fff;
 }
 
-/* === ボトムナビゲーションバー（浮かせて角丸＋上揃え） === */
+/* === ボトムナビゲーションバー（左右ぴったり・角なし・背景との一体化） === */
 .bottom-nav {
   position: fixed;
-  bottom: 24px;
-  left: 12px;
-  right: 12px;
+  bottom: 0;
+  left: 0;
+  right: 0;
   height: 64px;
   background: rgba(15, 15, 15, 0.85);
-  backdrop-filter: blur(6px);
-  border-radius: 18px;
-  border: 1px solid rgba(255, 215, 100, 0.2);
+  backdrop-filter: blur(4px);
+  border-top: 1px solid rgba(255, 215, 100, 0.15);
   display: flex;
   justify-content: space-around;
-  align-items: flex-start; /* 上揃え */
+  align-items: flex-start;
   padding: 6px 0 4px;
   z-index: 999;
   box-sizing: border-box;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .nav-item {
