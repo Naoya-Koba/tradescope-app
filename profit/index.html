@@ -2,12 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta 
-    name="viewport" 
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-  />
-  <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="manifest.json" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="manifest" href="../manifest.json" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <title>損益 - TradeScope</title>
@@ -62,12 +58,30 @@
         <!-- JavaScriptでカードが動的に挿入される -->
       </div>
     </section>
-
   </div>
 
-  <!-- フッター -->
-  <footer>
-    <p class="footer-text">Powered by TradeScope</p>
+  <!-- ✅ ボトムナビゲーションバー（損益管理が active） -->
+  <footer class="bottom-nav">
+    <a href="../index.html" class="nav-item">
+      <i class="icon">🏠</i>
+      <span class="label">トップ</span>
+    </a>
+    <a href="../tenkan.html" class="nav-item">
+      <i class="icon">🔁</i>
+      <span class="label">転換シグナル</span>
+    </a>
+    <a href="../oshime.html" class="nav-item">
+      <i class="icon">📈</i>
+      <span class="label">押し目/戻り</span>
+    </a>
+    <a href="index.html" class="nav-item active">
+      <i class="icon">💰</i>
+      <span class="label">損益管理</span>
+    </a>
+    <a href="../history.html" class="nav-item">
+      <i class="icon">🗂️</i>
+      <span class="label">取引履歴</span>
+    </a>
   </footer>
 
   <script src="script.js"></script>
