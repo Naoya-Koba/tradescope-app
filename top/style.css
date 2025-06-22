@@ -152,7 +152,7 @@ body, html {
 /* === ボトムナビ（画面幅ぴったり・角なし・上に浮かせる・上揃え）=== */
 .bottom-nav {
   position: fixed;
-  bottom: 20px; /* ← これで約5mm上に浮かせる */
+  bottom: 20px;
   left: 0;
   right: 0;
   height: 64px;
@@ -161,7 +161,7 @@ body, html {
   border-top: 1px solid rgba(255, 215, 100, 0.15);
   display: flex;
   justify-content: space-around;
-  align-items: flex-start; /* ← ナビ内の要素を上揃え */
+  align-items: flex-start;
   padding: 6px 0 4px;
   z-index: 999;
   box-sizing: border-box;
@@ -196,7 +196,16 @@ body, html {
 .nav-item:hover {
   color: #f6d987;
 }
-
+/* ← 🔽 ナビの下の隙間を見た目上「塞ぐ」 */
+.bottom-nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -20px;
+  height: 20px;
+  background: rgba(15, 15, 15, 0.85);
+}
 
 /* === PC向け拡張（幅481px以上）=== */
 @media (min-width: 481px) {
