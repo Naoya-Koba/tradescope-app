@@ -60,6 +60,7 @@ body, html {
   flex-direction: column;
   height: 100vh;
   box-sizing: border-box;
+  padding-bottom: 56px;
 }
 
 /* トップ画像（横幅にフィット） */
@@ -147,6 +148,48 @@ body, html {
 .custom-select option {
   color: #111;
   background-color: #fff;
+}
+
+/* === ボトムナビゲーションバー（共通フッター） === */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(4px);
+  border-top: 1px solid rgba(255, 215, 100, 0.2);
+  z-index: 999;
+  box-sizing: border-box;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #f5eac8;
+  text-decoration: none;
+  font-size: 12px;
+  font-family: "Noto Serif JP", serif;
+  transition: color 0.3s ease;
+}
+
+.nav-item .icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.nav-item.active {
+  color: #e0c76e; /* 高級感あるゴールド */
+}
+
+.nav-item:hover {
+  color: #f6d987;
 }
 
 /* === PC向け拡張（幅481px以上）=== */
