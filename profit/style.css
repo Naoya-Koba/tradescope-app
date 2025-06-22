@@ -25,6 +25,7 @@ h1, h2, h3 {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  padding-bottom: 80px; /* ← ナビゲーション高さ + 余裕 */
 }
 
 /* === 年セレクター === */
@@ -216,7 +217,7 @@ input.sum:disabled {
   }
 }
 
-/* === フッター === */
+/* === フッター汎用 === */
 footer {
   text-align: center;
   padding: 1rem;
@@ -241,4 +242,42 @@ footer {
     font-size: 1.1rem;
     padding: 1rem 2.5rem;
   }
+}
+
+/* === ✅ ボトムナビゲーションバー === */
+.bottom-nav {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 90%;
+  max-width: 600px;
+  height: 64px;
+  background: rgba(10, 10, 10, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  z-index: 1000;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #f0e8d8;
+  text-decoration: none;
+}
+
+.nav-item .icon {
+  font-size: 1.2rem;
+  margin-bottom: 2px;
+}
+
+.nav-item.active {
+  color: gold;
+  font-weight: bold;
 }
