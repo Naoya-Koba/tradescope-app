@@ -60,7 +60,7 @@ body, html {
   flex-direction: column;
   height: 100vh;
   box-sizing: border-box;
-  padding-bottom: 64px;
+  padding-bottom: 84px;
 }
 
 /* トップ画像（横幅にフィット） */
@@ -149,10 +149,10 @@ body, html {
   background-color: #fff;
 }
 
-/* === ボトムナビゲーションバー（左右ぴったり・角なし・背景との一体化） === */
+/* === ボトムナビ（画面幅ぴったり・角なし・上に浮かせる・上揃え）=== */
 .bottom-nav {
   position: fixed;
-  bottom: 0;
+  bottom: 20px; /* ← これで約5mm上に浮かせる */
   left: 0;
   right: 0;
   height: 64px;
@@ -161,17 +161,18 @@ body, html {
   border-top: 1px solid rgba(255, 215, 100, 0.15);
   display: flex;
   justify-content: space-around;
-  align-items: flex-start;
+  align-items: flex-start; /* ← ナビ内の要素を上揃え */
   padding: 6px 0 4px;
   z-index: 999;
   box-sizing: border-box;
 }
 
+/* ナビ内のボタン項目 */
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-start; /* ← アイコン＋ラベルを上から配置 */
   color: #f5eac8;
   text-decoration: none;
   font-size: 12px;
@@ -180,18 +181,22 @@ body, html {
   height: 100%;
 }
 
+/* アイコンのサイズと余白調整 */
 .nav-item .icon {
   font-size: 18px;
   margin-bottom: 2px;
 }
 
+/* 選択中の色（ゴールド系） */
 .nav-item.active {
   color: #e0c76e;
 }
 
+/* ホバー時の変化 */
 .nav-item:hover {
   color: #f6d987;
 }
+
 
 /* === PC向け拡張（幅481px以上）=== */
 @media (min-width: 481px) {
