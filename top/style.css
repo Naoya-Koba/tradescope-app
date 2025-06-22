@@ -60,7 +60,7 @@ body, html {
   flex-direction: column;
   height: 100vh;
   box-sizing: border-box;
-  padding-bottom: 64px;
+  padding-bottom: 90px; /* ← ボトムナビ上浮き対策済み */
 }
 
 /* トップ画像（横幅にフィット） */
@@ -144,49 +144,51 @@ body, html {
   cursor: pointer;
 }
 
-/* プルダウンの option の文字色と背景色 */
 .custom-select option {
   color: #111;
   background-color: #fff;
 }
 
-/* === ボトムナビゲーションバー（共通フッター） === */
+/* === ボトムナビゲーションバー（浮かせて角丸＋上揃え） === */
 .bottom-nav {
   position: fixed;
-  bottom: env(safe-area-inset-bottom, 12px); /* iPhoneのセーフエリア考慮 */
-  left: 0;
-  width: 100%;
-  height: 64px; /* 少し広めに */
+  bottom: 24px;
+  left: 12px;
+  right: 12px;
+  height: 64px;
+  background: rgba(15, 15, 15, 0.85);
+  backdrop-filter: blur(6px);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 215, 100, 0.2);
   display: flex;
   justify-content: space-around;
-  align-items: center;
-  background: rgba(15, 15, 15, 0.8);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid rgba(255, 215, 100, 0.2);
+  align-items: flex-start; /* 上揃え */
+  padding: 6px 0 4px;
   z-index: 999;
   box-sizing: border-box;
-  padding-bottom: env(safe-area-inset-bottom, 12px); /* 内部余白も追加 */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   color: #f5eac8;
   text-decoration: none;
   font-size: 12px;
   font-family: "Noto Serif JP", serif;
   transition: color 0.3s ease;
+  height: 100%;
 }
 
 .nav-item .icon {
-  font-size: 20px;
+  font-size: 18px;
   margin-bottom: 2px;
 }
 
 .nav-item.active {
-  color: #e0c76e; /* 高級感あるゴールド */
+  color: #e0c76e;
 }
 
 .nav-item:hover {
