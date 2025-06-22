@@ -90,7 +90,7 @@ body, html {
 
 /* ニュースセクション全体 */
 .news-section {
-  background: rgba(10, 10, 10, 0.75);
+  background: rgba(20, 20, 20, 0.75);
   border: 1px solid rgba(255, 215, 0, 0.2);
   box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.25);
   backdrop-filter: blur(4px);
@@ -112,7 +112,7 @@ body, html {
 .news-ticker {
   overflow: hidden;
   white-space: nowrap;
-  background: rgba(10, 10, 10, 0.7);
+  background: rgba(20, 20, 20, 0.7);
   border-radius: 6px;
   padding: 6px 12px;
   color: #f5eac8;
