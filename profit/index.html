@@ -1,90 +1,244 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <!-- ✅ ピンチズーム防止 -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <title>損益 - TradeScope</title>
-</head>
-<body>
-  <div class="app">
+/* === フォント読み込み === */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
 
-    <!-- 年間損益と資金：上部カード（2列） -->
-    <div class="summary-section">
-      <div class="summary-card">
-        <h2>年間損益</h2>
-        <p id="total-profit" class="positive">¥0</p>
-      </div>
-      <div class="summary-card">
-        <h2>資金</h2>
-        <p id="total-balance">¥1,000,000</p>
-      </div>
-    </div>
+/* === 全体背景・基本設定（モバイルファースト）=== */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  font-family: 'Noto Serif JP', serif;
+  background: url('../assets/bright_background_v2.jpg') no-repeat center center fixed;
+  background-size: cover;
+  color: #f0e8d8;
+  overflow-y: auto;
+}
 
-    <!-- 年度セレクター -->
-    <div class="year-selector">
-      <select id="year">
-        <option value="2025" selected>2025</option>
-        <option value="2024">2024</option>
-      </select>
-    </div>
+h1, h2, h3 {
+  font-weight: 700;
+  text-align: center;
+  color: #f0e8d8;
+}
 
-    <!-- 資金グラフエリア -->
-    <div class="chart-area">
-      <canvas id="balance-chart"></canvas>
-    </div>
+/* === アプリ全体のレイアウト === */
+.app {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
 
-    <!-- 保存ボタン -->
-    <div class="save-button-area">
-      <button id="save-button">保存する</button>
-    </div>
+/* === 年セレクター === */
+.year-selector {
+  text-align: center;
+}
+#year {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #f0e8d8;
+  border: 1px solid #f0e8d8;
+  font-size: 1rem;
+  font-family: inherit;
+}
 
-    <!-- 確認ダイアログ -->
-    <div id="confirm-dialog" class="dialog hidden">
-      <p>保存しますか？</p>
-      <button id="confirm-yes">はい</button>
-      <button id="confirm-no">いいえ</button>
-    </div>
+/* === 年間損益と資金のカード（2列）=== */
+.summary-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.summary-card {
+  background: rgba(20, 20, 20, 0.6);
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+.summary-card p {
+  font-size: 1.5rem;
+  margin-top: 0.5rem;
+}
+.positive {
+  color: #f0e8d8;
+}
+.negative {
+  color: #ff5a5a;
+}
 
-    <!-- トースト通知 -->
-    <div id="toast" class="toast hidden">保存が完了しました</div>
+/* === チャートの表示エリア === */
+.chart-area canvas {
+  width: 100%;
+  height: 200px;
+}
 
-    <!-- 月別損益欄（3列構成） -->
-    <section class="monthly-section">
-      <h2>月別損益</h2>
-      <div class="monthly-grid" id="monthly-cards">
-        <!-- JavaScriptでカードが動的に挿入される -->
-      </div>
-    </section>
-  </div>
+/* === 保存ボタンエリア === */
+.save-button-area {
+  text-align: center;
+}
+#save-button {
+  padding: 0.7rem 2rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid #f0e8d8;
+  color: #f0e8d8;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+#save-button:hover {
+  background-color: #f0e8d8;
+  color: #111;
+}
 
-  <!-- ✅ ボトムナビゲーションバー（損益管理が active） -->
-  <footer class="bottom-nav">
-    <a href="index.html" class="nav-item">
-      <i class="icon">🏠</i>
-      <span class="label">トップ</span>
-    </a>
-    <a href="tenkan.html" class="nav-item">
-      <i class="icon">🔁</i>
-      <span class="label">転換シグナル</span>
-    </a>
-    <a href="oshime.html" class="nav-item">
-      <i class="icon">📈</i>
-      <span class="label">押し目/戻り</span>
-    </a>
-    <a href="index.html" class="nav-item active">
-      <i class="icon">💰</i>
-      <span class="label">損益管理</span>
-    </a>
-    <a href="history.html" class="nav-item">
-      <i class="icon">🗂️</i>
-      <span class="label">取引履歴</span>
-    </a>
-  </footer>
+/* === 保存確認ダイアログ === */
+#confirm-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(10, 10, 10, 0.9);
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  display: none;
+  z-index: 1000;
+}
+#confirm-dialog.show {
+  display: block;
+}
+#confirm-dialog button {
+  margin: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+#confirm-yes {
+  background-color: #f0e8d8;
+  color: #111;
+}
+#confirm-no {
+  background-color: #999;
+  color: #fff;
+}
 
-  <script src="script.js"></script>
-</body>
-</html>
+/* === トースト通知 === */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f0e8d8;
+  color: #111;
+  padding: 1rem 2rem;
+  border-radius: 6px;
+  font-weight: bold;
+  opacity: 0;
+  z-index: 9999;
+  transition: opacity 0.3s ease;
+}
+.toast.show {
+  opacity: 1;
+}
+.toast.hidden {
+  display: none;
+}
+
+/* === 月別損益セクション === */
+.monthly-section h2 {
+  text-align: center;
+  font-size: 1.3rem;
+}
+.monthly-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+.month-card {
+  background: rgba(20, 20, 20, 0.6);
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.month-card h3 {
+  margin-bottom: 0.6rem;
+  font-size: 1.1rem;
+  color: #f0e8d8;
+}
+.month-card label {
+  font-size: 0.85rem;
+  color: #f0e8d8;
+  display: block;
+  margin-top: 0.6rem;
+  margin-bottom: 0.2rem;
+  white-space: nowrap;
+}
+.month-card input {
+  width: 95%;
+  margin: 0 auto 0.6rem;
+  display: block;
+  padding: 0.5rem 0.4rem;
+  font-size: 0.85rem;
+  letter-spacing: -0.3px;
+  text-align: center;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6ddc5;
+  box-sizing: border-box;
+}
+input.positive {
+  color: #f0e8d8;
+}
+input.negative {
+  color: #ff5a5a;
+}
+input.sum {
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #f0e8d8 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #f0e8d8 !important;
+}
+input.sum:disabled {
+  opacity: 1 !important;
+  -webkit-text-fill-color: #f0e8d8 !important;
+}
+
+/* === スマホ入力欄ズーム防止（フォント16px以上） === */
+@media (max-width: 480px) {
+  .month-card input {
+    font-size: 16px !important;
+  }
+}
+
+/* === フッター === */
+footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+/* === PC向け拡張 === */
+@media (min-width: 768px) {
+  .app {
+    padding: 2rem;
+    max-width: 800px;
+    margin: auto;
+  }
+  .monthly-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .summary-section {
+    gap: 2rem;
+  }
+  #save-button {
+    font-size: 1.1rem;
+    padding: 1rem 2.5rem;
+  }
+}
