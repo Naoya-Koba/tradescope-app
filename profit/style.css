@@ -210,6 +210,12 @@ input.sum:disabled {
   -webkit-text-fill-color: #f0e8d8 !important;
 }
 
+/* ✅ 合計欄がマイナスのとき赤く表示 */
+input.sum.negative {
+  color: #ff5a5a !important;
+  -webkit-text-fill-color: #ff5a5a !important;
+}
+
 /* === スマホ入力欄ズーム防止（フォント16px以上） === */
 @media (max-width: 480px) {
   .month-card input {
