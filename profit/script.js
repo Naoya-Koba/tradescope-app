@@ -192,6 +192,7 @@ async function saveProfitData(year, data) {
   try {
     const response = await fetch(GAS_WEB_APP_URL, {
       method: 'POST',
+      mode: 'cors',  // ここを追加しました
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year, data })
     });
