@@ -17,6 +17,9 @@ const months = [
   "7月", "8月", "9月", "10月", "11月", "12月"
 ];
 
+// GAS WebアプリURL（必ずご自身のURLに書き換えてください）
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwRyWJShgDuvkiTGpaUzW-9jr9FkQzBxivzHpEiDhfOPoX9MRmBwUQXXJRCnR0gFxk7/exec';
+
 // === 月別カード生成 ===
 months.forEach(month => {
   const card = document.createElement("div");
@@ -171,7 +174,40 @@ function updateChart(data) {
   });
 }
 
-// 保存処理
+// 送信する損益データを収集
+function collectProfitData() {
+  const cards = document.querySelectorAll('.month-card');
+  const data = [];
+  cards.forEach(card => {
+    const realized = parseInput(card.querySelector('.realized').value);
+    const swap = parseInput(card.querySelector('.swap').value);
+    const fee = parseInput(card.querySelector('.fee').value);
+    data.push({ realized, swap, fee });
+  });
+  return data;
+}
+
+// GASへPOST送信
+async function saveProfitData(year, data) {
+  try {
+    const response = await fetch(GAS_WEB_APP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year, data })
+    });
+    const text = await response.text();
+    if (response.ok) {
+      showToast("損益データを保存しました");
+    } else {
+      showToast("保存に失敗しました: " + text);
+    }
+  } catch (error) {
+    showToast("通信エラーが発生しました");
+    console.error(error);
+  }
+}
+
+// 保存ボタン押下時の動作を修正
 saveButton.addEventListener("click", () => {
   confirmDialog.classList.add("show");
 });
@@ -182,9 +218,12 @@ confirmNo.addEventListener("click", () => {
 
 confirmYes.addEventListener("click", () => {
   confirmDialog.classList.remove("show");
-  showToast("保存が完了しました");
+  const year = parseInt(yearSelector.value) || new Date().getFullYear();
+  const data = collectProfitData();
+  saveProfitData(year, data);
 });
 
+// トースト表示関数はそのまま使用
 function showToast(message) {
   const toast = document.createElement("div");
   toast.textContent = message;
