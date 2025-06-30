@@ -190,18 +190,14 @@ function collectProfitData() {
 // GASへPOST送信
 async function saveProfitData(year, data) {
   try {
-    const response = await fetch(GAS_WEB_APP_URL, {
+    await fetch(GAS_WEB_APP_URL, {
       method: 'POST',
-      mode: 'cors',  // ここを追加しました
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',        // ここを 'no-cors' に変更
+      headers: { 'Content-Type': 'application/json' },  // このヘッダーは無視されますが残してもOK
       body: JSON.stringify({ year, data })
     });
-    const text = await response.text();
-    if (response.ok) {
-      showToast("損益データを保存しました");
-    } else {
-      showToast("保存に失敗しました: " + text);
-    }
+    // レスポンスは読めないので成功は即時表示
+    showToast("損益データを送信しました（レスポンス未確認）");
   } catch (error) {
     showToast("通信エラーが発生しました");
     console.error(error);
