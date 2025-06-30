@@ -18,7 +18,7 @@ const months = [
 ];
 
 // GAS WebアプリURL（必ずご自身のURLに書き換えてください）
-const GAS_WEB_APP_URL ='https://script.google.com/macros/s/AKfycbwDMHKPl0TaB3_8-sDXY3F7ZVWR_FFl9azJmalw5YSsJoSEOTywv97BlndLCsPbt7zy/exec'
+const GAS_WEB_APP_URL ='https://script.google.com/macros/s/AKfycbx4DTe6XkYgYKvUyvvEzZY5hQp3zyQEtPGfFwo_mTCuMXjfOA0pQ_v-RnBcbpKl5Q-r/exec'
 
 // === 月別カード生成 ===
 months.forEach(month => {
@@ -192,14 +192,36 @@ async function saveProfitData(year, data) {
   try {
     await fetch(GAS_WEB_APP_URL, {
       method: 'POST',
-      mode: 'no-cors',        // ここを 'no-cors' に変更
-      headers: { 'Content-Type': 'application/json' },  // このヘッダーは無視されますが残してもOK
+      mode: 'no-cors',        // 'no-cors' にしています。レスポンスは読めません
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year, data })
     });
-    // レスポンスは読めないので成功は即時表示
+    // 成功は即時表示（レスポンスは読めません）
     showToast("損益データを送信しました（レスポンス未確認）");
   } catch (error) {
     showToast("通信エラーが発生しました");
+    console.error(error);
+  }
+}
+
+// ページ読み込み時にスプレッドシートからデータを読み込んで画面に反映する
+async function loadProfitData(year) {
+  try {
+    const response = await fetch(`${GAS_WEB_APP_URL}?year=${year}`);
+    if (!response.ok) throw new Error('データ取得に失敗しました');
+    const data = await response.json();
+
+    data.forEach((item, i) => {
+      const card = monthContainer.children[i];
+      card.querySelector('.realized').value = formatYen(item.realized);
+      card.querySelector('.swap').value = formatYen(item.swap);
+      card.querySelector('.fee').value = formatYen(item.fee);
+    });
+
+    updateTotals();
+    showToast('損益データを読み込みました');
+  } catch (error) {
+    showToast(error.message);
     console.error(error);
   }
 }
@@ -218,6 +240,12 @@ confirmYes.addEventListener("click", () => {
   const year = parseInt(yearSelector.value) || new Date().getFullYear();
   const data = collectProfitData();
   saveProfitData(year, data);
+});
+
+// ページ読み込み時に自動で読み込み実行
+window.addEventListener('DOMContentLoaded', () => {
+  const year = parseInt(yearSelector.value) || new Date().getFullYear();
+  loadProfitData(year);
 });
 
 // トースト表示関数はそのまま使用
