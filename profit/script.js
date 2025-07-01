@@ -248,6 +248,12 @@ window.addEventListener('DOMContentLoaded', () => {
   loadProfitData(year);
 });
 
+// 年セレクターの変更時にデータ読み込み
+yearSelector.addEventListener('change', () => {
+  const selectedYear = parseInt(yearSelector.value) || new Date().getFullYear();
+  loadProfitData(selectedYear);
+});
+
 // トースト表示関数はそのまま使用
 function showToast(message) {
   const toast = document.createElement("div");
