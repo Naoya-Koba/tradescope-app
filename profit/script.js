@@ -18,7 +18,7 @@ const months = [
 ];
 
 // GAS WebアプリURL（必ずご自身のURLに書き換えてください）
-const GAS_WEB_APP_URL ='https://script.google.com/macros/s/AKfycbyX_6i_hFvZQpHympdp13D9xjkCN8FYqSbVwmACJUsfojmB7qJAKWnVoYiivNJZFIC2/exec'
+const GAS_WEB_APP_URL ='https://script.google.com/macros/s/AKfycbxJwqRVlKSu_3X7MI8U0RR_-o-HerrP4OGjUj2Ma5137lNYajxi4aYkKloMpsHRKZr9/exec'
 
 // === 月別カード生成 ===
 months.forEach(month => {
