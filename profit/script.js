@@ -197,7 +197,7 @@ async function saveProfitData(year, data) {
       body: JSON.stringify({ year, data })
     });
     // 成功は即時表示（レスポンスは読めません）
-    showToast("損益データを送信しました（レスポンス未確認）");
+    showToast("データを送信しました");
   } catch (error) {
     showToast("通信エラーが発生しました");
     console.error(error);
@@ -219,7 +219,7 @@ async function loadProfitData(year) {
     });
 
     updateTotals();
-    showToast('損益データを読み込みました');
+    showToast('データの取得が完了しました');
   } catch (error) {
     showToast(error.message);
     console.error(error);
