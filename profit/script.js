@@ -5,6 +5,7 @@ const monthContainer = document.getElementById("monthly-cards");
 const totalProfitEl = document.getElementById("total-profit");
 const totalBalanceEl = document.getElementById("total-balance");
 const balanceChartEl = document.getElementById("balance-chart");
+const monthlyBarChartEl = document.getElementById("monthly-bar-chart");  // ← 追加
 const yearSelector = document.getElementById("year");
 const confirmDialog = document.getElementById("confirm-dialog");
 const saveButton = document.getElementById("save-button");
@@ -91,10 +92,14 @@ function applyColorClass(inputEl, value) {
   inputEl.classList.add(value >= 0 ? "positive" : "negative");
 }
 
+let myChart;             // 折れ線グラフのChartオブジェクト
+let monthlyBarChart;     // 棒グラフのChartオブジェクト
+
 function updateTotals() {
   let total = 0;
   let balance = 5649006;
   const balances = [];
+  const monthlySums = [];  // ← 追加: 月別合計の配列
 
   document.querySelectorAll(".month-card").forEach(card => {
     const realizedInput = card.querySelector(".realized");
@@ -121,6 +126,7 @@ function updateTotals() {
     total += sum;
     balance += sum;
     balances.push(balance);
+    monthlySums.push(sum);  // ← ここで配列に追加
   });
 
   totalProfitEl.textContent = formatYen(total);
@@ -130,11 +136,12 @@ function updateTotals() {
   totalBalanceEl.className = balance >= 0 ? "positive" : "negative";
 
   updateChart(balances);
+  updateMonthlyBarChart(monthlySums);  // ← 追加: 棒グラフ更新
 }
 
 function updateChart(data) {
-  if (window.myChart) window.myChart.destroy();
-  window.myChart = new Chart(balanceChartEl, {
+  if (myChart) myChart.destroy();
+  myChart = new Chart(balanceChartEl, {
     type: 'line',
     data: {
       labels: months,
@@ -165,6 +172,45 @@ function updateChart(data) {
           beginAtZero: false,
           suggestedMin: 900000,
           suggestedMax: 1100000
+        },
+        x: {
+          ticks: { color: "#e6ddc5" }
+        }
+      }
+    }
+  });
+}
+
+// --- 追加: 月別損益棒グラフ表示用 ---
+function updateMonthlyBarChart(data) {
+  if (monthlyBarChart) monthlyBarChart.destroy();
+  monthlyBarChart = new Chart(monthlyBarChartEl, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{
+        label: '月別合計損益',
+        data: data,
+        backgroundColor: data.map(v => v >= 0 ? '#e6ddc5' : '#ff5a5a'),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: context => `月別合計損益: \u00a5${context.raw.toLocaleString()}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: { color: "#e6ddc5" },
+          beginAtZero: true,
+          // プラス・マイナス両方向表示のために自動調整
+          suggestedMin: Math.min(...data) < 0 ? Math.min(...data) * 1.1 : 0,
+          suggestedMax: Math.max(...data) * 1.1
         },
         x: {
           ticks: { color: "#e6ddc5" }
