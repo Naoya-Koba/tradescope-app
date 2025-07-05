@@ -1,0 +1,19 @@
+.signal-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: #f0e8d8;
+}
+.pair-name {
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+.current-price {
+  margin-top: 0.5rem;
+  font-size: 1.1rem;
+}
+.recommendation {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+}
