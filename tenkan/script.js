@@ -1,31 +1,41 @@
-// === 通貨ペアカードを挿入するコンテナを取得 ===
 const container = document.getElementById("signal-container");
 
-// === ダミーデータ（例） ===
-const pairs = [
-  {
-    pair: "USD/JPY",
-    currentPrice: 144.615,
-    high1m: 146.153,
-    low2m: 139.882,
-    takeProfit: 145.715,
-    stopLoss: 138.903,
-    riseRate: 3.4,
-    ma50: 144.475,
-    ma50Compare: "上",
-    rsi: 50.5,
-    rsiComment: "中立",
-    trend: "⬆",
-    goldenCross: "⏫",
-    atrRate: 1,
-    atrComment: "低ボラ",
-    rating: "★★☆☆☆",
-    reason: "安値から3.4%＋⬆＋RSI中立＋MA50上"
-  }
+// 表面用の8通貨ペアリスト（最低限の情報）
+const pairsFront = [
+  "USD/JPY",
+  "EUR/JPY",
+  "AUD/JPY",
+  "USD/CHF",
+  "GBP/JPY",
+  "CAD/JPY",
+  "ZAR/JPY",
+  "MXN/JPY"
 ];
 
-// === 詳細HTMLを生成する関数 ===
+// 裏面の詳細はUSD/JPYのみダミーデータで用意
+const usdJpyDetail = {
+  pair: "USD/JPY",
+  currentPrice: 144.615,
+  high1m: 146.153,
+  low2m: 139.882,
+  takeProfit: 145.715,
+  stopLoss: 138.903,
+  riseRate: 3.4,
+  ma50: 144.475,
+  ma50Compare: "上",
+  rsi: 50.5,
+  rsiComment: "中立",
+  trend: "⬆",
+  goldenCross: "⏫",
+  atrRate: 1,
+  atrComment: "低ボラ",
+  rating: "★★☆☆☆",
+  reason: "安値から3.4%＋⬆＋RSI中立＋MA50上"
+};
+
+// 詳細HTML生成関数
 function createDetailHTML(data) {
+  if (!data) return "詳細情報はありません";
   return `
     <strong>詳細情報</strong><br>
     通貨ペア: ${data.pair}<br>
@@ -45,23 +55,24 @@ function createDetailHTML(data) {
   `;
 }
 
-// === カードを生成しコンテナに挿入 ===
-pairs.forEach(pair => {
+// カード生成
+pairsFront.forEach(pairName => {
   const card = document.createElement("div");
   card.className = "signal-card";
 
+  // USD/JPYだけ詳細データを入れる、それ以外は簡易メッセージ
+  const detailData = (pairName === "USD/JPY") ? usdJpyDetail : null;
+
   card.innerHTML = `
     <div class="signal-card-front">
-      <div>${pair.pair}</div>
-      <div>￥${pair.currentPrice.toFixed(3)}</div>
-      <div>推奨度：${pair.rating}</div>
+      <div>${pairName}</div>
+      <div>推奨度：${detailData ? detailData.rating : "情報なし"}</div>
     </div>
     <div class="signal-card-back">
-      ${createDetailHTML(pair)}
+      ${createDetailHTML(detailData)}
     </div>
   `;
 
-  // クリックでフリップ切り替え
   card.addEventListener("click", () => {
     card.classList.toggle("flipped");
   });
