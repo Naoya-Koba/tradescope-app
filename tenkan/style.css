@@ -1,7 +1,18 @@
+/* === ページ全体のスクロール制御 === */
+body, html {
+  overflow-x: hidden;  /* 横スクロール禁止 */
+  overflow-y: auto;    /* 縦スクロールは必要に応じて自動 */
+  max-width: 100vw;
+  height: 100%;
+}
+
+/* === カードコンテナのパースペクティブ設定 === */
 .signal-card-container {
   perspective: 1000px;
   margin-bottom: 1rem;
 }
+
+/* === カード本体のスタイル === */
 .signal-card {
   width: 100%;
   max-width: 480px;
@@ -18,10 +29,14 @@
   user-select: none;
   overflow: hidden;
 }
+
+/* === カードがフリップ＆拡大状態のスタイル === */
 .signal-card.flipped {
   transform: rotateY(180deg) scale(2.5);
   z-index: 10;
 }
+
+/* === カード表面・裏面共通スタイル === */
 .signal-card-front, .signal-card-back {
   position: absolute;
   width: 100%;
@@ -30,6 +45,8 @@
   top: 0; left: 0;
   border-radius: 12px;
 }
+
+/* === カード表面のスタイル === */
 .signal-card-front {
   display: flex;
   flex-direction: column;
@@ -38,6 +55,8 @@
   font-weight: 700;
   font-size: 1.1rem;
 }
+
+/* === カード裏面のスタイル === */
 .signal-card-back {
   background: rgba(0,0,0,0.6);
   color: #fff;
