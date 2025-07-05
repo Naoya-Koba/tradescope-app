@@ -52,8 +52,6 @@ body, html {
   background-size: cover;
   display: flex;
   flex-direction: column;
-  filter: brightness(1.3);
-
 }
 
 /* トップページ全体構造 */
