@@ -300,34 +300,42 @@ yearSelector.addEventListener('change', () => {
   loadProfitData(selectedYear);
 });
 
-// トースト表示関数はそのまま使用
+/**
+ * トースト通知表示関数
+ * 画面中央下に一時的にメッセージを表示します。
+ * 同時に複数表示されることを防ぎ、見やすさを保ちます。
+ * @param {string} message 表示するメッセージ文字列
+ */
 function showToast(message) {
+  // 既存のトーストがあれば削除して多重表示を防止
+  const existingToast = document.querySelector(".toast");
+  if (existingToast) {
+    existingToast.remove();
+  }
+
+  // トースト用divを生成し、CSSクラスを付与
   const toast = document.createElement("div");
+  toast.classList.add("toast");
+
+  // テキスト内容を設定
   toast.textContent = message;
-  toast.style.position = "fixed";
-  toast.style.bottom = "30px";
-  toast.style.left = "50%";
-  toast.style.transform = "translateX(-50%)";
-  toast.style.backgroundColor = "#e6ddc5";
-  toast.style.color = "#111";
-  toast.style.padding = "1rem 2rem";
-  toast.style.borderRadius = "8px";
-  toast.style.boxShadow = "0 0 12px rgba(0,0,0,0.3)";
-  toast.style.fontWeight = "bold";
-  toast.style.zIndex = "2000";
-  toast.style.opacity = "0";
-  toast.style.transition = "opacity 0.5s ease";
+
+  // ドキュメントボディに追加
   document.body.appendChild(toast);
 
+  // 表示用アニメーション：0.1秒後にopacityを1に
   setTimeout(() => {
     toast.style.opacity = "1";
   }, 100);
 
+  // 2秒後にフェードアウト開始、0.5秒後にDOMから削除
   setTimeout(() => {
     toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 500);
+    setTimeout(() => {
+      toast.remove();
+    }, 500);
   }, 2000);
 }
 
-// 初期化
+// 初期化処理：合計などを更新
 updateTotals();
