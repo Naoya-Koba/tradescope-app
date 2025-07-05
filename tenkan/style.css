@@ -59,9 +59,10 @@ body, html {
   font-weight: 700;
   font-size: 1.1rem;
 
-  opacity: 1;
-  visibility: visible;
+  opacity: 1 !important;
+  visibility: visible !important;
   transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 10 !important;
 }
 
 /* === カード裏面のスタイル（位置、サイズ、表示制御、回転） === */
@@ -74,25 +75,28 @@ body, html {
   left: 0;
   border-radius: 12px;
 
-  background: rgba(0,0,0,0.6);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
   padding: 1rem;
   transform: rotateY(180deg);
   font-size: 0.9rem;
   overflow-y: auto;
 
-  opacity: 0;
-  visibility: hidden;
+  opacity: 1 !important;          /* 強制表示 */
+  visibility: visible !important; /* 強制表示 */
+  z-index: 20 !important;         /* 表面より手前 */
   transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-/* === 表面と裏面の表示切り替え === */
+/* === 表面と裏面の表示切り替え（無効化） === */
 .signal-card.flipped .signal-card-front {
-  opacity: 0;
-  visibility: hidden;
+  opacity: 1 !important;       /* 常に表示 */
+  visibility: visible !important;
+  z-index: 10 !important;
 }
 
 .signal-card.flipped .signal-card-back {
-  opacity: 1;
-  visibility: visible;
+  opacity: 1 !important;       /* 常に表示 */
+  visibility: visible !important;
+  z-index: 20 !important;
 }
