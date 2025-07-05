@@ -40,7 +40,7 @@ body, html {
   min-height: 240px; /* 必要に応じ調整 */
 }
 
-/* === カード表面のスタイル === */
+/* === カード表面のスタイル（位置、サイズ、表示制御） === */
 .signal-card-front {
   position: absolute;
   width: 100%;
@@ -57,7 +57,7 @@ body, html {
   font-size: 1.1rem;
 }
 
-/* === カード裏面のスタイル === */
+/* === カード裏面のスタイル（位置、サイズ、表示制御、回転） === */
 .signal-card-back {
   position: absolute;
   width: 100%;
@@ -66,27 +66,6 @@ body, html {
   top: 0; left: 0;
   border-radius: 12px;
 
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  padding: 1rem;
-  transform: rotateY(180deg);
-  font-size: 0.9rem;
-  overflow-y: auto;
-}
-
-
-/* === カード表面のスタイル === */
-.signal-card-front {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.3rem;
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-
-/* === カード裏面のスタイル === */
-.signal-card-back {
   background: rgba(0,0,0,0.6);
   color: #fff;
   padding: 1rem;
