@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>TradeScope - 転換シグナル</title>
+  <link rel="stylesheet" href="../top/style.css" />
+  <!-- 必要に応じて追加CSS -->
+  <style>
+    /* 横スクロール禁止 */
+    body, html {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
+    /* 転換シグナル専用のスタイルをここに書く */
+    .signal-container {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>転換シグナル</h1>
+    </header>
+
+    <main class="signal-container" id="signal-container">
+      <!-- 通貨ペアカード群をJSでここに挿入 -->
+    </main>
+
+    <!-- ボトムナビゲーション -->
+    <footer class="bottom-nav">
+      <a href="../index.html" class="nav-item">
+        <i class="icon">🏠</i>
+        <span class="label">トップ</span>
+      </a>
+      <a href="../tenkan.html" class="nav-item active">
+        <i class="icon">🔁</i>
+        <span class="label">転換シグナル</span>
+      </a>
+      <a href="../oshime.html" class="nav-item">
+        <i class="icon">📈</i>
+        <span class="label">押し目/戻り</span>
+      </a>
+      <a href="../soneki.html" class="nav-item">
+        <i class="icon">💰</i>
+        <span class="label">損益管理</span>
+      </a>
+      <a href="../history.html" class="nav-item">
+        <i class="icon">🗂️</i>
+        <span class="label">取引履歴</span>
+      </a>
+    </footer>
+
+    <script src="../top/script.js"></script>
+    <!-- 必要に応じて転換シグナル専用JSをここに追加 -->
+  </div>
+</body>
+</html>
