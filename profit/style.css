@@ -139,6 +139,10 @@ h1, h2, h3 {
   opacity: 0;
   z-index: 9999;
   transition: opacity 0.3s ease;
+  max-width: 90vw;          /* 画面幅の90%まで広げる */
+  white-space: nowrap;      /* 改行禁止 */
+  overflow: hidden;         /* はみ出し部分を隠す */
+  text-overflow: ellipsis;  /* はみ出しは「…」で省略 */
 }
 .toast.show {
   opacity: 1;
