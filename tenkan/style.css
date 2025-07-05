@@ -30,10 +30,14 @@ body, html {
   overflow: hidden;
 }
 
-/* === カードがフリップ＆拡大状態のスタイル === */
+/* === カードが反転・拡大した状態 === */
 .signal-card.flipped {
-  transform: rotateY(180deg) scale(2.5);
+  transform: rotateY(180deg) scaleX(1) scaleY(2.5);
   z-index: 10;
+  width: 100%;
+  max-width: 480px;
+  height: auto; /* 高さ自動調整 */
+  min-height: 240px; /* 必要に応じ調整 */
 }
 
 /* === カード表面・裏面共通スタイル === */
