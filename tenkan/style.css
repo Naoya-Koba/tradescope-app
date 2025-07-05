@@ -37,7 +37,9 @@ body, html {
   width: 100%;
   max-width: 480px;
   height: auto; /* 高さ自動調整 */
-  min-height: 240px; /* 必要に応じ調整 */
+  min-height: 320px; /* 高さを少し増やしました */
+  box-sizing: border-box;
+  padding: 1.5rem;  /* 拡大時パディング調整 */
 }
 
 /* === カード表面のスタイル（位置、サイズ、表示制御） === */
@@ -55,6 +57,10 @@ body, html {
   gap: 0.3rem;
   font-weight: 700;
   font-size: 1.1rem;
+
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 /* === カード裏面のスタイル（位置、サイズ、表示制御、回転） === */
@@ -62,7 +68,7 @@ body, html {
   position: absolute;
   width: 100%;
   height: 100%;
-  backface-visibility: visible; /* 裏面は表示 */
+  backface-visibility: hidden; /* 裏面の裏側も非表示に */
   top: 0; left: 0;
   border-radius: 12px;
 
@@ -72,4 +78,19 @@ body, html {
   transform: rotateY(180deg);
   font-size: 0.9rem;
   overflow-y: auto;
+
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* === 表示切り替え === */
+.signal-card.flipped .signal-card-front {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.signal-card.flipped .signal-card-back {
+  opacity: 1;
+  visibility: visible;
 }
