@@ -19,7 +19,7 @@ body, html {
   height: 120px;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.8s ease, min-height 0.8s ease, padding 0.8s ease;
+  transition: transform 0.8s ease;
   cursor: pointer;
   border-radius: 12px;
   background: rgba(255,255,255,0.1);
@@ -32,13 +32,12 @@ body, html {
 
 /* === カードが反転・拡大した状態 === */
 .signal-card.flipped {
-  transform-origin: left center;
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) scaleX(1) scaleY(2.5);
   z-index: 10;
   width: 100%;
   max-width: 480px;
-  min-height: 300px; /* 縦に広げる */
-  padding: 2rem;     /* 内側の余白を増やす */
+  height: auto; /* 高さ自動調整 */
+  min-height: 240px; /* 必要に応じ調整 */
 }
 
 /* === カード表面・裏面共通スタイル === */
@@ -59,7 +58,6 @@ body, html {
   gap: 0.3rem;
   font-weight: 700;
   font-size: 1.1rem;
-  transform: rotateY(0deg);
 }
 
 /* === カード裏面のスタイル === */
