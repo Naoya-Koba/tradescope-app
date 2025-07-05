@@ -32,6 +32,7 @@ body, html {
 
 /* === カードが反転・拡大した状態 === */
 .signal-card.flipped {
+  transform-origin: left center; /* 左側を起点に回転・拡大 */
   transform: rotateY(180deg) scaleX(1) scaleY(2.5);
   z-index: 10;
   width: 100%;
@@ -58,6 +59,7 @@ body, html {
   gap: 0.3rem;
   font-weight: 700;
   font-size: 1.1rem;
+  transform: rotateY(0deg); /* 表面は回転なし */
 }
 
 /* === カード裏面のスタイル === */
@@ -65,7 +67,7 @@ body, html {
   background: rgba(0,0,0,0.6);
   color: #fff;
   padding: 1rem;
-  transform: rotateY(180deg);
+  transform: rotateY(180deg); /* 裏面は180度回転して文字の向きを正しく */
   font-size: 0.9rem;
   overflow-y: auto;
 }
