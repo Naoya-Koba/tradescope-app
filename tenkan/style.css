@@ -36,45 +36,34 @@ body, html {
   font-size: 1.1rem;
 }
 
-/* === ポップアップの背景オーバーレイ === */
-.modal-overlay {
+/* === モーダルの背景と配置 === */
+.modal {
+  display: none; /* 初期は非表示 */
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.7);
-  display: none; /* 非表示が初期状態 */
-  justify-content: center;
-  align-items: center;
   z-index: 1000;
-  transition: opacity 0.3s ease;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.5);
 }
 
-/* === ポップアップ表示時に使うクラス === */
-.modal-overlay.active {
-  display: flex;
-  opacity: 1;
-}
-
-/* === ポップアップ本体 === */
+/* === モーダルコンテンツのスタイル === */
 .modal-content {
-  background: rgba(20,20,20,0.9);
-  color: #f0e8d8;
-  padding: 2rem;
+  background-color: #222;
+  margin: 10% auto;
+  padding: 20px;
   border-radius: 12px;
-  max-width: 90vw;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  font-size: 0.95rem;
-  line-height: 1.5;
-  position: relative;
+  width: 90%;
+  max-width: 480px;
+  color: #f0e8d8;
+  box-sizing: border-box;
+  font-size: 1rem;
+  line-height: 1.4;
 
   display: grid;
   grid-template-columns: 1fr 1fr;
   column-gap: 1rem;
-  row-gap: 1rem;
+  row-gap: 0.5rem;
   white-space: normal;
   word-break: break-word;
 }
@@ -83,15 +72,24 @@ body, html {
 .modal-content strong {
   grid-column: 1 / -1;
   color: #f5eac8; /* 明るめのゴールド */
-  font-size: 1.3rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #a99244;
-  padding-bottom: 0.6rem;
+  font-size: 1.1rem;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid #f5eac8;
+  padding-bottom: 0.4rem;
+}
+
+/* モーダル内セクションの枠 */
+.modal-section {
+  grid-column: 1 / -1;
+  background: rgba(255 255 255 / 0.05);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.6rem;
 }
 
 /* 左側ラベル（項目名） */
-.modal-content div:nth-child(odd) {
-  color: #f5e8c0; /* 少し明るめのゴールド */
+.modal-section div:nth-child(odd) {
+  color: #f5eac8; /* 明るめのゴールド */
   font-weight: 600;
   padding: 0.2rem 0;
   border-bottom: 1px solid #514822; /* 柔らかい区切り線 */
@@ -103,8 +101,8 @@ body, html {
 }
 
 /* 右側値（項目の値） */
-.modal-content div:nth-child(even) {
-  color: #c4b97e; /* 落ち着いたゴールド */
+.modal-section div:nth-child(even) {
+  color: #c4b97e; /* 少し濃いめの落ち着いたゴールド */
   font-weight: 400;
   padding: 0.2rem 0;
   border-bottom: 1px solid #514822; /* 柔らかい区切り線 */
@@ -112,4 +110,18 @@ body, html {
   display: flex;
   align-items: center;
   height: 100%;
+}
+
+/* === モーダルの閉じるボタン === */
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  color: #f5eac8;
+  background: transparent;
+  border: none;
 }

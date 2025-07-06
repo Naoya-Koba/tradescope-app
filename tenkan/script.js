@@ -33,10 +33,38 @@ const usdJpyDetail = {
   reason: "安値から3.4%＋⬆＋RSI中立＋MA50上"
 };
 
-// 詳細HTML生成関数（改行を極力排除し、ラベルと値をspanで分割）
+// 詳細HTML生成関数（セクション毎にグループ化）
 function createDetailHTML(data) {
   if (!data) return "<div>詳細情報はありません</div>";
-  return `<div><strong>通貨ペア:</strong><span class="value">${data.pair}</span></div><div><strong>現在価格:</strong><span class="value">￥${data.currentPrice.toFixed(3)}</span></div><div><strong>過去1ヶ月高値:</strong><span class="value">￥${data.high1m.toFixed(3)}</span></div><div><strong>過去2ヶ月安値:</strong><span class="value">￥${data.low2m.toFixed(3)}</span></div><div><strong>利確ライン（買）:</strong><span class="value">￥${data.takeProfit.toFixed(3)}</span></div><div><strong>損切りライン（買）:</strong><span class="value">￥${data.stopLoss.toFixed(3)}</span></div><div><strong>安値からの上昇率:</strong><span class="value">${data.riseRate.toFixed(1)}%</span></div><div><strong>MA50:</strong><span class="value">￥${data.ma50.toFixed(3)} (${data.ma50Compare})</span></div><div><strong>RSI(14日):</strong><span class="value">${data.rsi.toFixed(1)} (${data.rsiComment})</span></div><div><strong>トレンド:</strong><span class="value">${data.trend}</span></div><div><strong>ゴールデンクロス:</strong><span class="value">${data.goldenCross}</span></div><div><strong>ATR率:</strong><span class="value">${data.atrRate}% (${data.atrComment})</span></div><div><strong>おすすめ度:</strong><span class="value">${data.rating}</span></div><div><strong>おすすめ理由:</strong><span class="value">${data.reason}</span></div>`;
+  return `
+    <strong>詳細情報</strong>
+
+    <div class="modal-section">
+      <strong>価格</strong>
+      <div><strong>通貨ペア:</strong><span class="value">${data.pair}</span></div>
+      <div><strong>現在価格:</strong><span class="value">￥${data.currentPrice.toFixed(3)}</span></div>
+      <div><strong>過去1ヶ月高値:</strong><span class="value">￥${data.high1m.toFixed(3)}</span></div>
+      <div><strong>過去2ヶ月安値:</strong><span class="value">￥${data.low2m.toFixed(3)}</span></div>
+    </div>
+
+    <div class="modal-section">
+      <strong>取引</strong>
+      <div><strong>利確ライン（買）:</strong><span class="value">￥${data.takeProfit.toFixed(3)}</span></div>
+      <div><strong>損切りライン（買）:</strong><span class="value">￥${data.stopLoss.toFixed(3)}</span></div>
+      <div><strong>安値からの上昇率:</strong><span class="value">${data.riseRate.toFixed(1)}%</span></div>
+      <div><strong>MA50:</strong><span class="value">￥${data.ma50.toFixed(3)} (${data.ma50Compare})</span></div>
+    </div>
+
+    <div class="modal-section">
+      <strong>指標</strong>
+      <div><strong>RSI(14日):</strong><span class="value">${data.rsi.toFixed(1)} (${data.rsiComment})</span></div>
+      <div><strong>トレンド:</strong><span class="value">${data.trend}</span></div>
+      <div><strong>ゴールデンクロス:</strong><span class="value">${data.goldenCross}</span></div>
+      <div><strong>ATR率:</strong><span class="value">${data.atrRate}% (${data.atrComment})</span></div>
+      <div><strong>おすすめ度:</strong><span class="value">${data.rating}</span></div>
+      <div><strong>おすすめ理由:</strong><span class="value">${data.reason}</span></div>
+    </div>
+  `;
 }
 
 // カード生成
