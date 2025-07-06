@@ -68,14 +68,27 @@ pairsFront.forEach(pairName => {
       <div>${pairName}</div>
       <div>推奨度：${detailData ? detailData.rating : "情報なし"}</div>
     </div>
-    <div class="signal-card-back">
-      ${createDetailHTML(detailData)}
-    </div>
   `;
 
   card.addEventListener("click", () => {
-    card.classList.toggle("flipped");
+    const modal = document.getElementById("detail-modal");
+    const modalBody = document.getElementById("modal-body");
+    modalBody.innerHTML = createDetailHTML(detailData);
+    modal.style.display = "block";
   });
 
   container.appendChild(card);
+});
+
+// モーダルの閉じるボタンイベント
+document.getElementById("modal-close").addEventListener("click", () => {
+  document.getElementById("detail-modal").style.display = "none";
+});
+
+// モーダル背景クリックで閉じる
+window.addEventListener("click", (event) => {
+  const modal = document.getElementById("detail-modal");
+  if (event.target === modal) {
+    modal.style.display = "none";
+  }
 });

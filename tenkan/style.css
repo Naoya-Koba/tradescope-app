@@ -1,21 +1,15 @@
 /* === ページ全体のスクロール制御 === */
 body, html {
-  overflow-x: hidden;  /* 横スクロール禁止 */
-  overflow-y: auto;    /* 縦スクロールは必要に応じて自動 */
+  overflow-x: hidden;
+  overflow-y: auto;
   max-width: 100vw;
   height: 100%;
-}
-
-/* === カードコンテナのパースペクティブ設定 === */
-.signal-card-container {
-  perspective: 1000px;
-  margin-bottom: 1rem;
 }
 
 /* === カードコンテナのレイアウト（モバイル2列固定） === */
 .signal-container {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);  /* 2列固定 */
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
   max-width: 480px;
   margin: 0 auto;
@@ -26,95 +20,66 @@ body, html {
   width: 100%;
   max-width: 480px;
   height: 120px;
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 0.8s ease;
   cursor: pointer;
-  border-radius: 10px;  /* 損益管理ページに合わせて10px */
-  background: rgba(20, 20, 20, 0.6); /* 損益管理ページのカード背景色 */
+  border-radius: 10px;
+  background: rgba(20, 20, 20, 0.6);
   color: #f0e8d8;
   box-sizing: border-box;
   padding: 1rem;
   user-select: none;
-  overflow: hidden;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-/* === カードが反転・拡大した状態（全画面化） === */
-.signal-card.flipped {
-  transform: rotateY(180deg) scale(1.5); /* お好みで拡大率調整 */
-  z-index: 1000;
-  width: 100vw;
-  max-width: none;
-  height: auto;
-  min-height: 320px;
-  box-sizing: border-box;
-  padding: 1.5rem;
-
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  margin: auto;
-}
-
-
-/* === カード表面のスタイル（位置、サイズ、表示制御） === */
-.signal-card-front {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden; /* 表面は裏側非表示 */
-  top: 0;
-  left: 0;
-  border-radius: 12px;
-
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 0.3rem;
   font-weight: 700;
   font-size: 1.1rem;
-
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
-  z-index: 10;
 }
 
-/* === カード裏面のスタイル（位置、サイズ、表示制御、回転） === */
-.signal-card-back {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: visible; /* 裏面は常に表示 */
+/* === ポップアップの背景オーバーレイ === */
+.modal-overlay {
+  position: fixed;
   top: 0;
   left: 0;
-  border-radius: 12px;
-
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  padding: 1rem;
-  transform: rotateY(180deg);
-  font-size: 0.9rem;
-  overflow-y: auto;
-
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
-  z-index: 5;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.7);
+  display: none; /* 非表示が初期状態 */
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
 }
 
-/* === 表面と裏面の表示切り替え === */
-.signal-card.flipped .signal-card-front {
-  opacity: 0;
-  visibility: hidden;
-  z-index: 5;
-}
-
-.signal-card.flipped .signal-card-back {
+/* === ポップアップ表示時に使うクラス === */
+.modal-overlay.active {
+  display: flex;
   opacity: 1;
-  visibility: visible;
-  z-index: 20;
+}
+
+/* === ポップアップ本体 === */
+.modal-content {
+  background: rgba(20,20,20,0.9);
+  color: #f0e8d8;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  position: relative;
+}
+
+/* === ポップアップ閉じるボタン === */
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #f0e8d8;
+  cursor: pointer;
 }

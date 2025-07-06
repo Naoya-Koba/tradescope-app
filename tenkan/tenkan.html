@@ -9,23 +9,55 @@
   <title>TradeScope - 転換シグナル</title>
   <link rel="stylesheet" href="../top/style.css" />
   <link rel="stylesheet" href="style.css" />
-  <!-- 必要に応じて追加CSS -->
   <style>
     /* 横スクロール禁止 */
     body, html {
       overflow-x: hidden;
       max-width: 100vw;
     }
-    /* 転換シグナル専用のスタイルをここに書く */
-.signal-container {
-  padding: 1rem;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  max-width: 480px;
-  margin: 0 auto;
-}
+    /* 転換シグナル専用のスタイル */
+    .signal-container {
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
 
+    /* === モーダル背景と配置 === */
+    .modal {
+      display: none; /* 初期は非表示 */
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+
+    /* === モーダルコンテンツのスタイル === */
+    .modal-content {
+      background-color: #222;
+      margin: 10% auto;
+      padding: 20px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 480px;
+      color: #f0e8d8;
+      box-sizing: border-box;
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    /* === モーダルの閉じるボタン === */
+    .modal-close {
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -37,6 +69,14 @@
     <main class="signal-container" id="signal-container">
       <!-- 通貨ペアカード群をJSでここに挿入 -->
     </main>
+
+    <!-- モーダルの要素 -->
+    <div id="detail-modal" class="modal">
+      <div class="modal-content">
+        <span id="modal-close" class="modal-close">&times;</span>
+        <div id="modal-body"></div>
+      </div>
+    </div>
 
     <!-- ボトムナビゲーション -->
     <footer class="bottom-nav">
