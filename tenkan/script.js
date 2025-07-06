@@ -75,6 +75,7 @@ pairsFront.forEach(pairName => {
     const modalBody = document.getElementById("modal-body");
     modalBody.innerHTML = createDetailHTML(detailData);
     modal.style.display = "block";
+    document.body.style.overflow = "hidden";  // 背景スクロール禁止
   });
 
   container.appendChild(card);
@@ -82,7 +83,9 @@ pairsFront.forEach(pairName => {
 
 // モーダルの閉じるボタンイベント
 document.getElementById("modal-close").addEventListener("click", () => {
-  document.getElementById("detail-modal").style.display = "none";
+  const modal = document.getElementById("detail-modal");
+  modal.style.display = "none";
+  document.body.style.overflow = "";         // 背景スクロール解除
 });
 
 // モーダル背景クリックで閉じる
@@ -90,5 +93,6 @@ window.addEventListener("click", (event) => {
   const modal = document.getElementById("detail-modal");
   if (event.target === modal) {
     modal.style.display = "none";
+    document.body.style.overflow = "";       // 背景スクロール解除
   }
 });
