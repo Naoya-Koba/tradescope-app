@@ -91,12 +91,12 @@ body, html {
 /* === 表面と裏面の表示切り替え === */
 .signal-card.flipped .signal-card-front {
   opacity: 0;
-  visibility: hidden;
+  visibility: visible;
   z-index: 5;
 }
 
 .signal-card.flipped .signal-card-back {
   opacity: 1;
   visibility: visible;
-  z-index: 5;
+  z-index: 20;
 }
