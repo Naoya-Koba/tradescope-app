@@ -70,7 +70,7 @@ body, html {
   position: absolute;
   width: 100%;
   height: 100%;
-  backface-visibility: hidden; /* 裏面の裏側も非表示 */
+  backface-visibility: visible; /* 裏面の裏側も非表示 */
   top: 0;
   left: 0;
   border-radius: 12px;
@@ -91,7 +91,7 @@ body, html {
 /* === 表面と裏面の表示切り替え === */
 .signal-card.flipped .signal-card-front {
   opacity: 0;
-  visibility: visible;
+  visibility: hidden;
   z-index: 5;
 }
 
