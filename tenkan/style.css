@@ -70,45 +70,48 @@ body, html {
   font-size: 0.9rem;
   line-height: 1.4;
   position: relative;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 1rem;
+  row-gap: 0.5rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* モーダル見出しを2列の全幅に */
+.modal-content strong {
+  grid-column: 1 / -1;
+  color: #f5eac8; /* 明るめのゴールド */
+  font-size: 1.1rem;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid #f5eac8;
+  padding-bottom: 0.4rem;
+}
+
+/* 左側ラベル（項目名） */
+.modal-content div:nth-child(odd) {
+  color: #f5eac8; /* 明るめのゴールド */
+  font-weight: 600;
+}
+
+/* 右側値（項目の値） */
+.modal-content div:nth-child(even) {
+  color: #c4b97e; /* 少し濃いめの落ち着いたゴールド */
+  font-weight: 400;
+  word-break: break-word;
 }
 
 /* === ポップアップ閉じるボタン === */
 .modal-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 12px;
+  right: 16px;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  color: #f5eac8;
   background: transparent;
   border: none;
-  font-size: 1.5rem;
-  color: #f0e8d8;
-  cursor: pointer;
-}
-
-/* === モーダル詳細情報のラベルと値の2列レイアウト === */
-#modal-body {
-  display: grid;
-  grid-template-columns: 120px 1fr; /* ラベル幅固定、値は可変 */
-  gap: 0.4rem 1rem;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-/* === ラベルのスタイル（左側） === */
-#modal-body strong {
-  color: #d4b56e; /* 薄めのゴールド */
-  text-align: right;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  height: 100%;
-}
-
-/* === 値のスタイル（右側） === */
-#modal-body span.value {
-  color: #b59f4d; /* 少し濃いめのゴールド */
-  user-select: text;
-  display: flex;
-  align-items: center;
-  height: 100%;
 }
