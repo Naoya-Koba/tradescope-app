@@ -48,15 +48,50 @@
       box-sizing: border-box;
       font-size: 1rem;
       line-height: 1.4;
+
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 1rem;
+      row-gap: 0.5rem;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    /* モーダル見出しを2列の全幅に */
+    .modal-content strong {
+      grid-column: 1 / -1;
+      color: #f5eac8; /* 明るめのゴールド */
+      font-size: 1.1rem;
+      margin-bottom: 0.8rem;
+      border-bottom: 1px solid #f5eac8;
+      padding-bottom: 0.4rem;
+    }
+
+    /* 左側ラベル（項目名） */
+    .modal-content div:nth-child(odd) {
+      color: #f5eac8; /* 明るめのゴールド */
+      font-weight: 600;
+    }
+
+    /* 右側値（項目の値） */
+    .modal-content div:nth-child(even) {
+      color: #c4b97e; /* 少し濃いめの落ち着いたゴールド */
+      font-weight: 400;
+      word-break: break-word;
     }
 
     /* === モーダルの閉じるボタン === */
     .modal-close {
-      float: right;
+      position: absolute;
+      top: 12px;
+      right: 16px;
       font-size: 28px;
       font-weight: bold;
       cursor: pointer;
       user-select: none;
+      color: #f5eac8;
+      background: transparent;
+      border: none;
     }
   </style>
 </head>
@@ -72,8 +107,8 @@
 
     <!-- モーダルの要素 -->
     <div id="detail-modal" class="modal">
-      <div class="modal-content">
-        <span id="modal-close" class="modal-close">&times;</span>
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button id="modal-close" class="modal-close" aria-label="閉じる">&times;</button>
         <div id="modal-body"></div>
       </div>
     </div>

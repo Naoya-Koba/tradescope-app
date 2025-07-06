@@ -83,3 +83,32 @@ body, html {
   color: #f0e8d8;
   cursor: pointer;
 }
+
+/* === モーダル詳細情報のラベルと値の2列レイアウト === */
+#modal-body {
+  display: grid;
+  grid-template-columns: 120px 1fr; /* ラベル幅固定、値は可変 */
+  gap: 0.4rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* === ラベルのスタイル（左側） === */
+#modal-body strong {
+  color: #d4b56e; /* 薄めのゴールド */
+  text-align: right;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+/* === 値のスタイル（右側） === */
+#modal-body span.value {
+  color: #b59f4d; /* 少し濃いめのゴールド */
+  user-select: text;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
