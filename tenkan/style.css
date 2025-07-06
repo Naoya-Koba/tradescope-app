@@ -98,5 +98,5 @@ body, html {
 .signal-card.flipped .signal-card-back {
   opacity: 1;
   visibility: visible;
-  z-index: 20;
+  z-index: 5;
 }
