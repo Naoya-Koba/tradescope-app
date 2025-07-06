@@ -40,17 +40,25 @@ body, html {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
-/* === カードが反転・拡大した状態 === */
+/* === カードが反転・拡大した状態（全画面化） === */
 .signal-card.flipped {
-  transform: rotateY(180deg) scaleX(1) scaleY(2.5);
-  z-index: 10;
-  width: 100%;
-  max-width: 480px;
+  transform: rotateY(180deg) scale(1.5); /* お好みで拡大率調整 */
+  z-index: 1000;
+  width: 100vw;
+  max-width: none;
   height: auto;
   min-height: 320px;
   box-sizing: border-box;
   padding: 1.5rem;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
 }
+
 
 /* === カード表面のスタイル（位置、サイズ、表示制御） === */
 .signal-card-front {
