@@ -1,4 +1,4 @@
-const CACHE_NAME = "tradescope-static-v2";
+const CACHE_NAME = "tradescope-static-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -8,8 +8,7 @@ const CORE_ASSETS = [
   "./profit/soneki.html",
   "./profit/soneki.css",
   "./profit/soneki.js",
-  "./assets/con-192.png",
-  "./assets/icon-512.png"
+  "./assets/icon-192.png"
 ];
 
 self.addEventListener("install", (event) => {

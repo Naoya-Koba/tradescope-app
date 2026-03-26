@@ -1,0 +1,5 @@
+<svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>  <!-- 赤 -->
+      <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>  <!-- 緑 -->
+      <rect x="16" y="2" width="4" height="20" rx="1.5" fill="#3DA2FF"/> <!-- 青 -->
+    </svg>
