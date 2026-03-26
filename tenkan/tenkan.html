@@ -15,6 +15,36 @@
       overflow-x: hidden;
       max-width: 100vw;
     }
+
+    header {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 12px 6px;
+    }
+
+    header h1 {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.05;
+    }
+
+    .brand-link {
+      color: #eef1ff;
+      text-decoration: none;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .page-current {
+      color: #aab5d0;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
     /* 転換シグナル専用のスタイル */
     .signal-container {
       padding: 1rem;
@@ -98,7 +128,10 @@
 <body>
   <div class="app">
     <header>
-      <h1>転換シグナル</h1>
+      <h1>
+        <a class="brand-link" href="../index.html" aria-label="トップページへ移動">TradeScope</a>
+        <span class="page-current">転換シグナル</span>
+      </h1>
     </header>
 
     <main class="signal-container" id="signal-container">

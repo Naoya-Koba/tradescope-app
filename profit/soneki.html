@@ -1,97 +1,256 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#000000" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="../manifest.json" />
-  <link rel="stylesheet" href="style.css" />
+  <meta name="apple-mobile-web-app-title" content="TradeScope" />
+  <title>損益管理 - TradeScope</title>
+
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="../assets/con-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="../assets/icon-512.png" />
+  <link rel="apple-touch-icon" href="../assets/con-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="soneki.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <title>TradeScope - 損益管理</title>
 </head>
+
 <body>
-  <div class="app">
+  <header class="app-header glass-nav">
+    <button id="menuButton" class="icon-btn" aria-label="メニューを開く">☰</button>
+    <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>
+      <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>
+      <rect x="16" y="2" width="4" height="20" rx="1.5" fill="#3DA2FF"/>
+    </svg>
+    <h1 class="app-title">
+      <a class="brand-link" href="../index.html" aria-label="トップページへ移動">TradeScope</a>
+    </h1>
+  </header>
 
-    <!-- 年間損益と資金 -->
-    <div class="summary-section">
-      <div class="summary-card">
-        <h2>年間損益</h2>
-        <p id="total-profit" class="positive">¥0</p>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <button id="drawerClose" class="drawer-close" aria-label="閉じる">✕</button>
+    <div class="drawer-header"><span>メニュー</span></div>
+    <nav class="drawer-nav">
+      <a href="../index.html">トップ</a>
+      <a href="../tenkan/tenkan.html">転換シグナル</a>
+      <a href="../oshime.html">押し/戻り</a>
+      <a href="./soneki.html" class="active">損益管理</a>
+      <a href="../history.html">取引履歴</a>
+      <a href="../analysis/rates.html">政策金利予測</a>
+      <a href="../settings.html" class="secondary">設定</a>
+    </nav>
+  </aside>
+  <div id="scrim" class="scrim" hidden></div>
+
+  <main class="container">
+    <!-- 1. 年間損益表示セクション -->
+    <div class="annual-summary-head">
+      <h2 class="heading-muted annual-summary-heading">Annual Summary</h2>
+      <div class="year-switch-row">
+        <select id="yearDisplay" class="year-toggle year-chip" aria-label="年度を選択"></select>
       </div>
-      <div class="summary-card">
-        <h2>資金</h2>
-        <p id="total-balance">¥1,000,000</p>
-      </div>
     </div>
+    <section class="section glass margin-bottom">
+      <div class="annual-summary-list">
+        <div class="annual-summary-row annual-primary">
+          <span class="annual-summary-label">純資産 <span class="sub-en">Total Equity</span></span>
+          <div class="annual-summary-right">
+            <span id="totalAssets" class="annual-summary-value annual-main-value">¥0</span>
+            <div class="annual-growth-group">
+              <span id="yearGrowthRate" class="annual-growth-pill neutral">0%</span>
+            </div>
+          </div>
+        </div>
 
-    <!-- 年度セレクター -->
-    <div class="year-selector">
-      <select id="year">
-        <option value="2025" selected>2025</option>
-        <option value="2024">2024</option>
-      </select>
-    </div>
+        <div class="annual-summary-row">
+          <span class="annual-summary-label">年間決済 <span class="sub-en">Realized PnL</span></span>
+          <span id="yearRealizedSum" class="annual-summary-value">¥0</span>
+        </div>
 
-    <!-- 資金チャート -->
-    <div class="chart-area">
-      <canvas id="balance-chart"></canvas>
-    </div>
+        <div class="annual-summary-row">
+          <span class="annual-summary-label">年間スワップ <span class="sub-en">Swap PnL</span></span>
+          <span id="yearSwapSum" class="annual-summary-value">¥0</span>
+        </div>
 
-    <!-- 月別損益棒グラフ -->
-<div class="chart-area" style="margin-top: 1rem;">
-  <canvas id="monthly-bar-chart"></canvas>
-</div>
+        <details class="annual-minor-details">
+          <summary class="annual-minor-summary">入出金詳細</summary>
+          <div class="annual-minor-list">
+            <div class="annual-summary-row">
+              <span class="annual-summary-label">年初資金 <span class="sub-en">Initial Capital</span></span>
+              <span id="yearInitialCapital" class="annual-summary-value">¥0</span>
+            </div>
 
-    <!-- 保存ボタン -->
-    <div class="save-button-area">
-      <button id="save-button">保存</button>
-    </div>
+            <div class="annual-summary-row">
+              <span class="annual-summary-label">年間入金 <span class="sub-en">Deposit</span></span>
+              <span id="yearDepositSum" class="annual-summary-value">¥0</span>
+            </div>
 
-    <!-- 確認ダイアログ -->
-    <div id="confirm-dialog" class="dialog hidden">
-      <p>保存しますか？</p>
-      <button id="confirm-yes">はい</button>
-      <button id="confirm-no">いいえ</button>
-    </div>
+            <div class="annual-summary-row">
+              <span class="annual-summary-label">年間出金 <span class="sub-en">Withdrawal</span></span>
+              <span id="yearWithdrawSum" class="annual-summary-value">¥0</span>
+            </div>
 
-    <!-- トースト通知 -->
-    <div id="toast" class="toast hidden">保存が完了しました</div>
-
-    <!-- 月別損益カード -->
-    <section class="monthly-section">
-      <h2>月別損益</h2>
-      <div class="monthly-grid" id="monthly-cards">
-        <!-- JavaScriptが動的に生成 -->
+            <div class="annual-summary-row">
+              <span class="annual-summary-label">年間入出金差額 <span class="sub-en">Net Cash Flow</span></span>
+              <span id="yearNetCashFlow" class="annual-summary-value">¥0</span>
+            </div>
+          </div>
+        </details>
       </div>
     </section>
-  </div>
 
-  <!-- ボトムナビゲーション -->
-  <footer class="bottom-nav">
-    <a href="../index.html" class="nav-item">
-      <i class="icon">🏠</i>
-      <span class="label">トップ</span>
-    </a>
-    <a href="../tenkan/tenkan.html" class="nav-item">
-      <i class="icon">🔁</i>
-      <span class="label">転換シグナル</span>
-    </a>
-    <a href="../oshime.html" class="nav-item">
-      <i class="icon">📈</i>
-      <span class="label">押し目/戻り</span>
-    </a>
-    <a href="soneki.html" class="nav-item active">
-      <i class="icon">💰</i>
-      <span class="label">損益管理</span>
-    </a>
-    <a href="../history.html" class="nav-item">
-      <i class="icon">🗂️</i>
-      <span class="label">取引履歴</span>
-    </a>
-  </footer>
+    <div class="performance-head">
+      <h2 class="heading-muted performance-heading">P/L Trend</h2>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="dot dot-realized"></span> Realized P/L</span>
+        <span class="legend-item"><span class="dot dot-swap"></span> Swap P/L</span>
+        <span class="legend-item"><span class="dot dot-assets"></span> Total Equity</span>
+      </div>
+    </div>
+    <section class="chart-area margin-bottom" aria-label="損益パフォーマンス">
+      <div class="chart-wrap">
+        <canvas id="pnlTrendChart" aria-label="月別損益と純資産推移"></canvas>
+      </div>
+    </section>
 
-  <script src="script.js"></script>
+    <!-- 2. 月別損益表示セクション -->
+    <h2 class="heading-muted">Monthly Summary</h2>
+    <section class="section glass monthly-summary-section margin-bottom">
+      <div class="monthly-grid" id="monthlyDisplay">
+        <!-- 1月〜12月の月別カードが動的に生成される -->
+      </div>
+    </section>
+
+    <!-- 3. 月別入力セクション -->
+    <h2 class="heading-muted">Input</h2>
+    <section class="section glass margin-bottom monthly-input-section">
+      <!-- 3-2. 月選択UI -->
+      <div class="month-selector">
+        <div class="month-tabs" id="monthTabs">
+          <!-- 1月〜12月の月ボタンが動的に生成される -->
+        </div>
+      </div>
+
+      <!-- 3-3. 口座別入力カード -->
+      <div class="account-input-grid" id="accountInputGrid">
+        <!-- 選択月の口座別カードが動的に生成される -->
+      </div>
+
+      <button class="btn btn-primary btn-block" id="saveMonthData">月別データを保存</button>
+    </section>
+
+    <div class="initial-capital-outside">
+      <div class="collapsible-panel">
+        <button class="collapsible-header" id="initialCapitalToggle">
+          <span class="toggle-icon">▶</span>
+          年初資金設定
+          <span class="toggle-status" id="initialCapitalStatus"></span>
+        </button>
+        <div class="collapsible-content" id="initialCapitalContent">
+          <div class="initial-capital-form">
+            <div class="form-group">
+              <label for="yearSelect">対象年</label>
+              <select id="yearSelect">
+                <option value="2024">2024</option>
+                <option value="2025" selected>2025</option>
+                <option value="2026">2026</option>
+              </select>
+            </div>
+            <div class="account-initial-grid">
+              <div class="form-group">
+                <label for="initGMO">GMO 年初資金</label>
+                <input type="number" id="initGMO" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initLightFX">Light FX 年初資金</label>
+                <input type="number" id="initLightFX" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initMinano">みんなのFX 年初資金</label>
+                <input type="number" id="initMinano" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initSBI">SBI 年初資金</label>
+                <input type="number" id="initSBI" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initSBIVC">SBI VC 年初資金</label>
+                <input type="number" id="initSBIVC" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="saveInitialCapital">保存</button>
+              <button class="btn btn-secondary" id="reloadDemoData">ダミーデータ再投入</button>
+              <button class="btn btn-danger" id="clearStoredData">保存データ削除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 月別画像取込セクション -->
+    <h2 class="heading-muted">OCR</h2>
+    <section class="section glass margin-bottom">
+      <p class="section-description">※ 将来的にスマホで撮影した画像をアップロードして自動読取する機能を実装予定です</p>
+      
+      <div class="ocr-grid">
+        <div class="ocr-placeholder">
+          <div class="ocr-icon">📸</div>
+          <div class="ocr-text">GMO トレード日記<br/>スクリーンショット</div>
+          <button class="btn btn-secondary btn-small" disabled>将来実装予定</button>
+        </div>
+        <div class="ocr-placeholder">
+          <div class="ocr-icon">📸</div>
+          <div class="ocr-text">GMO 余力情報<br/>スクリーンショット</div>
+          <button class="btn btn-secondary btn-small" disabled>将来実装予定</button>
+        </div>
+        <div class="ocr-placeholder">
+          <div class="ocr-icon">📸</div>
+          <div class="ocr-text">Light FX / みんなのFX<br/>収益カレンダー</div>
+          <button class="btn btn-secondary btn-small" disabled>将来実装予定</button>
+        </div>
+        <div class="ocr-placeholder">
+          <div class="ocr-icon">📸</div>
+          <div class="ocr-text">Light FX / みんなのFX<br/>報告書</div>
+          <button class="btn btn-secondary btn-small" disabled>将来実装予定</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="monthlyDetailScrim" class="monthly-detail-scrim" hidden></div>
+  <aside id="monthlyDetailPane" class="monthly-detail-pane" aria-hidden="true">
+    <div class="monthly-detail-head">
+      <div class="monthly-detail-title-wrap">
+        <p class="monthly-detail-kicker">MONTH DETAIL</p>
+        <h3 id="monthlyDetailTitle" class="monthly-detail-title">1月 詳細</h3>
+      </div>
+      <button id="monthlyDetailClose" class="monthly-detail-close" aria-label="詳細を閉じる">✕</button>
+    </div>
+    <div id="monthlyDetailBody" class="monthly-detail-body"></div>
+  </aside>
+
+  <script src="soneki.js"></script>
+  <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("../service-worker.js", { scope: "../" }).catch(() => {
+        // SW登録失敗時は通常のWebとして継続
+      });
+    });
+  }
+  </script>
 </body>
 </html>

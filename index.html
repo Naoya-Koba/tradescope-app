@@ -1,87 +1,460 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <!-- ✅ ピンチ防止を含む -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="top/style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP&display=swap" rel="stylesheet" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TradeScope" />
   <title>TradeScope</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/con-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png" />
+  <link rel="apple-touch-icon" href="assets/con-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="top/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <div class="top-container">
-    <img src="assets/top_visual.png" alt="トップビジュアル" class="top-image" />
+  <header class="app-header glass-nav">
+    <button id="menuButton" class="icon-btn" aria-label="メニューを開く" aria-controls="drawer" aria-expanded="false">☰</button>
+    <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>  <!-- 赤 -->
+      <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>  <!-- 緑 -->
+      <rect x="16" y="2" width="4" height="20" rx="1.5" fill="#3DA2FF"/> <!-- 青 -->
+    </svg>
+    <h1 class="app-title">
+      <a class="brand-link" href="./index.html" aria-label="トップページへ移動">TradeScope</a>
+    </h1>
+  </header>
 
-    <!-- ニュースティッカー：為替全体 -->
-    <div class="news-section">
-      <div class="news-title">為替注目ニュース</div>
-      <div class="news-ticker">
-        <div class="ticker-content" id="general-news">
-          米CPIの結果を受けてドルが急伸／日銀の政策修正観測強まる／ECBが利下げを示唆
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <span>メニュー</span>
+      <button id="drawerClose" class="icon-btn" aria-label="閉じる">✕</button>
+    </div>
+    <nav class="drawer-nav">
+      <a href="./index.html">トップ</a>
+      <a href="tenkan/tenkan.html">転換シグナル</a>
+      <a href="./oshime.html">押し/戻り</a>
+      <a href="profit/soneki.html">損益管理</a>
+      <a href="./history.html">取引履歴</a>
+      <a href="analysis/rates.html">政策金利予測</a>
+      <a href="./settings.html" class="secondary">設定</a>
+    </nav>
+  </aside>
+  <div id="scrim" class="scrim" hidden></div>
+
+  <main class="container">
+
+    <!-- ===== Summary Section ===== -->
+    <h2 class="heading-muted">Summary</h2>
+<section class="section glass">
+  <div class="summary-list">
+    <div class="summary-row">
+      <span class="summary-label">純資産 <span class="sub-en">Total Equity</span></span>
+      <div class="summary-right">
+        <span id="kpiTotal" class="summary-value">¥0</span>
+        <div class="growth-group">
+          <span class="growth-label">年間成長率</span>
+          <span id="growthTotal" class="growth-pill neutral">+0.0%</span>
         </div>
       </div>
     </div>
 
-    <!-- ニュースティッカー：国別選択 -->
-    <div class="news-section">
-      <div class="news-title">
-        国別注目ニュース：
-        <select id="country-select" class="custom-select">
-          <option value="TRY">トルコ</option>
-          <option value="USD">アメリカ</option>
-          <option value="JPY">日本</option>
-          <option value="EUR">ユーロ</option>
-          <option value="GBP">イギリス</option>
-          <option value="CHF">スイス</option>
-          <option value="CAD">カナダ</option>
-          <option value="AUD">オーストラリア</option>
-          <option value="NZD">ニュージーランド</option>
-          <option value="ZAR">南アフリカ</option>
-          <option value="MXN">メキシコ</option>
-        </select>
-      </div>
-      <div class="news-ticker">
-        <div class="ticker-content" id="country-news">
-          トルコ中銀が金利据え置き決定／政局不安が再燃／IMFの警告報道も
-        </div>
+    <div class="summary-row">
+      <span class="summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
+      <div class="summary-right">
+        <span id="kpiRealized" class="summary-value">¥0</span>
+        <span id="growthNet" class="growth-pill neutral">+0.0%</span>
       </div>
     </div>
+  </div>
+</section>
 
-    <!-- 機能ボタン -->
-    <div class="button-grid">
-      <a href="/tenkan/tenkan.html" class="feature-button">トレンド転換シグナル</a>
-      <a href="/oshime/oshime.html" class="feature-button">押し目買い／戻り売り分析</a>
-      <a href="profit/soneki.html" class="feature-button">損益管理</a>
-      <a href="history/history.html" class="feature-button">取引履歴</a>
+    <!-- ===== Performance Section ===== -->
+    <h2 class="heading-muted">Performance</h2>
+<section class="chart-area" aria-label="パフォーマンス（月次）">
+  <div class="chart-legend">
+    <span class="legend-item"><span class="dot dot-green"></span> Total Equity</span>
+    <span class="legend-item"><span class="dot dot-blue"></span> Net Balance</span>
+  </div>
+  <canvas id="perfChart" height="200"></canvas>
+</section>
+
+    <!-- ===== Portfolio Section ===== -->
+    <h2 class="heading-muted">Portfolio</h2>
+    <section class="section glass">
+      <div class="portfolio-columns">
+        <div class="portfolio-column">
+          <p class="portfolio-col-title">資産配分</p>
+          <div class="portfolio-chart-container">
+            <canvas id="portfolioChart"></canvas>
+          </div>
+          <div class="portfolio-items" id="portfolioItems"></div>
+        </div>
+        <div class="portfolio-col-divider"></div>
+        <div class="portfolio-column">
+          <p class="portfolio-col-title">口座別配分</p>
+          <div class="portfolio-chart-container">
+            <canvas id="accountChart"></canvas>
+          </div>
+          <div class="portfolio-items" id="accountItems"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== News Section ===== -->
+    <h2 class="heading-muted">News</h2>
+    <section class="section glass">
+      <div class="news-block">
+        <div class="news-head">
+          <span class="news-label">トピックス</span>
+        </div>
+        <div class="ticker">
+          <div id="globalTickerTrack" class="ticker-track"></div>
+        </div>
+      </div>
+
+      <div class="country-news">
+        <div class="country-news-head">
+          <span class="news-label">国別</span>
+          <select id="countrySelect" class="select">
+            <option value="USD">USD</option><option value="JPY">JPY</option>
+            <option value="EUR">EUR</option><option value="GBP">GBP</option>
+            <option value="AUD">AUD</option><option value="NZD">NZD</option>
+            <option value="CHF">CHF</option><option value="CAD">CAD</option>
+            <option value="TRY">TRY</option><option value="MXN">MXN</option>
+          </select>
+        </div>
+        <div class="ticker">
+          <div id="countryTickerTrack" class="ticker-track"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Position & Risk ===== -->
+   <h2 class="heading-muted">Position & Risk</h2>
+<section class="section">
+ <ul id="pairList" class="sortable-list glass">
+  <li class="pair-card" data-pair="USDJPY">
+    <div class="pair-title">USD/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥25,000</div>
+      <div class="pair-growth positive">+2.3%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="EURJPY">
+    <div class="pair-title">EUR/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥14,000</div>
+      <div class="pair-growth positive">+0.9%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="GBPJPY">
+    <div class="pair-title">GBP/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit negative">¥−6,000</div>
+      <div class="pair-growth negative">-0.8%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="CHFJPY">
+    <div class="pair-title">CHF/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥4,500</div>
+      <div class="pair-growth positive">+0.3%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="AUDJPY">
+    <div class="pair-title">AUD/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥18,000</div>
+      <div class="pair-growth positive">+1.1%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="NZDJPY">
+    <div class="pair-title">NZD/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥12,000</div>
+      <div class="pair-growth positive">+0.7%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="TRYJPY">
+    <div class="pair-title">TRY/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥1,095,000</div>
+      <div class="pair-growth positive">+4.1%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="HUFJPY">
+    <div class="pair-title">HUF/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit negative">¥−42,000</div>
+      <div class="pair-growth negative">-0.5%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="MXNJPY">
+    <div class="pair-title">MXN/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥265,000</div>
+      <div class="pair-growth positive">+1.9%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="ZARJPY">
+    <div class="pair-title">ZAR/JPY</div>
+    <div class="pair-right">
+      <div class="pair-profit positive">¥85,000</div>
+      <div class="pair-growth positive">+0.6%</div>
+    </div>
+  </li>
+
+  <li class="pair-card" data-pair="EURUSD">
+    <div class="pair-title">EUR/USD</div>
+    <div class="pair-right">
+      <div class="pair-profit neutral">¥0</div>
+      <div class="pair-growth neutral">0.0%</div>
+    </div>
+  </li>
+</ul>
+    </section>
+
+   <!-- ===== Detail Panel（右ペイン） ===== -->
+<aside id="pairDetailPanel" class="pair-detail" aria-hidden="true">
+<header class="detail-header enhanced">
+  <div class="detail-header-main">
+    <h2 id="detailTitle">USD/JPY</h2>
+    <button id="detailClose" class="close-btn">×</button>
+  </div>
+
+  <div class="detail-stats">
+    <span class="profit positive" id="detailProfit">¥25,000</span>
+    <span class="rate-change" id="detailRate">(+2.3%)</span>
+  </div>
+</header>
+
+  <!-- ポジション情報 -->
+  <div class="detail-section">
+    <h4 class="detail-heading">ポジション情報</h4>
+    <div class="detail-grid">
+      <div><span>ロット数</span><strong id="detailLots">300</strong></div>
+      <div><span>平均建値</span><strong id="detailAvg">3.250</strong></div>
+      <div><span>現在レート</span><strong id="detailNow">3.630</strong></div>
     </div>
   </div>
 
-  <script src="top/script.js"></script>
+<!-- チャートエリア -->
+<section class="detail-section">
+  <h4>損益・スワップ推移</h4>
+  <div class="chart-tabs">
+    <button class="chart-tab active" data-type="total">累計損益</button>
+    <button class="chart-tab" data-type="unrealized">含み損益</button>
+    <button class="chart-tab" data-type="swap">スワップ</button>
+  </div>
+  <div class="detail-chart">
+    <canvas id="detailChart"></canvas>
+  </div>
+</section>
 
-  <!-- ✅ ボトムナビゲーション -->
-  <footer class="bottom-nav">
-    <a href="index.html" class="nav-item active">
-      <i class="icon">🏠</i>
-      <span class="label">トップ</span>
-    </a>
-    <a href="/tenkan/tenkan.html" class="nav-item">
-      <i class="icon">🔁</i>
-      <span class="label">転換シグナル</span>
-    </a>
-    <a href="/oshime/oshime.html" class="nav-item">
-      <i class="icon">📈</i>
-      <span class="label">押し目/戻り</span>
-    </a>
-    <a href="profit/soneki.html" class="nav-item">
-      <i class="icon">💰</i>
-      <span class="label">損益管理</span>
-    </a>
-    <a href="history/history.html" class="nav-item">
-      <i class="icon">🗂️</i>
-      <span class="label">取引履歴</span>
-    </a>
-  </footer>
+
+  <!-- スワップ情報 -->
+<div class="detail-section">
+  <h4>スワップ情報</h4>
+  <div class="detail-grid">
+    <div><span>累計スワップ</span><strong>¥45,000</strong></div>
+    <div><span>1日平均スワップ</span><strong>¥1,500</strong></div>
+  </div>
+</div>
+
+  <!-- 損失リスク情報 -->
+  <div class="detail-section">
+    <h4 class="detail-heading">損失リスク</h4>
+    <div class="detail-grid">
+      <div><span>証拠金維持率</span><strong id="detailMMR">265%</strong></div>
+      <div><span>0円時損失</span><strong id="detailZero" class="negative">-¥3,280,000</strong></div>
+      <div><span>半額損失</span><strong id="detailHalf" class="negative">-¥1,640,000</strong></div>
+    </div>
+  </div>
+
+  <!-- コメント／戦略メモ -->
+  <div class="detail-section">
+    <h4 class="detail-heading">コメント</h4>
+    <p id="detailNote">高スワップ維持中。利確目標は3.8。</p>
+  </div>
+</aside>
+
+
+    <!-- ===== Swap Section ===== -->
+    <h2 class="heading-muted">Swap</h2>
+    <section class="section glass">
+      <div class="swap-card">
+        <div class="swap-main">
+          <div class="kpi-label small">本日のスワップ</div>
+          <div id="swapToday" class="kpi-value positive">+¥0</div>
+          <div id="swapTodayPairs" class="swap-mini"></div>
+        </div>
+
+        <div class="swap-sub">
+          <div class="kpi-label small">今年のスワップ予想</div>
+          <div id="swapYear" class="kpi-subvalue">¥0</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Memo ===== -->
+    <h2 class="heading-muted">Memo</h2>
+    <div class="memo-section">
+      <button id="addMemoBtn" class="memo-add-btn" aria-label="メモを追加">+メモを追加</button>
+      <ul id="memoList" class="memo-list glass"></ul>
+    </div>
+
+    <!-- ===== Memo Modal ===== -->
+    <div id="memoModal" class="memo-modal" aria-hidden="true">
+      <div class="memo-modal-content">
+        <div class="memo-modal-header">
+          <h3>メモを追加</h3>
+          <button id="closeMemoModal" class="close-btn">×</button>
+        </div>
+        <textarea id="memoInput" class="memo-input" placeholder="メモを入力してください..."></textarea>
+        <div class="memo-modal-footer">
+          <button id="cancelMemoBtn" class="btn-secondary">キャンセル</button>
+          <button id="saveMemoBtn" class="btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+    <div id="memoModalBackdrop" class="memo-modal-backdrop" aria-hidden="true"></div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="top/script.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const ctx = document.getElementById("detailChart").getContext("2d");
+
+  // ▼ ダミーデータ例（月別）
+  const labels = ["7月","8月","9月","10月","11月","12月"];
+  const dataSets = {
+    total: [10000, 15000, 18000, 12000, 20000, 26000],
+    unrealized: [-8000, -4000, 3000, 12000, 8000, 15000],
+    swap: [2000, 5000, 9000, 13000, 17000, 21000],
+  };
+
+  // ▼ グラデーション作成関数
+  function createGradient(ctx, chartArea, data, type) {
+  const { top, bottom } = chartArea;
+  const gradient = ctx.createLinearGradient(0, bottom, 0, top);
+  const lastValue = data[data.length - 1];
+
+  // 種類別グラデーション設定
+  if (type === "total") {
+    if (lastValue >= 0) {
+      gradient.addColorStop(0, "rgba(62,224,143,0.05)");  // 緑・下
+      gradient.addColorStop(1, "rgba(62,224,143,0.45)");  // 緑・上
+    } else {
+      gradient.addColorStop(0, "rgba(255,107,107,0.05)");
+      gradient.addColorStop(1, "rgba(255,107,107,0.45)");
+    }
+  } else {
+    if (lastValue >= 0) {
+      gradient.addColorStop(0, "rgba(255,255,255,0)");
+      gradient.addColorStop(1, "rgba(255,255,255,0.45)");
+    } else {
+      gradient.addColorStop(0, "rgba(255,107,107,0.0)");
+      gradient.addColorStop(1, "rgba(255,107,107,0.4)");
+    }
+  }
+  return gradient;
+}
+
+
+  let chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        data: dataSets.total,
+        fill: true,
+        borderColor: "#3EE08F",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.35,
+backgroundColor: function(context) {
+  const chart = context.chart;
+  const { ctx, chartArea } = chart;
+  if (!chartArea) return null;
+  return createGradient(ctx, chartArea, dataSets.total, "total");
+},
+
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          ticks: { color: "rgba(255,255,255,0.7)" },
+          grid: { color: "rgba(255,255,255,0.1)" }
+        },
+        y: {
+          position: "right",
+          beginAtZero: true,
+          ticks: {
+            color: "rgba(255,255,255,0.7)",
+callback: (val) => val.toLocaleString(),
+          },
+          grid: { color: "rgba(255,255,255,0.1)" }
+        }
+      },
+      plugins: { legend: { display: false } },
+    }
+  });
+
+  // ▼ タブ切り替え制御
+  document.querySelectorAll(".chart-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".chart-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+
+      const type = tab.dataset.type;
+      const dataset = dataSets[type];
+      chart.data.datasets[0].data = dataset;
+
+      chart.data.datasets[0].borderColor =
+        type === "total" ? "#3EE08F" : "#FFFFFF";
+
+      chart.data.datasets[0].backgroundColor = (context) => {
+  const { ctx, chartArea } = context.chart;
+  if (!chartArea) return null;
+  return createGradient(ctx, chartArea, dataset, type);
+};
+
+
+      chart.update();
+    });
+  });
+});
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch(() => {
+      // SW登録失敗時は通常のWebとして継続
+    });
+  });
+}
+</script>
 </body>
 </html>

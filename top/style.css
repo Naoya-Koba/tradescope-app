@@ -1,225 +1,1784 @@
-/* === <a>と<button>を完全に統一する設定（中央揃え対応） === */
-a.feature-button,
-button.feature-button {
-  all: unset;
+:root {
+  --bg-from: #0b1020;
+  --bg-to: #1a2250;
+  --glass-bg: rgba(255,255,255,.08);
+  --glass-stroke: rgba(255,255,255,.18);
+  --glass-highlight: rgba(255,255,255,.25);
+  --text: #eef1ff;
+  --muted: #aab5d0;
+  --blue: #3DA2FF;
+  --green: #3EE08F;
+  --red: #FF6B6B;
+  --neutral: #AAB5D0;
+}
+
+/* ============================
+   基本設定
+============================ */
+html, body {
+  margin: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip;
+  font-family: Inter, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  color: var(--text);
+  background-color: var(--bg-from);
+  padding-top: 48px;
+  box-sizing: border-box;
+  overscroll-behavior-y: none;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(160deg, var(--bg-from), var(--bg-to));
+}
+
+/* ============================
+   固定ヘッダー（ガラス調）
+============================ */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  backdrop-filter: blur(16px);
+  background: rgba(10, 12, 26, 0.75);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 22px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.app-logo {
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+}
+.app-title {
+  font-size: 22px;
+  font-weight: 700;
+  flex: 1;
+  letter-spacing: .4px;
+  margin: 0;
+}
+
+.brand-link {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand-link:hover {
+  opacity: 0.9;
+}
+
+/* ============================
+   グラフ（少し高さアップ版）
+============================ */
+.chart-area {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  margin: 12px auto 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+}
+.chart-area canvas {
+  display: block;
+  width: 100%;
+  height: 240px;     /* ← 高さアップ */
+  max-height: 260px; /* ← 最大値もアップ */
+}
+
+/* ============================
+   共通セクション
+============================ */
+.container {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  overflow-x: visible;
+}
+.section {
+  margin-bottom: 20px;
+}
+.glass {
+  background: var(--glass-bg);
+  box-shadow: 0 1px 0 0 var(--glass-highlight) inset, 0 0 0 1px var(--glass-stroke) inset;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+/* ============================
+   見出し・KPI
+============================ */
+.heading-muted {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
+}
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+.positive { color: var(--green); }
+.negative { color: var(--red); }
+.neutral { color: var(--neutral); }
+
+/* ============================
+   サマリー・リスク
+============================ */
+.summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  padding: 4px 0;
+}
+.summary-label {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 15px;
+}
+.summary-label .sub-en {
+  font-size: 13px;
+  color: rgba(255,255,255,.5);
+  margin-left: 4px;
+}
+
+/* ============================
+   モバイル対応
+============================ */
+@media (max-width: 480px) {
+  html, body {
+    padding-top: 46px;
+  }
+
+  .summary-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .summary-label .sub-en {
+    margin-left: 0;
+  }
+  .growth-pill {
+    font-size: 11px;
+    padding: 2px 6px;
+    min-width: 50px;
+  }
+}
+.summary-right {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.summary-value {
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text);
+  text-align: right;
+  min-width: 110px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.growth-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin-top: -8px;
+}
+
+.growth-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+}
+
+.growth-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* ============================
+   スワップカード
+============================ */
+.swap-card {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+}
+.swap-mini {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ============================
+   ニュースティッカー
+============================ */
+.ticker {
+  overflow: hidden;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  border-radius: 0;
+}
+.ticker-track {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 6px 0;
+  animation: ticker 24s linear infinite;
+}
+.ticker-item {
+  display: inline-block;
+  margin: 0 24px;
+  color: var(--text);   /* ← サマリー金額と完全同一の白 #eef1ff */
+  font-size: 13px;
+}
+
+/* プルダウン調整 */
+.select {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.15);
+  color: var(--muted);
+  font-size: 12px !important;       
+  font-weight: 500;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: inherit;
+  line-height: 1.1;
+  appearance: none;
+  -webkit-appearance: none;        
+  -moz-appearance: none;           
+}
+
+/* 国別ニュース間隔 */
+.country-news {
+  margin-top: 10px;
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ============================
+   Newsセクション
+============================ */
+.news-label {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  font-family: inherit;
+}
+
+.select {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.15);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: inherit;
+  appearance: none;
+}
+
+/* ============================
+   メモセクション
+============================ */
+.memo-section {
+  position: relative;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 40px;
+  padding: 12px 16px;
+}
+
+.memo-item {
+  padding: 10px 12px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.memo-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.memo-item-text {
+  word-break: break-word;
+}
+
+.memo-item-time {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.memo-delete-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  min-width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.memo-add-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.memo-add-btn:active {
+  background: rgba(255,255,255,.08);
+}
+
+/* ============================
+   メモモーダル
+============================ */
+.memo-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  background: rgba(10,12,26,.95);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 90vw;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(16px);
+}
+
+.memo-modal[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.memo-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.memo-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.memo-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(100% - 4px);
-  aspect-ratio: 3.302 / 1;
-  background-color: #ddc9a4;
-  background-image:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.08) 0px,
-      rgba(255, 255, 255, 0.08) 1px,
-      transparent 1px,
-      transparent 2.5px
-    ),
-    linear-gradient(145deg, #e9d8b7, #c9b38a);
-  border: 1px solid #bfa77c;
-  border-radius: 14px;
-  font-size: 13px;
-  font-family: "Noto Serif JP", serif;
-  color: #111;
-  text-align: center;
-  font-weight: bold;
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.4),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.1),
-    0 3px 6px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  background-blend-mode: overlay;
-  text-decoration: none;
-  box-sizing: border-box;
 }
 
-a.feature-button:hover,
-button.feature-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-}
-
-/* === 全体設定（スマホファースト）=== */
-body, html {
-  margin: 0;
-  padding: 0;
-  font-family: "Noto Serif JP", serif;
-  height: 100vh;
-  overflow: hidden;
-  background: url("../assets/bright_background_v2.jpg") no-repeat center center fixed;
-  background-size: cover;
-  display: flex;
-  flex-direction: column;
-}
-
-/* トップページ全体構造 */
-.top-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  box-sizing: border-box;
-  padding-bottom: 84px;
-}
-
-/* トップ画像（横幅にフィット） */
-.top-image {
+.memo-input {
   width: 100%;
-  height: 25vh;
-  object-fit: cover;
-  object-position: center;
-  display: block;
-  margin: 0;
-  line-height: 0;
-}
-
-/* ボタングリッド（2列×2行） */
-.button-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 4px;
-  row-gap: 8px;
-  padding: 0 12px;
-  margin-top: 14px;
-  width: 100%;
+  min-height: 140px;
+  padding: 12px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
   box-sizing: border-box;
-  flex-grow: 1;
-  align-content: start;
-  justify-items: center;
 }
 
-/* ニュースセクション全体 */
-.news-section {
-  background: rgba(30, 30, 30, 0.75);
-  border: 1px solid rgba(255, 215, 0, 0.2);
-  box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.25);
-  backdrop-filter: blur(4px);
-  border-radius: 0;
-  padding: 6px 12px;
-  margin: 2px 0;
+.memo-input:focus {
+  outline: none;
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.2);
 }
 
-.news-title {
-  color: #f7e7b0;
-  font-size: 13px;
-  font-weight: bold;
-  border-left: 4px solid #f7e7b0;
-  padding-left: 8px;
-  margin-bottom: 4px;
-  font-family: "Noto Serif JP", serif;
+.memo-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
-.news-ticker {
-  overflow: hidden;
-  white-space: nowrap;
-  background: rgba(30, 30, 30, 0.7);
+.btn-primary,
+.btn-secondary {
+  padding: 8px 16px;
+  border: none;
   border-radius: 6px;
-  padding: 6px 12px;
-  color: #f5eac8;
   font-size: 13px;
-  font-weight: 500;
-  font-family: "Noto Serif JP", serif;
-}
-
-.ticker-content {
-  display: inline-block;
-  text-shadow: 0 0 6px rgba(255, 235, 180, 0.3);
-  will-change: transform;
-}
-
-.custom-select {
-  appearance: none;
-  background-color: rgba(245, 234, 200, 0.08);
-  border: 1px solid rgba(245, 234, 200, 0.3);
-  border-radius: 6px;
-  padding: 4px 28px 4px 8px;
-  font-family: "Noto Serif JP", serif;
-  font-size: 13px;
-  color: #f5eac8;
-  background-image: url("data:image/svg+xml,%3Csvg fill='%23f5eac8' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 6px center;
-  background-size: 14px 14px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.custom-select option {
-  color: #111;
-  background-color: #fff;
+.btn-primary {
+  background: var(--blue);
+  color: white;
 }
 
-/* === ボトムナビ（画面幅ぴったり・角なし・上に浮かせる・上揃え）=== */
-.bottom-nav {
+.btn-primary:active {
+  background: rgba(61,162,255,.8);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,.15);
+}
+
+.btn-secondary:active {
+  background: rgba(255,255,255,.1);
+}
+
+.memo-modal-backdrop {
   position: fixed;
-  bottom: 20px;
+  top: 0;
   left: 0;
   right: 0;
-  height: 64px;
-  background: rgba(15, 15, 15, 0.85);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid rgba(255, 215, 100, 0.15);
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-start;
-  padding: 6px 0 4px;
-  z-index: 999;
-  box-sizing: border-box;
+  bottom: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 99;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 
-/* ナビ内のボタン項目 */
-.nav-item {
+.memo-modal-backdrop[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ============================
+   ドロワーメニュー
+============================ */
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 78vw;
+  max-width: 320px;
+  height: 100%;
+  transform: translateX(-100%);
+  background: rgba(17,22,45,.6);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(255,255,255,.12);
+  z-index: 60;
+  transition: transform .25s ease;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.drawer-nav {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start; /* ← アイコン＋ラベルを上から配置 */
-  color: #f5eac8;
+  padding: 8px;
+}
+.drawer-nav a {
+  padding: 10px 14px;
+  color: var(--text);
   text-decoration: none;
-  font-size: 12px;
-  font-family: "Noto Serif JP", serif;
-  transition: color 0.3s ease;
+  border-radius: 10px;
+}
+.drawer-nav a:hover {
+  background: rgba(255,255,255,.08);
+}
+.drawer-nav a.secondary {
+  color: var(--muted);
+}
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.25);
+  backdrop-filter: blur(2px);
+  z-index: 55;
+}
+
+/* ============================
+   モバイル調整
+============================ */
+@media (max-width: 860px) {
+  .summary-grid, .pairs, .risk {
+    grid-template-columns: 1fr;
+  }
+  .swap-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================
+   右ペイン（詳細ビュー）
+============================ */
+.pair-detail {
+  position: fixed;
+  top: 0;
+  right: 0;
   height: 100%;
+  width: 44%;
+  max-width: 440px;
+  background: rgba(17,22,45,0.8);
+  backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255,255,255,.1);
+  transform: translateX(100%);
+  transition: transform .35s ease;
+  z-index: 70;
+  color: var(--text);
+  overflow-y: auto;
+}
+.pair-detail.open {
+  transform: translateX(0);
+}
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.detail-body {
+  padding: 16px 18px 30px;
+}
+.detail-stats, .detail-risk {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-top: 16px;
+  font-size: 14px;
+}
+.detail-note {
+  margin-top: 20px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+.detail-note p {
+  margin: 6px 0 0;
 }
 
-/* アイコンのサイズと余白調整 */
-.nav-item .icon {
+/* ============================
+   モバイル時の右ペイン
+============================ */
+@media (max-width: 768px) {
+  .pair-detail {
+    width: 100%;
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid rgba(255,255,255,.1);
+  }
+}
+
+
+/* ============================
+   サマリー（純資産・確定資産）
+============================ */
+.summary {
+  background: var(--glass-bg);
+  box-shadow: 0 1px 0 0 var(--glass-highlight) inset, 0 0 0 1px var(--glass-stroke) inset;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 6px 0;
+}
+.summary-label {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 14px;
+}
+.summary-label small {
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.summary-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.summary-value {
   font-size: 18px;
-  margin-bottom: 2px;
+  font-weight: 700;
+  color: var(--text);
+}
+.growth-pill {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  line-height: 1.4;
+  border-radius: 9999px;
+  background: rgba(255,255,255,.10);
+  backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 選択中の色（ゴールド系） */
-.nav-item.active {
-  color: #e0c76e;
+.growth.positive { color: var(--green); }
+.growth.negative { color: var(--red); }
+.growth.neutral  { color: var(--neutral); }
+
+/* ============================
+   チャート凡例（中央上固定）
+============================ */
+.chart-area {
+  position: relative;
 }
 
-/* ホバー時の変化 */
-.nav-item:hover {
-  color: #f6d987;
+.chart-legend {
+  position: absolute;
+  top: -24px;
+  right: 10px;                 /* ← 右端から少し内側に配置 */
+  transform: none;             /* ← 中央寄せ解除 */
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;           /* ← テキストも右寄せ */
+  pointer-events: none;
 }
-/* ← 🔽 ナビの下の隙間を見た目上「塞ぐ」 */
-.bottom-nav::after {
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot-green { background-color: var(--green); }
+.dot-blue  { background-color: var(--blue); }
+
+/* =========================
+   ▼ Position & Risk（カード形式・Yahoo!風リスト調整版）
+   ========================= */
+/* ▼ リスト上下に少し余白を追加 */
+.sortable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 0;  /* ← 上下4px余白追加 */
+  list-style: none;
+}
+
+/* ▼ 金額（主役感アップ） */
+.pair-profit {
+  flex: 1.1;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.05rem; /* ← 0.1remアップ */
+  font-family: "Inter", monospace; /* ← 等幅で数字整列 */
+  letter-spacing: 0.3px;
+}
+
+/* 各通貨ペア行（右2段構成） */
+.pair-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: transparent;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.25s ease, transform 0.15s ease;
+}
+
+/* 左：通貨ペア名 */
+.pair-title {
+  flex: 1;
+  font-weight: 600;
+  color: #fff;
+  text-align: left;
+}
+
+/* 右：損益＋利益率を縦並びに */
+.pair-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+/* 利益率（下段） */
+.pair-growth {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* hover時 */
+.pair-card:hover {
+  background: rgba(255,255,255,0.05);
+  transform: translateY(-1px);
+}
+
+/* 損益・利益率の色指定（修正版） */
+.pair-profit.positive { color: #fff; }     /* ← プラス損益は白 */
+.pair-profit.negative { color: #FF6B6B; }  /* ← マイナス損益は赤 */
+.pair-profit.neutral  { color: #ccc; }     /* ← ±0など中立はグレー */
+
+.pair-growth.positive { color: #3EE08F; }  /* ← 利益率プラスは緑 */
+.pair-growth.negative { color: #FF6B6B; }  /* ← 利益率マイナスは赤 */
+.pair-growth.neutral  { color: #ccc; }     /* ← 利益率0はグレー */
+
+@media (max-width: 480px) {
+  .pair-card {
+    padding: 8px 10px;
+  }
+  .pair-title {
+    font-size: 0.9rem;
+  }
+  .pair-profit,
+  .pair-growth {
+    font-size: 0.8rem;
+  }
+}
+
+
+/* =========================
+   右ペイン（Safari完全対応版）
+========================= */
+.pair-detail {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  bottom: 0;                  /* ← これを追加 */
+  width: 90%;
+  max-width: 420px;
+  background: rgba(15, 15, 30, 0.8);
+  backdrop-filter: blur(20px);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: right 0.35s ease-in-out;
+  z-index: 1000;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 20px env(safe-area-inset-bottom);
+}
+
+.pair-detail.open {
+  right: 0;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.detail-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-stats,
+.detail-risk {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+
+.detail-stats span,
+.detail-risk span {
+  font-size: 13px;
+  color: #ccc;
+}
+
+.detail-stats strong,
+.detail-risk strong {
+  font-size: 14px;
+}
+
+.detail-note span {
+  font-size: 13px;
+  color: #ccc;
+}
+.detail-note p {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* =========================
+   ▼ Yahoo!風リスト 微調整パッチ（安全版）
+   ========================= */
+
+/* Inter + Roboto Monoで数字整列を安定化 */
+.pair-profit {
+  font-family: "Inter", "Roboto Mono", monospace !important;
+}
+
+/* 行の上下位置を中央寄せに修正（2段でも自然） */
+.pair-card {
+  align-items: center !important;
+}
+
+/* 損益・利益率の間隔をわずかに広げて視認性UP */
+.pair-right {
+  gap: 3px !important;
+}
+
+/* hover背景をわずかに強調して行の境目を見やすく */
+.pair-card:hover {
+  background: rgba(255,255,255,0.07) !important;
+}
+/* 最終行のみ下線を非表示にする */
+.sortable-list .pair-card:last-child {
+  border-bottom: none !important;
+}
+/* =========================
+   ▼ モバイル時の右ペイン修正版（左を10%残す）
+   ========================= */
+@media (max-width: 768px) {
+  .pair-detail {
+    width: 65%;                            /* ← 幅を65%に固定（左35%残す） */
+    right: -65%;                           /* ← 初期位置を画面外へ */
+    transition: right 0.35s ease-in-out;   /* ← スライド復活（transformではなくrightで） */
+  }
+
+  .pair-detail.open {
+    right: 0;                              /* ← 開いた時に右端ぴったり */
+  }
+}
+/* =========================
+   右ペイン本文デザイン（改善案適用）
+========================= */
+
+/* 各セクション全体の区切りをやや明確化 */
+.pair-detail .detail-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+.pair-detail .detail-section:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* セクション見出し */
+.pair-detail .detail-section h4 {
+  position: relative;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f3ff;
+  margin-bottom: 10px;
+  padding-left: 10px;
+  line-height: 1.4;
+}
+
+/* 見出し左にグラデーションバー */
+.pair-detail .detail-section h4::before {
   content: "";
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: -20px;
-  height: 20px;
-  background: rgba(15, 15, 15, 0.85);
+  top: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3EE08F, #3DA2FF);
 }
 
-/* === PC向け拡張（幅481px以上）=== */
-@media (min-width: 481px) {
-  .button-grid {
-    column-gap: 6px;
-    row-gap: 8px;
-    padding: 16px;
-    max-width: 600px;
-    margin: 0 auto;
+/* グリッド配置（全デバイス1列固定・行間最適化） */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 6px;                /* 各行間隔を少し詰める */
+  font-size: 13.5px;
+  line-height: 1.5;            /* 適度な行間で読みやすく */
+  padding: 2px 0;
+}
+
+/* ラベル（span）と値（strong）の整列 */
+.detail-grid span {
+  display: block;
+  color: #aab5d0;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  margin-bottom: 2px;          /* ラベルと値の間に軽い余白 */
+}
+
+.detail-grid strong {
+  display: block;
+  text-align: left;            /* 値も左寄せで自然に */
+  font-weight: 700;
+  color: #fff;
+  font-size: 14px;
+  margin-bottom: 4px;          /* 各ペア間の余白 */
+}
+
+/* 値の色分け */
+.detail-grid strong.positive { color: #3EE08F; }
+.detail-grid strong.negative { color: #FF6B6B; }
+.detail-grid strong.neutral  { color: #ccc; }
+
+/* 数値整列（右寄せ） */
+.detail-grid strong {
+  text-align: right;
+  display: block;
+}
+
+/* 値に応じた色 */
+.detail-grid strong.positive { color: #3EE08F; }
+.detail-grid strong.negative { color: #FF6B6B; }
+
+/* コメント欄 */
+.detail-note {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  line-height: 1.7;
+  font-size: 13.5px;
+  color: #e6e9f5;
+}
+
+/* コメント上の見出し */
+.detail-note h4 {
+  font-size: 13.5px;
+  color: #9fa8c0;
+  margin-bottom: 6px;
+  border-left: 3px solid rgba(255,255,255,0.2);
+  padding-left: 8px;
+}
+
+/* チャート下の統計補助情報 */
+.detail-chart-info {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #aab5d0;
+  text-align: right;
+  opacity: 0.9;
+}
+
+/* セクション出現アニメーション */
+.detail-section {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fadeInUp 0.4s ease forwards;
+}
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 開くアニメーション */
+.pair-detail.open {
+  right: 0;
+}
+
+/* ヘッダー（左端まで背景拡張・縦配置） */
+.detail-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2;
+  padding: 4px 0 2px; /* ← 左右paddingを削除して端まで伸ばす */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgb(15, 15, 30); /* ← 不透過で透け防止維持 */
+}
+
+.detail-header::before {
+  content: "";
+  position: absolute;
+  top: -20px;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: rgb(15, 15, 30);            /* ← こちらも非透過で統一 */
+}
+
+.detail-header h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.detail-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1;
+  margin: -10px 0 0;              /* ← これが詰めの核心 */
+}
+
+.detail-stats .profit {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* 利率（+/-で色を変える） */
+.detail-stats .rate-change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rate-change.positive {
+  color: #3EE08F;   /* 緑：上昇 */
+}
+
+.rate-change.negative {
+  color: #FF6B6B;   /* 赤：下落 */
+}
+
+.rate-change.neutral {
+  color: #ccc;      /* グレー：変化なし */
+}
+#detailClose {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 18px;
+  cursor: pointer;
+  transition: opacity 0.25s;
+}
+
+#detailClose:hover {
+  opacity: 1;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* セクション共通（本文スクロールエリア） */
+.detail-body {
+  flex: 1;                   /* ← 残りの高さを全て使う */
+  overflow-y: auto;          /* ← 縦スクロールのみ有効 */
+  overflow-x: hidden;        /* ← 横スクロール禁止 */
+  padding: 16px 18px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  scroll-behavior: smooth;   /* ← スクロールを自然に */
+}
+.detail-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #aab5d0;
+  margin-bottom: 8px;
+  border-left: 3px solid rgba(255,255,255,0.25);
+  padding-left: 8px;
+}
+.detail-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* 内部要素（保険で制限） */
+.detail-section,
+.detail-grid,
+.detail-chart,
+.detail-note {
+  max-width: 100%;          /* ← 横はみ出し防止 */
+  overflow-x: hidden;       /* ← 子要素がはみ出す場合も抑制 */
+  box-sizing: border-box;
+}
+
+/* グリッド整列 */
+.detail-section {
+  background: rgba(255,255,255,0.03) !important; /* ← ごく薄い背景を復活 */
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important; /* ← 区切り線 */
+  box-shadow: none !important;
+  border-radius: 10px;
+  padding: 12px 16px 10px !important;
+  margin-bottom: 8px; /* ← セクション間の余白 */
+}
+
+.pair-detail .detail-section:last-of-type {
+  border-bottom: none !important;
+}
+
+/* グリッド整列 */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  font-size: 13px;
+  font-family: "Inter", "Roboto Mono", monospace; /* ← 桁揃え */
+}
+.detail-grid span {
+  color: #cfd5e6;
+  font-size: 12.5px; /* ← わずかに下げて主従明確化 */
+}
+.detail-grid strong {
+  font-weight: 600;
+  color: #fff;
+  font-size: 13.5px;
+}
+
+/* ===== 右ペイン：ラベルと値を同一行で横並びに表示（非破壊版） ===== */
+.detail-grid {
+  display: flex !important;
+  flex-direction: column;
+  gap: 6px; /* 各行の間隔 */
+}
+
+.detail-grid > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.detail-grid span {
+  text-align: left;
+  color: #cfd5e6;
+  font-size: 13px;
+  flex: 1;
+}
+
+.detail-grid strong {
+  text-align: right;
+  font-weight: 600;
+  color: #fff;
+  font-size: 13.5px;
+  min-width: 60px;
+}
+
+/* ===== detail-grid：右端で完全整列（確定版） ===== */
+.detail-grid {
+  width: 100%;                        /* ← 親幅を全体に拡張 */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.detail-grid > div {
+  display: flex;
+  justify-content: space-between;     /* ← 左右端にラベルと値を配置 */
+  align-items: baseline;
+  width: 100%;
+}
+
+.detail-grid span {
+  flex: 1;
+  color: #cfd5e6;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.detail-grid strong {
+  flex-shrink: 0;                     /* ← 数字幅が潰れないように固定 */
+  text-align: right;                  /* ← 数値を右寄せ */
+  font-weight: 600;
+  color: #fff;
+  font-size: 13.5px;
+  font-family: "Inter", "Roboto Mono", monospace; /* ← 桁揃え */
+  min-width: 90px;                    /* ← 各行の右端基準を統一 */
+  box-sizing: border-box;
+}
+
+/* ===== 右ペイン：詳細グリッドを全デバイス1列に統一 ===== */
+.detail-grid {
+  grid-template-columns: 1fr !important;  /* ← 強制的に1列表示 */
+  row-gap: 6px !important;                /* ← 各行の間隔を少し詰める */
+}
+
+/* チャート */
+.detail-chart {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* キャンバス（チャート）自体を最大表示＆フラットに */
+.detail-chart canvas {
+  display: block;
+  width: 100%;
+  height: 200px; /* ← 少し大きめにして見やすく */
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ===== グラフエリアの余白を完全除去（入れ子構造対応） ===== */
+.detail-section .detail-chart {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.detail-section .detail-chart canvas {
+  display: block;
+  width: 100%;
+  height: 220px; /* 必要に応じて高さ調整 */
+  border-radius: 0;
+  background: transparent !important;
+}
+
+/* detail-body 下部の余白も除去（必要なら） */
+.detail-body {
+  padding-bottom: 0 !important;
+}
+
+/* ============================
+   Portfolio Section
+============================ */
+.portfolio-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.portfolio-chart-container {
+  position: relative;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.portfolio-chart-container canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.portfolio-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4px 0 8px;
+}
+
+.portfolio-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.portfolio-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  font-size: 13px;
+}
+
+.portfolio-item:last-child {
+  border-bottom: none;
+}
+
+.portfolio-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.portfolio-amount {
+  text-align: right;
+  min-width: 100px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.portfolio-percent {
+  text-align: right;
+  min-width: 50px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.portfolio-columns {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 0 20px;
+  align-items: start;
+}
+
+.portfolio-col-divider {
+  background: rgba(255,255,255,.08);
+  align-self: stretch;
+}
+
+.portfolio-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.portfolio-col-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+.portfolio-chart-container {
+  position: relative;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-chart-container canvas {
+  max-width: 100%;
+  max-height: 100%;
+  filter: drop-shadow(0 0 10px rgba(61,162,255,0.12)) drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+}
+
+.portfolio-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portfolio-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0 8px 8px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  font-size: 12px;
+}
+
+.portfolio-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background-color: var(--item-color, #AAB5D0);
+}
+
+.portfolio-item:last-child {
+  border-bottom: none;
+}
+
+.portfolio-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.portfolio-amount {
+  text-align: right;
+  min-width: 88px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.portfolio-percent {
+  text-align: right;
+  min-width: 40px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* モバイル対応 */
+@media (max-width: 860px) {
+  .portfolio-columns {
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 0 12px;
   }
 
-  .feature-button {
-    font-size: 14px;
-    border-radius: 18px;
-    width: calc(100% - 6px);
+  .portfolio-col-divider {
+    height: auto;
+    width: 1px;
+    margin: 0;
   }
+
+  .portfolio-chart-container {
+    height: 170px;
+  }
+
+  .portfolio-item {
+    position: relative;
+    font-size: 11px;
+    gap: 8px;
+    padding: 7px 0 7px 8px;
+  }
+
+  .portfolio-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 3px;
+    bottom: 3px;
+    width: 3px;
+    background-color: var(--item-color, #AAB5D0);
+  }
+
+  .portfolio-amount {
+    min-width: 76px;
+  }
+
+  .portfolio-percent {
+    min-width: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .portfolio-columns {
+    gap: 0 8px;
+  }
+
+  .portfolio-col-title {
+    font-size: 11px;
+  }
+
+  .portfolio-chart-container {
+    height: 130px;
+  }
+
+  .portfolio-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label amount"
+      "label percent";
+    column-gap: 8px;
+    row-gap: 2px;
+    align-items: center;
+    font-size: 10px;
+    padding: 6px 0 6px 6px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+
+  .portfolio-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 24px;
+    background-color: var(--item-color, #AAB5D0);
+  }
+
+  .portfolio-label {
+    grid-area: label;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-amount {
+    grid-area: amount;
+    min-width: 64px;
+    font-size: 10px;
+    text-align: right;
+    justify-self: end;
+  }
+
+  .portfolio-percent {
+    grid-area: percent;
+    min-width: 64px;
+    font-size: 10px;
+    text-align: right;
+    justify-self: end;
+  }
+}
+
+/* コメント */
+.detail-note p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #eee;
+}
+
+/* モバイル調整 */
+@media (max-width: 480px) {
+  .pair-detail {
+    width: 65%;             /* ← スマホで左側を少し残す */
+  }
+  .detail-section {
+    padding: 10px 12px;
+  }
+  .detail-header h3 {
+    font-size: 16px;
+  }
+}
+/* ===== Right Pane: カ;ド見た目だけ撤去（非破壊パッチ） ===== */
+.pair-detail .glass,
+.pair-detail .detail-card,
+.pair-detail .detail-section {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* 余白は維持（必要なら微調整） */
+.pair-detail .detail-section {
+  padding: 6px 16px !important;
+}
+
+/* ===== Right Pane - Flat Layout Polishing ===== */
+.pair-detail {
+  color: #e5e8f0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* セクション全体の間隔（コンパクト化） */
+.pair-detail section,
+.pair-detail .detail-section {
+  margin: 2px 0 !important;        /* ← 10px → 2px に */
+  padding: 2px 0 !important;       /* ← padding-bottom も詰める */
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+/* 最終セクションだけは余白をゼロに */
+.pair-detail section:last-of-type,
+.pair-detail .detail-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* セクション見出し（グレー棒削除＋グラデーション維持） */
+.pair-detail h3,
+.pair-detail h4 {
+  font-size: 15px !important;
+  font-weight: 650 !important;
+  margin-bottom: 8px !important;
+  color: rgba(255,255,255,0.95) !important;
+  padding-left: 9px !important;
+  letter-spacing: 0.2px !important;
+  border-left: none !important; /* ← グレー棒を完全削除 */
+}
+
+/* 見出し左のグラデーションバーを残す */
+.pair-detail .detail-section h4::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3EE08F, #3DA2FF);
+}
+
+/* ラベル＋値 */
+.pair-detail .detail-grid span {
+  color: #cfd5e6;
+}
+.pair-detail .detail-grid strong {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* 損益など強調テキストのマージン微調整 */
+.pair-detail p {
+  margin: 3px 0;
+}
+
+/* 最下部コメントの余白調整 */
+.pair-detail .detail-section:last-of-type {
+  margin-bottom: 25;
+}
+/* ===== Chart Tabs ===== */
+.chart-tabs {
+  display: flex;
+  justify-content: space-around;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.chart-tab {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 6px 0;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(4px);
+}
+
+.chart-tab:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.chart-tab.active {
+  background: linear-gradient(90deg, #3EE08F55, #3DA2FF55);
+  border-color: rgba(255,255,255,0.25);
+  color: #fff;
+  box-shadow: 0 0 8px rgba(61,162,255,0.4);
+}
+
+.detail-chart {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  padding: 8px;
 }

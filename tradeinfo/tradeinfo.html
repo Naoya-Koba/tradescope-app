@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>取引情報 | TradeScope</title>
+  <link rel="stylesheet" href="tradeinfo.css" />
+</head>
+<body>
+  <!-- ===== Header ===== -->
+  <header class="glass-header">
+    <button id="menuButton" class="icon-btn">☰</button>
+    <h1 class="page-title">
+      <a class="brand-link" href="../index.html" aria-label="トップページへ移動">TradeScope</a>
+      <span class="page-current">取引情報</span>
+    </h1>
+  </header>
+
+  <!-- ===== Drawer ===== -->
+  <aside id="drawer" class="drawer glass-card">
+    <button id="drawerClose" class="close-btn">✕</button>
+    <nav>
+      <a href="../index.html">🏠 トップ</a>
+      <a href="../tenkan/tenkan.html">🔄 転換シグナル</a>
+      <a href="../oshime.html">📈 押し/戻り</a>
+      <a href="../profit/soneki.html">💰 損益管理</a>
+      <a href="../analysis/rates.html">📉 政策金利予測</a>
+      <a href="../tradeinfo/tradeinfo.html" class="active">📊 取引情報</a>
+      <a href="../settings.html">⚙️ 設定</a>
+    </nav>
+  </aside>
+  <div id="scrim" hidden></div>
+
+  <!-- ===== Toast ===== -->
+  <div id="toast" hidden></div>
+
+  <!-- ===== Main ===== -->
+  <main class="container">
+    <!-- 集計エリア -->
+    <section class="summary glass-card">
+      <h2>成績サマリー</h2>
+      <div class="summary-grid">
+        <div><span>総取引数：</span><b id="totalTrades">0</b></div>
+        <div><span>勝率：</span><b id="winRate">0%</b></div>
+        <div><span>平均利益：</span><b id="avgProfit">¥0</b></div>
+        <div><span>平均損失：</span><b id="avgLoss">¥0</b></div>
+        <div><span>累計損益：</span><b id="totalProfit">¥0</b></div>
+      </div>
+    </section>
+
+    <!-- フィルター -->
+    <section class="filter glass-card">
+      <label>表示切替：</label>
+      <select id="statusFilter">
+        <option value="all">全取引</option>
+        <option value="open">保有中</option>
+        <option value="closed">決済済</option>
+      </select>
+    </section>
+
+    <!-- 取引リスト -->
+    <section id="tradeList" class="trade-list glass-card">
+      <table>
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>通貨ペア</th>
+            <th>売買</th>
+            <th>Lot</th>
+            <th>エントリー</th>
+            <th>決済</th>
+            <th>損益</th>
+            <th>コメント</th>
+            <th>状態</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tradeTableBody"></tbody>
+      </table>
+    </section>
+
+    <!-- 入力フォーム -->
+    <section class="input-area glass-card">
+      <div class="tab-header">
+        <button id="tabEntry" class="active">新規エントリー</button>
+        <button id="tabExit">決済入力</button>
+      </div>
+
+      <!-- 新規エントリーフォーム -->
+      <form id="entryForm" class="form active">
+        <label>日付 <input type="date" id="entryDate" /></label>
+        <label>通貨ペア <input type="text" id="entryPair" placeholder="例: USD/JPY" /></label>
+        <label>売買
+          <select id="entryType">
+            <option value="Buy">買</option>
+            <option value="Sell">売</option>
+          </select>
+        </label>
+        <label>Lot <input type="number" id="entryLot" step="0.1" /></label>
+        <label>エントリー価格 <input type="number" id="entryPrice" step="0.01" /></label>
+        <label>コメント <input type="text" id="entryComment" /></label>
+        <button type="submit" class="btn">保存</button>
+      </form>
+
+      <!-- 決済入力フォーム -->
+      <form id="exitForm" class="form">
+        <label>決済対象
+          <select id="exitSelect"></select>
+        </label>
+        <label>決済日 <input type="date" id="exitDate" /></label>
+        <label>決済価格 <input type="number" id="exitPrice" step="0.01" /></label>
+        <label>コメント <input type="text" id="exitComment" /></label>
+        <button type="submit" class="btn">保存</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="tradeinfo.js"></script>
+</body>
+</html>

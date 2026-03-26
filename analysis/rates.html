@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>政策金利予測 - TradeScope</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="rates.css" />
+</head>
+<body>
+  <header class="app-header glass-nav">
+    <button id="menuButton" class="icon-btn" aria-label="メニューを開く">☰</button>
+    <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>
+      <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>
+      <rect x="16" y="2" width="4" height="20" rx="1.5" fill="#3DA2FF"/>
+    </svg>
+    <h1 class="app-title">
+      <a class="brand-link" href="../index.html" aria-label="トップページへ移動">TradeScope</a>
+      <span class="page-current">政策金利予測</span>
+    </h1>
+    <button id="yearButton" class="year-btn">2025 ▼</button>
+  </header>
+
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <span>メニュー</span>
+      <button id="drawerClose" class="icon-btn" aria-label="閉じる">✕</button>
+    </div>
+    <nav class="drawer-nav">
+      <a href="../index.html">トップ</a>
+      <a href="../tenkan/tenkan.html">転換シグナル</a>
+      <a href="../oshime.html">押し/戻り</a>
+      <a href="../profit/soneki.html">損益管理</a>
+      <a href="../history.html">取引履歴</a>
+      <a href="./rates.html" class="active">政策金利予測</a>
+      <a href="../settings.html" class="secondary">設定</a>
+    </nav>
+  </aside>
+  <div id="scrim" class="scrim" hidden></div>
+
+  <main class="container">
+    <!-- Global Summary -->
+    <section class="section glass summary-card">
+      <div class="summary-top">
+        <div>
+          <div class="summary-label">世界平均金利（Global Avg Rate）</div>
+          <div id="avgRate" class="summary-value">-</div>
+        </div>
+        <div class="summary-meta">
+          <div class="summary-label">前年比変化（YoY Change）</div>
+          <div id="rateChange" class="summary-value small">-</div>
+        </div>
+      </div>
+      <div class="summary-bottom">
+        <div id="trendComment" class="trend-comment">-</div>
+        <div id="lastUpdated" class="updated-date">最終更新: -</div>
+      </div>
+    </section>
+
+    <!-- Country Rates -->
+    <section class="section glass">
+      <div class="grid" id="rateGrid"></div>
+    </section>
+  </main>
+
+  <script src="rates.js"></script>
+</body>
+</html>
