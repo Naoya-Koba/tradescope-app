@@ -5,6 +5,11 @@ const fmtJPY = (n) => {
   const sign = n < 0 ? '−' : '';
   return '¥' + sign + value;
 };
+const fmtMan = (n) => {
+  if (!isFinite(n)) return '-';
+  const sign = n < 0 ? '−' : '';
+  return sign + Math.round(Math.abs(n) / 10000).toLocaleString();
+};
 const setSignClass = (el, val) => {
   if (!el) return;
   el.classList.remove('positive', 'negative', 'neutral');
@@ -132,24 +137,129 @@ const demoMonthly = {
   realized: [500,520,540,560,580,600,610,620,640,660,680,700],
   total: [510,535,555,575,590,615,625,640,665,690,705,730]
 };
+const PROFIT_STORAGE_KEY_TRADING = 'tradingData';
+const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
+const LINKED_ACCOUNTS = [
+  { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
+  { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
+  { name: 'みんなのFX', key: 'minano', color: '#E9C85E' },
+  { name: 'SBI', key: 'sbi', color: '#D95757' },
+  { name: 'SBI VC', key: 'sbivc', color: '#EAF1FF' },
+  { name: '三井住友銀行', key: 'smbc', color: '#2F7A46' }
+];
+
+function parseStoredJson(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function getNumericYears(dataObj) {
+  return Object.keys(dataObj || {})
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v))
+    .sort((a, b) => a - b);
+}
+
+function calculateLinkedMonthlyTotals(tradingData, year, month) {
+  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
+  const monthData = yearData?.[month] || yearData?.[String(month)] || {};
+  return LINKED_ACCOUNTS.reduce((acc, account) => {
+    const row = monthData?.[account.key] || {};
+    acc.realized += Number(row.realizedPnL) || 0;
+    acc.swap += Number(row.swapPnL) || 0;
+    return acc;
+  }, { realized: 0, swap: 0 });
+}
+
+function calculateLinkedAccountNetAssets(tradingData, initialFunds, year, targetMonth, accountKey) {
+  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
+  const yearInitial = initialFunds?.[year] || initialFunds?.[String(year)] || {};
+  const initial = Number(yearInitial?.[accountKey]) || 0;
+
+  let realized = 0;
+  let swap = 0;
+  let deposit = 0;
+  let withdrawal = 0;
+
+  for (let month = 1; month <= targetMonth; month += 1) {
+    const row = yearData?.[month]?.[accountKey] || yearData?.[String(month)]?.[accountKey] || {};
+    realized += Number(row.realizedPnL) || 0;
+    swap += Number(row.swapPnL) || 0;
+    deposit += Number(row.deposit) || 0;
+    withdrawal += Number(row.withdrawal) || 0;
+  }
+
+  const currentRow = yearData?.[targetMonth]?.[accountKey] || yearData?.[String(targetMonth)]?.[accountKey] || {};
+  const unrealized = Number(currentRow.unrealizedPnL) || 0;
+
+  return initial + realized + swap + deposit - withdrawal + unrealized;
+}
+
+function buildTopLinkedData() {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
+  const years = getNumericYears(tradingData);
+  if (!years.length) return null;
+
+  const targetYear = years[years.length - 1];
+  const realized = [];
+  const total = [];
+  let cumulativeRealized = 0;
+
+  for (let month = 1; month <= 12; month += 1) {
+    const monthly = calculateLinkedMonthlyTotals(tradingData, targetYear, month);
+    cumulativeRealized += monthly.realized + monthly.swap;
+    realized.push(cumulativeRealized);
+
+    const monthTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
+      return sum + calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, month, account.key);
+    }, 0);
+    total.push(monthTotal);
+  }
+
+  const latestMonth = (() => {
+    const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
+    for (let month = 12; month >= 1; month -= 1) {
+      if (yearData?.[month] || yearData?.[String(month)]) return month;
+    }
+    return 12;
+  })();
+
+  const linkedAccountData = LINKED_ACCOUNTS.map((account) => ({
+    label: account.name,
+    amount: Math.max(0, calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, latestMonth, account.key)),
+    color: account.color
+  })).filter((item) => item.amount > 0);
+
+  return {
+    realized,
+    total,
+    accountData: linkedAccountData,
+    year: targetYear,
+    month: latestMonth
+  };
+}
+
+const fallbackTopData = {
+  realized: demoMonthly.realized.map((v) => v * 10000),
+  total: demoMonthly.total.map((v) => v * 10000),
+  accountData: null
+};
+const linkedTopData = buildTopLinkedData();
+const topSeries = linkedTopData || fallbackTopData;
 const lotsByPair = { TRY:300, HUF:200, MXN:150, ZAR:80 };
 const risk = { zero:-3280000, half:-1640000, mmr:265 };
 const swapToday = { total:12300, pairs:[['TRY',7800],['HUF',2900],['MXN',1600]] };
 const swapYearForecast = 532000;
 
 // ===== Portfolio Data =====
-const accountData = [
-  { label: 'GMO',         amount: 1800000, color: '#3B6DFF' },
-  { label: 'Light FX',    amount:  950000, color: '#74D2F5' },
-  { label: 'みんなのFX',  amount: 1200000, color: '#E9C85E' },
-  { label: 'SBI',         amount: 1500000, color: '#D95757' },
-  { label: 'SBI VC',      amount:  568000, color: '#EAF1FF' },
-  { label: '三井住友銀行', amount: 1282000, color: '#2F7A46' }
-];
+let accountData = topSeries.accountData?.length ? topSeries.accountData : [];
 
 const portfolioData = [
-  { label: 'キャリー', amount: 3650000, color: '#E9C85E' },
-  { label: 'キャピタルゲイン', amount: 910000, color: '#3B6DFF' },
+  { label: 'FX', amount: 4560000, color: '#3B6DFF' },
   { label: '暗号資産', amount: 568000, color: '#EAF1FF' },
   { label: 'NISA', amount: 1260000, color: '#D95757' },
   { label: '現金', amount: 710000, color: '#2F7A46' },
@@ -158,11 +268,11 @@ const portfolioData = [
 
 // ===== KPI =====
 function updateKPIs() {
-  const i = demoMonthly.realized.length - 1;
-  const rLast = demoMonthly.realized[i]*10000;
-  const tLast = demoMonthly.total[i]*10000;
-  const rPrev = demoMonthly.realized[i-1]*10000;
-  const tPrev = demoMonthly.total[i-1]*10000;
+  const i = topSeries.realized.length - 1;
+  const rLast = topSeries.realized[i];
+  const tLast = topSeries.total[i];
+  const rPrev = topSeries.realized[i - 1];
+  const tPrev = topSeries.total[i - 1];
 
   const elTotal = document.getElementById('kpiTotal');
   elTotal.textContent = fmtJPY(tLast);
@@ -194,33 +304,256 @@ function updateSwap() {
 }
 updateSwap();
 
-// ===== Position & Risk: Right Panel =====
+// ===== Position & Risk: Detail Panel (unified behavior) =====
 const pairCards = document.querySelectorAll('.pair-card');
-const detailView = document.getElementById('detailView');
-const detailPair = document.getElementById('detailPair');
+const detailPanel = document.getElementById('pairDetailPanel');
+const detailTitle = document.getElementById('detailTitle');
 const detailProfit = document.getElementById('detailProfit');
 const detailRate = document.getElementById('detailRate');
+const detailLots = document.getElementById('detailLots');
+const detailAvg = document.getElementById('detailAvg');
+const detailNow = document.getElementById('detailNow');
+const detailMMR = document.getElementById('detailMMR');
+const detailZero = document.getElementById('detailZero');
+const detailHalf = document.getElementById('detailHalf');
+const detailNote = document.getElementById('detailNote');
 const detailClose = document.getElementById('detailClose');
+let detailScrim = document.getElementById('pairDetailScrim');
+let detailLockScrollY = 0;
+
+if (!detailScrim) {
+  detailScrim = document.createElement('div');
+  detailScrim.id = 'pairDetailScrim';
+  detailScrim.className = 'pair-detail-scrim';
+  detailScrim.hidden = true;
+  document.body.appendChild(detailScrim);
+}
 
 const pairDetails = {
-  'USDJPY': {profit:'¥25,000', rate:'+2.3%', lots:300, avg:'3.250', now:'3.630', swap:'¥1,095,000', daily:'¥260', zero:'-¥3,280,000', mmr:'265%', note:'高スワップ維持中。利確目標は3.8。'},
-  'TRYJPY': {profit:'¥1,095,000', rate:'+4.1%', lots:300, avg:'3.250', now:'3.630', swap:'¥1,095,000', daily:'¥280', zero:'-¥3,280,000', mmr:'270%', note:'安定推移中。'},
-  'HUFJPY': {profit:'-¥42,000', rate:'-0.5%', lots:200, avg:'0.410', now:'0.445', swap:'¥75,000', daily:'¥95', zero:'-¥820,000', mmr:'310%', note:'金利低下懸念。'}
+  'USDJPY': { profit: '¥25,000', rate: '+2.3%', lots: '300', avg: '3.250', now: '3.630', mmr: '265%', zero: '-¥3,280,000', half: '-¥1,640,000', note: '高スワップ維持中。利確目標は3.8。' },
+  'EURJPY': { profit: '¥14,000', rate: '+0.9%', lots: '220', avg: '168.200', now: '169.110', mmr: '278%', zero: '-¥1,840,000', half: '-¥920,000', note: '押し目待ち。利確と積み増しを分離。' },
+  'GBPJPY': { profit: '¥−6,000', rate: '-0.8%', lots: '180', avg: '201.800', now: '200.190', mmr: '241%', zero: '-¥2,120,000', half: '-¥1,060,000', note: 'ボラ高め。逆行時はロット調整優先。' },
+  'CHFJPY': { profit: '¥4,500', rate: '+0.3%', lots: '140', avg: '174.020', now: '174.550', mmr: '286%', zero: '-¥1,420,000', half: '-¥710,000', note: '中立。スワップ寄与を観察。' },
+  'AUDJPY': { profit: '¥18,000', rate: '+1.1%', lots: '200', avg: '96.800', now: '97.860', mmr: '268%', zero: '-¥1,760,000', half: '-¥880,000', note: '押し目で分割追加予定。' },
+  'NZDJPY': { profit: '¥12,000', rate: '+0.7%', lots: '170', avg: '89.500', now: '90.120', mmr: '276%', zero: '-¥1,520,000', half: '-¥760,000', note: '短期はレンジ想定。' },
+  'TRYJPY': { profit: '¥1,095,000', rate: '+4.1%', lots: '300', avg: '3.250', now: '3.630', mmr: '270%', zero: '-¥3,280,000', half: '-¥1,640,000', note: '安定推移中。' },
+  'HUFJPY': { profit: '¥−42,000', rate: '-0.5%', lots: '200', avg: '0.410', now: '0.445', mmr: '310%', zero: '-¥820,000', half: '-¥410,000', note: '金利低下懸念。' },
+  'MXNJPY': { profit: '¥265,000', rate: '+1.9%', lots: '150', avg: '8.710', now: '8.980', mmr: '289%', zero: '-¥1,260,000', half: '-¥630,000', note: '保有継続。急騰時は部分利確。' },
+  'ZARJPY': { profit: '¥85,000', rate: '+0.6%', lots: '110', avg: '8.020', now: '8.170', mmr: '295%', zero: '-¥960,000', half: '-¥480,000', note: 'ニュースイベント時は注意。' },
+  'EURUSD': { profit: '¥0', rate: '0.0%', lots: '0', avg: '1.080', now: '1.080', mmr: '---', zero: '---', half: '---', note: '現在ポジションなし。' }
 };
 
-// --- カードクリックで右ペイン開く ---
-pairCards.forEach(card => {
-  card.addEventListener('click', () => {
-    const key = card.dataset.pair;
-    const data = pairDetails[key];
-    if (!data) return;
+function lockBackgroundScroll() {
+  detailLockScrollY = window.scrollY || window.pageYOffset || 0;
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    document.documentElement.classList.add('detail-open');
+    document.body.classList.add('detail-open');
+  }
+}
 
-    detailPair.textContent = card.querySelector('.pair-title').textContent;
+function unlockBackgroundScroll() {
+  document.documentElement.classList.remove('detail-open');
+  document.body.classList.remove('detail-open');
+}
+
+function applyRateClass(el, rawText) {
+  if (!el) return;
+  const normalized = String(rawText).replace(/−/g, '-');
+  const numeric = parseFloat(normalized.replace(/[^\d.-]/g, ''));
+  el.classList.remove('positive', 'negative', 'neutral');
+  if (numeric > 0) el.classList.add('positive');
+  else if (numeric < 0) el.classList.add('negative');
+  else el.classList.add('neutral');
+}
+
+function openDetail(card) {
+  if (!detailPanel || !card) return;
+  const pair = card.dataset.pair || '';
+  const title = card.querySelector('.pair-title')?.textContent || pair;
+  const fallbackProfit = card.querySelector('.pair-profit')?.textContent || '¥0';
+  const fallbackRate = card.querySelector('.pair-growth')?.textContent || '0.0%';
+  const data = pairDetails[pair] || {
+    profit: fallbackProfit,
+    rate: fallbackRate,
+    lots: detailLots?.textContent || '---',
+    avg: detailAvg?.textContent || '---',
+    now: detailNow?.textContent || '---',
+    mmr: detailMMR?.textContent || '---',
+    zero: detailZero?.textContent || '---',
+    half: detailHalf?.textContent || '---',
+    note: detailNote?.textContent || 'データ準備中。'
+  };
+
+  if (detailTitle) detailTitle.textContent = title;
+  if (detailProfit) {
     detailProfit.textContent = data.profit;
-    detailRate.textContent = `(${data.rate})`;
-    detailView.hidden = false;
-  });
+    detailProfit.classList.remove('positive', 'negative', 'neutral');
+    if (data.profit.includes('−') || data.profit.includes('-')) detailProfit.classList.add('negative');
+    else if (data.profit.includes('0')) detailProfit.classList.add('neutral');
+    else detailProfit.classList.add('positive');
+  }
+  if (detailRate) {
+    detailRate.textContent = data.rate;
+    applyRateClass(detailRate, data.rate);
+  }
+  if (detailLots) detailLots.textContent = data.lots;
+  if (detailAvg) detailAvg.textContent = data.avg;
+  if (detailNow) detailNow.textContent = data.now;
+  if (detailMMR) detailMMR.textContent = data.mmr;
+  if (detailZero) detailZero.textContent = data.zero;
+  if (detailHalf) detailHalf.textContent = data.half;
+  if (detailNote) detailNote.textContent = data.note;
+
+  detailPanel.classList.add('open');
+  detailPanel.setAttribute('aria-hidden', 'false');
+  detailPanel.style.transform = '';
+  lockBackgroundScroll();
+  detailScrim.hidden = false;
+  requestAnimationFrame(() => detailScrim.classList.add('show'));
+}
+
+function closeDetail() {
+  if (!detailPanel) return;
+  detailPanel.classList.remove('open');
+  detailPanel.setAttribute('aria-hidden', 'true');
+  detailPanel.style.transform = '';
+  unlockBackgroundScroll();
+  detailScrim.classList.remove('show');
+  setTimeout(() => {
+    detailScrim.hidden = true;
+  }, 250);
+}
+
+pairCards.forEach((card) => {
+  card.addEventListener('click', () => openDetail(card));
 });
+
+detailClose?.addEventListener('click', closeDetail);
+detailScrim?.addEventListener('click', closeDetail);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && detailPanel?.classList.contains('open')) {
+    closeDetail();
+  }
+});
+
+// モバイルは下方向スワイプで閉じる、横レイアウト時は右スワイプで閉じる。
+(() => {
+  if (!detailPanel) return;
+  let startX = 0;
+  let startY = 0;
+  let canDismissBySwipe = false;
+  let isTracking = false;
+
+  detailPanel.addEventListener('touchstart', (e) => {
+    if (!detailPanel.classList.contains('open')) return;
+    if (e.touches.length !== 1) return;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const rect = detailPanel.getBoundingClientRect();
+    const touchYFromPanelTop = e.touches[0].clientY - rect.top;
+    const startedNearHeader = touchYFromPanelTop <= 96;
+    const atTop = detailPanel.scrollTop <= 2;
+
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    canDismissBySwipe = isMobile ? (atTop || startedNearHeader) : true;
+    isTracking = canDismissBySwipe;
+    if (isTracking) {
+      detailPanel.style.transition = 'none';
+    }
+  }, { passive: true });
+
+  detailPanel.addEventListener('touchmove', (e) => {
+    if (!isTracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (isMobile && dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+      detailPanel.style.transform = `translateY(${Math.min(dy, 220)}px)`;
+    } else if (!isMobile && dx > 0 && Math.abs(dx) > Math.abs(dy)) {
+      detailPanel.style.transform = `translateX(${Math.min(dx, 220)}px)`;
+    }
+  }, { passive: true });
+
+  detailPanel.addEventListener('touchend', (e) => {
+    if (!isTracking) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const shouldClose = isMobile
+      ? (canDismissBySwipe && dy > 110 && Math.abs(dy) > Math.abs(dx) * 1.05)
+      : (dx > 120 && Math.abs(dx) > Math.abs(dy) * 1.1);
+    detailPanel.style.transition = '';
+    if (shouldClose) closeDetail();
+    else detailPanel.style.transform = '';
+    isTracking = false;
+    canDismissBySwipe = false;
+  });
+})();
+
+// iPad等で右ペイン端のスクロールが背景へ伝播するのを防ぐ。
+(() => {
+  if (!detailPanel) return;
+  let lastY = 0;
+
+  detailPanel.addEventListener('touchstart', (e) => {
+    if (!detailPanel.classList.contains('open')) return;
+    if (e.touches.length !== 1) return;
+    lastY = e.touches[0].clientY;
+  }, { passive: true });
+
+  detailPanel.addEventListener('touchmove', (e) => {
+    if (!detailPanel.classList.contains('open')) return;
+    // モバイル(bottom sheet)は既存の閉じジェスチャー制御に任せる。
+    if (window.matchMedia('(max-width: 768px)').matches) return;
+    if (e.touches.length !== 1) return;
+
+    const currentY = e.touches[0].clientY;
+    const dy = currentY - lastY;
+    lastY = currentY;
+
+    const canScroll = detailPanel.scrollHeight > detailPanel.clientHeight + 1;
+    const atTop = detailPanel.scrollTop <= 1;
+    const atBottom = detailPanel.scrollTop + detailPanel.clientHeight >= detailPanel.scrollHeight - 1;
+
+    if (!canScroll || (atTop && dy > 0) || (atBottom && dy < 0)) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+})();
+
+// 詳細表示中は、パネル外タッチで背景のスクロールを発生させない。
+document.addEventListener('touchmove', (e) => {
+  if (!detailPanel?.classList.contains('open')) return;
+  if (!detailPanel.contains(e.target)) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+document.addEventListener('wheel', (e) => {
+  if (!detailPanel?.classList.contains('open')) return;
+  if (!detailPanel.contains(e.target)) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+function adjustDetailHeight() {
+  if (!detailPanel) return;
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    const viewportHeight = Math.floor(window.visualViewport?.height || window.innerHeight);
+    const vh = Math.floor(viewportHeight * 0.9);
+    detailPanel.style.setProperty('--detail-sheet-height', `${vh}px`);
+  } else {
+    detailPanel.style.removeProperty('--detail-sheet-height');
+  }
+}
+
+window.addEventListener('load', adjustDetailHeight);
+window.addEventListener('resize', adjustDetailHeight);
+window.addEventListener('orientationchange', adjustDetailHeight);
+window.visualViewport?.addEventListener('resize', adjustDetailHeight);
+setTimeout(adjustDetailHeight, 200);
 
 // ===== Chart =====
 const ctx = document.getElementById('perfChart')?.getContext('2d');
@@ -243,7 +576,7 @@ if (ctx) {
       datasets: [
         {
           label: 'Realized Balance',
-          data: demoMonthly.realized,
+          data: topSeries.realized,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
           fill: true,
@@ -252,7 +585,7 @@ if (ctx) {
         },
         {
           label: 'Total Balance',
-          data: demoMonthly.total,
+          data: topSeries.total,
           borderColor: '#3EE08F',
           backgroundColor: gradGreen,
           fill: true,
@@ -264,14 +597,25 @@ if (ctx) {
     options: {
       maintainAspectRatio: false,
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`
+          }
+        }
+      },
       scales: {
         x: {
           ticks: { color: 'rgba(255,255,255,0.8)', font: { size: tickFontSize } },
           grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
         },
         y: {
-          ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 12 } },
+          ticks: {
+            color: 'rgba(255,255,255,0.8)',
+            font: { size: 12 },
+            callback: (v) => fmtMan(v)
+          },
           grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
         }
       }
@@ -384,116 +728,3 @@ function renderPortfolio() {
   }
 }
 renderPortfolio();
-
-// ===== Pair Detail Panel 開閉（右ペイン版）=====
-document.querySelectorAll('.pair-card').forEach(card => {
-  card.addEventListener('click', () => {
-    const panel = document.getElementById('pairDetailPanel');
-    if (!panel) return;
-    const title = card.querySelector('.pair-title')?.textContent || '';
-    panel.querySelector('#detailTitle').textContent = title;
-    panel.classList.add('open');
-    panel.setAttribute('aria-hidden', 'false');
-  });
-});
-
-// ===== （右スライドで閉じるアニメーション付き） =====
-document.getElementById('detailClose')?.addEventListener('click', () => {
-  const panel = document.getElementById('pairDetailPanel');
-  if (!panel) return;
-  panel.style.transition = 'transform 0.35s ease';
-  panel.style.transform = 'translateX(100%)';
-  setTimeout(() => {
-    panel.classList.remove('open');
-    panel.setAttribute('aria-hidden', 'true');
-    panel.style.transform = '';
-    panel.style.transition = '';
-  }, 350);
-});
-
-// ================================
-// スワイプで右ペインを閉じる
-// ================================
-(() => {
-  const detail = document.querySelector('.pair-detail');
-  if (!detail) return;
-
-  let startX = 0;
-  let currentX = 0;
-  let isSwiping = false;
-
-  detail.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    startX = e.touches[0].clientX;
-    isSwiping = true;
-    detail.style.transition = 'none';
-  });
-
-  detail.addEventListener('touchmove', (e) => {
-    if (!isSwiping) return;
-    currentX = e.touches[0].clientX;
-    const diffX = currentX - startX;
-    if (diffX > 0) {
-      detail.style.transform = `translateX(${Math.min(diffX, 150)}px)`;
-    }
-  });
-
-  detail.addEventListener('touchend', () => {
-    if (!isSwiping) return;
-    const diffX = currentX - startX;
-    detail.style.transition = 'transform 0.35s ease';
-
-    if (diffX > 100) {
-      detail.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        detail.classList.remove('open');
-        detail.style.transform = '';
-      }, 350);
-    } else {
-      detail.style.transform = 'translateX(0%)';
-    }
-    isSwiping = false;
-  });
-})();
-document.querySelectorAll('.rate-change').forEach(el => {
-  const val = parseFloat(el.textContent);
-  el.classList.remove('positive', 'negative', 'neutral');
-  if (val > 0) el.classList.add('positive');
-  else if (val < 0) el.classList.add('negative');
-  else el.classList.add('neutral');
-});
-// ===== 利率カラー適用 =====
-window.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll('.rate-change').forEach(el => {
-    const val = parseFloat(el.textContent.replace(/[^\d.-]/g, ''));
-    el.classList.remove('positive', 'negative', 'neutral');
-    if (val > 0) el.classList.add('positive');
-    else if (val < 0) el.classList.add('negative');
-    else el.classList.add('neutral');
-  });
-});
-// 括弧を削除（利率表示整形）
-document.querySelectorAll('.rate-change').forEach(el => {
-  el.textContent = el.textContent.replace(/[()]/g, '');
-});
-/* =========================
-   iPhone Safari用：右ペイン高さを完全フィットさせる
-========================= */
-function adjustDetailHeight() {
-  const pane = document.querySelector('.pair-detail');
-  if (!pane) return;
-
-  // 実際の見える範囲（ビジュアルビューポート）を優先
-  const realHeight = document.documentElement.clientHeight || window.innerHeight;
-
-  // 高さをCSSに反映（!importantで強制）
-  pane.style.setProperty('height', `${realHeight}px`, 'important');
-  pane.style.setProperty('min-height', `${realHeight}px`, 'important');
-  pane.style.setProperty('max-height', `${realHeight}px`, 'important');
-}
-
-// 初期化とイベント監視
-window.addEventListener('load', adjustDetailHeight);
-window.addEventListener('resize', adjustDetailHeight);
-window.addEventListener('orientationchange', adjustDetailHeight);
-setTimeout(adjustDetailHeight, 200); // Safari対策で遅延実行

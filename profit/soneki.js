@@ -1,5 +1,6 @@
 // ===== Utility =====
 const fmtJPY = n => isFinite(n) ? '¥' + Math.round(n).toLocaleString() : '-';
+const fmtMan = n => isFinite(n) ? Math.round(n / 10000).toLocaleString() : '-';
 const colorBySign = n => (Number(n) < 0 ? '#FF6B6B' : '#EEF1FF');
 const setSignClass = (el, val) => {
   if (!el) return;
@@ -16,7 +17,8 @@ const ACCOUNTS = [
   { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
   { name: 'みんなのFX', key: 'minano', color: '#E9C85E' },
   { name: 'SBI', key: 'sbi', color: '#D95757' },
-  { name: 'SBI VC', key: 'sbivc', color: '#EAF1FF' }
+  { name: 'SBI VC', key: 'sbivc', color: '#EAF1FF' },
+  { name: '三井住友銀行', key: 'smbc', color: '#2F7A46', bankOnly: true }
 ];
 
 // ===== Drawer =====
@@ -164,9 +166,9 @@ function rerenderAfterDataChange() {
 // ===== Data Calculation =====
 function ensureYearMonth(year, month) {
   if (!tradingData[year]) tradingData[year] = {};
-  if (!tradingData[year][month]) {
-    tradingData[year][month] = {};
-    ACCOUNTS.forEach(a => {
+  if (!tradingData[year][month]) tradingData[year][month] = {};
+  ACCOUNTS.forEach(a => {
+    if (!tradingData[year][month][a.key]) {
       tradingData[year][month][a.key] = {
         realizedPnL: 0,
         swapPnL: 0,
@@ -175,8 +177,8 @@ function ensureYearMonth(year, month) {
         deposit: 0,
         withdrawal: 0
       };
-    });
-  }
+    }
+  });
 }
 
 function calculateMonthlyTotals(year, month) {
@@ -322,12 +324,12 @@ function renderPerformanceChart() {
           titleColor: 'rgba(255,255,255,0.95)',
           bodyColor: 'rgba(255,255,255,0.9)',
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${fmtJPY(ctx.parsed.y)}`,
+            label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`,
             afterBody: (items) => {
               const idx = items?.[0]?.dataIndex;
               if (idx == null) return '';
               const totalPnL = (realizedData[idx] || 0) + (swapData[idx] || 0);
-              return `当月合計損益: ${fmtJPY(totalPnL)}`;
+              return `当月合計損益: ${fmtMan(totalPnL)}`;
             }
           }
         }
@@ -350,7 +352,7 @@ function renderPerformanceChart() {
           position: 'left',
           ticks: {
             color: 'rgba(255,255,255,0.75)',
-            callback: (v) => fmtJPY(v)
+            callback: (v) => fmtMan(v)
           },
           grid: {
             color: 'rgba(255,255,255,0.1)',
@@ -361,7 +363,7 @@ function renderPerformanceChart() {
           position: 'right',
           ticks: {
             color: 'rgba(255,255,255,0.75)',
-            callback: (v) => fmtJPY(v)
+            callback: (v) => fmtMan(v)
           },
           grid: {
             drawOnChartArea: false,
@@ -569,19 +571,11 @@ function renderAccountInputs() {
   ensureYearMonth(currentYear, currentMonth);
   
   ACCOUNTS.forEach(account => {
-    const data = tradingData[currentYear][currentMonth][account.key];
+    const data = tradingData[currentYear][currentMonth][account.key] || {};
     
     const card = document.createElement('div');
     card.className = 'account-card';
-    card.innerHTML = `
-      <button type="button" class="account-toggle" data-account-toggle="${account.key}" aria-expanded="false">
-        <div class="account-title">
-          <div class="account-color-dot" style="background-color: ${account.color}"></div>
-          ${account.name}
-        </div>
-        <span class="account-toggle-icon">▼</span>
-      </button>
-      <div class="account-body" data-account-body="${account.key}">
+    const tradingFields = account.bankOnly ? '' : `
         <div class="form-group">
           <label>決済損益</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="realizedPnL" value="${data.realizedPnL}" placeholder="0" />
@@ -596,12 +590,17 @@ function renderAccountInputs() {
           <label>評価損益</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="unrealizedPnL" value="${data.unrealizedPnL}" placeholder="0" />
           <span class="suffix">¥</span>
+        </div>`;
+    card.innerHTML = `
+      <button type="button" class="account-toggle" data-account-toggle="${account.key}" aria-expanded="false">
+        <div class="account-title">
+          <div class="account-color-dot" style="background-color: ${account.color}"></div>
+          ${account.name}
         </div>
-        <div class="form-group">
-          <label>維持率</label>
-          <input type="number" class="input-account" data-account="${account.key}" data-field="maintenanceRate" value="${data.maintenanceRate}" placeholder="0" />
-          <span class="suffix">%</span>
-        </div>
+        <span class="account-toggle-icon">▼</span>
+      </button>
+      <div class="account-body" data-account-body="${account.key}">
+        ${tradingFields}
         <div class="form-group">
           <label>入金</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="deposit" value="${data.deposit}" placeholder="0" />
@@ -631,7 +630,19 @@ function renderAccountInputs() {
       const body = container.querySelector(`[data-account-body="${key}"]`);
       const isOpen = btn.classList.toggle('open');
       btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      if (body) body.classList.toggle('open', isOpen);
+      if (!body) return;
+      if (isOpen) {
+        body.classList.add('open');
+        requestAnimationFrame(() => {
+          body.style.maxHeight = `${body.scrollHeight}px`;
+        });
+      } else {
+        body.style.maxHeight = `${body.scrollHeight}px`;
+        requestAnimationFrame(() => {
+          body.classList.remove('open');
+          body.style.maxHeight = '0px';
+        });
+      }
     });
   });
 }
@@ -715,7 +726,8 @@ function renderInitialCapitalForm() {
     'initLightFX': 'lightfx',
     'initMinano': 'minano',
     'initSBI': 'sbi',
-    'initSBIVC': 'sbivc'
+    'initSBIVC': 'sbivc',
+    'initSMBC': 'smbc'
   };
   
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
@@ -786,7 +798,8 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
     'initLightFX': 'lightfx',
     'initMinano': 'minano',
     'initSBI': 'sbi',
-    'initSBIVC': 'sbivc'
+    'initSBIVC': 'sbivc',
+    'initSMBC': 'smbc'
   };
   
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {

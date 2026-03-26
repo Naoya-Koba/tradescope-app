@@ -23,7 +23,7 @@ html, body {
   font-family: Inter, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   color: var(--text);
   background-color: var(--bg-from);
-  padding-top: 48px;
+  padding-top: 44px;
   box-sizing: border-box;
   overscroll-behavior-y: none;
   height: 100%;
@@ -138,7 +138,7 @@ body::before {
   color: var(--muted);
   font-weight: 600;
   font-size: 15px;
-  margin-bottom: 6px;
+  margin: 0 0 6px;
   letter-spacing: 0.3px;
 }
 .kpi-value {
@@ -180,7 +180,7 @@ body::before {
 ============================ */
 @media (max-width: 480px) {
   html, body {
-    padding-top: 46px;
+    padding-top: 42px;
   }
 
   .summary-label {
@@ -1781,4 +1781,67 @@ body::before {
   background: rgba(255,255,255,0.03);
   border-radius: 10px;
   padding: 8px;
+}
+
+/* ===== Top Detail UX Override (desktop: right, mobile: bottom) ===== */
+.pair-detail-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: rgba(6, 8, 18, 0.38);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.pair-detail-scrim.show {
+  opacity: 1;
+}
+
+.app-header,
+.drawer,
+.pair-detail {
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+.drawer {
+  background: rgba(15, 19, 38, 0.62);
+}
+
+.pair-detail {
+  background: rgba(15, 19, 38, 0.72);
+}
+
+@media (max-width: 768px) {
+  .pair-detail {
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: var(--detail-sheet-height, 90dvh) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 8px) !important;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+    box-sizing: border-box;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    border-left: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%) !important;
+    transition: transform 0.28s ease, opacity 0.28s ease !important;
+  }
+
+  .pair-detail.open {
+    transform: translateY(0) !important;
+  }
+}
+
+/* 詳細表示中は背景スクロールを固定（iPad含む） */
+html.detail-open,
+body.detail-open {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
