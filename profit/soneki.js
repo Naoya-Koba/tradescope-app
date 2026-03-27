@@ -20,6 +20,121 @@ const ACCOUNTS = [
   { name: 'SBI VC', key: 'sbivc', color: '#EAF1FF' },
   { name: '三井住友銀行', key: 'smbc', color: '#2F7A46', bankOnly: true }
 ];
+const UNREALIZED_HELPER_ACCOUNTS = new Set(['lightfx', 'minano']);
+const GROWTH_TARGET_ACCOUNTS = ACCOUNTS.filter((account) => !account.bankOnly);
+
+function getUnrealizedLegs(year, month, accountKey) {
+  ensureYearMonth(year, month);
+  const row = tradingData[year]?.[month]?.[accountKey] || {};
+  if (!Array.isArray(row.unrealizedLegs)) row.unrealizedLegs = [];
+  return row.unrealizedLegs;
+}
+
+function createUnrealizedLegRowHtml(accountKey, value, index) {
+  return `
+    <div class="unrealized-leg-row" data-account="${accountKey}" data-index="${index}">
+      <input type="number" class="unrealized-leg-input" data-account="${accountKey}" data-index="${index}" value="${value}" placeholder="建玉${index + 1}" />
+      <button type="button" class="unrealized-leg-remove" data-account="${accountKey}" aria-label="建玉行を削除">−</button>
+    </div>
+  `;
+}
+
+function reindexUnrealizedLegRows(accountKey) {
+  const rows = document.querySelectorAll(`.unrealized-leg-row[data-account="${accountKey}"]`);
+  rows.forEach((row, idx) => {
+    row.dataset.index = String(idx);
+    const input = row.querySelector('.unrealized-leg-input');
+    if (input) {
+      input.dataset.index = String(idx);
+      input.placeholder = `建玉${idx + 1}`;
+    }
+  });
+}
+
+function syncUnrealizedFromLegInputs(accountKey) {
+  ensureYearMonth(currentYear, currentMonth);
+  const inputs = document.querySelectorAll(`.unrealized-leg-input[data-account="${accountKey}"]`);
+  const legs = Array.from(inputs).map((input) => Number(input.value) || 0);
+
+  const row = tradingData[currentYear][currentMonth][accountKey];
+
+  if (!legs.length) {
+    const fallback = Number(row.unrealizedBackup ?? row.unrealizedPnL) || 0;
+    row.unrealizedLegs = [];
+    row.unrealizedPnL = fallback;
+
+    const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
+    if (unrealizedInput) unrealizedInput.value = String(fallback);
+
+    updateInputs();
+    return;
+  }
+
+  const total = legs.reduce((sum, v) => sum + v, 0);
+  row.unrealizedLegs = legs;
+  row.unrealizedPnL = total;
+
+  const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
+  if (unrealizedInput) unrealizedInput.value = String(total);
+
+  updateInputs();
+}
+
+function bindUnrealizedHelperEvents(container) {
+  if (!container || container.dataset.unrealizedHelperBound === '1') return;
+
+  container.addEventListener('click', (event) => {
+    const addBtn = event.target.closest('.unrealized-helper-add, .inline-unrealized-add');
+    if (addBtn) {
+      const accountKey = addBtn.dataset.account;
+      const rowsWrap = container.querySelector(`.unrealized-helper-rows[data-account="${accountKey}"]`);
+      if (!rowsWrap) return;
+
+      const legs = getUnrealizedLegs(currentYear, currentMonth, accountKey);
+      const row = tradingData[currentYear]?.[currentMonth]?.[accountKey] || {};
+      const currentUnrealized = Number(tradingData[currentYear]?.[currentMonth]?.[accountKey]?.unrealizedPnL) || 0;
+      if (!legs.length) {
+        // 初回は「既存の評価損益」行に加えて、新規追加行も同時に作る
+        row.unrealizedBackup = currentUnrealized;
+        legs.push(currentUnrealized);
+        legs.push(0);
+      } else {
+        legs.push(0);
+      }
+
+      const newIndex = rowsWrap.querySelectorAll('.unrealized-leg-row').length;
+      if (newIndex === 0 && legs.length >= 2) {
+        rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, legs[0], 0));
+        rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, legs[1], 1));
+      } else {
+        rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, legs[legs.length - 1], newIndex));
+      }
+      reindexUnrealizedLegRows(accountKey);
+      syncUnrealizedFromLegInputs(accountKey);
+
+      const latestInput = rowsWrap.querySelector(`.unrealized-leg-input[data-index="${rowsWrap.querySelectorAll('.unrealized-leg-row').length - 1}"]`);
+      latestInput?.focus();
+      return;
+    }
+
+    const removeBtn = event.target.closest('.unrealized-leg-remove');
+    if (removeBtn) {
+      const accountKey = removeBtn.dataset.account;
+      const row = removeBtn.closest('.unrealized-leg-row');
+      row?.remove();
+      reindexUnrealizedLegRows(accountKey);
+      syncUnrealizedFromLegInputs(accountKey);
+    }
+  });
+
+  container.addEventListener('input', (event) => {
+    const input = event.target.closest('.unrealized-leg-input');
+    if (!input) return;
+    syncUnrealizedFromLegInputs(input.dataset.account);
+  });
+
+  container.dataset.unrealizedHelperBound = '1';
+}
 
 // ===== Drawer =====
 const drawer = document.getElementById('drawer');
@@ -95,6 +210,46 @@ function dismissChartTooltipOnOutsideTap(event) {
 }
 
 document.addEventListener('pointerdown', dismissChartTooltipOnOutsideTap, true);
+
+// ===== Backup: Export / Import =====
+function exportData() {
+  const payload = {
+    tradingData,
+    yearInitialFunds,
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `tradescope-backup-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.tradingData || !parsed.yearInitialFunds) {
+        alert('ファイル形式が正しくありません。TradeScope のバックアップファイルを選択してください。');
+        return;
+      }
+      if (!confirm('現在のデータをインポートデータで上書きします。よろしいですか？')) return;
+      tradingData = parsed.tradingData;
+      yearInitialFunds = parsed.yearInitialFunds;
+      saveToStorage();
+      rerenderAfterDataChange();
+      alert('インポートが完了しました。');
+    } catch {
+      alert('ファイルの読み込みに失敗しました。');
+    }
+  };
+  reader.readAsText(file);
+}
 
 function saveToStorage() {
   localStorage.setItem(STORAGE_KEY_TRADING, JSON.stringify(tradingData));
@@ -173,6 +328,7 @@ function ensureYearMonth(year, month) {
         realizedPnL: 0,
         swapPnL: 0,
         unrealizedPnL: 0,
+        unrealizedLegs: [],
         maintenanceRate: 0,
         deposit: 0,
         withdrawal: 0
@@ -225,6 +381,39 @@ function calculateAccountNetAssets(year, month, accountKey) {
   return initialFund + cumulative.realized + cumulative.swap + cumulative.deposit - cumulative.withdrawal + currentMonthUnrealized;
 }
 
+function getBankMonthEndBalance(year, month, accountKey) {
+  ensureYearMonth(year, month);
+  const stored = Number(tradingData?.[year]?.[month]?.[accountKey]?.monthEndBalance);
+  if (Number.isFinite(stored)) return stored;
+  return calculateAccountNetAssets(year, month, accountKey);
+}
+
+function applyBankBalanceInputsForMonth(year, month) {
+  ensureYearMonth(year, month);
+
+  ACCOUNTS.filter((account) => account.bankOnly).forEach((account) => {
+    const row = tradingData[year][month][account.key];
+    const monthEndInput = Number(row.monthEndBalance);
+    const monthEndBalance = Number.isFinite(monthEndInput)
+      ? monthEndInput
+      : calculateAccountNetAssets(year, month, account.key);
+
+    const prevBalance = month === 1
+      ? (Number(yearInitialFunds?.[year]?.[account.key]) || 0)
+      : getBankMonthEndBalance(year, month - 1, account.key);
+
+    const diff = monthEndBalance - prevBalance;
+
+    row.monthEndBalance = monthEndBalance;
+    row.realizedPnL = 0;
+    row.swapPnL = 0;
+    row.unrealizedPnL = 0;
+    row.unrealizedLegs = [];
+    row.deposit = diff > 0 ? diff : 0;
+    row.withdrawal = diff < 0 ? Math.abs(diff) : 0;
+  });
+}
+
 function calculateTotalNetAssets(year, month) {
   let total = 0;
   ACCOUNTS.forEach(a => {
@@ -243,20 +432,49 @@ function calculateInitialCapital(year) {
   return total;
 }
 
+function hasMeaningfulMonthData(year, month) {
+  const monthData = tradingData?.[year]?.[month];
+  if (!monthData) return false;
+  if (monthData.__saved) return true;
+
+  return ACCOUNTS.some((account) => {
+    const row = monthData?.[account.key] || {};
+    return (Number(row.realizedPnL) || 0) !== 0
+      || (Number(row.swapPnL) || 0) !== 0
+      || (Number(row.unrealizedPnL) || 0) !== 0
+      || (Number(row.deposit) || 0) !== 0
+      || (Number(row.withdrawal) || 0) !== 0
+      || (Number(row.maintenanceRate) || 0) !== 0
+      || Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0
+      || Object.prototype.hasOwnProperty.call(row, 'monthEndBalance');
+  });
+}
+
+function getLatestSavedMonth(year) {
+  for (let month = 12; month >= 1; month -= 1) {
+    if (hasMeaningfulMonthData(year, month)) return month;
+  }
+  return 1;
+}
+
 function renderPerformanceChart() {
   const canvas = document.getElementById('pnlTrendChart');
   if (!canvas || typeof Chart === 'undefined') return;
 
   const labels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
+  const shiftedLabels = ['年初', ...labels];
   const realizedData = [];
   const swapData = [];
-  const assetsData = [];
+  const assetsScaleData = [];
+  const shiftedAssetsData = [calculateInitialCapital(currentYear)];
 
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
     realizedData.push(monthly.realizedSum);
     swapData.push(monthly.swapSum);
-    assetsData.push(calculateTotalNetAssets(currentYear, m));
+    const monthEndAssets = calculateTotalNetAssets(currentYear, m);
+    assetsScaleData.push(monthEndAssets);
+    shiftedAssetsData.push(monthEndAssets);
   }
 
   if (pnlTrendChart) {
@@ -266,7 +484,71 @@ function renderPerformanceChart() {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
+  const shiftedLinePlugin = {
+    id: 'shiftedAssetsLine',
+    afterDatasetsDraw(chart) {
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.yAssets;
+      const chartArea = chart.chartArea;
+      if (!xScale || !yScale || !chartArea || labels.length === 0) return;
+
+      const firstCenter = xScale.getPixelForTick(0);
+      const secondCenter = xScale.getPixelForTick(1);
+      const step = Number.isFinite(secondCenter - firstCenter) ? (secondCenter - firstCenter) : 0;
+      if (!step) return;
+
+      const xPositions = [firstCenter - step / 2];
+      for (let index = 0; index < labels.length; index += 1) {
+        xPositions.push(xScale.getPixelForTick(index) + step / 2);
+      }
+
+      const pointRadius = 2;
+      const labelPadding = 12;
+      const minX = chartArea.left + pointRadius + 2;
+      const maxX = chartArea.right - pointRadius - 2;
+      const minY = chartArea.top + pointRadius + 2;
+      const maxY = chartArea.bottom - pointRadius - 2;
+      const clampedXPositions = xPositions.map((x) => Math.min(maxX, Math.max(minX, x)));
+
+      const yPositions = shiftedAssetsData.map((value) => {
+        const y = yScale.getPixelForValue(value);
+        return Math.min(maxY, Math.max(minY, y));
+      });
+      const chartCtx = chart.ctx;
+
+      chartCtx.save();
+      chartCtx.strokeStyle = '#EEF1FF';
+      chartCtx.lineWidth = 2;
+      chartCtx.beginPath();
+      clampedXPositions.forEach((x, index) => {
+        const y = yPositions[index];
+        if (index === 0) chartCtx.moveTo(x, y);
+        else chartCtx.lineTo(x, y);
+      });
+      chartCtx.stroke();
+
+      chartCtx.fillStyle = '#EEF1FF';
+      clampedXPositions.forEach((x, index) => {
+        const y = yPositions[index];
+        chartCtx.beginPath();
+        chartCtx.arc(x, y, pointRadius, 0, Math.PI * 2);
+        chartCtx.fill();
+      });
+
+      chartCtx.fillStyle = 'rgba(255,255,255,0.8)';
+      chartCtx.font = '12px Inter, system-ui, sans-serif';
+      chartCtx.textAlign = 'center';
+      chartCtx.textBaseline = 'top';
+      const labelY = chartArea.bottom + labelPadding;
+      clampedXPositions.forEach((x, index) => {
+        chartCtx.fillText(shiftedLabels[index], x, labelY);
+      });
+      chartCtx.restore();
+    }
+  };
+
   pnlTrendChart = new Chart(ctx, {
+    plugins: [shiftedLinePlugin],
     data: {
       labels,
       datasets: [
@@ -293,14 +575,14 @@ function renderPerformanceChart() {
         {
           type: 'line',
           label: '純資産推移',
-          data: assetsData,
-          borderColor: '#EEF1FF',
-          backgroundColor: 'rgba(238,241,255,0.15)',
-          pointBackgroundColor: '#EEF1FF',
-          pointBorderColor: '#EEF1FF',
-          pointRadius: 2,
-          pointHoverRadius: 3,
-          tension: 0.28,
+          data: assetsScaleData,
+          borderColor: 'rgba(0,0,0,0)',
+          backgroundColor: 'rgba(0,0,0,0)',
+          pointBackgroundColor: 'rgba(0,0,0,0)',
+          pointBorderColor: 'rgba(0,0,0,0)',
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0,
           fill: false,
           yAxisID: 'yAssets'
         }
@@ -309,6 +591,13 @@ function renderPerformanceChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: {
+        padding: {
+          left: 8,
+          right: 8,
+          bottom: 34
+        }
+      },
       interaction: {
         mode: 'index',
         intersect: false
@@ -324,9 +613,16 @@ function renderPerformanceChart() {
           titleColor: 'rgba(255,255,255,0.95)',
           bodyColor: 'rgba(255,255,255,0.9)',
           callbacks: {
+            title: (items) => {
+              const item = items?.[0];
+              if (!item) return '';
+              return `${item.dataIndex + 1}月`;
+            },
             label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`,
             afterBody: (items) => {
-              const idx = items?.[0]?.dataIndex;
+              const item = items?.[0];
+              if (!item) return '';
+              const idx = item.dataIndex;
               if (idx == null) return '';
               const totalPnL = (realizedData[idx] || 0) + (swapData[idx] || 0);
               return `当月合計損益: ${fmtMan(totalPnL)}`;
@@ -338,9 +634,7 @@ function renderPerformanceChart() {
         x: {
           stacked: true,
           ticks: {
-            color: 'rgba(255,255,255,0.8)',
-            maxRotation: 0,
-            autoSkipPadding: 10
+            display: false
           },
           grid: {
             color: 'rgba(255,255,255,0.08)',
@@ -377,10 +671,32 @@ function renderPerformanceChart() {
 
 // ===== UI Updates =====
 function renderAnnualSummary() {
+  const latestMonth = getLatestSavedMonth(currentYear);
   const yearly = calculateYearlyTotals(currentYear);
   const initialCapital = calculateInitialCapital(currentYear);
-  const totalAssets = calculateTotalNetAssets(currentYear, 12);
-  const growthRate = initialCapital > 0 ? ((totalAssets - initialCapital) / initialCapital * 100) : 0;
+  const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
+
+  const investmentInitialCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0);
+  }, 0);
+
+  const investmentTotalAssets = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + calculateAccountNetAssets(currentYear, latestMonth, account.key);
+  }, 0);
+
+  const investmentCashflow = GROWTH_TARGET_ACCOUNTS.reduce((acc, account) => {
+    for (let m = 1; m <= latestMonth; m += 1) {
+      const row = tradingData?.[currentYear]?.[m]?.[account.key] || {};
+      acc.deposit += Number(row.deposit) || 0;
+      acc.withdraw += Number(row.withdrawal) || 0;
+    }
+    return acc;
+  }, { deposit: 0, withdraw: 0 });
+
+  // 実質損益 = 現在純資産 - 年初純資産 - 累計入金 + 累計出金
+  // 年間成長率 = 実質損益 ÷ 年初純資産 × 100
+  const realPnL = investmentTotalAssets - investmentInitialCapital - investmentCashflow.deposit + investmentCashflow.withdraw;
+  const growthRate = investmentInitialCapital > 0 ? (realPnL / investmentInitialCapital * 100) : 0;
   const netCashFlowYear = yearly.depositSum - yearly.withdrawSum;
 
   document.getElementById('yearRealizedSum').textContent = fmtJPY(yearly.realizedSum);
@@ -572,10 +888,25 @@ function renderAccountInputs() {
   
   ACCOUNTS.forEach(account => {
     const data = tradingData[currentYear][currentMonth][account.key] || {};
+    const unrealizedLegs = getUnrealizedLegs(currentYear, currentMonth, account.key);
+    const unrealizedHelper = UNREALIZED_HELPER_ACCOUNTS.has(account.key)
+      ? `
+        <div class="unrealized-helper" data-account="${account.key}">
+          <button type="button" class="unrealized-helper-add" data-account="${account.key}" aria-label="建玉行を追加">＋</button>
+          <div class="unrealized-helper-rows" data-account="${account.key}">
+            ${unrealizedLegs.map((v, idx) => createUnrealizedLegRowHtml(account.key, Number(v) || 0, idx)).join('')}
+          </div>
+        </div>`
+      : '';
     
     const card = document.createElement('div');
     card.className = 'account-card';
-    const tradingFields = account.bankOnly ? '' : `
+    const tradingFields = account.bankOnly ? `
+        <div class="form-group">
+          <label>月末残高</label>
+          <input type="number" class="input-account" data-account="${account.key}" data-field="monthEndBalance" value="${Number.isFinite(Number(data.monthEndBalance)) ? Number(data.monthEndBalance) : getBankMonthEndBalance(currentYear, currentMonth, account.key)}" placeholder="0" />
+          <span class="suffix">¥</span>
+        </div>` : `
         <div class="form-group">
           <label>決済損益</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="realizedPnL" value="${data.realizedPnL}" placeholder="0" />
@@ -588,7 +919,21 @@ function renderAccountInputs() {
         </div>
         <div class="form-group">
           <label>評価損益</label>
-          <input type="number" class="input-account" data-account="${account.key}" data-field="unrealizedPnL" value="${data.unrealizedPnL}" placeholder="0" />
+          <div class="unrealized-input-inline${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? ' with-add' : ''}">
+            <input type="number" class="input-account${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? ' unrealized-main-input' : ''}" data-account="${account.key}" data-field="unrealizedPnL" value="${data.unrealizedPnL}" placeholder="0" />
+            ${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? `<button type="button" class="inline-unrealized-add" data-account="${account.key}" aria-label="建玉行を追加">＋</button>` : ''}
+          </div>
+          <span class="suffix">¥</span>
+        </div>`;
+    const cashflowFields = account.bankOnly ? '' : `
+        <div class="form-group">
+          <label>入金</label>
+          <input type="number" class="input-account" data-account="${account.key}" data-field="deposit" value="${data.deposit}" placeholder="0" />
+          <span class="suffix">¥</span>
+        </div>
+        <div class="form-group">
+          <label>出金</label>
+          <input type="number" class="input-account" data-account="${account.key}" data-field="withdrawal" value="${data.withdrawal}" placeholder="0" />
           <span class="suffix">¥</span>
         </div>`;
     card.innerHTML = `
@@ -601,16 +946,8 @@ function renderAccountInputs() {
       </button>
       <div class="account-body" data-account-body="${account.key}">
         ${tradingFields}
-        <div class="form-group">
-          <label>入金</label>
-          <input type="number" class="input-account" data-account="${account.key}" data-field="deposit" value="${data.deposit}" placeholder="0" />
-          <span class="suffix">¥</span>
-        </div>
-        <div class="form-group">
-          <label>出金</label>
-          <input type="number" class="input-account" data-account="${account.key}" data-field="withdrawal" value="${data.withdrawal}" placeholder="0" />
-          <span class="suffix">¥</span>
-        </div>
+        ${unrealizedHelper}
+        ${cashflowFields}
       </div>
     `;
     
@@ -645,6 +982,8 @@ function renderAccountInputs() {
       }
     });
   });
+
+  bindUnrealizedHelperEvents(container);
 }
 
 function handleAccountInputFocus(event) {
@@ -676,7 +1015,16 @@ function updateInputs() {
       el.value = normalized;
     }
   });
-  
+
+  applyBankBalanceInputsForMonth(currentYear, currentMonth);
+
+  UNREALIZED_HELPER_ACCOUNTS.forEach((accountKey) => {
+    const row = tradingData[currentYear]?.[currentMonth]?.[accountKey];
+    if (!row) return;
+    if (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0) return;
+    row.unrealizedBackup = Number(row.unrealizedPnL) || 0;
+  });
+
   // サマリー更新
   renderMonthlyDisplay();
   renderAnnualSummary();
@@ -716,6 +1064,20 @@ function updateYearSelect() {
   fillYearOptions(document.getElementById('yearSelect'), years);
 }
 
+function bindInitialCapitalInputBehavior() {
+  document.querySelectorAll('.initial-capital-outside .account-initial-grid input[type="number"]').forEach((input) => {
+    if (input.dataset.zeroInputBound === '1') return;
+
+    const selectZeroValue = () => {
+      if (input.value === '0') input.select();
+    };
+
+    input.addEventListener('focus', selectZeroValue);
+    input.addEventListener('click', selectZeroValue);
+    input.dataset.zeroInputBound = '1';
+  });
+}
+
 function renderInitialCapitalForm() {
   if (!yearInitialFunds[currentYear]) yearInitialFunds[currentYear] = {};
   
@@ -733,6 +1095,8 @@ function renderInitialCapitalForm() {
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
     document.getElementById(elemId).value = yearInitialFunds[currentYear][accountKey] || 0;
   }
+
+  bindInitialCapitalInputBehavior();
   
   updateInitialCapitalStatus();
 }
@@ -819,6 +1183,12 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
   setTimeout(() => toast.remove(), 2000);
 });
 
+document.getElementById('exportDataBtn')?.addEventListener('click', exportData);
+document.getElementById('importDataInput')?.addEventListener('change', (e) => {
+  importData(e.target.files[0]);
+  e.target.value = '';
+});
+
 document.getElementById('saveMonthData').addEventListener('click', () => {
   const confirmed = window.confirm(currentYear + '年' + currentMonth + '月のデータを保存します。よろしいですか？');
   if (!confirmed) return;
@@ -829,6 +1199,10 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
     const value = Number(el.value) || 0;
     tradingData[currentYear][currentMonth][account][field] = normalizeCashflowValue(field, value);
   });
+
+  tradingData[currentYear][currentMonth].__saved = true;
+
+  applyBankBalanceInputsForMonth(currentYear, currentMonth);
   
   saveToStorage();
   renderAnnualSummary();

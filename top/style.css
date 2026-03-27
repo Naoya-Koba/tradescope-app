@@ -150,6 +150,59 @@ body::before {
 .neutral { color: var(--neutral); }
 
 /* ============================
+   年選択セクション
+============================ */
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.summary-header .heading-muted {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.year-selector {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-width: 80px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%23aab5d0' d='M0 0l6 8 6-8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+  padding-right: 28px;
+}
+
+.year-selector:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.year-selector:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 2px rgba(61, 162, 255, 0.2);
+}
+
+.year-selector option {
+  background-color: #0b1020;
+  color: var(--text);
+}
+
+/* ============================
    サマリー・リスク
 ============================ */
 .summary-list {
@@ -181,6 +234,17 @@ body::before {
 @media (max-width: 480px) {
   html, body {
     padding-top: 42px;
+  }
+
+  .summary-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .year-selector {
+    min-width: 100px;
   }
 
   .summary-label {

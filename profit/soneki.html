@@ -204,7 +204,20 @@
       </div>
     </div>
 
-    <!-- 4. 月別画像取込セクション -->
+    <!-- 4. データバックアップセクション -->
+    <h2 class="heading-muted">Backup</h2>
+    <section class="section glass margin-bottom">
+      <p class="section-description">データをJSONファイルに書き出してバックアップ、または復元できます。<br/>iOSアプリ再インストール前には必ずエクスポートしてください。</p>
+      <div class="form-actions" style="margin-top:12px">
+        <button class="btn btn-secondary" id="exportDataBtn">📥 エクスポート</button>
+        <label class="btn btn-secondary" style="cursor:pointer">
+          📤 インポート
+          <input type="file" id="importDataInput" accept=".json" style="display:none" />
+        </label>
+      </div>
+    </section>
+
+    <!-- 5. 月別画像取込セクション -->
     <h2 class="heading-muted">OCR</h2>
     <section class="section glass margin-bottom">
       <p class="section-description">※ 将来的にスマホで撮影した画像をアップロードして自動読取する機能を実装予定です</p>

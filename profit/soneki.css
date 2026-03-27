@@ -964,6 +964,21 @@ input:focus {
   margin-bottom: 0;
 }
 
+.monthly-input-section .suffix {
+  display: none;
+}
+
+.monthly-input-section input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.monthly-input-section input[type="number"]::-webkit-outer-spin-button,
+.monthly-input-section input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .initial-capital-outside {
   margin-top: -4px;
   margin-bottom: 20px;
@@ -994,6 +1009,21 @@ input:focus {
 
 .initial-capital-outside .initial-capital-form {
   padding: 12px 14px 14px;
+}
+
+.initial-capital-outside .suffix {
+  display: none;
+}
+
+.initial-capital-outside input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.initial-capital-outside input[type="number"]::-webkit-outer-spin-button,
+.initial-capital-outside input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* ===== Account Card ===== */
@@ -1080,6 +1110,33 @@ input:focus {
   letter-spacing: 0.3px;
   font-weight: 600;
 }
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.unrealized-input-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.unrealized-input-inline.with-add .unrealized-main-input {
+  flex: 1;
+  min-width: 0;
+}
+.inline-unrealized-add {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+}
 .form-group input,
 .form-group select {
   padding: 8px;
@@ -1106,6 +1163,40 @@ input:focus {
   font-size: 11px;
   color: var(--muted);
   pointer-events: none;
+}
+
+.unrealized-helper {
+  margin: -4px 0 10px;
+}
+.unrealized-helper-add {
+  display: none;
+}
+.unrealized-helper-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.unrealized-leg-row {
+  display: grid;
+  grid-template-columns: 1fr 28px;
+  gap: 6px;
+}
+.unrealized-leg-input {
+  padding: 8px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: Inter, system-ui, sans-serif;
+}
+.unrealized-leg-remove {
+  border: 1px solid rgba(255,107,107,.35);
+  background: rgba(255,107,107,.12);
+  color: #ffd7d7;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
 }
 
 /* ===== Buttons ===== */

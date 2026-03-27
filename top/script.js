@@ -147,6 +147,7 @@ const LINKED_ACCOUNTS = [
   { name: 'SBI VC', key: 'sbivc', color: '#EAF1FF' },
   { name: '三井住友銀行', key: 'smbc', color: '#2F7A46' }
 ];
+const GROWTH_EXCLUDED_ACCOUNT_KEYS = new Set(['smbc']);
 
 function parseStoredJson(key) {
   try {
@@ -174,6 +175,27 @@ function calculateLinkedMonthlyTotals(tradingData, year, month) {
   }, { realized: 0, swap: 0 });
 }
 
+function calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, targetMonth, accountKey) {
+  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
+  const yearInitial = initialFunds?.[year] || initialFunds?.[String(year)] || {};
+  const initial = Number(yearInitial?.[accountKey]) || 0;
+
+  let realized = 0;
+  let swap = 0;
+  let deposit = 0;
+  let withdrawal = 0;
+
+  for (let month = 1; month <= targetMonth; month += 1) {
+    const row = yearData?.[month]?.[accountKey] || yearData?.[String(month)]?.[accountKey] || {};
+    realized += Number(row.realizedPnL) || 0;
+    swap += Number(row.swapPnL) || 0;
+    deposit += Number(row.deposit) || 0;
+    withdrawal += Number(row.withdrawal) || 0;
+  }
+
+  return initial + realized + swap + deposit - withdrawal;
+}
+
 function calculateLinkedAccountNetAssets(tradingData, initialFunds, year, targetMonth, accountKey) {
   const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
   const yearInitial = initialFunds?.[year] || initialFunds?.[String(year)] || {};
@@ -198,28 +220,14 @@ function calculateLinkedAccountNetAssets(tradingData, initialFunds, year, target
   return initial + realized + swap + deposit - withdrawal + unrealized;
 }
 
-function buildTopLinkedData() {
+function buildTopLinkedData(selectedYear = null) {
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
   const years = getNumericYears(tradingData);
   if (!years.length) return null;
 
-  const targetYear = years[years.length - 1];
-  const realized = [];
-  const total = [];
-  let cumulativeRealized = 0;
-
-  for (let month = 1; month <= 12; month += 1) {
-    const monthly = calculateLinkedMonthlyTotals(tradingData, targetYear, month);
-    cumulativeRealized += monthly.realized + monthly.swap;
-    realized.push(cumulativeRealized);
-
-    const monthTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
-      return sum + calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, month, account.key);
-    }, 0);
-    total.push(monthTotal);
-  }
-
+  const targetYear = selectedYear || years[years.length - 1];
+  const growthAccounts = LINKED_ACCOUNTS.filter((account) => !GROWTH_EXCLUDED_ACCOUNT_KEYS.has(account.key));
   const latestMonth = (() => {
     const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
     for (let month = 12; month >= 1; month -= 1) {
@@ -227,6 +235,34 @@ function buildTopLinkedData() {
     }
     return 12;
   })();
+  const realized = [];
+  const total = [];
+  let cumulativeRealized = 0;
+  let cumulativeDeposits = 0;
+  let cumulativeWithdrawals = 0;
+
+  for (let month = 1; month <= 12; month += 1) {
+    const confirmedTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
+      return sum + calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, targetYear, month, account.key);
+    }, 0);
+    realized.push(confirmedTotal);
+
+    // 成長率向けの累計入出金は投資口座のみを対象にする
+    if (month <= latestMonth) {
+      growthAccounts.forEach((account) => {
+        const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
+        const monthData = yearData?.[month] || yearData?.[String(month)] || {};
+        const row = monthData?.[account.key] || {};
+        cumulativeDeposits += Number(row.deposit) || 0;
+        cumulativeWithdrawals += Number(row.withdrawal) || 0;
+      });
+    }
+
+    const monthTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
+      return sum + calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, month, account.key);
+    }, 0);
+    total.push(monthTotal);
+  }
 
   const linkedAccountData = LINKED_ACCOUNTS.map((account) => ({
     label: account.name,
@@ -234,22 +270,48 @@ function buildTopLinkedData() {
     color: account.color
   })).filter((item) => item.amount > 0);
 
+  // 年初の総純資産: 月次データ開始前の初期残高のみを使用する
+  // （calculateLinkedAccountNetAssetsを使うと1月分の入出金が混入してしまうため）
+  const yearInitialData = initialFunds?.[targetYear] || initialFunds?.[String(targetYear)] || {};
+  const yearStartTotal = growthAccounts.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0);
+  }, 0);
+
+  const growthCurrentTotal = growthAccounts.reduce((sum, account) => {
+    return sum + calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, latestMonth, account.key);
+  }, 0);
+
+  const chartStartTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0);
+  }, 0);
+
   return {
     realized,
     total,
     accountData: linkedAccountData,
     year: targetYear,
-    month: latestMonth
+    month: latestMonth,
+    yearStartTotal,
+    growthCurrentTotal,
+    chartStartTotal,
+    cumulativeDeposits,
+    cumulativeWithdrawals
   };
 }
 
+const demoTotal = demoMonthly.total.map((v) => v * 10000);
 const fallbackTopData = {
   realized: demoMonthly.realized.map((v) => v * 10000),
-  total: demoMonthly.total.map((v) => v * 10000),
-  accountData: null
+  total: demoTotal,
+  accountData: null,
+  yearStartTotal: demoTotal[0],
+  growthCurrentTotal: demoTotal[demoTotal.length - 1],
+  chartStartTotal: demoTotal[0],
+  cumulativeDeposits: 0,
+  cumulativeWithdrawals: 0
 };
 const linkedTopData = buildTopLinkedData();
-const topSeries = linkedTopData || fallbackTopData;
+let topSeries = linkedTopData || fallbackTopData;
 const lotsByPair = { TRY:300, HUF:200, MXN:150, ZAR:80 };
 const risk = { zero:-3280000, half:-1640000, mmr:265 };
 const swapToday = { total:12300, pairs:[['TRY',7800],['HUF',2900],['MXN',1600]] };
@@ -268,7 +330,7 @@ const portfolioData = [
 
 // ===== KPI =====
 function updateKPIs() {
-  const i = topSeries.realized.length - 1;
+  const i = Math.max(0, (topSeries.month || topSeries.realized.length) - 1);
   const rLast = topSeries.realized[i];
   const tLast = topSeries.total[i];
   const rPrev = topSeries.realized[i - 1];
@@ -285,10 +347,23 @@ function updateKPIs() {
   elNet.textContent = (momNet >= 0 ? '+' : '') + momNet.toFixed(1) + '%';
   setSignClass(elNet, momNet);
 
-  const momTotal = tPrev ? ((tLast - tPrev) / tPrev) * 100 : 0;
+  // 年間成長率: 入出金の影響を除いた実質ベースの計算
+  // 実質損益 = 現在純資産 - 年初純資産 - 累計入金額 + 累計出金額
+  // 年間成長率 = 実質損益 ÷ 年初純資産 × 100
+  const yearStartTotal = topSeries.yearStartTotal || 0;
+  const growthCurrentTotal = topSeries.growthCurrentTotal || tLast;
+  const cumulativeDeposits = topSeries.cumulativeDeposits || 0;
+  const cumulativeWithdrawals = topSeries.cumulativeWithdrawals || 0;
+  
+  let annualGrowthRate = 0;
+  if (yearStartTotal > 0) {
+    const realPnL = growthCurrentTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
+    annualGrowthRate = (realPnL / yearStartTotal) * 100;
+  }
+  
   const elTotalGrowth = document.getElementById('growthTotal');
-  elTotalGrowth.textContent = (momTotal >= 0 ? '+' : '') + momTotal.toFixed(1) + '%';
-  setSignClass(elTotalGrowth, momTotal);
+  elTotalGrowth.textContent = (annualGrowthRate >= 0 ? '+' : '') + annualGrowthRate.toFixed(1) + '%';
+  setSignClass(elTotalGrowth, annualGrowthRate);
 }
 updateKPIs();
 
@@ -566,17 +641,26 @@ if (ctx) {
   gradGreen.addColorStop(1, 'rgba(62,224,143,0)');
 
   const monthLabels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const perfLabels = ['年初', ...monthLabels];
+  const latestMonth = topSeries.month || 12;
+  const realizedSeries = [topSeries.chartStartTotal || topSeries.realized[0] || 0];
+  const totalSeries = [topSeries.chartStartTotal || topSeries.total[0] || 0];
+
+  for (let month = 1; month <= 12; month += 1) {
+    realizedSeries.push(month <= latestMonth ? topSeries.realized[month - 1] : null);
+    totalSeries.push(month <= latestMonth ? topSeries.total[month - 1] : null);
+  }
   const isMobile = window.innerWidth <= 480;
   const tickFontSize = isMobile ? 10 : 12;
 
   new Chart(ctx, {
     type: 'line',
     data: {
-      labels: monthLabels,
+      labels: perfLabels,
       datasets: [
         {
           label: 'Realized Balance',
-          data: topSeries.realized,
+          data: realizedSeries,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
           fill: true,
@@ -585,7 +669,7 @@ if (ctx) {
         },
         {
           label: 'Total Balance',
-          data: topSeries.total,
+          data: totalSeries,
           borderColor: '#3EE08F',
           backgroundColor: gradGreen,
           fill: true,
@@ -728,3 +812,121 @@ function renderPortfolio() {
   }
 }
 renderPortfolio();
+
+// ===== Year Selector =====
+function initializeYearSelector() {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  let years = getNumericYears(tradingData);
+  const yearSelect = document.getElementById('topYearSelect');
+  
+  if (!yearSelect) return;
+  
+  // データがなくても2025年は表示
+  if (years.length === 0) {
+    years = [2025];
+  }
+  
+  // セレクトボックスの初期化
+  yearSelect.innerHTML = years.map(year => 
+    `<option value="${year}">${year}</option>`
+  ).join('');
+  
+  // デフォルト値（最新年）を選択
+  yearSelect.value = years[years.length - 1];
+  
+  // 年選択変更イベント
+  yearSelect.addEventListener('change', updateDataByYear);
+}
+
+function updateDataByYear() {
+  const yearSelect = document.getElementById('topYearSelect');
+  const selectedYear = yearSelect ? Number(yearSelect.value) : null;
+  
+  if (!selectedYear) return;
+  
+  // 新しい年のデータを取得
+  const newData = buildTopLinkedData(selectedYear);
+  if (!newData) return;
+  
+  // グローバルtopSeriesを再代入（letで定義されている）
+  topSeries = newData;
+  
+  // KPiを更新
+  updateKPIs();
+  
+  // ポートフォリオを更新
+  accountData = newData.accountData?.length ? newData.accountData : [];
+  renderPortfolio();
+  
+  // パフォーマンスグラフを更新
+  const latestMonth = newData.month || 12;
+  const realizedSeries = [newData.chartStartTotal || newData.realized[0] || 0];
+  const totalSeries = [newData.chartStartTotal || newData.total[0] || 0];
+  
+  for (let month = 1; month <= 12; month += 1) {
+    realizedSeries.push(month <= latestMonth ? newData.realized[month - 1] : null);
+    totalSeries.push(month <= latestMonth ? newData.total[month - 1] : null);
+  }
+  
+  // チャートを再描画
+  const ctx = document.getElementById('perfChart')?.getContext('2d');
+  if (ctx && window.perfChart) {
+    window.perfChart.destroy();
+  }
+  
+  if (ctx) {
+    window.perfChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['年初', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+        datasets: [
+          {
+            label: 'Net Balance',
+            data: realizedSeries,
+            backgroundColor: 'rgba(62,224,143,0.2)',
+            borderColor: '#3EE08F',
+            borderWidth: 1,
+            yAxisID: 'y',
+            fill: true,
+            tension: 0.3
+          },
+          {
+            label: 'Total Equity',
+            data: totalSeries,
+            backgroundColor: 'rgba(61,162,255,0.2)',
+            borderColor: '#3DA2FF',
+            borderWidth: 1,
+            yAxisID: 'y',
+            fill: true,
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { left: 0, right: 16, top: 0, bottom: 0 } },
+        plugins: {
+          filler: { propagate: true },
+          tooltip: { enabled: true, mode: 'index', intersect: false }
+        },
+        scales: {
+          x: { display: true, stacked: false },
+          y: { display: true, title: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+// ページロード時の初期化
+document.addEventListener('DOMContentLoaded', () => {
+  initializeYearSelector();
+});
+
+// スクリプト直後の初期化（DOMReady待たずに実行）
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeYearSelector);
+} else {
+  initializeYearSelector();
+}
