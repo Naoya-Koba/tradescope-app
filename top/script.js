@@ -93,16 +93,79 @@ const drawer = document.getElementById('drawer');
 const scrim = document.getElementById('scrim');
 const menuButton = document.getElementById('menuButton');
 const drawerClose = document.getElementById('drawerClose');
+
+drawer?.querySelectorAll('.menu-item').forEach((item, idx) => {
+  const order = item.dataset.order || idx;
+  item.style.setProperty('--menu-order', String(order));
+});
+
 function openDrawer() {
-  drawer.classList.add('open'); scrim.hidden = false;
+  if (!drawer || !scrim) return;
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  menuButton?.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('drawer-open');
+  scrim.hidden = false;
+  requestAnimationFrame(() => scrim.classList.add('show'));
 }
 function closeDrawer() {
-  drawer.classList.remove('open'); scrim.hidden = true;
+  if (!drawer || !scrim) return;
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
+  menuButton?.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('drawer-open');
+  scrim.classList.remove('show');
+  setTimeout(() => {
+    if (!drawer.classList.contains('open')) scrim.hidden = true;
+  }, 220);
 }
 menuButton?.addEventListener('click', openDrawer);
 drawerClose?.addEventListener('click', closeDrawer);
 scrim?.addEventListener('click', closeDrawer);
-document.addEventListener('keydown', e => e.key === 'Escape' && closeDrawer());
+drawer?.querySelectorAll('.menu-item').forEach(link => {
+  link.addEventListener('click', closeDrawer);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && drawer?.classList.contains('open')) closeDrawer();
+});
+
+let drawerSwipeStartX = 0;
+let drawerSwipeStartY = 0;
+let drawerEdgeTracking = false;
+
+document.addEventListener('touchstart', (e) => {
+  if (!drawer || e.touches.length !== 1) return;
+  const isMobile = window.matchMedia('(max-width: 860px)').matches;
+  if (!isMobile || drawer.classList.contains('open')) return;
+  drawerSwipeStartX = e.touches[0].clientX;
+  drawerSwipeStartY = e.touches[0].clientY;
+  drawerEdgeTracking = drawerSwipeStartX <= 20;
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!drawerEdgeTracking || !drawer || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - drawerSwipeStartX;
+  const dy = e.touches[0].clientY - drawerSwipeStartY;
+  if (dx > 56 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    openDrawer();
+    drawerEdgeTracking = false;
+  }
+}, { passive: true });
+
+drawer?.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) return;
+  drawerSwipeStartX = e.touches[0].clientX;
+  drawerSwipeStartY = e.touches[0].clientY;
+}, { passive: true });
+
+drawer?.addEventListener('touchmove', (e) => {
+  if (!drawer.classList.contains('open') || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - drawerSwipeStartX;
+  const dy = e.touches[0].clientY - drawerSwipeStartY;
+  if (dx < -64 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    closeDrawer();
+  }
+}, { passive: true });
 
 // ===== News =====
 const globalTicker = [
@@ -461,14 +524,17 @@ const pairDetails = {
 function lockBackgroundScroll() {
   detailLockScrollY = window.scrollY || window.pageYOffset || 0;
   if (window.matchMedia('(max-width: 768px)').matches) {
-    document.documentElement.classList.add('detail-open');
-    document.body.classList.add('detail-open');
+    document.body.style.position = 'fixed';
+    document.body.style.top = -detailLockScrollY + 'px';
+    document.body.style.width = '100%';
   }
 }
 
 function unlockBackgroundScroll() {
-  document.documentElement.classList.remove('detail-open');
-  document.body.classList.remove('detail-open');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, detailLockScrollY);
 }
 
 function applyRateClass(el, rawText) {

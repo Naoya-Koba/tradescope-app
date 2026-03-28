@@ -71,6 +71,25 @@ body::before {
   padding: 6px 10px;
   cursor: pointer;
 }
+.icon-btn.menu-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu-btn-lines {
+  display: grid;
+  gap: 4px;
+}
+.menu-btn-line {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: #eef1ff;
+}
 .app-logo {
   width: 24px;
   height: 24px;
@@ -637,47 +656,157 @@ body::before {
   position: fixed;
   top: 0;
   left: 0;
-  width: 78vw;
-  max-width: 320px;
+  width: min(86vw, 360px);
   height: 100%;
   transform: translateX(-100%);
-  background: rgba(17,22,45,.6);
-  backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(255,255,255,.12);
+  background: linear-gradient(165deg, rgba(15,22,46,.92), rgba(10,14,32,.9));
+  backdrop-filter: blur(16px) saturate(140%);
+  border-right: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
   z-index: 60;
-  transition: transform .25s ease;
+  transition: transform .36s cubic-bezier(.22, .86, .32, 1);
+  overflow-y: auto;
 }
 .drawer.open { transform: translateX(0); }
 .drawer-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 14px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.09);
+}
+.drawer-header-text {
+  display: grid;
+  gap: 2px;
+}
+.drawer-kicker {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1.1px;
+  color: rgba(170,181,208,.92);
+}
+.drawer-title {
+  margin: 0;
+  font-family: 'Noto Sans JP', 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #f0f4ff;
+}
+.drawer-x {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.drawer-segment-label {
+  margin: 12px 14px 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: rgba(170,181,208,.9);
+  letter-spacing: .9px;
 }
 .drawer-nav {
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  gap: 8px;
+  padding: 6px 10px 10px;
 }
-.drawer-nav a {
-  padding: 10px 14px;
+.drawer-nav .menu-item {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
   color: var(--text);
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.02);
+  transform: translateY(8px);
+  opacity: 0;
+  transition: background .2s ease, border-color .2s ease, transform .46s ease, opacity .46s ease;
+  transition-delay: calc(var(--menu-order, 0) * 36ms);
 }
-.drawer-nav a:hover {
+.drawer.open .drawer-nav .menu-item {
+  transform: translateY(0);
+  opacity: 1;
+}
+.drawer-nav .menu-item:hover {
   background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.18);
 }
-.drawer-nav a.secondary {
-  color: var(--muted);
+.menu-mark {
+  font-size: 9px;
+  color: rgba(61,162,255,.92);
+  transform: translateY(-1px);
+}
+.menu-copy {
+  display: grid;
+  gap: 2px;
+}
+.menu-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Noto Sans JP', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #eef1ff;
+}
+.menu-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: rgba(170,181,208,.86);
+}
+.menu-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(170,181,208,.95);
+}
+.menu-item.active {
+  border-color: rgba(61,162,255,.55);
+  background: linear-gradient(120deg, rgba(61,162,255,.2), rgba(255,255,255,.03));
+  box-shadow: inset 3px 0 0 #3da2ff;
+}
+.menu-item.active .menu-mark {
+  color: #7ec1ff;
+}
+.menu-item.is-coming .menu-title,
+.menu-item.is-coming .menu-sub {
+  color: rgba(170,181,208,.86);
+}
+.menu-item.is-coming {
+  pointer-events: none;
+  cursor: default;
+  opacity: .72;
 }
 .scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.25);
-  backdrop-filter: blur(2px);
+  background: rgba(3,7,16,.45);
+  backdrop-filter: blur(4px);
   z-index: 55;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .24s ease;
+}
+.scrim.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+body.drawer-open {
+  overflow: hidden;
 }
 
 /* ============================
@@ -1946,8 +2075,4 @@ body::before {
 }
 
 /* 詳細表示中は背景スクロールを固定（iPad含む） */
-html.detail-open,
-body.detail-open {
-  overflow: hidden;
-  overscroll-behavior: none;
-}
+

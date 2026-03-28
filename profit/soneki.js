@@ -143,16 +143,79 @@ const scrim = document.getElementById('scrim');
 const menuButton = document.getElementById('menuButton');
 const drawerClose = document.getElementById('drawerClose');
 
-function openDrawer() { drawer.classList.add('open'); scrim.hidden = false; }
-function closeDrawer() { drawer.classList.remove('open'); scrim.hidden = true; }
+drawer?.querySelectorAll('.menu-item').forEach((item, idx) => {
+  const order = item.dataset.order || idx;
+  item.style.setProperty('--menu-order', String(order));
+});
+
+function openDrawer() {
+  if (!drawer || !scrim) return;
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  menuButton?.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('drawer-open');
+  scrim.hidden = false;
+  requestAnimationFrame(() => scrim.classList.add('show'));
+}
+function closeDrawer() {
+  if (!drawer || !scrim) return;
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
+  menuButton?.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('drawer-open');
+  scrim.classList.remove('show');
+  setTimeout(() => {
+    if (!drawer.classList.contains('open')) scrim.hidden = true;
+  }, 220);
+}
 
 menuButton?.addEventListener('click', openDrawer);
 drawerClose?.addEventListener('click', closeDrawer);
 scrim?.addEventListener('click', closeDrawer);
+drawer?.querySelectorAll('.menu-item').forEach(link => {
+  link.addEventListener('click', closeDrawer);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && drawer?.classList.contains('open')) closeDrawer();
+});
 
-let startX = 0;
-drawer.addEventListener('touchstart', e => startX = e.touches[0].clientX);
-drawer.addEventListener('touchmove', e => { if (e.touches[0].clientX - startX < -60) closeDrawer(); });
+let drawerSwipeStartX = 0;
+let drawerSwipeStartY = 0;
+let drawerEdgeTracking = false;
+
+document.addEventListener('touchstart', (e) => {
+  if (!drawer || e.touches.length !== 1) return;
+  const isMobile = window.matchMedia('(max-width: 860px)').matches;
+  if (!isMobile || drawer.classList.contains('open')) return;
+  drawerSwipeStartX = e.touches[0].clientX;
+  drawerSwipeStartY = e.touches[0].clientY;
+  drawerEdgeTracking = drawerSwipeStartX <= 20;
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!drawerEdgeTracking || !drawer || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - drawerSwipeStartX;
+  const dy = e.touches[0].clientY - drawerSwipeStartY;
+  if (dx > 56 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    openDrawer();
+    drawerEdgeTracking = false;
+  }
+}, { passive: true });
+
+drawer?.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) return;
+  drawerSwipeStartX = e.touches[0].clientX;
+  drawerSwipeStartY = e.touches[0].clientY;
+}, { passive: true });
+
+drawer?.addEventListener('touchmove', (e) => {
+  if (!drawer.classList.contains('open') || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - drawerSwipeStartX;
+  const dy = e.touches[0].clientY - drawerSwipeStartY;
+  if (dx < -64 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+    closeDrawer();
+  }
+}, { passive: true });
 
 // ===== Global State =====
 let currentYear = 2025;
@@ -171,6 +234,7 @@ const monthlyDetailTitle = document.getElementById('monthlyDetailTitle');
 const monthlyDetailClose = document.getElementById('monthlyDetailClose');
 const monthlyDetailScrim = document.getElementById('monthlyDetailScrim');
 let pnlTrendChart = null;
+let monthlyDetailLockScrollY = 0;
 
 function dismissInputFocusOnOutsideTap(event) {
   const activeEl = document.activeElement;
@@ -827,6 +891,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
           <div class="detail-account-stats">
             <div class="item"><span class="k">決済</span><span class="v" style="color:${colorBySign(data.realizedPnL || 0)}">${fmtJPY(data.realizedPnL || 0)}</span></div>
             <div class="item"><span class="k">スワップ</span><span class="v" style="color:${colorBySign(data.swapPnL || 0)}">${fmtJPY(data.swapPnL || 0)}</span></div>
+            <div class="item"><span class="k">評価損益</span><span class="v" style="color:${colorBySign(data.unrealizedPnL || 0)}">${fmtJPY(data.unrealizedPnL || 0)}</span></div>
           </div>
         </div>
         <div class="detail-account-cashflow">
@@ -867,6 +932,12 @@ function renderMonthlyDetailPane(month = currentMonth) {
             <span class="detail-summary-stat-value" style="color:${colorBySign(monthly.swapSum)}">${fmtJPY(monthly.swapSum)}</span>
           </div>
           <div class="detail-summary-row">
+            <span class="detail-summary-stat">評価損益</span>
+            <span class="detail-summary-stat-value" style="color:${colorBySign(monthly.unrealizedSum)}">${fmtJPY(monthly.unrealizedSum)}</span>
+          </div>
+        </div>
+        <div class="detail-account-cashflow" style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.08)">
+          <div class="detail-summary-row">
             <span class="detail-summary-stat">入出金</span>
             <span class="detail-summary-stat-value" style="color:${colorBySign(netCashFlow)}">${fmtJPY(netCashFlow)}</span>
           </div>
@@ -891,16 +962,25 @@ function renderMonthlyDetailPane(month = currentMonth) {
 }
 
 function openMonthlyDetailPane(month = currentMonth) {
+  monthlyDetailLockScrollY = window.scrollY || window.pageYOffset || 0;
   renderMonthlyDetailPane(month);
   monthlyDetailPane.classList.add('open');
   monthlyDetailPane.setAttribute('aria-hidden', 'false');
   monthlyDetailScrim.hidden = false;
+  document.body.style.position = 'fixed';
+  document.body.style.top = -monthlyDetailLockScrollY + 'px';
+  document.body.style.width = '100%';
 }
 
 function closeMonthlyDetailPane() {
   monthlyDetailPane.classList.remove('open');
   monthlyDetailPane.setAttribute('aria-hidden', 'true');
+  monthlyDetailPane.style.transform = '';
   monthlyDetailScrim.hidden = true;
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, monthlyDetailLockScrollY);
 }
 
 function renderMonthTabs() {
@@ -1268,6 +1348,121 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
 
 monthlyDetailClose?.addEventListener('click', closeMonthlyDetailPane);
 monthlyDetailScrim?.addEventListener('click', closeMonthlyDetailPane);
+
+// ===== Month Detail Pane Swipe Gesture =====
+(() => {
+  if (!monthlyDetailPane) return;
+  let startX = 0;
+  let startY = 0;
+  let canDismissBySwipe = false;
+  let isTracking = false;
+  let startedFromHeader = false;
+
+  monthlyDetailPane.addEventListener('touchstart', (e) => {
+    if (!monthlyDetailPane.classList.contains('open')) return;
+    if (e.touches.length !== 1) return;
+    monthlyDetailPane.style.transform = '';
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const scrollEl = monthlyDetailBody || monthlyDetailPane;
+    const canScroll = scrollEl.scrollHeight > scrollEl.clientHeight + 1;
+    const atTop = scrollEl.scrollTop <= 2;
+    const target = e.target;
+    startedFromHeader = target instanceof Element ? !!target.closest('.monthly-detail-head') : false;
+
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    // モバイルは「ヘッダー開始」または「本文が上端」の時のみ格納ジェスチャーを許可
+    canDismissBySwipe = isMobile ? (startedFromHeader || !canScroll || atTop) : true;
+    isTracking = canDismissBySwipe;
+    if (isTracking) {
+      monthlyDetailPane.style.transition = 'none';
+    }
+  }, { passive: true });
+
+  monthlyDetailPane.addEventListener('touchmove', (e) => {
+    if (!isTracking) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    
+    if (isMobile && canDismissBySwipe) {
+      const scrollEl = monthlyDetailBody || monthlyDetailPane;
+      const canScroll = scrollEl.scrollHeight > scrollEl.clientHeight + 1;
+      const atTop = scrollEl.scrollTop <= 2;
+      // 本文開始かつ上端を離れている場合は格納ジェスチャーを中断（スクロールを優先）
+      if (!startedFromHeader && canScroll && !atTop) {
+        isTracking = false;
+        monthlyDetailPane.style.transition = '';
+        monthlyDetailPane.style.transform = '';
+        return;
+      }
+      // 許可条件下でのみ下スワイプでペインを追従
+      if (dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+        monthlyDetailPane.style.transform = `translateY(${Math.min(dy, 220)}px)`;
+      }
+    } else if (!isMobile && dx > 0 && Math.abs(dx) > Math.abs(dy)) {
+      monthlyDetailPane.style.transform = `translateX(${Math.min(dx, 220)}px)`;
+    }
+  }, { passive: true });
+
+  monthlyDetailPane.addEventListener('touchend', (e) => {
+    if (!isTracking) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const shouldClose = isMobile
+      ? (canDismissBySwipe && dy > 120 && Math.abs(dy) > Math.abs(dx) * 1.02)
+      : (dx > 120 && Math.abs(dx) > Math.abs(dy) * 1.1);
+    monthlyDetailPane.style.transition = '';
+    if (shouldClose) closeMonthlyDetailPane();
+    else monthlyDetailPane.style.transform = '';
+    isTracking = false;
+    canDismissBySwipe = false;
+    startedFromHeader = false;
+  });
+})();
+
+// iPad等でMonth Detail Paneのスクロールが背景へ伝播するのを防ぐ
+(() => {
+  if (!monthlyDetailPane) return;
+  let lastY = 0;
+
+  monthlyDetailPane.addEventListener('touchstart', (e) => {
+    if (!monthlyDetailPane.classList.contains('open')) return;
+    if (e.touches.length !== 1) return;
+    lastY = e.touches[0].clientY;
+  }, { passive: true });
+
+  monthlyDetailPane.addEventListener('touchmove', (e) => {
+    if (!monthlyDetailPane.classList.contains('open')) return;
+    // モバイル(bottom sheet)は既存の閉じジェスチャー制御に任せる。
+    if (window.matchMedia('(max-width: 768px)').matches) return;
+    if (e.touches.length !== 1) return;
+
+    const currentY = e.touches[0].clientY;
+    const dy = currentY - lastY;
+    lastY = currentY;
+
+    const scrollEl = monthlyDetailBody || monthlyDetailPane;
+    const canScroll = scrollEl.scrollHeight > scrollEl.clientHeight + 1;
+    const atTop = scrollEl.scrollTop <= 1;
+    const atBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 1;
+
+    if (!canScroll || (atTop && dy > 0) || (atBottom && dy < 0)) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+})();
+
+// Month Detail Pane表示中は、パネル外タッチで背景のスクロールを発生させない
+document.addEventListener('touchmove', (e) => {
+  if (!monthlyDetailPane?.classList.contains('open')) return;
+  if (!monthlyDetailPane.contains(e.target)) {
+    e.preventDefault();
+  }
+}, { passive: false });
 
 document.getElementById('clearStoredData')?.addEventListener('click', () => {
   const confirmed = window.confirm('保存済みの損益データを削除します。よろしいですか？');

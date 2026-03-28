@@ -16,13 +16,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="soneki.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
   <header class="app-header glass-nav">
-    <button id="menuButton" class="icon-btn" aria-label="メニューを開く">☰</button>
+    <button id="menuButton" class="icon-btn menu-btn" aria-label="メニューを開く" aria-controls="drawer" aria-expanded="false">
+      <span class="menu-btn-lines" aria-hidden="true">
+        <span class="menu-btn-line"></span>
+        <span class="menu-btn-line"></span>
+        <span class="menu-btn-line"></span>
+      </span>
+    </button>
     <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
       <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>
       <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>
@@ -34,16 +41,68 @@
   </header>
 
   <aside id="drawer" class="drawer" aria-hidden="true">
-    <button id="drawerClose" class="drawer-close" aria-label="閉じる">✕</button>
-    <div class="drawer-header"><span>メニュー</span></div>
-    <nav class="drawer-nav">
-      <a href="../index.html">トップ</a>
-      <a href="../tenkan/tenkan.html">転換シグナル</a>
-      <a href="../oshime.html">押し/戻り</a>
-      <a href="./soneki.html" class="active">損益管理</a>
-      <a href="../history.html">取引履歴</a>
-      <a href="../analysis/rates.html">政策金利予測</a>
-      <a href="../settings.html" class="secondary">設定</a>
+    <div class="drawer-header">
+      <div class="drawer-header-text">
+        <p class="drawer-kicker">NAVIGATION</p>
+        <h2 class="drawer-title">TradeScope Menu</h2>
+      </div>
+      <button id="drawerClose" class="icon-btn drawer-x" aria-label="閉じる">✕</button>
+    </div>
+
+    <nav class="drawer-nav" aria-label="主要メニュー">
+      <a href="../index.html" class="menu-item" data-order="0">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy">
+          <span class="menu-title">トップ</span>
+          <span class="menu-sub">Summary / Portfolio</span>
+        </span>
+      </a>
+      <a href="./soneki.html" class="menu-item active" data-order="1">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy">
+          <span class="menu-title">損益管理</span>
+          <span class="menu-sub">Input / Annual Summary</span>
+        </span>
+      </a>
+    </nav>
+
+    <div class="drawer-segment-label">準備中</div>
+    <nav class="drawer-nav" aria-label="準備中メニュー">
+      <a href="../tenkan/tenkan.html" class="menu-item is-coming" data-order="2" aria-disabled="true" tabindex="-1">
+        <span class="menu-mark">○</span>
+        <span class="menu-copy">
+          <span class="menu-title">転換シグナル <span class="menu-badge">準備中</span></span>
+          <span class="menu-sub">Coming Soon</span>
+        </span>
+      </a>
+      <a href="../oshime.html" class="menu-item is-coming" data-order="3" aria-disabled="true" tabindex="-1">
+        <span class="menu-mark">○</span>
+        <span class="menu-copy">
+          <span class="menu-title">押し/戻り <span class="menu-badge">準備中</span></span>
+          <span class="menu-sub">Coming Soon</span>
+        </span>
+      </a>
+      <a href="../history.html" class="menu-item is-coming" data-order="4" aria-disabled="true" tabindex="-1">
+        <span class="menu-mark">○</span>
+        <span class="menu-copy">
+          <span class="menu-title">取引履歴 <span class="menu-badge">準備中</span></span>
+          <span class="menu-sub">Coming Soon</span>
+        </span>
+      </a>
+      <a href="../analysis/rates.html" class="menu-item is-coming" data-order="5" aria-disabled="true" tabindex="-1">
+        <span class="menu-mark">○</span>
+        <span class="menu-copy">
+          <span class="menu-title">政策金利予測 <span class="menu-badge">準備中</span></span>
+          <span class="menu-sub">Coming Soon</span>
+        </span>
+      </a>
+      <a href="../settings.html" class="menu-item is-coming" data-order="6" aria-disabled="true" tabindex="-1">
+        <span class="menu-mark">○</span>
+        <span class="menu-copy">
+          <span class="menu-title">設定 <span class="menu-badge">準備中</span></span>
+          <span class="menu-sub">Coming Soon</span>
+        </span>
+      </a>
     </nav>
   </aside>
   <div id="scrim" class="scrim" hidden></div>
@@ -218,7 +277,7 @@
     <h2 class="heading-muted">Backup</h2>
     <section class="section glass margin-bottom">
       <p class="section-description">データをJSONファイルに書き出してバックアップ、または復元できます。<br/>iOSアプリ再インストール前には必ずエクスポートしてください。</p>
-      <div class="form-actions" style="margin-top:12px">
+      <div class="form-actions" style="margin-top:12px;justify-content:center">
         <button class="btn btn-secondary" id="exportDataBtn">📥 エクスポート</button>
         <label class="btn btn-secondary" style="cursor:pointer">
           📤 インポート
