@@ -59,7 +59,7 @@
     </div>
 <section class="section glass">
   <div class="summary-list">
-    <div class="summary-row">
+    <div class="summary-row summary-primary">
       <span class="summary-label">純資産 <span class="sub-en">Total Equity</span></span>
       <div class="summary-right">
         <span id="kpiTotal" class="summary-value">¥0</span>
@@ -70,11 +70,14 @@
       </div>
     </div>
 
-    <div class="summary-row">
+    <div class="summary-row summary-primary">
       <span class="summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
       <div class="summary-right">
         <span id="kpiRealized" class="summary-value">¥0</span>
-        <span id="growthNet" class="growth-pill neutral">+0.0%</span>
+        <div class="growth-group">
+          <span class="growth-label">年間成長率</span>
+          <span id="growthNet" class="growth-pill neutral">+0.0%</span>
+        </div>
       </div>
     </div>
   </div>
@@ -343,6 +346,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/profit-metrics.js"></script>
   <script src="top/script.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

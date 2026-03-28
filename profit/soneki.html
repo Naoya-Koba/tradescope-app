@@ -68,6 +68,16 @@
           </div>
         </div>
 
+        <div class="annual-summary-row annual-primary">
+          <span class="annual-summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
+          <div class="annual-summary-right">
+            <span id="confirmedAssets" class="annual-summary-value annual-main-value">¥0</span>
+            <div class="annual-growth-group">
+              <span id="confirmedYearGrowthRate" class="annual-growth-pill neutral">0%</span>
+            </div>
+          </div>
+        </div>
+
         <div class="annual-summary-row">
           <span class="annual-summary-label">年間決済 <span class="sub-en">Realized PnL</span></span>
           <span id="yearRealizedSum" class="annual-summary-value">¥0</span>
@@ -259,6 +269,7 @@
     <div id="monthlyDetailBody" class="monthly-detail-body"></div>
   </aside>
 
+  <script src="../assets/profit-metrics.js"></script>
   <script src="soneki.js"></script>
   <script>
   if ("serviceWorker" in navigator) {

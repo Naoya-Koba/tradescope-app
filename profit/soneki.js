@@ -22,6 +22,7 @@ const ACCOUNTS = [
 ];
 const UNREALIZED_HELPER_ACCOUNTS = new Set(['lightfx', 'minano']);
 const GROWTH_TARGET_ACCOUNTS = ACCOUNTS.filter((account) => !account.bankOnly);
+const profitMetrics = window.TradeScopeProfitMetrics;
 
 function getUnrealizedLegs(year, month, accountKey) {
   ensureYearMonth(year, month);
@@ -365,9 +366,13 @@ function calculateYearlyTotals(year) {
 
 function calculateAccountNetAssets(year, month, accountKey) {
   ensureYearMonth(year, month);
+  if (profitMetrics?.calculateAccountNetAssets) {
+    return profitMetrics.calculateAccountNetAssets(tradingData, yearInitialFunds, year, month, accountKey);
+  }
+
   if (!yearInitialFunds[year]) yearInitialFunds[year] = {};
   const initialFund = yearInitialFunds[year][accountKey] || 0;
-  
+
   let cumulative = { realized: 0, swap: 0, deposit: 0, withdrawal: 0 };
   for (let m = 1; m <= month; m++) {
     const accData = tradingData[year]?.[m]?.[accountKey] || {};
@@ -376,9 +381,30 @@ function calculateAccountNetAssets(year, month, accountKey) {
     cumulative.deposit += accData.deposit || 0;
     cumulative.withdrawal += accData.withdrawal || 0;
   }
-  
+
   const currentMonthUnrealized = tradingData[year]?.[month]?.[accountKey]?.unrealizedPnL || 0;
   return initialFund + cumulative.realized + cumulative.swap + cumulative.deposit - cumulative.withdrawal + currentMonthUnrealized;
+}
+
+function calculateAccountConfirmedAssets(year, month, accountKey) {
+  ensureYearMonth(year, month);
+  if (profitMetrics?.calculateAccountConfirmedAssets) {
+    return profitMetrics.calculateAccountConfirmedAssets(tradingData, yearInitialFunds, year, month, accountKey);
+  }
+
+  if (!yearInitialFunds[year]) yearInitialFunds[year] = {};
+  const initialFund = yearInitialFunds[year][accountKey] || 0;
+
+  let cumulative = { realized: 0, swap: 0, deposit: 0, withdrawal: 0 };
+  for (let m = 1; m <= month; m++) {
+    const accData = tradingData[year]?.[m]?.[accountKey] || {};
+    cumulative.realized += accData.realizedPnL || 0;
+    cumulative.swap += accData.swapPnL || 0;
+    cumulative.deposit += accData.deposit || 0;
+    cumulative.withdrawal += accData.withdrawal || 0;
+  }
+
+  return initialFund + cumulative.realized + cumulative.swap + cumulative.deposit - cumulative.withdrawal;
 }
 
 function getBankMonthEndBalance(year, month, accountKey) {
@@ -418,6 +444,14 @@ function calculateTotalNetAssets(year, month) {
   let total = 0;
   ACCOUNTS.forEach(a => {
     total += calculateAccountNetAssets(year, month, a.key);
+  });
+  return total;
+}
+
+function calculateTotalConfirmedAssets(year, month) {
+  let total = 0;
+  ACCOUNTS.forEach(a => {
+    total += calculateAccountConfirmedAssets(year, month, a.key);
   });
   return total;
 }
@@ -675,6 +709,7 @@ function renderAnnualSummary() {
   const yearly = calculateYearlyTotals(currentYear);
   const initialCapital = calculateInitialCapital(currentYear);
   const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
+  const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
 
   const investmentInitialCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
     return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0);
@@ -682,6 +717,10 @@ function renderAnnualSummary() {
 
   const investmentTotalAssets = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
     return sum + calculateAccountNetAssets(currentYear, latestMonth, account.key);
+  }, 0);
+
+  const investmentConfirmedAssets = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + calculateAccountConfirmedAssets(currentYear, latestMonth, account.key);
   }, 0);
 
   const investmentCashflow = GROWTH_TARGET_ACCOUNTS.reduce((acc, account) => {
@@ -697,6 +736,8 @@ function renderAnnualSummary() {
   // 年間成長率 = 実質損益 ÷ 年初純資産 × 100
   const realPnL = investmentTotalAssets - investmentInitialCapital - investmentCashflow.deposit + investmentCashflow.withdraw;
   const growthRate = investmentInitialCapital > 0 ? (realPnL / investmentInitialCapital * 100) : 0;
+  const confirmedRealPnL = investmentConfirmedAssets - investmentInitialCapital - investmentCashflow.deposit + investmentCashflow.withdraw;
+  const confirmedGrowthRate = investmentInitialCapital > 0 ? (confirmedRealPnL / investmentInitialCapital * 100) : 0;
   const netCashFlowYear = yearly.depositSum - yearly.withdrawSum;
 
   document.getElementById('yearRealizedSum').textContent = fmtJPY(yearly.realizedSum);
@@ -706,19 +747,25 @@ function renderAnnualSummary() {
   document.getElementById('yearWithdrawSum').textContent = fmtJPY(yearly.withdrawSum);
   document.getElementById('yearNetCashFlow').textContent = fmtJPY(netCashFlowYear);
   document.getElementById('totalAssets').textContent = fmtJPY(totalAssets);
+  document.getElementById('confirmedAssets').textContent = fmtJPY(confirmedAssets);
   document.getElementById('yearGrowthRate').textContent = (growthRate >= 0 ? '+' : '') + growthRate.toFixed(1) + '%';
+  document.getElementById('confirmedYearGrowthRate').textContent = (confirmedGrowthRate >= 0 ? '+' : '') + confirmedGrowthRate.toFixed(1) + '%';
 
   const elRealized = document.getElementById('yearRealizedSum');
   const elSwap = document.getElementById('yearSwapSum');
   const elNetCash = document.getElementById('yearNetCashFlow');
   const elGrowth = document.getElementById('yearGrowthRate');
+  const elConfirmedGrowth = document.getElementById('confirmedYearGrowthRate');
   const elTotalAssets = document.getElementById('totalAssets');
+  const elConfirmedAssets = document.getElementById('confirmedAssets');
 
   setSignClass(elRealized, yearly.realizedSum);
   setSignClass(elSwap, yearly.swapSum);
   setSignClass(elNetCash, netCashFlowYear);
   setSignClass(elGrowth, growthRate);
+  setSignClass(elConfirmedGrowth, confirmedGrowthRate);
   setSignClass(elTotalAssets, totalAssets);
+  setSignClass(elConfirmedAssets, confirmedAssets);
 }
 
 function renderMonthlyDisplay() {
