@@ -183,8 +183,19 @@
       </div>
     </div>
     <section class="chart-area margin-bottom" aria-label="損益パフォーマンス">
-      <div class="chart-wrap">
-        <canvas id="pnlTrendChart" aria-label="月別損益と純資産推移"></canvas>
+      <div class="chart-stack">
+        <div class="chart-panel">
+          <div class="chart-panel-label">Total Equity Trend</div>
+          <div class="chart-wrap">
+            <canvas id="assetsTrendChart" aria-label="純資産推移"></canvas>
+          </div>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-panel-label">Monthly P/L</div>
+          <div class="chart-wrap">
+            <canvas id="pnlBarChart" aria-label="月別損益"></canvas>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -211,7 +222,7 @@
         <!-- 選択月の口座別カードが動的に生成される -->
       </div>
 
-      <button class="btn btn-primary btn-block" id="saveMonthData">月別データを保存</button>
+      <button class="btn btn-primary btn-block" id="saveMonthData">入力データを保存</button>
     </section>
 
     <div class="initial-capital-outside">
@@ -238,8 +249,18 @@
                 <span class="suffix">¥</span>
               </div>
               <div class="form-group">
+                <label for="initGMOUnrealized">GMO 年初評価損益</label>
+                <input type="number" id="initGMOUnrealized" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
                 <label for="initLightFX">Light FX 年初資金</label>
                 <input type="number" id="initLightFX" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initLightFXUnrealized">Light FX 年初評価損益</label>
+                <input type="number" id="initLightFXUnrealized" value="0" placeholder="0" />
                 <span class="suffix">¥</span>
               </div>
               <div class="form-group">
@@ -248,8 +269,18 @@
                 <span class="suffix">¥</span>
               </div>
               <div class="form-group">
+                <label for="initMinanoUnrealized">みんなのFX 年初評価損益</label>
+                <input type="number" id="initMinanoUnrealized" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
                 <label for="initSBI">SBI 年初資金</label>
                 <input type="number" id="initSBI" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initSBIUnrealized">SBI 年初評価損益</label>
+                <input type="number" id="initSBIUnrealized" value="0" placeholder="0" />
                 <span class="suffix">¥</span>
               </div>
               <div class="form-group">
@@ -258,8 +289,18 @@
                 <span class="suffix">¥</span>
               </div>
               <div class="form-group">
+                <label for="initSBIVCUnrealized">SBI VC 年初評価損益</label>
+                <input type="number" id="initSBIVCUnrealized" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
                 <label for="initSMBC">三井住友銀行 残高</label>
                 <input type="number" id="initSMBC" value="0" placeholder="0" />
+                <span class="suffix">¥</span>
+              </div>
+              <div class="form-group">
+                <label for="initSMBCUnrealized">三井住友銀行 年初評価損益</label>
+                <input type="number" id="initSMBCUnrealized" value="0" placeholder="0" />
                 <span class="suffix">¥</span>
               </div>
             </div>

@@ -222,10 +222,12 @@ let currentYear = 2025;
 let currentMonth = new Date().getMonth() + 1; // 1-12
 let tradingData = {}; // { year: { month: { account: { realizedPnL, swapPnL, unrealizedPnL, maintenanceRate, deposit, withdrawal } } } }
 let yearInitialFunds = {}; // { year: { account: amount } }
+let yearInitialUnrealized = {}; // { year: { account: amount } }
 
 // ===== Storage =====
 const STORAGE_KEY_TRADING = 'tradingData';
 const STORAGE_KEY_INITIAL = 'yearInitialFunds';
+const STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const STORAGE_KEY_SKIP_DEMO = 'profitSkipDemoSeed';
 
 const monthlyDetailPane = document.getElementById('monthlyDetailPane');
@@ -233,7 +235,8 @@ const monthlyDetailBody = document.getElementById('monthlyDetailBody');
 const monthlyDetailTitle = document.getElementById('monthlyDetailTitle');
 const monthlyDetailClose = document.getElementById('monthlyDetailClose');
 const monthlyDetailScrim = document.getElementById('monthlyDetailScrim');
-let pnlTrendChart = null;
+let pnlBarChart = null;
+let assetsTrendChart = null;
 let monthlyDetailLockScrollY = 0;
 
 function dismissInputFocusOnOutsideTap(event) {
@@ -257,21 +260,22 @@ function dismissInputFocusOnOutsideTap(event) {
 document.addEventListener('pointerdown', dismissInputFocusOnOutsideTap, true);
 
 function dismissChartTooltipOnOutsideTap(event) {
-  if (!pnlTrendChart || !pnlTrendChart.canvas) return;
-
   const target = event.target;
   if (!(target instanceof Element)) return;
 
-  if (pnlTrendChart.canvas.contains(target)) return;
+  [assetsTrendChart, pnlBarChart].forEach((chart) => {
+    if (!chart || !chart.canvas) return;
+    if (chart.canvas.contains(target)) return;
 
-  const hasActive = pnlTrendChart.getActiveElements().length > 0;
-  if (!hasActive) return;
+    const hasActive = chart.getActiveElements().length > 0;
+    if (!hasActive) return;
 
-  pnlTrendChart.setActiveElements([]);
-  if (pnlTrendChart.tooltip) {
-    pnlTrendChart.tooltip.setActiveElements([], { x: 0, y: 0 });
-  }
-  pnlTrendChart.update();
+    chart.setActiveElements([]);
+    if (chart.tooltip) {
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+    }
+    chart.update();
+  });
 }
 
 document.addEventListener('pointerdown', dismissChartTooltipOnOutsideTap, true);
@@ -281,6 +285,7 @@ function exportData() {
   const payload = {
     tradingData,
     yearInitialFunds,
+    yearInitialUnrealized,
     exportedAt: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -306,6 +311,7 @@ function importData(file) {
       if (!confirm('現在のデータをインポートデータで上書きします。よろしいですか？')) return;
       tradingData = parsed.tradingData;
       yearInitialFunds = parsed.yearInitialFunds;
+      yearInitialUnrealized = parsed.yearInitialUnrealized || {};
       saveToStorage();
       rerenderAfterDataChange();
       alert('インポートが完了しました。');
@@ -319,18 +325,21 @@ function importData(file) {
 function saveToStorage() {
   localStorage.setItem(STORAGE_KEY_TRADING, JSON.stringify(tradingData));
   localStorage.setItem(STORAGE_KEY_INITIAL, JSON.stringify(yearInitialFunds));
+  localStorage.setItem(STORAGE_KEY_INITIAL_UNREALIZED, JSON.stringify(yearInitialUnrealized));
 }
 
 function loadFromStorage() {
   tradingData = JSON.parse(localStorage.getItem(STORAGE_KEY_TRADING) || '{}');
   yearInitialFunds = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL) || '{}');
+  yearInitialUnrealized = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL_UNREALIZED) || '{}');
 }
 
 function seedDemoDataIfEmpty() {
   if (localStorage.getItem(STORAGE_KEY_SKIP_DEMO) === '1') return;
   const hasTrading = Object.keys(tradingData || {}).length > 0;
   const hasInitial = Object.keys(yearInitialFunds || {}).length > 0;
-  if (hasTrading || hasInitial) return;
+  const hasUnrealized = Object.keys(yearInitialUnrealized || {}).length > 0;
+  if (hasTrading || hasInitial || hasUnrealized) return;
 
   const year = 2025;
   yearInitialFunds[year] = {
@@ -339,6 +348,14 @@ function seedDemoDataIfEmpty() {
     minano: 700000,
     sbi: 820000,
     sbivc: 430000
+  };
+  yearInitialUnrealized[year] = {
+    gmo: 12000,
+    lightfx: 6200,
+    minano: 5400,
+    sbi: -2500,
+    sbivc: 4500,
+    smbc: 0
   };
 
   const monthlyBase = [22000, 18000, 25000, 21000, 27000, 24000, 30000, 26000, 28000, 32000, 29000, 34000];
@@ -375,6 +392,7 @@ function seedDemoDataIfEmpty() {
 function clearStoredDataState() {
   tradingData = {};
   yearInitialFunds = {};
+  yearInitialUnrealized = {};
 }
 
 function rerenderAfterDataChange() {
@@ -556,97 +574,153 @@ function getLatestSavedMonth(year) {
 }
 
 function renderPerformanceChart() {
-  const canvas = document.getElementById('pnlTrendChart');
-  if (!canvas || typeof Chart === 'undefined') return;
+  const assetsCanvas = document.getElementById('assetsTrendChart');
+  const pnlCanvas = document.getElementById('pnlBarChart');
+  if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
 
   const labels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
-  const shiftedLabels = ['年初', ...labels];
+  const assetsLabels = ['年初', ...labels];
   const realizedData = [];
   const swapData = [];
-  const assetsScaleData = [];
-  const shiftedAssetsData = [calculateInitialCapital(currentYear)];
+  const confirmedTrendData = [calculateInitialCapital(currentYear)];
+  const assetsTrendData = [calculateInitialCapital(currentYear)];
 
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
     realizedData.push(monthly.realizedSum);
     swapData.push(monthly.swapSum);
     const monthEndAssets = calculateTotalNetAssets(currentYear, m);
-    assetsScaleData.push(monthEndAssets);
-    shiftedAssetsData.push(monthEndAssets);
+    const monthEndConfirmed = calculateTotalConfirmedAssets(currentYear, m);
+    confirmedTrendData.push(monthEndConfirmed);
+    assetsTrendData.push(monthEndAssets);
   }
 
-  if (pnlTrendChart) {
-    pnlTrendChart.destroy();
+  if (assetsTrendChart) {
+    assetsTrendChart.destroy();
+  }
+  if (pnlBarChart) {
+    pnlBarChart.destroy();
   }
 
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  const assetsCtx = assetsCanvas.getContext('2d');
+  const pnlCtx = pnlCanvas.getContext('2d');
+  if (!assetsCtx || !pnlCtx) return;
 
-  const shiftedLinePlugin = {
-    id: 'shiftedAssetsLine',
-    afterDatasetsDraw(chart) {
-      const xScale = chart.scales.x;
-      const yScale = chart.scales.yAssets;
-      const chartArea = chart.chartArea;
-      if (!xScale || !yScale || !chartArea || labels.length === 0) return;
-
-      const firstCenter = xScale.getPixelForTick(0);
-      const secondCenter = xScale.getPixelForTick(1);
-      const step = Number.isFinite(secondCenter - firstCenter) ? (secondCenter - firstCenter) : 0;
-      if (!step) return;
-
-      const xPositions = [firstCenter - step / 2];
-      for (let index = 0; index < labels.length; index += 1) {
-        xPositions.push(xScale.getPixelForTick(index) + step / 2);
-      }
-
-      const pointRadius = 2;
-      const labelPadding = 12;
-      const minX = chartArea.left + pointRadius + 2;
-      const maxX = chartArea.right - pointRadius - 2;
-      const minY = chartArea.top + pointRadius + 2;
-      const maxY = chartArea.bottom - pointRadius - 2;
-      const clampedXPositions = xPositions.map((x) => Math.min(maxX, Math.max(minX, x)));
-
-      const yPositions = shiftedAssetsData.map((value) => {
-        const y = yScale.getPixelForValue(value);
-        return Math.min(maxY, Math.max(minY, y));
-      });
-      const chartCtx = chart.ctx;
-
-      chartCtx.save();
-      chartCtx.strokeStyle = '#EEF1FF';
-      chartCtx.lineWidth = 2;
-      chartCtx.beginPath();
-      clampedXPositions.forEach((x, index) => {
-        const y = yPositions[index];
-        if (index === 0) chartCtx.moveTo(x, y);
-        else chartCtx.lineTo(x, y);
-      });
-      chartCtx.stroke();
-
-      chartCtx.fillStyle = '#EEF1FF';
-      clampedXPositions.forEach((x, index) => {
-        const y = yPositions[index];
-        chartCtx.beginPath();
-        chartCtx.arc(x, y, pointRadius, 0, Math.PI * 2);
-        chartCtx.fill();
-      });
-
-      chartCtx.fillStyle = 'rgba(255,255,255,0.8)';
-      chartCtx.font = '12px Inter, system-ui, sans-serif';
-      chartCtx.textAlign = 'center';
-      chartCtx.textBaseline = 'top';
-      const labelY = chartArea.bottom + labelPadding;
-      clampedXPositions.forEach((x, index) => {
-        chartCtx.fillText(shiftedLabels[index], x, labelY);
-      });
-      chartCtx.restore();
+  const setChartActiveByMonth = (chart, monthIndex) => {
+    if (!chart) return;
+    if (monthIndex == null || monthIndex < 0) {
+      chart.setActiveElements([]);
+      if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+      chart.update('none');
+      return;
     }
+
+    if (chart === assetsTrendChart) {
+      const active = [{ datasetIndex: 0, index: monthIndex }];
+      chart.setActiveElements(active);
+      if (chart.tooltip) chart.tooltip.setActiveElements(active, { x: 0, y: 0 });
+      chart.update('none');
+      return;
+    }
+
+    const active = [
+      { datasetIndex: 0, index: monthIndex },
+      { datasetIndex: 1, index: monthIndex }
+    ];
+    chart.setActiveElements(active);
+    if (chart.tooltip) chart.tooltip.setActiveElements(active, { x: 0, y: 0 });
+    chart.update('none');
   };
 
-  pnlTrendChart = new Chart(ctx, {
-    plugins: [shiftedLinePlugin],
+  const syncHoverFromAssets = (activeElements) => {
+    if (!pnlBarChart) return;
+    if (!activeElements.length) {
+      setChartActiveByMonth(pnlBarChart, null);
+      return;
+    }
+    const assetIndex = activeElements[0].index;
+    if (assetIndex <= 0) {
+      setChartActiveByMonth(pnlBarChart, null);
+      return;
+    }
+    setChartActiveByMonth(pnlBarChart, assetIndex - 1);
+  };
+
+  const syncHoverFromPnl = (activeElements) => {
+    if (!assetsTrendChart) return;
+    if (!activeElements.length) {
+      setChartActiveByMonth(assetsTrendChart, null);
+      return;
+    }
+    const pnlIndex = activeElements[0].index;
+    setChartActiveByMonth(assetsTrendChart, pnlIndex + 1);
+  };
+
+  // Chart.js gradient for fill (match top page)
+  const gradBlue = assetsCtx.createLinearGradient(0, 0, 0, 250);
+  gradBlue.addColorStop(0, 'rgba(61,162,255,0.25)');
+  gradBlue.addColorStop(1, 'rgba(61,162,255,0)');
+  const gradGreen = assetsCtx.createLinearGradient(0, 0, 0, 250);
+  gradGreen.addColorStop(0, 'rgba(62,224,143,0.25)');
+  gradGreen.addColorStop(1, 'rgba(62,224,143,0)');
+
+  assetsTrendChart = new Chart(assetsCtx, {
+    type: 'line',
+    data: {
+      labels: assetsLabels,
+      datasets: [
+        {
+          label: 'Realized Balance',
+          data: confirmedTrendData,
+          borderColor: '#3DA2FF',
+          backgroundColor: gradBlue,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2
+        },
+        {
+          label: 'Total Balance',
+          data: assetsTrendData,
+          borderColor: '#3EE08F',
+          backgroundColor: gradGreen,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2
+        }
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`
+          }
+        }
+      },
+      onHover: (_event, activeElements) => {
+        syncHoverFromAssets(activeElements || []);
+      },
+      scales: {
+        x: {
+          ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 12 } },
+          grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
+        },
+        y: {
+          ticks: {
+            color: 'rgba(255,255,255,0.8)',
+            font: { size: 12 },
+            callback: (v) => fmtMan(v)
+          },
+          grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
+        }
+      }
+    }
+  });
+
+  pnlBarChart = new Chart(pnlCtx, {
     data: {
       labels,
       datasets: [
@@ -657,8 +731,7 @@ function renderPerformanceChart() {
           stack: 'pnl',
           backgroundColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,0.75)' : 'rgba(255,107,107,0.75)'),
           borderColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
-          borderWidth: 1,
-          yAxisID: 'yPnL'
+          borderWidth: 1
         },
         {
           type: 'bar',
@@ -667,34 +740,15 @@ function renderPerformanceChart() {
           stack: 'pnl',
           backgroundColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,0.75)' : 'rgba(255,107,107,0.55)'),
           borderColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,1)' : 'rgba(255,107,107,0.9)'),
-          borderWidth: 1,
-          yAxisID: 'yPnL'
-        },
-        {
-          type: 'line',
-          label: '純資産推移',
-          data: assetsScaleData,
-          borderColor: 'rgba(0,0,0,0)',
-          backgroundColor: 'rgba(0,0,0,0)',
-          pointBackgroundColor: 'rgba(0,0,0,0)',
-          pointBorderColor: 'rgba(0,0,0,0)',
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          tension: 0,
-          fill: false,
-          yAxisID: 'yAssets'
+          borderWidth: 1
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: {
-        padding: {
-          left: 8,
-          right: 8,
-          bottom: 34
-        }
+      onHover: (_event, activeElements) => {
+        syncHoverFromPnl(activeElements || []);
       },
       interaction: {
         mode: 'index',
@@ -732,33 +786,21 @@ function renderPerformanceChart() {
         x: {
           stacked: true,
           ticks: {
-            display: false
+            color: 'rgba(255,255,255,0.75)'
           },
           grid: {
             color: 'rgba(255,255,255,0.08)',
             drawBorder: false
           }
         },
-        yPnL: {
+        y: {
           stacked: true,
-          position: 'left',
           ticks: {
             color: 'rgba(255,255,255,0.75)',
             callback: (v) => fmtMan(v)
           },
           grid: {
             color: 'rgba(255,255,255,0.1)',
-            drawBorder: false
-          }
-        },
-        yAssets: {
-          position: 'right',
-          ticks: {
-            color: 'rgba(255,255,255,0.75)',
-            callback: (v) => fmtMan(v)
-          },
-          grid: {
-            drawOnChartArea: false,
             drawBorder: false
           }
         }
@@ -776,7 +818,9 @@ function renderAnnualSummary() {
   const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
 
   const investmentInitialCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0);
+    const fund = Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0;
+    const unreal = Number(yearInitialUnrealized?.[currentYear]?.[account.key]) || 0;
+    return sum + fund + unreal;
   }, 0);
 
   const investmentTotalAssets = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
@@ -1207,9 +1251,10 @@ function bindInitialCapitalInputBehavior() {
 
 function renderInitialCapitalForm() {
   if (!yearInitialFunds[currentYear]) yearInitialFunds[currentYear] = {};
-  
+  if (!yearInitialUnrealized[currentYear]) yearInitialUnrealized[currentYear] = {};
+
   updateYearSelect();
-  
+
   const accountKeys = {
     'initGMO': 'gmo',
     'initLightFX': 'lightfx',
@@ -1218,13 +1263,34 @@ function renderInitialCapitalForm() {
     'initSBIVC': 'sbivc',
     'initSMBC': 'smbc'
   };
-  
+  const unrealizedKeys = {
+    'initGMOUnrealized': 'gmo',
+    'initLightFXUnrealized': 'lightfx',
+    'initMinanoUnrealized': 'minano',
+    'initSBIUnrealized': 'sbi',
+    'initSBIVCUnrealized': 'sbivc',
+    'initSMBCUnrealized': 'smbc'
+  };
+
+  // 年初資金
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
     document.getElementById(elemId).value = yearInitialFunds[currentYear][accountKey] || 0;
   }
+  // 年初評価損益（前年度年末の評価損益をデフォルト）
+  const prevYear = currentYear - 1;
+  for (const [elemId, accountKey] of Object.entries(unrealizedKeys)) {
+    let val = yearInitialUnrealized[currentYear][accountKey];
+    if (typeof val !== 'number') {
+      // 前年度年末12月の評価損益
+      val = 0;
+      if (tradingData?.[prevYear]?.[12]?.[accountKey]?.unrealizedPnL != null) {
+        val = Number(tradingData[prevYear][12][accountKey].unrealizedPnL) || 0;
+      }
+    }
+    document.getElementById(elemId).value = val;
+  }
 
   bindInitialCapitalInputBehavior();
-  
   updateInitialCapitalStatus();
 }
 
@@ -1283,7 +1349,8 @@ document.getElementById('initialCapitalToggle').addEventListener('click', (e) =>
 document.getElementById('saveInitialCapital').addEventListener('click', () => {
   const year = Number(document.getElementById('yearSelect').value);
   if (!yearInitialFunds[year]) yearInitialFunds[year] = {};
-  
+  if (!yearInitialUnrealized[year]) yearInitialUnrealized[year] = {};
+
   const accountKeys = {
     'initGMO': 'gmo',
     'initLightFX': 'lightfx',
@@ -1292,20 +1359,31 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
     'initSBIVC': 'sbivc',
     'initSMBC': 'smbc'
   };
-  
+  const unrealizedKeys = {
+    'initGMOUnrealized': 'gmo',
+    'initLightFXUnrealized': 'lightfx',
+    'initMinanoUnrealized': 'minano',
+    'initSBIUnrealized': 'sbi',
+    'initSBIVCUnrealized': 'sbivc',
+    'initSMBCUnrealized': 'smbc'
+  };
+
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
     yearInitialFunds[year][accountKey] = Number(document.getElementById(elemId).value) || 0;
   }
-  
+  for (const [elemId, accountKey] of Object.entries(unrealizedKeys)) {
+    yearInitialUnrealized[year][accountKey] = Number(document.getElementById(elemId).value) || 0;
+  }
+
   saveToStorage();
   updateInitialCapitalStatus();
   renderAnnualSummary();
   renderPerformanceChart();
   renderAccountInputs();
-  
+
   const toast = document.createElement('div');
   toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(62,224,143,.2); color: #3EE08F; padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(62,224,143,.3); font-size: 12px; font-weight: 600; z-index: 100;';
-  toast.textContent = '✔ 年初資金を保存しました';
+  toast.textContent = '✔ 年初資金・評価損益を保存しました';
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2000);
 });
@@ -1317,7 +1395,7 @@ document.getElementById('importDataInput')?.addEventListener('change', (e) => {
 });
 
 document.getElementById('saveMonthData').addEventListener('click', () => {
-  const confirmed = window.confirm(currentYear + '年' + currentMonth + '月のデータを保存します。よろしいですか？');
+  const confirmed = window.confirm('現在の入力データを保存します。');
   if (!confirmed) return;
 
   document.querySelectorAll('.input-account').forEach(el => {
@@ -1341,7 +1419,7 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
   
   const toast = document.createElement('div');
   toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(62,224,143,.2); color: #3EE08F; padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(62,224,143,.3); font-size: 12px; font-weight: 600; z-index: 100;';
-  toast.textContent = '✔ ' + currentYear + '年' + currentMonth + '月データを保存しました';
+  toast.textContent = '✔ 現在の入力データを保存しました';
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2000);
 });

@@ -253,8 +253,31 @@ body::before {
   background: #f0f4ff;
 }
 
+.chart-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.chart-panel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.chart-panel-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .3px;
+  margin-bottom: 6px;
+}
+
 .chart-wrap {
-  height: 280px;
+  height: 240px;
+}
+
+.chart-panel:first-child .chart-wrap {
+  height: 260px;
 }
 
 .chart-wrap canvas {
@@ -1431,7 +1454,11 @@ body.drawer-open {
     padding: 12px;
   }
   .chart-wrap {
-    height: 250px;
+    height: 225px;
+  }
+
+  .chart-panel:first-child .chart-wrap {
+    height: 245px;
   }
   .account-input-grid {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1564,6 +1591,10 @@ body.drawer-open {
     font-size: 10px;
   }
   .chart-wrap {
+    height: 205px;
+  }
+
+  .chart-panel:first-child .chart-wrap {
     height: 220px;
   }
   .monthly-grid {
