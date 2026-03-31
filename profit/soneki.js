@@ -1588,10 +1588,14 @@ function renderAll() {
   renderInitialCapitalForm();
 }
 
-window.addEventListener('load', () => {
+
+function appInit() {
   loadFromStorage();
   seedDemoDataIfEmpty();
   currentMonth = new Date().getMonth() + 1;
   renderAll();
   applyInitialCapitalDefaultOpen();
-});
+}
+
+window.addEventListener('load', appInit);
+window.addEventListener('DOMContentLoaded', appInit);
