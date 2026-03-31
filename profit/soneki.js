@@ -540,11 +540,11 @@ function calculateTotalConfirmedAssets(year, month) {
 
 function calculateInitialCapital(year) {
   let total = 0;
-  if (yearInitialFunds[year]) {
-    ACCOUNTS.forEach(a => {
-      total += yearInitialFunds[year][a.key] || 0;
-    });
-  }
+  const funds = yearInitialFunds[year] || {};
+  const unreal = yearInitialUnrealized?.[year] || {};
+  ACCOUNTS.forEach(a => {
+    total += (funds[a.key] || 0) + (unreal[a.key] || 0);
+  });
   return total;
 }
 
