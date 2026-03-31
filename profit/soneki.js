@@ -540,11 +540,11 @@ function calculateTotalConfirmedAssets(year, month) {
 
 function calculateInitialCapital(year) {
   let total = 0;
-  const funds = yearInitialFunds[year] || {};
-  const unreal = yearInitialUnrealized?.[year] || {};
-  ACCOUNTS.forEach(a => {
-    total += (funds[a.key] || 0) + (unreal[a.key] || 0);
-  });
+  if (yearInitialFunds[year]) {
+    ACCOUNTS.forEach(a => {
+      total += yearInitialFunds[year][a.key] || 0;
+    });
+  }
   return total;
 }
 
@@ -1274,16 +1274,13 @@ function renderInitialCapitalForm() {
 
   // 年初資金
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
-    document.getElementById(elemId).value =
-      (typeof yearInitialFunds[currentYear][accountKey] === 'number' && !isNaN(yearInitialFunds[currentYear][accountKey]))
-        ? yearInitialFunds[currentYear][accountKey]
-        : 0;
+    document.getElementById(elemId).value = yearInitialFunds[currentYear][accountKey] || 0;
   }
   // 年初評価損益（前年度年末の評価損益をデフォルト）
   const prevYear = currentYear - 1;
   for (const [elemId, accountKey] of Object.entries(unrealizedKeys)) {
     let val = yearInitialUnrealized[currentYear][accountKey];
-    if (val === undefined || val === null || isNaN(val)) {
+    if (typeof val !== 'number') {
       // 前年度年末12月の評価損益
       val = 0;
       if (tradingData?.[prevYear]?.[12]?.[accountKey]?.unrealizedPnL != null) {
@@ -1328,14 +1325,12 @@ function applyInitialCapitalDefaultOpen() {
 document.getElementById('yearDisplay').addEventListener('change', (e) => {
   currentYear = Number(e.target.value);
   renderAll();
-  renderInitialCapitalForm(); // 年度切り替え時も初期値を必ず再反映
   applyInitialCapitalDefaultOpen();
 });
 
 document.getElementById('yearSelect').addEventListener('change', (e) => {
   currentYear = Number(e.target.value);
   renderAll();
-  renderInitialCapitalForm();
   applyInitialCapitalDefaultOpen();
 });
 
@@ -1381,7 +1376,10 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
   }
 
   saveToStorage();
-  renderAll(); // 全体を再描画し、グラフ・サマリー・入力欄すべてに即時反映
+  updateInitialCapitalStatus();
+  renderAnnualSummary();
+  renderPerformanceChart();
+  renderAccountInputs();
 
   const toast = document.createElement('div');
   toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(62,224,143,.2); color: #3EE08F; padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(62,224,143,.3); font-size: 12px; font-weight: 600; z-index: 100;';
@@ -1590,14 +1588,10 @@ function renderAll() {
   renderInitialCapitalForm();
 }
 
-
-function appInit() {
+window.addEventListener('load', () => {
   loadFromStorage();
   seedDemoDataIfEmpty();
   currentMonth = new Date().getMonth() + 1;
   renderAll();
   applyInitialCapitalDefaultOpen();
-}
-
-window.addEventListener('load', appInit);
-window.addEventListener('DOMContentLoaded', appInit);
+});

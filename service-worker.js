@@ -9,6 +9,7 @@ const CORE_ASSETS = [
   "./profit/soneki.css",
   "./profit/soneki.js",
   "./assets/profit-metrics.js",
+  "./assets/chart.js",
   "./assets/icon-100.png"
 ];
 

@@ -316,7 +316,6 @@ function hasMeaningfulMonthData(yearData, month) {
 function buildTopLinkedData(selectedYear = null) {
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
-  const initialUnrealized = parseStoredJson('yearInitialUnrealized');
   const years = getNumericYears(tradingData);
   if (!years.length) return null;
 
@@ -366,11 +365,8 @@ function buildTopLinkedData(selectedYear = null) {
   // 年初の総純資産: 月次データ開始前の初期残高のみを使用する
   // （calculateLinkedAccountNetAssetsを使うと1月分の入出金が混入してしまうため）
   const yearInitialData = initialFunds?.[targetYear] || initialFunds?.[String(targetYear)] || {};
-  const yearInitialUnreal = initialUnrealized?.[targetYear] || initialUnrealized?.[String(targetYear)] || {};
   const yearStartTotal = growthAccounts.reduce((sum, account) => {
-    const fund = Number(yearInitialData?.[account.key]) || 0;
-    const unreal = Number(yearInitialUnreal?.[account.key]) || 0;
-    return sum + fund + unreal;
+    return sum + (Number(yearInitialData?.[account.key]) || 0);
   }, 0);
 
   const growthCurrentTotal = growthAccounts.reduce((sum, account) => {
@@ -382,9 +378,7 @@ function buildTopLinkedData(selectedYear = null) {
   }, 0);
 
   const chartStartTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
-    const fund = Number(yearInitialData?.[account.key]) || 0;
-    const unreal = Number(yearInitialUnreal?.[account.key]) || 0;
-    return sum + fund + unreal;
+    return sum + (Number(yearInitialData?.[account.key]) || 0);
   }, 0);
 
   return {
