@@ -582,8 +582,11 @@ function renderPerformanceChart() {
   const assetsLabels = ['年初', ...labels];
   const realizedData = [];
   const swapData = [];
+  const yearStartUnrealizedTotal = ACCOUNTS.reduce((sum, a) => {
+    return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
+  }, 0);
   const confirmedTrendData = [calculateInitialCapital(currentYear)];
-  const assetsTrendData = [calculateInitialCapital(currentYear)];
+  const assetsTrendData = [calculateInitialCapital(currentYear) + yearStartUnrealizedTotal];
 
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
@@ -670,7 +673,7 @@ function renderPerformanceChart() {
       labels: assetsLabels,
       datasets: [
         {
-          label: 'Realized Balance',
+          label: 'Confirmed Assets',
           data: confirmedTrendData,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
@@ -679,7 +682,7 @@ function renderPerformanceChart() {
           pointRadius: 2
         },
         {
-          label: 'Total Balance',
+          label: 'Total Equity',
           data: assetsTrendData,
           borderColor: '#3EE08F',
           backgroundColor: gradGreen,
@@ -817,6 +820,13 @@ function renderAnnualSummary() {
   const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
   const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
 
+  const fmtDeltaJPY = (value) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${fmtJPY(Math.abs(value))}`;
+
+  const investmentInitialConfirmedCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    const fund = Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0;
+    return sum + fund;
+  }, 0);
+
   const investmentInitialCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
     const fund = Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0;
     const unreal = Number(yearInitialUnrealized?.[currentYear]?.[account.key]) || 0;
@@ -844,24 +854,34 @@ function renderAnnualSummary() {
   // 年間成長率 = 実質損益 ÷ 年初純資産 × 100
   const realPnL = investmentTotalAssets - investmentInitialCapital - investmentCashflow.deposit + investmentCashflow.withdraw;
   const growthRate = investmentInitialCapital > 0 ? (realPnL / investmentInitialCapital * 100) : 0;
-  const confirmedRealPnL = investmentConfirmedAssets - investmentInitialCapital - investmentCashflow.deposit + investmentCashflow.withdraw;
-  const confirmedGrowthRate = investmentInitialCapital > 0 ? (confirmedRealPnL / investmentInitialCapital * 100) : 0;
+  const confirmedRealPnL = investmentConfirmedAssets - investmentInitialConfirmedCapital - investmentCashflow.deposit + investmentCashflow.withdraw;
+  const confirmedGrowthRate = investmentInitialConfirmedCapital > 0 ? (confirmedRealPnL / investmentInitialConfirmedCapital * 100) : 0;
   const netCashFlowYear = yearly.depositSum - yearly.withdrawSum;
+
+  const initialUnrealizedTotal = ACCOUNTS.reduce((sum, a) => {
+    return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
+  }, 0);
 
   document.getElementById('yearRealizedSum').textContent = fmtJPY(yearly.realizedSum);
   document.getElementById('yearSwapSum').textContent = fmtJPY(yearly.swapSum);
   document.getElementById('yearInitialCapital').textContent = fmtJPY(initialCapital);
+  document.getElementById('yearInitialUnrealizedTotal').textContent = fmtJPY(initialUnrealizedTotal);
   document.getElementById('yearDepositSum').textContent = fmtJPY(yearly.depositSum);
   document.getElementById('yearWithdrawSum').textContent = fmtJPY(yearly.withdrawSum);
   document.getElementById('yearNetCashFlow').textContent = fmtJPY(netCashFlowYear);
   document.getElementById('totalAssets').textContent = fmtJPY(totalAssets);
   document.getElementById('confirmedAssets').textContent = fmtJPY(confirmedAssets);
+  document.getElementById('totalAssetsDelta').textContent = fmtDeltaJPY(realPnL);
+  document.getElementById('confirmedAssetsDelta').textContent = fmtDeltaJPY(confirmedRealPnL);
   document.getElementById('yearGrowthRate').textContent = (growthRate >= 0 ? '+' : '') + growthRate.toFixed(1) + '%';
   document.getElementById('confirmedYearGrowthRate').textContent = (confirmedGrowthRate >= 0 ? '+' : '') + confirmedGrowthRate.toFixed(1) + '%';
 
   const elRealized = document.getElementById('yearRealizedSum');
   const elSwap = document.getElementById('yearSwapSum');
+  const elInitialUnrealized = document.getElementById('yearInitialUnrealizedTotal');
   const elNetCash = document.getElementById('yearNetCashFlow');
+  const elTotalAssetsDelta = document.getElementById('totalAssetsDelta');
+  const elConfirmedAssetsDelta = document.getElementById('confirmedAssetsDelta');
   const elGrowth = document.getElementById('yearGrowthRate');
   const elConfirmedGrowth = document.getElementById('confirmedYearGrowthRate');
   const elTotalAssets = document.getElementById('totalAssets');
@@ -869,7 +889,10 @@ function renderAnnualSummary() {
 
   setSignClass(elRealized, yearly.realizedSum);
   setSignClass(elSwap, yearly.swapSum);
+  setSignClass(elInitialUnrealized, initialUnrealizedTotal);
   setSignClass(elNetCash, netCashFlowYear);
+  setSignClass(elTotalAssetsDelta, realPnL);
+  setSignClass(elConfirmedAssetsDelta, confirmedRealPnL);
   setSignClass(elGrowth, growthRate);
   setSignClass(elConfirmedGrowth, confirmedGrowthRate);
   setSignClass(elTotalAssets, totalAssets);

@@ -202,6 +202,7 @@ const demoMonthly = {
 };
 const PROFIT_STORAGE_KEY_TRADING = 'tradingData';
 const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
+const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const profitMetrics = window.TradeScopeProfitMetrics;
 const LINKED_ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
@@ -316,6 +317,7 @@ function hasMeaningfulMonthData(yearData, month) {
 function buildTopLinkedData(selectedYear = null) {
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
+  const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
   const years = getNumericYears(tradingData);
   if (!years.length) return null;
 
@@ -365,7 +367,15 @@ function buildTopLinkedData(selectedYear = null) {
   // 年初の総純資産: 月次データ開始前の初期残高のみを使用する
   // （calculateLinkedAccountNetAssetsを使うと1月分の入出金が混入してしまうため）
   const yearInitialData = initialFunds?.[targetYear] || initialFunds?.[String(targetYear)] || {};
+  const yearInitialUnrealData = initialUnrealized?.[targetYear] || initialUnrealized?.[String(targetYear)] || {};
+
+  // 年間成長率ベース: 年初資金 + 年初評価損益
   const yearStartTotal = growthAccounts.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0)
+               + (Number(yearInitialUnrealData?.[account.key]) || 0);
+  }, 0);
+
+  const yearStartConfirmed = growthAccounts.reduce((sum, account) => {
     return sum + (Number(yearInitialData?.[account.key]) || 0);
   }, 0);
 
@@ -377,8 +387,15 @@ function buildTopLinkedData(selectedYear = null) {
     return sum + calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, targetYear, latestMonth, account.key);
   }, 0);
 
+  // Realized Balance チャート年初点: 確定資産ベース（評価損益除く）
   const chartStartTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
     return sum + (Number(yearInitialData?.[account.key]) || 0);
+  }, 0);
+
+  // Total Balance チャート年初点: 年初資金 + 年初評価損益
+  const chartStartTotalWithUnrealized = LINKED_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0)
+               + (Number(yearInitialUnrealData?.[account.key]) || 0);
   }, 0);
 
   return {
@@ -388,9 +405,11 @@ function buildTopLinkedData(selectedYear = null) {
     year: targetYear,
     month: latestMonth,
     yearStartTotal,
+    yearStartConfirmed,
     growthCurrentTotal,
     growthCurrentConfirmed,
     chartStartTotal,
+    chartStartTotalWithUnrealized,
     cumulativeDeposits,
     cumulativeWithdrawals
   };
@@ -402,9 +421,11 @@ const fallbackTopData = {
   total: demoTotal,
   accountData: null,
   yearStartTotal: demoTotal[0],
+  yearStartConfirmed: demoMonthly.realized[0] * 10000,
   growthCurrentTotal: demoTotal[demoTotal.length - 1],
   growthCurrentConfirmed: demoMonthly.realized[demoMonthly.realized.length - 1] * 10000,
   chartStartTotal: demoTotal[0],
+  chartStartTotalWithUnrealized: demoTotal[0],
   cumulativeDeposits: 0,
   cumulativeWithdrawals: 0
 };
@@ -444,6 +465,7 @@ function updateKPIs() {
   // 実質損益 = 現在純資産 - 年初純資産 - 累計入金額 + 累計出金額
   // 年間成長率 = 実質損益 ÷ 年初純資産 × 100
   const yearStartTotal = topSeries.yearStartTotal || 0;
+  const yearStartConfirmed = topSeries.yearStartConfirmed || 0;
   const growthCurrentTotal = topSeries.growthCurrentTotal || tLast;
   const growthCurrentConfirmed = topSeries.growthCurrentConfirmed || rLast;
   const cumulativeDeposits = topSeries.cumulativeDeposits || 0;
@@ -456,9 +478,9 @@ function updateKPIs() {
   }
 
   let confirmedAnnualGrowthRate = 0;
-  if (yearStartTotal > 0) {
-    const confirmedRealPnL = growthCurrentConfirmed - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
-    confirmedAnnualGrowthRate = (confirmedRealPnL / yearStartTotal) * 100;
+  if (yearStartConfirmed > 0) {
+    const confirmedRealPnL = growthCurrentConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals;
+    confirmedAnnualGrowthRate = (confirmedRealPnL / yearStartConfirmed) * 100;
   }
 
   elNet.textContent = (confirmedAnnualGrowthRate >= 0 ? '+' : '') + confirmedAnnualGrowthRate.toFixed(1) + '%';
@@ -750,7 +772,7 @@ if (ctx) {
   const perfLabels = ['年初', ...monthLabels];
   const latestMonth = topSeries.month || 12;
   const realizedSeries = [topSeries.chartStartTotal || topSeries.realized[0] || 0];
-  const totalSeries = [topSeries.chartStartTotal || topSeries.total[0] || 0];
+  const totalSeries = [(topSeries.chartStartTotalWithUnrealized ?? topSeries.chartStartTotal) || topSeries.total[0] || 0];
 
   for (let month = 1; month <= 12; month += 1) {
     realizedSeries.push(month <= latestMonth ? topSeries.realized[month - 1] : null);
@@ -967,7 +989,7 @@ function updateDataByYear() {
   // パフォーマンスグラフを更新
   const latestMonth = newData.month || 12;
   const realizedSeries = [newData.chartStartTotal || newData.realized[0] || 0];
-  const totalSeries = [newData.chartStartTotal || newData.total[0] || 0];
+  const totalSeries = [(newData.chartStartTotalWithUnrealized ?? newData.chartStartTotal) || newData.total[0] || 0];
   
   for (let month = 1; month <= 12; month += 1) {
     realizedSeries.push(month <= latestMonth ? newData.realized[month - 1] : null);

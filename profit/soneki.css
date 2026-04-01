@@ -249,8 +249,12 @@ body::before {
   background: var(--blue);
 }
 
-.dot-assets {
-  background: #f0f4ff;
+.dot-confirmed-assets {
+  background: #3DA2FF;
+}
+
+.dot-total-assets {
+  background: #3EE08F;
 }
 
 .chart-stack {
@@ -561,6 +565,21 @@ body.drawer-open {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.annual-growth-delta {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--neutral);
+  line-height: 1;
+}
+.annual-growth-delta.positive {
+  color: var(--green);
+}
+.annual-growth-delta.negative {
+  color: var(--red);
+}
+.annual-growth-delta.neutral {
+  color: var(--neutral);
 }
 .annual-growth-label {
   color: var(--muted);
