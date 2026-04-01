@@ -121,8 +121,12 @@
           <span class="annual-summary-label">純資産 <span class="sub-en">Total Equity</span></span>
           <div class="annual-summary-right">
             <span id="totalAssets" class="annual-summary-value annual-main-value">¥0</span>
-            <div class="annual-growth-group">
+            <div class="annual-metric-row">
+              <span class="annual-metric-label">変動額</span>
               <span id="totalAssetsDelta" class="annual-growth-delta neutral">¥0</span>
+            </div>
+            <div class="annual-metric-row">
+              <span class="annual-metric-label">年間成長率</span>
               <span id="yearGrowthRate" class="annual-growth-pill neutral">0%</span>
             </div>
           </div>
@@ -132,8 +136,12 @@
           <span class="annual-summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
           <div class="annual-summary-right">
             <span id="confirmedAssets" class="annual-summary-value annual-main-value">¥0</span>
-            <div class="annual-growth-group">
+            <div class="annual-metric-row">
+              <span class="annual-metric-label">変動額</span>
               <span id="confirmedAssetsDelta" class="annual-growth-delta neutral">¥0</span>
+            </div>
+            <div class="annual-metric-row">
+              <span class="annual-metric-label">年間成長率</span>
               <span id="confirmedYearGrowthRate" class="annual-growth-pill neutral">0%</span>
             </div>
           </div>
@@ -182,24 +190,30 @@
     </section>
 
     <div class="performance-head">
-      <h2 class="heading-muted performance-heading">Performance Overview</h2>
-      <div class="chart-legend">
-        <span class="legend-item"><span class="dot dot-confirmed-assets"></span> Confirmed Assets</span>
-        <span class="legend-item"><span class="dot dot-total-assets"></span> Total Equity</span>
-        <span class="legend-item"><span class="dot dot-realized"></span> Realized P/L</span>
-        <span class="legend-item"><span class="dot dot-swap"></span> Swap P/L</span>
-      </div>
+      <h2 class="heading-muted performance-heading">P/L Overview</h2>
     </div>
     <section class="chart-area margin-bottom" aria-label="損益パフォーマンス">
       <div class="chart-stack">
         <div class="chart-panel">
-          <div class="chart-panel-label">Assets Trend</div>
+          <div class="chart-panel-head">
+            <div class="chart-panel-label">Asset Trend</div>
+            <div class="chart-legend chart-legend-panel">
+              <span class="legend-item"><span class="dot dot-total-assets"></span> Total Equity</span>
+              <span class="legend-item"><span class="dot dot-confirmed-assets"></span> Net Balance</span>
+            </div>
+          </div>
           <div class="chart-wrap">
             <canvas id="assetsTrendChart" aria-label="純資産推移"></canvas>
           </div>
         </div>
         <div class="chart-panel">
-          <div class="chart-panel-label">Monthly P/L Breakdown</div>
+          <div class="chart-panel-head">
+            <div class="chart-panel-label">Monthly P/L</div>
+            <div class="chart-legend chart-legend-panel">
+              <span class="legend-item"><span class="dot dot-realized"></span> Realized P/L</span>
+              <span class="legend-item"><span class="dot dot-swap"></span> Swap P/L</span>
+            </div>
+          </div>
           <div class="chart-wrap">
             <canvas id="pnlBarChart" aria-label="月別損益"></canvas>
           </div>

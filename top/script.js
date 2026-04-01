@@ -203,6 +203,7 @@ const demoMonthly = {
 const PROFIT_STORAGE_KEY_TRADING = 'tradingData';
 const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
+const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
 const profitMetrics = window.TradeScopeProfitMetrics;
 const LINKED_ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
@@ -213,6 +214,9 @@ const LINKED_ACCOUNTS = [
   { name: '三井住友銀行', key: 'smbc', color: '#2F7A46', bankOnly: true }
 ];
 const GROWTH_TARGET_ACCOUNTS = LINKED_ACCOUNTS.filter((account) => !account.bankOnly);
+let perfChart = null;
+let portfolioChart = null;
+let accountChart = null;
 
 function parseStoredJson(key) {
   try {
@@ -439,13 +443,30 @@ const swapYearForecast = 532000;
 // ===== Portfolio Data =====
 let accountData = topSeries.accountData?.length ? topSeries.accountData : [];
 
-const portfolioData = [
+const fallbackPortfolioData = [
   { label: 'FX', amount: 4560000, color: '#3B6DFF' },
   { label: '暗号資産', amount: 568000, color: '#EAF1FF' },
   { label: 'NISA', amount: 1260000, color: '#D95757' },
   { label: '現金', amount: 710000, color: '#2F7A46' },
   { label: 'その他', amount: 202000, color: '#7E7A98' }
 ];
+
+function buildPortfolioAllocationFromAccounts(accounts) {
+  const byKey = accounts.reduce((acc, item) => {
+    acc[item.label] = Number(item.amount) || 0;
+    return acc;
+  }, {});
+
+  const data = [
+    { label: 'FX', amount: (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0) + (byKey['SBI'] || 0), color: '#3B6DFF' },
+    { label: '暗号資産', amount: byKey['SBI VC'] || 0, color: '#EAF1FF' },
+    { label: '現金', amount: byKey['三井住友銀行'] || 0, color: '#2F7A46' }
+  ].filter((item) => item.amount > 0);
+
+  return data.length ? data : fallbackPortfolioData;
+}
+
+let portfolioData = buildPortfolioAllocationFromAccounts(accountData);
 
 // ===== KPI =====
 function updateKPIs() {
@@ -759,8 +780,10 @@ window.visualViewport?.addEventListener('resize', adjustDetailHeight);
 setTimeout(adjustDetailHeight, 200);
 
 // ===== Chart =====
-const ctx = document.getElementById('perfChart')?.getContext('2d');
-if (ctx) {
+function renderPerformanceChart() {
+  const ctx = document.getElementById('perfChart')?.getContext('2d');
+  if (!ctx) return;
+
   const gradBlue = ctx.createLinearGradient(0, 0, 0, 250);
   gradBlue.addColorStop(0, 'rgba(61,162,255,0.25)');
   gradBlue.addColorStop(1, 'rgba(61,162,255,0)');
@@ -778,10 +801,15 @@ if (ctx) {
     realizedSeries.push(month <= latestMonth ? topSeries.realized[month - 1] : null);
     totalSeries.push(month <= latestMonth ? topSeries.total[month - 1] : null);
   }
+
   const isMobile = window.innerWidth <= 480;
   const tickFontSize = isMobile ? 10 : 12;
 
-  new Chart(ctx, {
+  if (perfChart) {
+    perfChart.destroy();
+  }
+
+  perfChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: perfLabels,
@@ -835,6 +863,8 @@ if (ctx) {
   });
 }
 
+renderPerformanceChart();
+
 // ===== Portfolio Chart & List =====
 function renderPortfolio() {
   // Calculate total
@@ -847,7 +877,7 @@ function renderPortfolio() {
   const listContainer = document.getElementById('portfolioItems');
   if (listContainer) {
     listContainer.innerHTML = sortedData.map(item => {
-      const pct = ((item.amount / total) * 100).toFixed(1);
+      const pct = total > 0 ? ((item.amount / total) * 100).toFixed(1) : '0.0';
       return `
         <div class="portfolio-item" style="--item-color: ${item.color}">
           <span class="portfolio-label">${item.label}</span>
@@ -890,7 +920,11 @@ function renderPortfolio() {
       }
     });
 
-    new Chart(portfolioCtx, {
+    if (portfolioChart) {
+      portfolioChart.destroy();
+    }
+
+    portfolioChart = new Chart(portfolioCtx, {
       type: 'doughnut',
       data: {
         labels: sortedData.map(d => d.label),
@@ -911,7 +945,7 @@ function renderPortfolio() {
     const accountListEl = document.getElementById('accountItems');
     if (accountListEl) {
       accountListEl.innerHTML = sortedAccount.map(item => {
-        const pct = ((item.amount / accountTotal) * 100).toFixed(1);
+        const pct = accountTotal > 0 ? ((item.amount / accountTotal) * 100).toFixed(1) : '0.0';
         return `
           <div class="portfolio-item" style="--item-color: ${item.color}">
             <span class="portfolio-label">${item.label}</span>
@@ -923,7 +957,11 @@ function renderPortfolio() {
 
     const accountCtx = document.getElementById('accountChart')?.getContext('2d');
     if (accountCtx) {
-      new Chart(accountCtx, {
+      if (accountChart) {
+        accountChart.destroy();
+      }
+
+      accountChart = new Chart(accountCtx, {
         type: 'doughnut',
         data: {
           labels: sortedAccount.map(d => d.label),
@@ -942,117 +980,84 @@ function renderPortfolio() {
 renderPortfolio();
 
 // ===== Year Selector =====
+function getPersistedSelectedYear() {
+  const raw = Number(localStorage.getItem(SHARED_SELECTED_YEAR_KEY));
+  return Number.isFinite(raw) ? raw : null;
+}
+
+function saveSelectedYear(year) {
+  localStorage.setItem(SHARED_SELECTED_YEAR_KEY, String(year));
+}
+
+function resolveTopSeriesForYear(selectedYear) {
+  const linkedData = buildTopLinkedData(selectedYear);
+  if (linkedData) return linkedData;
+  return {
+    ...fallbackTopData,
+    year: selectedYear,
+    month: 12,
+    realized: Array(12).fill(0),
+    total: Array(12).fill(0),
+    accountData: []
+  };
+}
+
 function initializeYearSelector() {
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  let years = getNumericYears(tradingData);
+  const tradingDataMap = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  let years = getNumericYears(tradingDataMap);
   const yearSelect = document.getElementById('topYearSelect');
-  
+
   if (!yearSelect) return;
-  
-  // データがなくても2025年は表示
+
+  const persistedYear = getPersistedSelectedYear();
+
   if (years.length === 0) {
     years = [2025];
   }
-  
-  // セレクトボックスの初期化
+
+  if (persistedYear && !years.includes(persistedYear)) {
+    years = [...years, persistedYear].sort((a, b) => a - b);
+  }
+
   yearSelect.innerHTML = years.map(year => 
     `<option value="${year}">${year}</option>`
   ).join('');
-  
-  // デフォルト値（最新年）を選択
-  yearSelect.value = years[years.length - 1];
-  
-  // 年選択変更イベント
-  yearSelect.addEventListener('change', updateDataByYear);
-}
 
-function updateDataByYear() {
-  const yearSelect = document.getElementById('topYearSelect');
-  const selectedYear = yearSelect ? Number(yearSelect.value) : null;
-  
-  if (!selectedYear) return;
-  
-  // 新しい年のデータを取得
-  const newData = buildTopLinkedData(selectedYear);
-  if (!newData) return;
-  
-  // グローバルtopSeriesを再代入（letで定義されている）
-  topSeries = newData;
-  
-  // KPiを更新
-  updateKPIs();
-  
-  // ポートフォリオを更新
-  accountData = newData.accountData?.length ? newData.accountData : [];
-  renderPortfolio();
-  
-  // パフォーマンスグラフを更新
-  const latestMonth = newData.month || 12;
-  const realizedSeries = [newData.chartStartTotal || newData.realized[0] || 0];
-  const totalSeries = [(newData.chartStartTotalWithUnrealized ?? newData.chartStartTotal) || newData.total[0] || 0];
-  
-  for (let month = 1; month <= 12; month += 1) {
-    realizedSeries.push(month <= latestMonth ? newData.realized[month - 1] : null);
-    totalSeries.push(month <= latestMonth ? newData.total[month - 1] : null);
-  }
-  
-  // チャートを再描画
-  const ctx = document.getElementById('perfChart')?.getContext('2d');
-  if (ctx && window.perfChart) {
-    window.perfChart.destroy();
-  }
-  
-  if (ctx) {
-    window.perfChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: ['年初', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-        datasets: [
-          {
-            label: 'Net Balance',
-            data: realizedSeries,
-            backgroundColor: 'rgba(62,224,143,0.2)',
-            borderColor: '#3EE08F',
-            borderWidth: 1,
-            yAxisID: 'y',
-            fill: true,
-            tension: 0.3
-          },
-          {
-            label: 'Total Equity',
-            data: totalSeries,
-            backgroundColor: 'rgba(61,162,255,0.2)',
-            borderColor: '#3DA2FF',
-            borderWidth: 1,
-            yAxisID: 'y',
-            fill: true,
-            tension: 0.3
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: { padding: { left: 0, right: 16, top: 0, bottom: 0 } },
-        plugins: {
-          filler: { propagate: true },
-          tooltip: { enabled: true, mode: 'index', intersect: false }
-        },
-        scales: {
-          x: { display: true, stacked: false },
-          y: { display: true, title: { display: false } }
-        }
-      }
+  const defaultYear = persistedYear && years.includes(persistedYear)
+    ? persistedYear
+    : years[years.length - 1];
+
+  yearSelect.value = String(defaultYear);
+  updateDataByYear(defaultYear);
+
+  if (yearSelect.dataset.yearBound !== '1') {
+    yearSelect.addEventListener('change', (event) => {
+      updateDataByYear(Number(event.target.value));
     });
+    yearSelect.dataset.yearBound = '1';
   }
 }
 
-// ページロード時の初期化
-document.addEventListener('DOMContentLoaded', () => {
-  initializeYearSelector();
-});
+function updateDataByYear(inputYear = null) {
+  const yearSelect = document.getElementById('topYearSelect');
+  const selectedYear = Number.isFinite(Number(inputYear))
+    ? Number(inputYear)
+    : (yearSelect ? Number(yearSelect.value) : null);
 
-// スクリプト直後の初期化（DOMReady待たずに実行）
+  if (!selectedYear) return;
+
+  saveSelectedYear(selectedYear);
+  topSeries = resolveTopSeriesForYear(selectedYear);
+
+  updateKPIs();
+
+  accountData = topSeries.accountData?.length ? topSeries.accountData : [];
+  portfolioData = buildPortfolioAllocationFromAccounts(accountData);
+  renderPortfolio();
+
+  renderPerformanceChart();
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeYearSelector);
 } else {

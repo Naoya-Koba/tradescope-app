@@ -1,6 +1,13 @@
 // ===== Utility =====
 const fmtJPY = n => isFinite(n) ? '¥' + Math.round(n).toLocaleString() : '-';
 const fmtMan = n => isFinite(n) ? Math.round(n / 10000).toLocaleString() : '-';
+const fmtManDecimal = n => {
+  if (!isFinite(n)) return '-';
+  return (Math.round((Number(n) / 10000) * 10) / 10).toLocaleString('ja-JP', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
+};
 const colorBySign = n => (Number(n) < 0 ? '#FF6B6B' : '#EEF1FF');
 const setSignClass = (el, val) => {
   if (!el) return;
@@ -229,6 +236,17 @@ const STORAGE_KEY_TRADING = 'tradingData';
 const STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const STORAGE_KEY_SKIP_DEMO = 'profitSkipDemoSeed';
+const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
+
+function getSharedSelectedYear() {
+  const raw = Number(localStorage.getItem(SHARED_SELECTED_YEAR_KEY));
+  return Number.isFinite(raw) ? raw : null;
+}
+
+function setSharedSelectedYear(year) {
+  if (!Number.isFinite(Number(year))) return;
+  localStorage.setItem(SHARED_SELECTED_YEAR_KEY, String(year));
+}
 
 const monthlyDetailPane = document.getElementById('monthlyDetailPane');
 const monthlyDetailBody = document.getElementById('monthlyDetailBody');
@@ -673,13 +691,15 @@ function renderPerformanceChart() {
       labels: assetsLabels,
       datasets: [
         {
-          label: 'Confirmed Assets',
+          label: 'Net Balance',
           data: confirmedTrendData,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
           fill: true,
           tension: 0.35,
-          pointRadius: 2
+          pointRadius: 2,
+          pointHitRadius: 20,
+          pointHoverRadius: 5
         },
         {
           label: 'Total Equity',
@@ -688,18 +708,27 @@ function renderPerformanceChart() {
           backgroundColor: gradGreen,
           fill: true,
           tension: 0.35,
-          pointRadius: 2
+          pointRadius: 2,
+          pointHitRadius: 20,
+          pointHoverRadius: 5
         }
       ]
     },
     options: {
       maintainAspectRatio: false,
       responsive: true,
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+      interaction: {
+        mode: 'index',
+        intersect: false,
+        axis: 'x'
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
+          itemSort: (a, b) => (Number(b.parsed?.y) || 0) - (Number(a.parsed?.y) || 0),
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`
+            label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`
           }
         }
       },
@@ -750,12 +779,14 @@ function renderPerformanceChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
       onHover: (_event, activeElements) => {
         syncHoverFromPnl(activeElements || []);
       },
       interaction: {
         mode: 'index',
-        intersect: false
+        intersect: false,
+        axis: 'x'
       },
       plugins: {
         legend: {
@@ -767,20 +798,26 @@ function renderPerformanceChart() {
           borderWidth: 1,
           titleColor: 'rgba(255,255,255,0.95)',
           bodyColor: 'rgba(255,255,255,0.9)',
+          itemSort: (a, b) => {
+            const aY = Number(a.element?.y);
+            const bY = Number(b.element?.y);
+            if (Number.isFinite(aY) && Number.isFinite(bY)) return aY - bY;
+            return (Number(a.datasetIndex) || 0) - (Number(b.datasetIndex) || 0);
+          },
           callbacks: {
             title: (items) => {
               const item = items?.[0];
               if (!item) return '';
               return `${item.dataIndex + 1}月`;
             },
-            label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`,
+            label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`,
             afterBody: (items) => {
               const item = items?.[0];
               if (!item) return '';
               const idx = item.dataIndex;
               if (idx == null) return '';
               const totalPnL = (realizedData[idx] || 0) + (swapData[idx] || 0);
-              return `当月合計損益: ${fmtMan(totalPnL)}`;
+              return `当月合計損益: ${fmtManDecimal(totalPnL)}`;
             }
           }
         }
@@ -820,7 +857,12 @@ function renderAnnualSummary() {
   const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
   const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
 
-  const fmtDeltaJPY = (value) => `${value < 0 ? '-' : ''}${fmtJPY(Math.abs(value))}`;
+  const fmtDeltaNumber = (value) => {
+    const abs = Math.round(Math.abs(value)).toLocaleString();
+    if (value > 0) return `+${abs}`;
+    if (value < 0) return `-${abs}`;
+    return '0';
+  };
 
   const investmentInitialConfirmedCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
     const fund = Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0;
@@ -871,8 +913,8 @@ function renderAnnualSummary() {
   document.getElementById('yearNetCashFlow').textContent = fmtJPY(netCashFlowYear);
   document.getElementById('totalAssets').textContent = fmtJPY(totalAssets);
   document.getElementById('confirmedAssets').textContent = fmtJPY(confirmedAssets);
-  document.getElementById('totalAssetsDelta').textContent = fmtDeltaJPY(realPnL);
-  document.getElementById('confirmedAssetsDelta').textContent = fmtDeltaJPY(confirmedRealPnL);
+  document.getElementById('totalAssetsDelta').textContent = fmtDeltaNumber(realPnL);
+  document.getElementById('confirmedAssetsDelta').textContent = fmtDeltaNumber(confirmedRealPnL);
   document.getElementById('yearGrowthRate').textContent = (growthRate >= 0 ? '+' : '') + growthRate.toFixed(1) + '%';
   document.getElementById('confirmedYearGrowthRate').textContent = (confirmedGrowthRate >= 0 ? '+' : '') + confirmedGrowthRate.toFixed(1) + '%';
 
@@ -1352,12 +1394,14 @@ function applyInitialCapitalDefaultOpen() {
 // ===== Event Handlers =====
 document.getElementById('yearDisplay').addEventListener('change', (e) => {
   currentYear = Number(e.target.value);
+  setSharedSelectedYear(currentYear);
   renderAll();
   applyInitialCapitalDefaultOpen();
 });
 
 document.getElementById('yearSelect').addEventListener('change', (e) => {
   currentYear = Number(e.target.value);
+  setSharedSelectedYear(currentYear);
   renderAll();
   applyInitialCapitalDefaultOpen();
 });
@@ -1618,6 +1662,11 @@ function renderAll() {
 window.addEventListener('load', () => {
   loadFromStorage();
   seedDemoDataIfEmpty();
+  const sharedYear = getSharedSelectedYear();
+  if (sharedYear) {
+    currentYear = sharedYear;
+  }
+  setSharedSelectedYear(currentYear);
   currentMonth = new Date().getMonth() + 1;
   renderAll();
   applyInitialCapitalDefaultOpen();

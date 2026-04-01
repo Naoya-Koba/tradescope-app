@@ -192,8 +192,8 @@ body::before {
   align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
-  margin: 0 6px 8px;
-  padding-top: 8px;
+  margin: 0 6px 4px;
+  padding-top: 6px;
 }
 
 .performance-heading {
@@ -204,7 +204,7 @@ body::before {
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
-  margin: 14px auto 22px;
+  margin: 8px auto 22px;
   padding: 0 6px;
   box-sizing: border-box;
 }
@@ -225,6 +225,13 @@ body::before {
   margin: 0;
   font-size: 11px;
   color: var(--muted);
+  text-align: right;
+}
+
+.chart-legend.chart-legend-panel {
+  justify-content: flex-end;
+  width: 100%;
+  margin: 0 0 8px;
   text-align: right;
 }
 
@@ -269,11 +276,25 @@ body::before {
   padding: 0;
 }
 
+.chart-panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 6px;
+}
+
 .chart-panel-label {
   font-size: 11px;
   color: var(--muted);
   letter-spacing: .3px;
-  margin-bottom: 6px;
+  margin: 0;
+}
+
+.chart-panel .chart-legend.chart-legend-panel {
+  width: auto;
+  margin: 0;
+  margin-left: auto;
 }
 
 .chart-wrap {
@@ -549,7 +570,7 @@ body.drawer-open {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 7px;
 }
 .annual-summary-value {
   font-size: 20px;
@@ -559,12 +580,19 @@ body.drawer-open {
   text-align: right;
 }
 .annual-main-value {
-  font-size: 24px;
+  font-size: 26px;
 }
-.annual-growth-group {
+.annual-metric-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.annual-metric-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
 }
 .annual-growth-delta {
   font-size: 14px;
@@ -1592,12 +1620,17 @@ body.drawer-open {
     padding: 10px;
   }
   .chart-area {
-    margin: 11px auto 16px;
+    margin: 8px auto 16px;
     padding: 0 2px;
   }
   .performance-head {
-    margin: 0 2px 7px;
+    margin: 0 2px 4px;
     padding-top: 6px;
+    gap: 8px;
+  }
+
+  .chart-panel-head {
+    margin: 0 0 4px;
     gap: 8px;
   }
 
