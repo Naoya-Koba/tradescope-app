@@ -598,6 +598,7 @@ function renderPerformanceChart() {
 
   const labels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
   const assetsLabels = ['年初', ...labels];
+  const latestMonth = getLatestSavedMonth(currentYear);
   const realizedData = [];
   const swapData = [];
   const yearStartUnrealizedTotal = ACCOUNTS.reduce((sum, a) => {
@@ -612,8 +613,9 @@ function renderPerformanceChart() {
     swapData.push(monthly.swapSum);
     const monthEndAssets = calculateTotalNetAssets(currentYear, m);
     const monthEndConfirmed = calculateTotalConfirmedAssets(currentYear, m);
-    confirmedTrendData.push(monthEndConfirmed);
-    assetsTrendData.push(monthEndAssets);
+    const isEnteredMonth = m <= latestMonth;
+    confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
+    assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
   }
 
   if (assetsTrendChart) {
@@ -637,6 +639,12 @@ function renderPerformanceChart() {
     }
 
     if (chart === assetsTrendChart) {
+      if (monthIndex > latestMonth) {
+        chart.setActiveElements([]);
+        if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+        chart.update('none');
+        return;
+      }
       const active = [
         { datasetIndex: 0, index: monthIndex },
         { datasetIndex: 1, index: monthIndex }
