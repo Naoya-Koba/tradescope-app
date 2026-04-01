@@ -1291,16 +1291,21 @@ function renderInitialCapitalForm() {
     'initLightFXUnrealized': 'lightfx',
     'initMinanoUnrealized': 'minano',
     'initSBIUnrealized': 'sbi',
-    'initSBIVCUnrealized': 'sbivc',
-    'initSMBCUnrealized': 'smbc'
+    'initSBIVCUnrealized': 'sbivc'
   };
 
-  // 年初資金
-  for (const [elemId, accountKey] of Object.entries(accountKeys)) {
-    document.getElementById(elemId).value = yearInitialFunds[currentYear][accountKey] || 0;
-  }
-  // 年初評価損益（前年度年末の評価損益をデフォルト）
   const prevYear = currentYear - 1;
+
+  // 年初確定資金（未設定時は前年度12月の確定資産をデフォルト）
+  for (const [elemId, accountKey] of Object.entries(accountKeys)) {
+    let val = yearInitialFunds[currentYear][accountKey];
+    if (typeof val !== 'number') {
+      val = calculateAccountConfirmedAssets(prevYear, 12, accountKey);
+    }
+    document.getElementById(elemId).value = Number(val) || 0;
+  }
+
+  // 年初評価損益（前年度年末の評価損益をデフォルト）
   for (const [elemId, accountKey] of Object.entries(unrealizedKeys)) {
     let val = yearInitialUnrealized[currentYear][accountKey];
     if (typeof val !== 'number') {
@@ -1387,8 +1392,7 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
     'initLightFXUnrealized': 'lightfx',
     'initMinanoUnrealized': 'minano',
     'initSBIUnrealized': 'sbi',
-    'initSBIVCUnrealized': 'sbivc',
-    'initSMBCUnrealized': 'smbc'
+    'initSBIVCUnrealized': 'sbivc'
   };
 
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
