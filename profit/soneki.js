@@ -637,7 +637,10 @@ function renderPerformanceChart() {
     }
 
     if (chart === assetsTrendChart) {
-      const active = [{ datasetIndex: 0, index: monthIndex }];
+      const active = [
+        { datasetIndex: 0, index: monthIndex },
+        { datasetIndex: 1, index: monthIndex }
+      ];
       chart.setActiveElements(active);
       if (chart.tooltip) chart.tooltip.setActiveElements(active, { x: 0, y: 0 });
       chart.update('none');
