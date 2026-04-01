@@ -820,7 +820,7 @@ function renderAnnualSummary() {
   const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
   const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
 
-  const fmtDeltaJPY = (value) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${fmtJPY(Math.abs(value))}`;
+  const fmtDeltaJPY = (value) => `${value < 0 ? '-' : ''}${fmtJPY(Math.abs(value))}`;
 
   const investmentInitialConfirmedCapital = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
     const fund = Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0;
