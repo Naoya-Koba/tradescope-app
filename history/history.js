@@ -347,4 +347,11 @@ window.addEventListener('load', () => {
   document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);
   bindEvents();
   renderAll();
+
+  // Backup button listeners
+  document.getElementById('exportHistoryBtn')?.addEventListener('click', exportHistoryData);
+  document.getElementById('importHistoryInput')?.addEventListener('change', (e) => {
+    importHistoryData(e.target.files[0]);
+    e.target.value = '';
+  });
 });
