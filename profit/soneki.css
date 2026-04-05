@@ -1306,23 +1306,7 @@ body.drawer-open {
 .unrealized-input-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-.unrealized-input-inline.with-add .unrealized-main-input {
-  flex: 1;
-  min-width: 0;
-}
-.inline-unrealized-add {
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 0;
+  gap: 0;
 }
 .form-group input,
 .form-group select {
@@ -1357,6 +1341,18 @@ body.drawer-open {
 }
 .unrealized-helper-add {
   display: none;
+  margin-bottom: 6px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(61,162,255,.38);
+  background: rgba(61,162,255,.16);
+  color: #dfeeff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
 }
 .unrealized-helper-rows {
   display: flex;
@@ -1365,8 +1361,13 @@ body.drawer-open {
 }
 .unrealized-leg-row {
   display: grid;
-  grid-template-columns: 1fr 28px;
+  grid-template-columns: 1fr auto;
   gap: 6px;
+}
+.unrealized-leg-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .unrealized-leg-input {
   padding: 8px;
@@ -1384,6 +1385,18 @@ body.drawer-open {
   border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
+  width: 28px;
+  height: 34px;
+}
+.unrealized-leg-add {
+  border: 1px solid rgba(61,162,255,.35);
+  background: rgba(61,162,255,.16);
+  color: #dfeeff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  width: 28px;
+  height: 34px;
 }
 
 /* ===== Buttons ===== */

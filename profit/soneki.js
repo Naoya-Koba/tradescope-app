@@ -1,9 +1,19 @@
 // ===== Utility =====
 const fmtJPY = n => isFinite(n) ? '¥' + Math.round(n).toLocaleString() : '-';
-const fmtMan = n => isFinite(n) ? Math.round(n / 10000).toLocaleString() : '-';
+const fmtMan = (n) => {
+  if (!isFinite(n)) return '-';
+  const rounded = Math.round(Number(n) / 10000);
+  return (Object.is(rounded, -0) ? 0 : rounded).toLocaleString();
+};
 const fmtManDecimal = n => {
   if (!isFinite(n)) return '-';
-  return (Math.round((Number(n) / 10000) * 10) / 10).toLocaleString('ja-JP', {
+  const rawMan = Number(n) / 10000;
+  const rounded = Math.round(rawMan * 10) / 10;
+  const normalized = Math.abs(rounded) < 0.05 ? 0 : rounded;
+  const displayValue = normalized === 0 && Number(n) !== 0
+    ? (Number(n) > 0 ? 0.1 : -0.1)
+    : normalized;
+  return displayValue.toLocaleString('ja-JP', {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1
   });
@@ -42,7 +52,10 @@ function createUnrealizedLegRowHtml(accountKey, value, index) {
   return `
     <div class="unrealized-leg-row" data-account="${accountKey}" data-index="${index}">
       <input type="number" class="unrealized-leg-input" data-account="${accountKey}" data-index="${index}" value="${value}" placeholder="建玉${index + 1}" />
-      <button type="button" class="unrealized-leg-remove" data-account="${accountKey}" aria-label="建玉行を削除">−</button>
+      <div class="unrealized-leg-actions">
+        <button type="button" class="unrealized-leg-add" data-account="${accountKey}" aria-label="建玉行を追加">＋</button>
+        <button type="button" class="unrealized-leg-remove" data-account="${accountKey}" aria-label="建玉行を削除">−</button>
+      </div>
     </div>
   `;
 }
@@ -56,7 +69,80 @@ function reindexUnrealizedLegRows(accountKey) {
       input.dataset.index = String(idx);
       input.placeholder = `建玉${idx + 1}`;
     }
+
+    const addBtn = row.querySelector('.unrealized-leg-add');
+    if (addBtn) {
+      addBtn.style.display = idx === rows.length - 1 ? 'inline-flex' : 'none';
+    }
   });
+
+  const helperAddBtn = document.querySelector(`.unrealized-helper-add[data-account="${accountKey}"]`);
+  if (helperAddBtn) {
+    helperAddBtn.style.display = rows.length === 0 ? 'inline-flex' : 'none';
+  }
+}
+
+function resizeAccountBodyForUnrealized(accountKey) {
+  const body = document.querySelector(`.account-body[data-account-body="${accountKey}"]`);
+  if (!body || !body.classList.contains('open')) return;
+  body.style.maxHeight = `${body.scrollHeight}px`;
+}
+
+function shouldSelectZeroForOverwrite(input) {
+  if (!input) return false;
+  return input.value === '0' || input.value === '0.0' || input.value === '-0';
+}
+
+function appendUnrealizedLegRow(accountKey, initialValue = 0, focusNew = false) {
+  const rowsWrap = document.querySelector(`.unrealized-helper-rows[data-account="${accountKey}"]`);
+  if (!rowsWrap) return;
+
+  const newIndex = rowsWrap.querySelectorAll('.unrealized-leg-row').length;
+  rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, initialValue, newIndex));
+  reindexUnrealizedLegRows(accountKey);
+  syncUnrealizedFromLegInputs(accountKey);
+  resizeAccountBodyForUnrealized(accountKey);
+
+  if (focusNew) {
+    const latestInput = rowsWrap.querySelector(`.unrealized-leg-input[data-index="${rowsWrap.querySelectorAll('.unrealized-leg-row').length - 1}"]`);
+    latestInput?.focus();
+    if (latestInput && shouldSelectZeroForOverwrite(latestInput)) latestInput.select();
+  }
+}
+
+function removeUnrealizedLegRow(rowEl, accountKey) {
+  rowEl?.remove();
+  reindexUnrealizedLegRows(accountKey);
+  syncUnrealizedFromLegInputs(accountKey);
+  resizeAccountBodyForUnrealized(accountKey);
+}
+
+function commitUnrealizedLegInput(inputEl, { focusNew = false } = {}) {
+  if (!inputEl) return;
+  const accountKey = inputEl.dataset.account;
+  const rowsWrap = document.querySelector(`.unrealized-helper-rows[data-account="${accountKey}"]`);
+  if (!rowsWrap) return;
+
+  const rows = Array.from(rowsWrap.querySelectorAll('.unrealized-leg-row'));
+  const rowEl = inputEl.closest('.unrealized-leg-row');
+  const rowIndex = rows.findIndex((row) => row === rowEl);
+  if (rowIndex < 0) return;
+
+  const value = Number(inputEl.value) || 0;
+  const isLastRow = rowIndex === rows.length - 1;
+
+  if (isLastRow && value !== 0) {
+    appendUnrealizedLegRow(accountKey, 0, focusNew);
+    return;
+  }
+
+  if (rows.length > 1 && rowIndex > 0 && value === 0) {
+    removeUnrealizedLegRow(rowEl, accountKey);
+    return;
+  }
+
+  syncUnrealizedFromLegInputs(accountKey);
+  resizeAccountBodyForUnrealized(accountKey);
 }
 
 function syncUnrealizedFromLegInputs(accountKey) {
@@ -92,7 +178,7 @@ function bindUnrealizedHelperEvents(container) {
   if (!container || container.dataset.unrealizedHelperBound === '1') return;
 
   container.addEventListener('click', (event) => {
-    const addBtn = event.target.closest('.unrealized-helper-add, .inline-unrealized-add');
+    const addBtn = event.target.closest('.unrealized-helper-add, .unrealized-leg-add');
     if (addBtn) {
       const accountKey = addBtn.dataset.account;
       const rowsWrap = container.querySelector(`.unrealized-helper-rows[data-account="${accountKey}"]`);
@@ -106,22 +192,22 @@ function bindUnrealizedHelperEvents(container) {
         row.unrealizedBackup = currentUnrealized;
         legs.push(currentUnrealized);
         legs.push(0);
-      } else {
-        legs.push(0);
       }
 
       const newIndex = rowsWrap.querySelectorAll('.unrealized-leg-row').length;
       if (newIndex === 0 && legs.length >= 2) {
         rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, legs[0], 0));
         rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, legs[1], 1));
-      } else {
-        rowsWrap.insertAdjacentHTML('beforeend', createUnrealizedLegRowHtml(accountKey, legs[legs.length - 1], newIndex));
-      }
-      reindexUnrealizedLegRows(accountKey);
-      syncUnrealizedFromLegInputs(accountKey);
+        reindexUnrealizedLegRows(accountKey);
+        syncUnrealizedFromLegInputs(accountKey);
+        resizeAccountBodyForUnrealized(accountKey);
 
-      const latestInput = rowsWrap.querySelector(`.unrealized-leg-input[data-index="${rowsWrap.querySelectorAll('.unrealized-leg-row').length - 1}"]`);
-      latestInput?.focus();
+        const latestInput = rowsWrap.querySelector(`.unrealized-leg-input[data-index="${rowsWrap.querySelectorAll('.unrealized-leg-row').length - 1}"]`);
+        latestInput?.focus();
+        if (latestInput && shouldSelectZeroForOverwrite(latestInput)) latestInput.select();
+      } else {
+        appendUnrealizedLegRow(accountKey, 0, true);
+      }
       return;
     }
 
@@ -129,9 +215,7 @@ function bindUnrealizedHelperEvents(container) {
     if (removeBtn) {
       const accountKey = removeBtn.dataset.account;
       const row = removeBtn.closest('.unrealized-leg-row');
-      row?.remove();
-      reindexUnrealizedLegRows(accountKey);
-      syncUnrealizedFromLegInputs(accountKey);
+      removeUnrealizedLegRow(row, accountKey);
     }
   });
 
@@ -140,6 +224,32 @@ function bindUnrealizedHelperEvents(container) {
     if (!input) return;
     syncUnrealizedFromLegInputs(input.dataset.account);
   });
+
+  container.addEventListener('focusin', (event) => {
+    const input = event.target.closest('.unrealized-leg-input');
+    if (!input) return;
+    if (shouldSelectZeroForOverwrite(input)) input.select();
+  });
+
+  container.addEventListener('click', (event) => {
+    const input = event.target.closest('.unrealized-leg-input');
+    if (!input) return;
+    if (shouldSelectZeroForOverwrite(input)) input.select();
+  });
+
+  container.addEventListener('keydown', (event) => {
+    const input = event.target.closest('.unrealized-leg-input');
+    if (!input) return;
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    commitUnrealizedLegInput(input, { focusNew: true });
+  });
+
+  container.addEventListener('blur', (event) => {
+    const input = event.target.closest('.unrealized-leg-input');
+    if (!input) return;
+    commitUnrealizedLegInput(input, { focusNew: false });
+  }, true);
 
   container.dataset.unrealizedHelperBound = '1';
 }
@@ -1139,10 +1249,10 @@ function renderAccountInputs() {
     const unrealizedHelper = UNREALIZED_HELPER_ACCOUNTS.has(account.key)
       ? `
         <div class="unrealized-helper" data-account="${account.key}">
-          <button type="button" class="unrealized-helper-add" data-account="${account.key}" aria-label="建玉行を追加">＋</button>
           <div class="unrealized-helper-rows" data-account="${account.key}">
             ${unrealizedLegs.map((v, idx) => createUnrealizedLegRowHtml(account.key, Number(v) || 0, idx)).join('')}
           </div>
+          <button type="button" class="unrealized-helper-add" data-account="${account.key}" aria-label="建玉行を追加">＋</button>
         </div>`
       : '';
     
@@ -1166,9 +1276,8 @@ function renderAccountInputs() {
         </div>
         <div class="form-group">
           <label>評価損益</label>
-          <div class="unrealized-input-inline${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? ' with-add' : ''}">
+          <div class="unrealized-input-inline">
             <input type="number" class="input-account${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? ' unrealized-main-input' : ''}" data-account="${account.key}" data-field="unrealizedPnL" value="${data.unrealizedPnL}" placeholder="0" />
-            ${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? `<button type="button" class="inline-unrealized-add" data-account="${account.key}" aria-label="建玉行を追加">＋</button>` : ''}
           </div>
           <span class="suffix">¥</span>
         </div>`;
@@ -1230,14 +1339,17 @@ function renderAccountInputs() {
     });
   });
 
+  UNREALIZED_HELPER_ACCOUNTS.forEach((accountKey) => {
+    reindexUnrealizedLegRows(accountKey);
+    resizeAccountBodyForUnrealized(accountKey);
+  });
+
   bindUnrealizedHelperEvents(container);
 }
 
 function handleAccountInputFocus(event) {
   const input = event.target;
-  if (input.value === '0') {
-    input.value = '';
-  }
+  if (shouldSelectZeroForOverwrite(input)) input.select();
 }
 
 function handleAccountInputBlur(event) {
