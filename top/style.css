@@ -985,19 +985,16 @@ body.drawer-open {
 }
 
 .chart-legend {
-  position: absolute;
-  top: -24px;
-  right: 10px;                 /* ← 右端から少し内側に配置 */
-  transform: none;             /* ← 中央寄せ解除 */
   display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  text-align: right;           /* ← テキストも右寄せ */
-  pointer-events: none;
+  text-align: right;
 }
 
 .legend-item {
@@ -1015,6 +1012,47 @@ body.drawer-open {
 
 .dot-green { background-color: var(--green); }
 .dot-blue  { background-color: var(--blue); }
+
+.chart-panel-head.chart-panel-head-top {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+
+.chart-view-tabs {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.chart-view-tab {
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.chart-view-tab.active {
+  color: var(--text);
+  border-color: rgba(61,162,255,.55);
+  background: rgba(61,162,255,.22);
+}
+
+@media (max-width: 480px) {
+  .chart-view-tab {
+    font-size: 10px;
+    padding: 4px 9px;
+  }
+
+  .chart-legend {
+    font-size: 10px;
+    gap: 8px;
+  }
+}
 
 /* =========================
    ▼ Position & Risk（カード形式・Yahoo!風リスト調整版）

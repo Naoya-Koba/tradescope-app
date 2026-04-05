@@ -151,6 +151,12 @@
     <!-- ===== Performance Section ===== -->
     <h2 class="heading-muted">Asset Trend</h2>
 <section class="chart-area" aria-label="パフォーマンス（月次）">
+  <div class="chart-panel-head chart-panel-head-top">
+    <div class="chart-view-tabs" role="tablist" aria-label="Asset Trend表示切り替え">
+      <button type="button" id="topAssetViewAssetBtn" class="chart-view-tab active" data-view="asset">Asset</button>
+      <button type="button" id="topAssetViewPerformanceBtn" class="chart-view-tab" data-view="performance">Performance</button>
+    </div>
+  </div>
   <div class="chart-legend">
     <span class="legend-item"><span class="dot dot-green"></span> Total Equity</span>
     <span class="legend-item"><span class="dot dot-blue"></span> Net Balance</span>

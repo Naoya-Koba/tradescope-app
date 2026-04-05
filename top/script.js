@@ -217,6 +217,7 @@ const GROWTH_TARGET_ACCOUNTS = LINKED_ACCOUNTS.filter((account) => !account.bank
 let perfChart = null;
 let portfolioChart = null;
 let accountChart = null;
+let topAssetTrendView = 'asset';
 
 function parseStoredJson(key) {
   try {
@@ -804,6 +805,54 @@ window.visualViewport?.addEventListener('resize', adjustDetailHeight);
 setTimeout(adjustDetailHeight, 200);
 
 // ===== Chart =====
+function buildTopPerformanceSeries(year, latestMonth) {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
+  const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
+  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
+  const yearInitialData = initialFunds?.[year] || initialFunds?.[String(year)] || {};
+  const yearInitialUnrealData = initialUnrealized?.[year] || initialUnrealized?.[String(year)] || {};
+
+  let cumulativeDeposits = 0;
+  let cumulativeWithdrawals = 0;
+
+  const confirmedSeries = [GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0);
+  }, 0)];
+
+  const totalSeries = [GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0)
+      + (Number(yearInitialUnrealData?.[account.key]) || 0);
+  }, 0)];
+
+  for (let month = 1; month <= 12; month += 1) {
+    if (month > latestMonth) {
+      confirmedSeries.push(null);
+      totalSeries.push(null);
+      continue;
+    }
+
+    const monthData = yearData?.[month] || yearData?.[String(month)] || {};
+    GROWTH_TARGET_ACCOUNTS.forEach((account) => {
+      const row = monthData?.[account.key] || {};
+      cumulativeDeposits += Number(row.deposit) || 0;
+      cumulativeWithdrawals += Number(row.withdrawal) || 0;
+    });
+
+    const growthConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+      return sum + calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, month, account.key);
+    }, 0);
+    const growthTotal = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+      return sum + calculateLinkedAccountNetAssets(tradingData, initialFunds, year, month, account.key);
+    }, 0);
+
+    confirmedSeries.push(growthConfirmed - cumulativeDeposits + cumulativeWithdrawals);
+    totalSeries.push(growthTotal - cumulativeDeposits + cumulativeWithdrawals);
+  }
+
+  return { confirmedSeries, totalSeries };
+}
+
 function renderPerformanceChart() {
   const ctx = document.getElementById('perfChart')?.getContext('2d');
   if (!ctx) return;
@@ -818,13 +867,21 @@ function renderPerformanceChart() {
   const monthLabels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const perfLabels = ['年初', ...monthLabels];
   const latestMonth = topSeries.month || 12;
-  const realizedSeries = [topSeries.chartStartTotal || topSeries.realized[0] || 0];
-  const totalSeries = [(topSeries.chartStartTotalWithUnrealized ?? topSeries.chartStartTotal) || topSeries.total[0] || 0];
+  const netBalanceSeries = [topSeries.chartStartTotal || topSeries.realized[0] || 0];
+  const totalEquitySeries = [(topSeries.chartStartTotalWithUnrealized ?? topSeries.chartStartTotal) || topSeries.total[0] || 0];
 
   for (let month = 1; month <= 12; month += 1) {
-    realizedSeries.push(month <= latestMonth ? topSeries.realized[month - 1] : null);
-    totalSeries.push(month <= latestMonth ? topSeries.total[month - 1] : null);
+    netBalanceSeries.push(month <= latestMonth ? topSeries.realized[month - 1] : null);
+    totalEquitySeries.push(month <= latestMonth ? topSeries.total[month - 1] : null);
   }
+
+  const performanceSeries = buildTopPerformanceSeries(topSeries.year, latestMonth);
+  const activeNetBalanceSeries = topAssetTrendView === 'performance'
+    ? performanceSeries.confirmedSeries
+    : netBalanceSeries;
+  const activeTotalEquitySeries = topAssetTrendView === 'performance'
+    ? performanceSeries.totalSeries
+    : totalEquitySeries;
 
   const isMobile = window.innerWidth <= 480;
   const tickFontSize = isMobile ? 10 : 12;
@@ -839,8 +896,8 @@ function renderPerformanceChart() {
       labels: perfLabels,
       datasets: [
         {
-          label: 'Realized Balance',
-          data: realizedSeries,
+          label: 'Net Balance',
+          data: activeNetBalanceSeries,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
           fill: true,
@@ -848,8 +905,8 @@ function renderPerformanceChart() {
           pointRadius: 2
         },
         {
-          label: 'Total Balance',
-          data: totalSeries,
+          label: 'Total Equity',
+          data: activeTotalEquitySeries,
           borderColor: '#3EE08F',
           backgroundColor: gradGreen,
           fill: true,
@@ -887,7 +944,44 @@ function renderPerformanceChart() {
   });
 }
 
+function syncTopAssetTrendTabs() {
+  const assetBtn = document.getElementById('topAssetViewAssetBtn');
+  const performanceBtn = document.getElementById('topAssetViewPerformanceBtn');
+  if (!assetBtn || !performanceBtn) return;
+  assetBtn.classList.toggle('active', topAssetTrendView === 'asset');
+  performanceBtn.classList.toggle('active', topAssetTrendView === 'performance');
+}
+
+function bindTopAssetTrendTabs() {
+  const assetBtn = document.getElementById('topAssetViewAssetBtn');
+  const performanceBtn = document.getElementById('topAssetViewPerformanceBtn');
+  if (!assetBtn || !performanceBtn) return;
+
+  if (assetBtn.dataset.bound !== '1') {
+    assetBtn.addEventListener('click', () => {
+      if (topAssetTrendView === 'asset') return;
+      topAssetTrendView = 'asset';
+      renderPerformanceChart();
+      syncTopAssetTrendTabs();
+    });
+    assetBtn.dataset.bound = '1';
+  }
+
+  if (performanceBtn.dataset.bound !== '1') {
+    performanceBtn.addEventListener('click', () => {
+      if (topAssetTrendView === 'performance') return;
+      topAssetTrendView = 'performance';
+      renderPerformanceChart();
+      syncTopAssetTrendTabs();
+    });
+    performanceBtn.dataset.bound = '1';
+  }
+
+  syncTopAssetTrendTabs();
+}
+
 renderPerformanceChart();
+bindTopAssetTrendTabs();
 
 function clearDoughnutTooltip(chart) {
   if (!chart) return;

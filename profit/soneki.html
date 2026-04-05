@@ -190,13 +190,17 @@
     </section>
 
     <div class="performance-head">
-      <h2 class="heading-muted performance-heading">P/L Overview</h2>
+      <h2 class="heading-muted performance-heading">Asset &amp; P/L</h2>
     </div>
     <section class="chart-area margin-bottom" aria-label="損益パフォーマンス">
       <div class="chart-stack">
         <div class="chart-panel">
           <div class="chart-panel-head">
             <div class="chart-panel-label">Asset Trend</div>
+            <div class="chart-view-tabs" role="tablist" aria-label="Asset Trend表示切り替え">
+              <button type="button" id="assetTrendAssetBtn" class="chart-view-tab active" data-view="asset">Asset</button>
+              <button type="button" id="assetTrendPerformanceBtn" class="chart-view-tab" data-view="performance">Performance</button>
+            </div>
             <div class="chart-legend chart-legend-panel">
               <span class="legend-item"><span class="dot dot-total-assets"></span> Total Equity</span>
               <span class="legend-item"><span class="dot dot-confirmed-assets"></span> Net Balance</span>
@@ -209,6 +213,10 @@
         <div class="chart-panel">
           <div class="chart-panel-head">
             <div class="chart-panel-label">Monthly P/L</div>
+            <div class="chart-view-tabs" role="tablist" aria-label="Monthly P/L表示切り替え">
+              <button type="button" id="monthlyPnlTotalBtn" class="chart-view-tab" data-view="total">Total</button>
+              <button type="button" id="monthlyPnlBreakdownBtn" class="chart-view-tab active" data-view="breakdown">Breakdown</button>
+            </div>
             <div class="chart-legend chart-legend-panel">
               <span class="legend-item"><span class="dot dot-realized"></span> Realized P/L</span>
               <span class="legend-item"><span class="dot dot-swap"></span> Swap P/L</span>

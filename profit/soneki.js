@@ -365,6 +365,8 @@ const monthlyDetailClose = document.getElementById('monthlyDetailClose');
 const monthlyDetailScrim = document.getElementById('monthlyDetailScrim');
 let pnlBarChart = null;
 let assetsTrendChart = null;
+let assetTrendView = 'asset';
+let monthlyPnlView = 'breakdown';
 let monthlyDetailLockScrollY = 0;
 
 function dismissInputFocusOnOutsideTap(event) {
@@ -711,22 +713,64 @@ function renderPerformanceChart() {
   const latestMonth = getLatestSavedMonth(currentYear);
   const realizedData = [];
   const swapData = [];
+  const totalPnlData = [];
   const yearStartUnrealizedTotal = ACCOUNTS.reduce((sum, a) => {
     return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
   }, 0);
   const confirmedTrendData = [calculateInitialCapital(currentYear)];
   const assetsTrendData = [calculateInitialCapital(currentYear) + yearStartUnrealizedTotal];
 
+  const growthInitialConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0);
+  }, 0);
+  const growthInitialTotal = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0)
+      + (Number(yearInitialUnrealized?.[currentYear]?.[account.key]) || 0);
+  }, 0);
+  const performanceConfirmedTrendData = [growthInitialConfirmed];
+  const performanceAssetsTrendData = [growthInitialTotal];
+  let cumulativeGrowthDeposits = 0;
+  let cumulativeGrowthWithdrawals = 0;
+
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
     realizedData.push(monthly.realizedSum);
     swapData.push(monthly.swapSum);
+    totalPnlData.push(monthly.realizedSum + monthly.swapSum);
     const monthEndAssets = calculateTotalNetAssets(currentYear, m);
     const monthEndConfirmed = calculateTotalConfirmedAssets(currentYear, m);
     const isEnteredMonth = m <= latestMonth;
     confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
     assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
+
+    if (isEnteredMonth) {
+      GROWTH_TARGET_ACCOUNTS.forEach((account) => {
+        const row = tradingData?.[currentYear]?.[m]?.[account.key] || {};
+        cumulativeGrowthDeposits += Number(row.deposit) || 0;
+        cumulativeGrowthWithdrawals += Number(row.withdrawal) || 0;
+      });
+
+      const growthAssets = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+        return sum + calculateAccountNetAssets(currentYear, m, account.key);
+      }, 0);
+      const growthConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+        return sum + calculateAccountConfirmedAssets(currentYear, m, account.key);
+      }, 0);
+
+      performanceAssetsTrendData.push(growthAssets - cumulativeGrowthDeposits + cumulativeGrowthWithdrawals);
+      performanceConfirmedTrendData.push(growthConfirmed - cumulativeGrowthDeposits + cumulativeGrowthWithdrawals);
+    } else {
+      performanceAssetsTrendData.push(null);
+      performanceConfirmedTrendData.push(null);
+    }
   }
+
+  const activeConfirmedTrend = assetTrendView === 'performance'
+    ? performanceConfirmedTrendData
+    : confirmedTrendData;
+  const activeAssetsTrend = assetTrendView === 'performance'
+    ? performanceAssetsTrendData
+    : assetsTrendData;
 
   if (assetsTrendChart) {
     assetsTrendChart.destroy();
@@ -765,10 +809,7 @@ function renderPerformanceChart() {
       return;
     }
 
-    const active = [
-      { datasetIndex: 0, index: monthIndex },
-      { datasetIndex: 1, index: monthIndex }
-    ];
+    const active = (chart.data?.datasets || []).map((_dataset, datasetIndex) => ({ datasetIndex, index: monthIndex }));
     chart.setActiveElements(active);
     if (chart.tooltip) chart.tooltip.setActiveElements(active, { x: 0, y: 0 });
     chart.update('none');
@@ -813,7 +854,7 @@ function renderPerformanceChart() {
       datasets: [
         {
           label: 'Net Balance',
-          data: confirmedTrendData,
+          data: activeConfirmedTrend,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
           fill: true,
@@ -824,7 +865,7 @@ function renderPerformanceChart() {
         },
         {
           label: 'Total Equity',
-          data: assetsTrendData,
+          data: activeAssetsTrend,
           borderColor: '#3EE08F',
           backgroundColor: gradGreen,
           fill: true,
@@ -873,29 +914,42 @@ function renderPerformanceChart() {
     }
   });
 
+  const pnlDatasets = monthlyPnlView === 'total'
+    ? [
+      {
+        type: 'bar',
+        label: 'Total P/L',
+        data: totalPnlData,
+        backgroundColor: totalPnlData.map(v => v >= 0 ? 'rgba(62,224,143,0.78)' : 'rgba(255,107,107,0.78)'),
+        borderColor: totalPnlData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
+        borderWidth: 1
+      }
+    ]
+    : [
+      {
+        type: 'bar',
+        label: 'Realized P/L',
+        data: realizedData,
+        stack: 'pnl',
+        backgroundColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,0.75)' : 'rgba(255,107,107,0.75)'),
+        borderColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
+        borderWidth: 1
+      },
+      {
+        type: 'bar',
+        label: 'Swap P/L',
+        data: swapData,
+        stack: 'pnl',
+        backgroundColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,0.75)' : 'rgba(255,107,107,0.55)'),
+        borderColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,1)' : 'rgba(255,107,107,0.9)'),
+        borderWidth: 1
+      }
+    ];
+
   pnlBarChart = new Chart(pnlCtx, {
     data: {
       labels,
-      datasets: [
-        {
-          type: 'bar',
-          label: '決済損益',
-          data: realizedData,
-          stack: 'pnl',
-          backgroundColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,0.75)' : 'rgba(255,107,107,0.75)'),
-          borderColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
-          borderWidth: 1
-        },
-        {
-          type: 'bar',
-          label: 'スワップ損益',
-          data: swapData,
-          stack: 'pnl',
-          backgroundColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,0.75)' : 'rgba(255,107,107,0.55)'),
-          borderColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,1)' : 'rgba(255,107,107,0.9)'),
-          borderWidth: 1
-        }
-      ]
+      datasets: pnlDatasets
     },
     options: {
       responsive: true,
@@ -933,6 +987,7 @@ function renderPerformanceChart() {
             },
             label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`,
             afterBody: (items) => {
+              if (monthlyPnlView === 'total') return '';
               const item = items?.[0];
               if (!item) return '';
               const idx = item.dataIndex;
@@ -945,7 +1000,7 @@ function renderPerformanceChart() {
       },
       scales: {
         x: {
-          stacked: true,
+          stacked: monthlyPnlView === 'breakdown',
           ticks: {
             color: 'rgba(255,255,255,0.75)'
           },
@@ -955,7 +1010,7 @@ function renderPerformanceChart() {
           }
         },
         y: {
-          stacked: true,
+          stacked: monthlyPnlView === 'breakdown',
           ticks: {
             color: 'rgba(255,255,255,0.75)',
             callback: (v) => fmtMan(v)
@@ -968,6 +1023,69 @@ function renderPerformanceChart() {
       }
     }
   });
+
+  syncChartViewTabs();
+}
+
+function syncChartViewTabs() {
+  const assetBtn = document.getElementById('assetTrendAssetBtn');
+  const performanceBtn = document.getElementById('assetTrendPerformanceBtn');
+  const totalBtn = document.getElementById('monthlyPnlTotalBtn');
+  const breakdownBtn = document.getElementById('monthlyPnlBreakdownBtn');
+
+  if (assetBtn && performanceBtn) {
+    assetBtn.classList.toggle('active', assetTrendView === 'asset');
+    performanceBtn.classList.toggle('active', assetTrendView === 'performance');
+  }
+  if (totalBtn && breakdownBtn) {
+    totalBtn.classList.toggle('active', monthlyPnlView === 'total');
+    breakdownBtn.classList.toggle('active', monthlyPnlView === 'breakdown');
+  }
+}
+
+function bindChartViewControls() {
+  const assetBtn = document.getElementById('assetTrendAssetBtn');
+  const performanceBtn = document.getElementById('assetTrendPerformanceBtn');
+  const totalBtn = document.getElementById('monthlyPnlTotalBtn');
+  const breakdownBtn = document.getElementById('monthlyPnlBreakdownBtn');
+
+  if (assetBtn && assetBtn.dataset.bound !== '1') {
+    assetBtn.addEventListener('click', () => {
+      if (assetTrendView === 'asset') return;
+      assetTrendView = 'asset';
+      renderPerformanceChart();
+    });
+    assetBtn.dataset.bound = '1';
+  }
+
+  if (performanceBtn && performanceBtn.dataset.bound !== '1') {
+    performanceBtn.addEventListener('click', () => {
+      if (assetTrendView === 'performance') return;
+      assetTrendView = 'performance';
+      renderPerformanceChart();
+    });
+    performanceBtn.dataset.bound = '1';
+  }
+
+  if (totalBtn && totalBtn.dataset.bound !== '1') {
+    totalBtn.addEventListener('click', () => {
+      if (monthlyPnlView === 'total') return;
+      monthlyPnlView = 'total';
+      renderPerformanceChart();
+    });
+    totalBtn.dataset.bound = '1';
+  }
+
+  if (breakdownBtn && breakdownBtn.dataset.bound !== '1') {
+    breakdownBtn.addEventListener('click', () => {
+      if (monthlyPnlView === 'breakdown') return;
+      monthlyPnlView = 'breakdown';
+      renderPerformanceChart();
+    });
+    breakdownBtn.dataset.bound = '1';
+  }
+
+  syncChartViewTabs();
 }
 
 // ===== UI Updates =====
@@ -1804,6 +1922,7 @@ function renderAll() {
   updateYearSelect();
   renderAnnualSummary();
   renderPerformanceChart();
+  bindChartViewControls();
   renderMonthlyDisplay();
   renderMonthTabs();
   renderAccountInputs();

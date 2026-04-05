@@ -283,6 +283,7 @@ body::before {
   justify-content: space-between;
   gap: 10px;
   margin: 0 0 6px;
+  flex-wrap: wrap;
 }
 
 .chart-panel-label {
@@ -290,6 +291,30 @@ body::before {
   color: var(--muted);
   letter-spacing: .3px;
   margin: 0;
+}
+
+.chart-view-tabs {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.chart-view-tab {
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.chart-view-tab.active {
+  color: var(--text);
+  border-color: rgba(61,162,255,.55);
+  background: rgba(61,162,255,.22);
 }
 
 .chart-panel .chart-legend.chart-legend-panel {
@@ -1646,6 +1671,11 @@ body.drawer-open {
   .chart-panel-head {
     margin: 0 0 4px;
     gap: 8px;
+  }
+
+  .chart-view-tab {
+    padding: 4px 9px;
+    font-size: 10px;
   }
 
   .chart-area.margin-bottom {
