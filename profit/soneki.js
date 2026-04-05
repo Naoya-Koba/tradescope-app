@@ -1120,9 +1120,6 @@ function renderMonthlyDetailPane(month = currentMonth) {
           <div class="detail-account-summary">
             <div class="detail-account-summary-label">月末残高</div>
             <div class="detail-account-total" style="color:${colorBySign(netAssets)}">${fmtJPY(netAssets)}</div>
-            <div class="detail-account-stats">
-              <div class="item"><span class="k">月間増減</span><span class="v" style="color:${colorBySign(accountCashflow)}">${fmtJPY(accountCashflow)}</span></div>
-            </div>
           </div>
           <div class="detail-account-cashflow">
             <div class="detail-account-cashflow-head">

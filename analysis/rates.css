@@ -1,7 +1,7 @@
 :root {
-  --bg-from: #0b1020;
-  --bg-to: #1a2250;
-  --glass-bg: rgba(255,255,255,.08);
+  --bg-from: #121833;
+  --bg-to: #243062;
+  --glass-bg: rgba(255,255,255,.1);
   --glass-stroke: rgba(255,255,255,.18);
   --glass-highlight: rgba(255,255,255,.25);
   --text: #eef1ff;

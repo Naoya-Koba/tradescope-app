@@ -458,7 +458,8 @@ function buildPortfolioAllocationFromAccounts(accounts) {
   }, {});
 
   const data = [
-    { label: 'FX', amount: (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0) + (byKey['SBI'] || 0), color: '#3B6DFF' },
+    { label: 'FX', amount: (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0), color: '#3B6DFF' },
+    { label: 'NISA', amount: byKey['SBI'] || 0, color: '#D95757' },
     { label: '暗号資産', amount: byKey['SBI VC'] || 0, color: '#EAF1FF' },
     { label: '現金', amount: byKey['三井住友銀行'] || 0, color: '#2F7A46' }
   ].filter((item) => item.amount > 0);

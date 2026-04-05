@@ -1,8 +1,13 @@
 (function () {
-  const EDGE_ZONE_PX = 24;
-  const HORIZONTAL_TRIGGER_PX = 14;
-  const HORIZONTAL_PRIORITY = 1.08;
+  const EDGE_ZONE_PX = 32;
+  const HORIZONTAL_TRIGGER_PX = 10;
+  const HORIZONTAL_PRIORITY = 1.02;
   let edgeSwipe = null;
+
+  document.documentElement.style.overscrollBehaviorX = 'none';
+  document.body.style.overscrollBehaviorX = 'none';
+  document.documentElement.style.touchAction = 'pan-y pinch-zoom';
+  document.body.style.touchAction = 'pan-y pinch-zoom';
 
   function resetEdgeSwipe() {
     edgeSwipe = null;
@@ -24,13 +29,15 @@
       return;
     }
 
+    event.preventDefault();
+
     edgeSwipe = {
       startX: touch.clientX,
       startY: touch.clientY,
       fromLeft,
       fromRight
     };
-  }, { passive: true });
+  }, { passive: false, capture: true });
 
   document.addEventListener('touchmove', (event) => {
     if (!edgeSwipe || event.touches.length !== 1) return;
@@ -43,7 +50,7 @@
     const horizontalIntent = absDx > HORIZONTAL_TRIGGER_PX && absDx > absDy * HORIZONTAL_PRIORITY;
     const isBrowserHistoryDirection = (edgeSwipe.fromLeft && dx > 0) || (edgeSwipe.fromRight && dx < 0);
 
-    if (horizontalIntent && isBrowserHistoryDirection) {
+    if (isBrowserHistoryDirection && (horizontalIntent || absDx > 2)) {
       event.preventDefault();
       return;
     }
