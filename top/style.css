@@ -237,7 +237,7 @@ body::before {
   padding: 8px 0;
 }
 .summary-primary {
-  align-items: center;
+  align-items: flex-start;
 }
 .summary-label {
   color: var(--text);
@@ -289,7 +289,7 @@ body::before {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 7px;
 }
 .summary-value {
   font-weight: 700;
@@ -297,6 +297,19 @@ body::before {
   color: var(--text);
   letter-spacing: 0.2px;
   text-align: right;
+}
+
+.summary-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.summary-delta {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .growth-group {
@@ -1711,11 +1724,13 @@ body.drawer-open {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
 }
 
 .portfolio-chart-container canvas {
   max-width: 100%;
   max-height: 100%;
+  touch-action: manipulation;
   filter: drop-shadow(0 0 10px rgba(61,162,255,0.12)) drop-shadow(0 2px 8px rgba(0,0,0,0.35));
 }
 

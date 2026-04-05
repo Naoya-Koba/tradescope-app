@@ -120,6 +120,10 @@
       <span class="summary-label">純資産 <span class="sub-en">Total Equity</span></span>
       <div class="summary-right">
         <span id="kpiTotal" class="summary-value">¥0</span>
+        <div class="summary-metric-row">
+          <span class="growth-label">変動額</span>
+          <span id="deltaTotal" class="summary-delta neutral">0</span>
+        </div>
         <div class="growth-group">
           <span class="growth-label">年間成長率</span>
           <span id="growthTotal" class="growth-pill neutral">+0.0%</span>
@@ -131,6 +135,10 @@
       <span class="summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
       <div class="summary-right">
         <span id="kpiRealized" class="summary-value">¥0</span>
+        <div class="summary-metric-row">
+          <span class="growth-label">変動額</span>
+          <span id="deltaNet" class="summary-delta neutral">0</span>
+        </div>
         <div class="growth-group">
           <span class="growth-label">年間成長率</span>
           <span id="growthNet" class="growth-pill neutral">+0.0%</span>
@@ -403,6 +411,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/app-gestures.js"></script>
   <script src="assets/profit-metrics.js"></script>
   <script src="top/script.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

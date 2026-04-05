@@ -1110,6 +1110,37 @@ function renderMonthlyDetailPane(month = currentMonth) {
     const accountTotal = (data.realizedPnL || 0) + (data.swapPnL || 0);
     const accountCashflow = (data.deposit || 0) - (data.withdrawal || 0);
     const netAssets = calculateAccountNetAssets(currentYear, month, account.key);
+
+    if (account.bankOnly) {
+      return `
+        <div class="detail-account-card detail-account-card-bank">
+          <div class="detail-account-head">
+            <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${account.name}</span>
+          </div>
+          <div class="detail-account-summary">
+            <div class="detail-account-summary-label">月末残高</div>
+            <div class="detail-account-total" style="color:${colorBySign(netAssets)}">${fmtJPY(netAssets)}</div>
+            <div class="detail-account-stats">
+              <div class="item"><span class="k">月間増減</span><span class="v" style="color:${colorBySign(accountCashflow)}">${fmtJPY(accountCashflow)}</span></div>
+            </div>
+          </div>
+          <div class="detail-account-cashflow">
+            <div class="detail-account-cashflow-head">
+              <span class="k">入出金合計</span>
+              <span class="v" style="color:${colorBySign(accountCashflow)}">${fmtJPY(accountCashflow)}</span>
+            </div>
+            <details class="detail-account-cashflow-details">
+              <summary class="detail-account-cashflow-toggle">入出金内訳</summary>
+              <div class="detail-account-cashflow-list">
+                <div class="item"><span class="k">入金</span><span class="v">${fmtJPY(data.deposit || 0)}</span></div>
+                <div class="item"><span class="k">出金</span><span class="v" style="color:${colorBySign(-(data.withdrawal || 0))}">${fmtJPY(data.withdrawal || 0)}</span></div>
+              </div>
+            </details>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="detail-account-card">
         <div class="detail-account-head">
@@ -1685,7 +1716,7 @@ monthlyDetailScrim?.addEventListener('click', closeMonthlyDetailPane);
     const dy = endY - startY;
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
     const shouldClose = isMobile
-      ? (canDismissBySwipe && dy > 120 && Math.abs(dy) > Math.abs(dx) * 1.02)
+      ? (canDismissBySwipe && dy > 108 && Math.abs(dy) > Math.abs(dx) * 0.98)
       : (dx > 120 && Math.abs(dx) > Math.abs(dy) * 1.1);
     monthlyDetailPane.style.transition = '';
     if (shouldClose) closeMonthlyDetailPane();

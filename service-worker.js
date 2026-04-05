@@ -1,8 +1,9 @@
-const CACHE_NAME = "tradescope-static-v80";
+const CACHE_NAME = "tradescope-static-v81";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
+  "./assets/app-gestures.js",
   "./top/style.css",
   "./top/script.js",
   "./profit/soneki.html",

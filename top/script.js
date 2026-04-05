@@ -473,6 +473,12 @@ function updateKPIs() {
   const i = Math.max(0, (topSeries.month || topSeries.realized.length) - 1);
   const rLast = topSeries.realized[i];
   const tLast = topSeries.total[i];
+  const fmtDeltaNumber = (value) => {
+    const abs = Math.round(Math.abs(value)).toLocaleString();
+    if (value > 0) return `+${abs}`;
+    if (value < 0) return `-${abs}`;
+    return '0';
+  };
 
   const elTotal = document.getElementById('kpiTotal');
   elTotal.textContent = fmtJPY(tLast);
@@ -493,15 +499,32 @@ function updateKPIs() {
   const cumulativeWithdrawals = topSeries.cumulativeWithdrawals || 0;
   
   let annualGrowthRate = 0;
+  let realPnL = 0;
   if (yearStartTotal > 0) {
-    const realPnL = growthCurrentTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
+    realPnL = growthCurrentTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
     annualGrowthRate = (realPnL / yearStartTotal) * 100;
+  } else {
+    realPnL = growthCurrentTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
   }
 
   let confirmedAnnualGrowthRate = 0;
+  let confirmedRealPnL = 0;
   if (yearStartConfirmed > 0) {
-    const confirmedRealPnL = growthCurrentConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals;
+    confirmedRealPnL = growthCurrentConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals;
     confirmedAnnualGrowthRate = (confirmedRealPnL / yearStartConfirmed) * 100;
+  } else {
+    confirmedRealPnL = growthCurrentConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals;
+  }
+
+  const elTotalDelta = document.getElementById('deltaTotal');
+  const elNetDelta = document.getElementById('deltaNet');
+  if (elTotalDelta) {
+    elTotalDelta.textContent = fmtDeltaNumber(realPnL);
+    setSignClass(elTotalDelta, realPnL);
+  }
+  if (elNetDelta) {
+    elNetDelta.textContent = fmtDeltaNumber(confirmedRealPnL);
+    setSignClass(elNetDelta, confirmedRealPnL);
   }
 
   elNet.textContent = (confirmedAnnualGrowthRate >= 0 ? '+' : '') + confirmedAnnualGrowthRate.toFixed(1) + '%';
@@ -865,6 +888,69 @@ function renderPerformanceChart() {
 
 renderPerformanceChart();
 
+function clearDoughnutTooltip(chart) {
+  if (!chart) return;
+  chart.setActiveElements([]);
+  if (chart.tooltip) {
+    chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+  }
+  chart.update('none');
+}
+
+function setDoughnutTooltip(chart, activeElements, point) {
+  if (!chart) return;
+  chart.setActiveElements(activeElements);
+  if (chart.tooltip) {
+    chart.tooltip.setActiveElements(activeElements, point);
+  }
+  chart.update('none');
+}
+
+function activateDoughnutTooltip(chart, event) {
+  if (!chart?.canvas) return;
+
+  const active = chart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
+  if (!active.length) {
+    clearDoughnutTooltip(chart);
+    return;
+  }
+
+  const rect = chart.canvas.getBoundingClientRect();
+  const sourcePoint = event.touches?.[0] || event.changedTouches?.[0] || event;
+  const point = {
+    x: sourcePoint.clientX - rect.left,
+    y: sourcePoint.clientY - rect.top
+  };
+  setDoughnutTooltip(chart, [active[0]], point);
+}
+
+function bindDoughnutTooltipInteractions(chart, siblingChartResolver) {
+  if (!chart?.canvas || chart.canvas.dataset.tooltipBound === '1') return;
+
+  chart.canvas.style.touchAction = 'manipulation';
+  chart.canvas.addEventListener('pointerdown', (event) => {
+    const siblingChart = siblingChartResolver?.();
+    if (siblingChart) clearDoughnutTooltip(siblingChart);
+    activateDoughnutTooltip(chart, event);
+  });
+
+  chart.canvas.dataset.tooltipBound = '1';
+}
+
+function dismissDoughnutTooltipsOnOutsideTap(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+
+  [portfolioChart, accountChart].forEach((chart) => {
+    if (!chart?.canvas) return;
+    if (chart.canvas.contains(target)) return;
+    if (!chart.getActiveElements().length) return;
+    clearDoughnutTooltip(chart);
+  });
+}
+
+document.addEventListener('pointerdown', dismissDoughnutTooltipsOnOutsideTap, true);
+
 // ===== Portfolio Chart & List =====
 function renderPortfolio() {
   // Calculate total
@@ -902,6 +988,11 @@ function renderPortfolio() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+      interaction: {
+        mode: 'nearest',
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -937,6 +1028,7 @@ function renderPortfolio() {
       },
       options: doughnutOpts(total)
     });
+    bindDoughnutTooltipInteractions(portfolioChart, () => accountChart);
 
     // ==== 口座別配分チャート ====
     const accountTotal = accountData.reduce((s, d) => s + d.amount, 0);
@@ -974,6 +1066,7 @@ function renderPortfolio() {
         },
         options: doughnutOpts(accountTotal)
       });
+      bindDoughnutTooltipInteractions(accountChart, () => portfolioChart);
     }
   }
 }
