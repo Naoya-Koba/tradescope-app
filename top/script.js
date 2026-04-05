@@ -945,36 +945,24 @@ function renderPerformanceChart() {
 }
 
 function syncTopAssetTrendTabs() {
-  const assetBtn = document.getElementById('topAssetViewAssetBtn');
-  const performanceBtn = document.getElementById('topAssetViewPerformanceBtn');
-  if (!assetBtn || !performanceBtn) return;
-  assetBtn.classList.toggle('active', topAssetTrendView === 'asset');
-  performanceBtn.classList.toggle('active', topAssetTrendView === 'performance');
+  const viewSelect = document.getElementById('topAssetViewSelect');
+  if (!viewSelect) return;
+  viewSelect.value = topAssetTrendView;
 }
 
 function bindTopAssetTrendTabs() {
-  const assetBtn = document.getElementById('topAssetViewAssetBtn');
-  const performanceBtn = document.getElementById('topAssetViewPerformanceBtn');
-  if (!assetBtn || !performanceBtn) return;
+  const viewSelect = document.getElementById('topAssetViewSelect');
+  if (!viewSelect) return;
 
-  if (assetBtn.dataset.bound !== '1') {
-    assetBtn.addEventListener('click', () => {
-      if (topAssetTrendView === 'asset') return;
-      topAssetTrendView = 'asset';
+  if (viewSelect.dataset.bound !== '1') {
+    viewSelect.addEventListener('change', (event) => {
+      const nextView = event.target.value === 'performance' ? 'performance' : 'asset';
+      if (topAssetTrendView === nextView) return;
+      topAssetTrendView = nextView;
       renderPerformanceChart();
       syncTopAssetTrendTabs();
     });
-    assetBtn.dataset.bound = '1';
-  }
-
-  if (performanceBtn.dataset.bound !== '1') {
-    performanceBtn.addEventListener('click', () => {
-      if (topAssetTrendView === 'performance') return;
-      topAssetTrendView = 'performance';
-      renderPerformanceChart();
-      syncTopAssetTrendTabs();
-    });
-    performanceBtn.dataset.bound = '1';
+    viewSelect.dataset.bound = '1';
   }
 
   syncTopAssetTrendTabs();

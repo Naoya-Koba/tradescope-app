@@ -703,7 +703,8 @@ function getLatestSavedMonth(year) {
   return 1;
 }
 
-function renderPerformanceChart() {
+function renderPerformanceChart(options = {}) {
+  const { renderAssets = true, renderPnl = true } = options;
   const assetsCanvas = document.getElementById('assetsTrendChart');
   const pnlCanvas = document.getElementById('pnlBarChart');
   if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
@@ -772,12 +773,41 @@ function renderPerformanceChart() {
     ? performanceAssetsTrendData
     : assetsTrendData;
 
-  if (assetsTrendChart) {
-    assetsTrendChart.destroy();
-  }
-  if (pnlBarChart) {
-    pnlBarChart.destroy();
-  }
+  const buildPnlDatasets = () => {
+    if (monthlyPnlView === 'total') {
+      return [
+        {
+          type: 'bar',
+          label: 'Total P/L',
+          data: totalPnlData,
+          backgroundColor: totalPnlData.map(v => v >= 0 ? 'rgba(62,224,143,0.78)' : 'rgba(255,107,107,0.78)'),
+          borderColor: totalPnlData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
+          borderWidth: 1
+        }
+      ];
+    }
+
+    return [
+      {
+        type: 'bar',
+        label: 'Realized P/L',
+        data: realizedData,
+        stack: 'pnl',
+        backgroundColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,0.75)' : 'rgba(255,107,107,0.75)'),
+        borderColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
+        borderWidth: 1
+      },
+      {
+        type: 'bar',
+        label: 'Swap P/L',
+        data: swapData,
+        stack: 'pnl',
+        backgroundColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,0.75)' : 'rgba(255,107,107,0.55)'),
+        borderColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,1)' : 'rgba(255,107,107,0.9)'),
+        borderWidth: 1
+      }
+    ];
+  };
 
   const assetsCtx = assetsCanvas.getContext('2d');
   const pnlCtx = pnlCanvas.getContext('2d');
@@ -847,242 +877,194 @@ function renderPerformanceChart() {
   gradGreen.addColorStop(0, 'rgba(62,224,143,0.25)');
   gradGreen.addColorStop(1, 'rgba(62,224,143,0)');
 
-  assetsTrendChart = new Chart(assetsCtx, {
-    type: 'line',
-    data: {
-      labels: assetsLabels,
-      datasets: [
-        {
-          label: 'Net Balance',
-          data: activeConfirmedTrend,
-          borderColor: '#3DA2FF',
-          backgroundColor: gradBlue,
-          fill: true,
-          tension: 0.35,
-          pointRadius: 2,
-          pointHitRadius: 20,
-          pointHoverRadius: 5
-        },
-        {
-          label: 'Total Equity',
-          data: activeAssetsTrend,
-          borderColor: '#3EE08F',
-          backgroundColor: gradGreen,
-          fill: true,
-          tension: 0.35,
-          pointRadius: 2,
-          pointHitRadius: 20,
-          pointHoverRadius: 5
-        }
-      ]
-    },
-    options: {
-      maintainAspectRatio: false,
-      responsive: true,
-      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
-      interaction: {
-        mode: 'index',
-        intersect: false,
-        axis: 'x'
+  const createAssetsChart = () => {
+    if (assetsTrendChart) assetsTrendChart.destroy();
+    assetsTrendChart = new Chart(assetsCtx, {
+      type: 'line',
+      data: {
+        labels: assetsLabels,
+        datasets: [
+          {
+            label: 'Net Balance',
+            data: activeConfirmedTrend,
+            borderColor: '#3DA2FF',
+            backgroundColor: gradBlue,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+            pointHitRadius: 20,
+            pointHoverRadius: 5
+          },
+          {
+            label: 'Total Equity',
+            data: activeAssetsTrend,
+            borderColor: '#3EE08F',
+            backgroundColor: gradGreen,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+            pointHitRadius: 20,
+            pointHoverRadius: 5
+          }
+        ]
       },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          itemSort: (a, b) => (Number(b.parsed?.y) || 0) - (Number(a.parsed?.y) || 0),
-          callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`
+      options: {
+        maintainAspectRatio: false,
+        responsive: true,
+        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+        interaction: {
+          mode: 'index',
+          intersect: false,
+          axis: 'x'
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            itemSort: (a, b) => (Number(b.parsed?.y) || 0) - (Number(a.parsed?.y) || 0),
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`
+            }
+          }
+        },
+        onHover: (_event, activeElements) => {
+          syncHoverFromAssets(activeElements || []);
+        },
+        scales: {
+          x: {
+            ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 12 } },
+            grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
+          },
+          y: {
+            ticks: {
+              color: 'rgba(255,255,255,0.8)',
+              font: { size: 12 },
+              callback: (v) => fmtMan(v)
+            },
+            grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
           }
         }
-      },
-      onHover: (_event, activeElements) => {
-        syncHoverFromAssets(activeElements || []);
-      },
-      scales: {
-        x: {
-          ticks: { color: 'rgba(255,255,255,0.8)', font: { size: 12 } },
-          grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
-        },
-        y: {
-          ticks: {
-            color: 'rgba(255,255,255,0.8)',
-            font: { size: 12 },
-            callback: (v) => fmtMan(v)
-          },
-          grid: { color: 'rgba(255,255,255,0.1)', borderDash: [3,3], drawBorder: false }
-        }
       }
-    }
-  });
+    });
+  };
 
-  const pnlDatasets = monthlyPnlView === 'total'
-    ? [
-      {
-        type: 'bar',
-        label: 'Total P/L',
-        data: totalPnlData,
-        backgroundColor: totalPnlData.map(v => v >= 0 ? 'rgba(62,224,143,0.78)' : 'rgba(255,107,107,0.78)'),
-        borderColor: totalPnlData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
-        borderWidth: 1
-      }
-    ]
-    : [
-      {
-        type: 'bar',
-        label: 'Realized P/L',
-        data: realizedData,
-        stack: 'pnl',
-        backgroundColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,0.75)' : 'rgba(255,107,107,0.75)'),
-        borderColor: realizedData.map(v => v >= 0 ? 'rgba(62,224,143,1)' : 'rgba(255,107,107,1)'),
-        borderWidth: 1
+  const createPnlChart = () => {
+    if (pnlBarChart) pnlBarChart.destroy();
+    pnlBarChart = new Chart(pnlCtx, {
+      data: {
+        labels,
+        datasets: buildPnlDatasets()
       },
-      {
-        type: 'bar',
-        label: 'Swap P/L',
-        data: swapData,
-        stack: 'pnl',
-        backgroundColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,0.75)' : 'rgba(255,107,107,0.55)'),
-        borderColor: swapData.map(v => v >= 0 ? 'rgba(61,162,255,1)' : 'rgba(255,107,107,0.9)'),
-        borderWidth: 1
-      }
-    ];
-
-  pnlBarChart = new Chart(pnlCtx, {
-    data: {
-      labels,
-      datasets: pnlDatasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
-      onHover: (_event, activeElements) => {
-        syncHoverFromPnl(activeElements || []);
-      },
-      interaction: {
-        mode: 'index',
-        intersect: false,
-        axis: 'x'
-      },
-      plugins: {
-        legend: {
-          display: false
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+        onHover: (_event, activeElements) => {
+          syncHoverFromPnl(activeElements || []);
         },
-        tooltip: {
-          backgroundColor: 'rgba(10,12,26,0.9)',
-          borderColor: 'rgba(255,255,255,0.15)',
-          borderWidth: 1,
-          titleColor: 'rgba(255,255,255,0.95)',
-          bodyColor: 'rgba(255,255,255,0.9)',
-          itemSort: (a, b) => {
-            const aY = Number(a.element?.y);
-            const bY = Number(b.element?.y);
-            if (Number.isFinite(aY) && Number.isFinite(bY)) return aY - bY;
-            return (Number(a.datasetIndex) || 0) - (Number(b.datasetIndex) || 0);
+        interaction: {
+          mode: 'index',
+          intersect: false,
+          axis: 'x'
+        },
+        plugins: {
+          legend: {
+            display: false
           },
-          callbacks: {
-            title: (items) => {
-              const item = items?.[0];
-              if (!item) return '';
-              return `${item.dataIndex + 1}月`;
+          tooltip: {
+            backgroundColor: 'rgba(10,12,26,0.9)',
+            borderColor: 'rgba(255,255,255,0.15)',
+            borderWidth: 1,
+            titleColor: 'rgba(255,255,255,0.95)',
+            bodyColor: 'rgba(255,255,255,0.9)',
+            itemSort: (a, b) => {
+              const aY = Number(a.element?.y);
+              const bY = Number(b.element?.y);
+              if (Number.isFinite(aY) && Number.isFinite(bY)) return aY - bY;
+              return (Number(a.datasetIndex) || 0) - (Number(b.datasetIndex) || 0);
             },
-            label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`,
-            afterBody: (items) => {
-              if (monthlyPnlView === 'total') return '';
-              const item = items?.[0];
-              if (!item) return '';
-              const idx = item.dataIndex;
-              if (idx == null) return '';
-              const totalPnL = (realizedData[idx] || 0) + (swapData[idx] || 0);
-              return `当月合計損益: ${fmtManDecimal(totalPnL)}`;
+            callbacks: {
+              title: (items) => {
+                const item = items?.[0];
+                if (!item) return '';
+                return `${item.dataIndex + 1}月`;
+              },
+              label: (ctx) => `${ctx.dataset.label}: ${fmtManDecimal(ctx.parsed.y)}`,
+              afterBody: (items) => {
+                if (monthlyPnlView === 'total') return '';
+                const item = items?.[0];
+                if (!item) return '';
+                const idx = item.dataIndex;
+                if (idx == null) return '';
+                const totalPnL = (realizedData[idx] || 0) + (swapData[idx] || 0);
+                return `当月合計損益: ${fmtManDecimal(totalPnL)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            stacked: monthlyPnlView === 'breakdown',
+            ticks: {
+              color: 'rgba(255,255,255,0.75)'
+            },
+            grid: {
+              color: 'rgba(255,255,255,0.08)',
+              drawBorder: false
+            }
+          },
+          y: {
+            stacked: monthlyPnlView === 'breakdown',
+            ticks: {
+              color: 'rgba(255,255,255,0.75)',
+              callback: (v) => fmtMan(v)
+            },
+            grid: {
+              color: 'rgba(255,255,255,0.1)',
+              drawBorder: false
             }
           }
         }
-      },
-      scales: {
-        x: {
-          stacked: monthlyPnlView === 'breakdown',
-          ticks: {
-            color: 'rgba(255,255,255,0.75)'
-          },
-          grid: {
-            color: 'rgba(255,255,255,0.08)',
-            drawBorder: false
-          }
-        },
-        y: {
-          stacked: monthlyPnlView === 'breakdown',
-          ticks: {
-            color: 'rgba(255,255,255,0.75)',
-            callback: (v) => fmtMan(v)
-          },
-          grid: {
-            color: 'rgba(255,255,255,0.1)',
-            drawBorder: false
-          }
-        }
       }
-    }
-  });
+    });
+  };
+
+  if (renderAssets) createAssetsChart();
+  if (renderPnl) createPnlChart();
 
   syncChartViewTabs();
 }
 
 function syncChartViewTabs() {
-  const assetBtn = document.getElementById('assetTrendAssetBtn');
-  const performanceBtn = document.getElementById('assetTrendPerformanceBtn');
-  const totalBtn = document.getElementById('monthlyPnlTotalBtn');
-  const breakdownBtn = document.getElementById('monthlyPnlBreakdownBtn');
-
-  if (assetBtn && performanceBtn) {
-    assetBtn.classList.toggle('active', assetTrendView === 'asset');
-    performanceBtn.classList.toggle('active', assetTrendView === 'performance');
-  }
-  if (totalBtn && breakdownBtn) {
-    totalBtn.classList.toggle('active', monthlyPnlView === 'total');
-    breakdownBtn.classList.toggle('active', monthlyPnlView === 'breakdown');
-  }
+  const assetSelect = document.getElementById('assetTrendViewSelect');
+  const monthlySelect = document.getElementById('monthlyPnlViewSelect');
+  if (assetSelect) assetSelect.value = assetTrendView;
+  if (monthlySelect) monthlySelect.value = monthlyPnlView;
 }
 
 function bindChartViewControls() {
-  const assetBtn = document.getElementById('assetTrendAssetBtn');
-  const performanceBtn = document.getElementById('assetTrendPerformanceBtn');
-  const totalBtn = document.getElementById('monthlyPnlTotalBtn');
-  const breakdownBtn = document.getElementById('monthlyPnlBreakdownBtn');
+  const assetSelect = document.getElementById('assetTrendViewSelect');
+  const monthlySelect = document.getElementById('monthlyPnlViewSelect');
 
-  if (assetBtn && assetBtn.dataset.bound !== '1') {
-    assetBtn.addEventListener('click', () => {
-      if (assetTrendView === 'asset') return;
-      assetTrendView = 'asset';
-      renderPerformanceChart();
+  if (assetSelect && assetSelect.dataset.bound !== '1') {
+    assetSelect.addEventListener('change', (event) => {
+      const nextView = event.target.value === 'performance' ? 'performance' : 'asset';
+      if (assetTrendView === nextView) return;
+      assetTrendView = nextView;
+      renderPerformanceChart({ renderAssets: true, renderPnl: false });
+      syncChartViewTabs();
     });
-    assetBtn.dataset.bound = '1';
+    assetSelect.dataset.bound = '1';
   }
 
-  if (performanceBtn && performanceBtn.dataset.bound !== '1') {
-    performanceBtn.addEventListener('click', () => {
-      if (assetTrendView === 'performance') return;
-      assetTrendView = 'performance';
-      renderPerformanceChart();
+  if (monthlySelect && monthlySelect.dataset.bound !== '1') {
+    monthlySelect.addEventListener('change', (event) => {
+      const nextView = event.target.value === 'total' ? 'total' : 'breakdown';
+      if (monthlyPnlView === nextView) return;
+      monthlyPnlView = nextView;
+      renderPerformanceChart({ renderAssets: false, renderPnl: true });
+      syncChartViewTabs();
     });
-    performanceBtn.dataset.bound = '1';
-  }
-
-  if (totalBtn && totalBtn.dataset.bound !== '1') {
-    totalBtn.addEventListener('click', () => {
-      if (monthlyPnlView === 'total') return;
-      monthlyPnlView = 'total';
-      renderPerformanceChart();
-    });
-    totalBtn.dataset.bound = '1';
-  }
-
-  if (breakdownBtn && breakdownBtn.dataset.bound !== '1') {
-    breakdownBtn.addEventListener('click', () => {
-      if (monthlyPnlView === 'breakdown') return;
-      monthlyPnlView = 'breakdown';
-      renderPerformanceChart();
-    });
-    breakdownBtn.dataset.bound = '1';
+    monthlySelect.dataset.bound = '1';
   }
 
   syncChartViewTabs();
