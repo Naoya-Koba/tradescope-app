@@ -917,6 +917,19 @@ function renderPerformanceChart(options = {}) {
           intersect: false,
           axis: 'x'
         },
+        animation: {
+          duration: 1800,
+          easing: 'easeInOutCubic',
+          delay: (ctx) => {
+            let delay = 0;
+            if (ctx.type === 'data') {
+              delay = ctx.dataIndex * 50 + ctx.datasetIndex * 100;
+            } else if (ctx.type !== 'none') {
+              delay = ctx.datasetIndex * 200;
+            }
+            return delay;
+          }
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -965,6 +978,19 @@ function renderPerformanceChart(options = {}) {
           mode: 'index',
           intersect: false,
           axis: 'x'
+        },
+        animation: {
+          duration: 1500,
+          easing: 'easeInOutQuad',
+          delay: (ctx) => {
+            let delay = 0;
+            if (ctx.type === 'data') {
+              delay = ctx.dataIndex * 40 + ctx.datasetIndex * 80;
+            } else if (ctx.type !== 'none') {
+              delay = ctx.datasetIndex * 150;
+            }
+            return delay;
+          }
         },
         plugins: {
           legend: {

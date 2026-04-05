@@ -20,6 +20,18 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+  <!-- Splash Screen Loader -->
+  <div id="splashScreen" class="splash-screen">
+    <div class="splash-container">
+      <svg class="splash-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>
+        <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>
+        <rect x="16" y="2" width="4" height="20" rx="1.5" fill="#3DA2FF"/>
+      </svg>
+      <h1 class="splash-title">TradeScope</h1>
+    </div>
+  </div>
+
   <header class="app-header glass-nav">
     <button id="menuButton" class="icon-btn menu-btn" aria-label="メニューを開く" aria-controls="drawer" aria-expanded="false">
       <span class="menu-btn-lines" aria-hidden="true">
@@ -523,6 +535,17 @@ backgroundColor: function(context) {
     },
     options: {
       maintainAspectRatio: false,
+      animation: {
+        duration: 2000,
+        easing: 'easeInOutCubic',
+        delay: (ctx) => {
+          let delay = 0;
+          if (ctx.type === 'data') {
+            delay = ctx.dataIndex * 60;
+          }
+          return delay;
+        }
+      },
       scales: {
         x: {
           ticks: { color: "rgba(255,255,255,0.7)" },
@@ -575,6 +598,17 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
-</script>
+// ===== Splash Screen Hidden After Load =====
+document.addEventListener('DOMContentLoaded', () => {
+  const splashScreen = document.getElementById('splashScreen');
+  // Show splash for 2.5 seconds then fade out
+  setTimeout(() => {
+    splashScreen?.classList.add('hide');
+    // Remove from DOM after fade out
+    setTimeout(() => {
+      splashScreen?.remove();
+    }, 800);
+  }, 2500);
+});</script>
 </body>
 </html>
