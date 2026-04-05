@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#121833" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TradeScope" />
+  <title>取引履歴 - TradeScope</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-100.png" />
+  <link rel="apple-touch-icon" href="assets/icon-100.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="history/history.css" />
+</head>
+<body>
+  <header class="app-header glass-nav">
+    <button id="menuButton" class="icon-btn menu-btn" aria-label="メニューを開く" aria-controls="drawer" aria-expanded="false">
+      <span class="menu-btn-lines" aria-hidden="true">
+        <span class="menu-btn-line"></span>
+        <span class="menu-btn-line"></span>
+        <span class="menu-btn-line"></span>
+      </span>
+    </button>
+    <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <rect x="2" y="10" width="4" height="12" rx="1.5" fill="#FF6B6B"/>
+      <rect x="9" y="6" width="4" height="16" rx="1.5" fill="#3EE08F"/>
+      <rect x="16" y="2" width="4" height="20" rx="1.5" fill="#3DA2FF"/>
+    </svg>
+    <h1 class="app-title">
+      <a class="brand-link" href="./index.html" aria-label="トップページへ移動">TradeScope</a>
+    </h1>
+  </header>
+
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-header-text">
+        <p class="drawer-kicker">NAVIGATION</p>
+        <h2 class="drawer-title">TradeScope Menu</h2>
+      </div>
+      <button id="drawerClose" class="icon-btn drawer-x" aria-label="閉じる">✕</button>
+    </div>
+
+    <nav class="drawer-nav" aria-label="主要メニュー">
+      <a href="./index.html" class="menu-item" data-order="0">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy">
+          <span class="menu-title">トップ</span>
+          <span class="menu-sub">Summary / Portfolio</span>
+        </span>
+      </a>
+      <a href="profit/soneki.html" class="menu-item" data-order="1">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy">
+          <span class="menu-title">損益管理</span>
+          <span class="menu-sub">Input / Annual Summary</span>
+        </span>
+      </a>
+      <a href="./history.html" class="menu-item active" data-order="2">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy">
+          <span class="menu-title">取引履歴</span>
+          <span class="menu-sub">History / Open Positions</span>
+        </span>
+      </a>
+    </nav>
+  </aside>
+  <div id="scrim" class="scrim" hidden></div>
+
+  <main class="container">
+    <h2 class="heading-muted">Trade History</h2>
+    <section class="section glass history-input-card">
+      <div class="form-grid">
+        <label class="form-group">
+          <span>日付</span>
+          <input id="entryDate" type="date" />
+        </label>
+        <label class="form-group">
+          <span>口座</span>
+          <select id="entryAccount"></select>
+        </label>
+        <label class="form-group">
+          <span>資産区分</span>
+          <select id="entryAssetType"></select>
+        </label>
+        <label class="form-group">
+          <span>通貨ペア / 銘柄</span>
+          <input id="entrySymbol" type="text" list="symbolHints" placeholder="例: USD/JPY, BTC/JPY" />
+          <datalist id="symbolHints"></datalist>
+        </label>
+        <label class="form-group">
+          <span>売買</span>
+          <select id="entrySide">
+            <option value="buy">買い</option>
+            <option value="sell">売り</option>
+          </select>
+        </label>
+        <label class="form-group">
+          <span>区分</span>
+          <select id="entryCategory"></select>
+        </label>
+        <label class="form-group">
+          <span>数量</span>
+          <input id="entryQuantity" type="number" min="0" step="0.0001" placeholder="0" />
+        </label>
+        <label class="form-group">
+          <span>レート</span>
+          <input id="entryRate" type="number" min="0" step="0.0001" placeholder="0" />
+        </label>
+        <label class="form-group">
+          <span>戦略区分</span>
+          <select id="entryStrategy"></select>
+        </label>
+        <label class="form-group form-group-wide">
+          <span>メモ</span>
+          <input id="entryMemo" type="text" placeholder="任意メモ" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="saveEntryBtn" class="btn btn-primary">追加</button>
+        <button id="exportHistoryBtn" class="btn btn-secondary" style="margin-left:8px">エクスポート</button>
+        <label class="btn btn-secondary" style="cursor:pointer;margin-left:8px">
+          インポート
+          <input type="file" id="importHistoryInput" accept=".json" style="display:none" />
+        </label>
+      </div>
+    </section>
+
+    <h2 class="heading-muted">Open Positions</h2>
+    <section class="section glass">
+      <div id="openPositionsSummary" class="open-summary">保有建玉を集計中...</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>口座</th>
+              <th>通貨ペア</th>
+              <th>方向</th>
+              <th>数量</th>
+              <th>平均レート</th>
+            </tr>
+          </thead>
+          <tbody id="openPositionsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <h2 class="heading-muted">History List</h2>
+    <section class="section glass">
+      <div class="filters-grid">
+        <label class="filter-item"><span>口座</span><select id="filterAccount"></select></label>
+        <label class="filter-item"><span>通貨ペア</span><select id="filterSymbol"></select></label>
+        <label class="filter-item"><span>戦略区分</span><select id="filterStrategy"></select></label>
+        <label class="filter-item"><span>区分</span><select id="filterCategory"></select></label>
+        <label class="filter-item"><span>並び順</span><select id="sortOrder"><option value="newest">新しい順</option><option value="oldest">古い順</option></select></label>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>口座</th>
+              <th>資産</th>
+              <th>通貨ペア</th>
+              <th>売買</th>
+              <th>区分</th>
+              <th>数量</th>
+              <th>レート</th>
+              <th>戦略</th>
+              <th>メモ</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/app-gestures.js"></script>
+  <script src="assets/trade-history-core.js"></script>
+  <script src="history/history.js"></script>
+  <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch(() => {
+        // SW登録失敗時は通常のWebとして継続
+      });
+    });
+  }
+  </script>
+</body>
+</html>

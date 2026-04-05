@@ -357,6 +357,79 @@ body::before {
   color: var(--neutral);
 }
 
+.risk-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.risk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.risk-header-label {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.risk-total-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .2px;
+  text-align: right;
+  color: var(--muted);
+}
+
+.risk-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.risk-rows {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(255,255,255,.1);
+  margin-top: 4px;
+}
+
+.risk-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  gap: 8px;
+}
+
+.risk-row-label {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.risk-row-value {
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.risk-row:last-child {
+  border-bottom: none;
+}
+
 /* ============================
    スワップカード
 ============================ */
@@ -832,6 +905,10 @@ body.drawer-open {
   }
   .swap-card {
     grid-template-columns: 1fr;
+  }
+
+  .risk-row {
+    flex-wrap: wrap;
   }
 }
 

@@ -62,28 +62,28 @@
           <span class="menu-sub">Input / Annual Summary</span>
         </span>
       </a>
+      <a href="./history.html" class="menu-item" data-order="2">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy">
+          <span class="menu-title">取引履歴</span>
+          <span class="menu-sub">History / Open Positions</span>
+        </span>
+      </a>
     </nav>
 
     <div class="drawer-segment-label">準備中</div>
     <nav class="drawer-nav" aria-label="準備中メニュー">
-      <a href="tenkan/tenkan.html" class="menu-item is-coming" data-order="2" aria-disabled="true" tabindex="-1">
+      <a href="tenkan/tenkan.html" class="menu-item is-coming" data-order="3" aria-disabled="true" tabindex="-1">
         <span class="menu-mark">○</span>
         <span class="menu-copy">
           <span class="menu-title">転換シグナル <span class="menu-badge">準備中</span></span>
           <span class="menu-sub">Coming Soon</span>
         </span>
       </a>
-      <a href="./oshime.html" class="menu-item is-coming" data-order="3" aria-disabled="true" tabindex="-1">
+      <a href="./oshime.html" class="menu-item is-coming" data-order="4" aria-disabled="true" tabindex="-1">
         <span class="menu-mark">○</span>
         <span class="menu-copy">
           <span class="menu-title">押し/戻り <span class="menu-badge">準備中</span></span>
-          <span class="menu-sub">Coming Soon</span>
-        </span>
-      </a>
-      <a href="./history.html" class="menu-item is-coming" data-order="4" aria-disabled="true" tabindex="-1">
-        <span class="menu-mark">○</span>
-        <span class="menu-copy">
-          <span class="menu-title">取引履歴 <span class="menu-badge">準備中</span></span>
           <span class="menu-sub">Coming Soon</span>
         </span>
       </a>
@@ -188,6 +188,30 @@
       </div>
     </section>
 
+    <!-- ===== Risk Section ===== -->
+    <h2 class="heading-muted">Risk</h2>
+    <section class="section glass risk-section" aria-label="リスクセクション">
+      <div class="risk-header">
+        <span class="risk-header-label">最大損失想定額</span>
+        <span id="riskMaxLoss" class="risk-total-value negative">-¥0</span>
+      </div>
+      <p id="riskNote" class="risk-note">-</p>
+      <div class="risk-rows">
+        <div class="risk-row">
+          <span class="risk-row-label">FX（主要キャリー）1円時損失想定額</span>
+          <span id="riskFxOne" class="risk-row-value negative">-¥0</span>
+        </div>
+        <div class="risk-row">
+          <span class="risk-row-label">FX（主要キャリー）0円時損失想定額</span>
+          <span id="riskFxZero" class="risk-row-value negative">-¥0</span>
+        </div>
+        <div class="risk-row">
+          <span class="risk-row-label">暗号資産0円時損失想定額</span>
+          <span id="riskCryptoZero" class="risk-row-value negative">-¥0</span>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== News Section ===== -->
     <h2 class="heading-muted">News</h2>
     <section class="section glass">
@@ -217,8 +241,8 @@
       </div>
     </section>
 
-    <!-- ===== Position & Risk ===== -->
-   <h2 class="heading-muted">Position & Risk</h2>
+    <!-- ===== Position ===== -->
+     <h2 class="heading-muted">Position</h2>
 <section class="section">
  <ul id="pairList" class="sortable-list glass">
   <li class="pair-card" data-pair="USDJPY">
@@ -393,6 +417,19 @@
       </div>
     </section>
 
+    <!-- ===== Backup ===== -->
+    <h2 class="heading-muted">Backup</h2>
+    <section class="section glass margin-bottom">
+      <p class="section-description">損益管理と取引履歴のデータをまとめてバックアップ・復元できます。<br/>iOSアプリ再インストール前には必ずエクスポートしてください。</p>
+      <div class="form-actions" style="margin-top:12px;justify-content:center">
+        <button class="btn btn-secondary" id="exportAllDataBtn">エクスポート</button>
+        <label class="btn btn-secondary" style="cursor:pointer">
+          インポート
+          <input type="file" id="importAllDataInput" accept=".json" style="display:none" />
+        </label>
+      </div>
+    </section>
+
     <!-- ===== Memo ===== -->
     <h2 class="heading-muted">Memo</h2>
     <div class="memo-section">
@@ -421,6 +458,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="assets/app-gestures.js"></script>
   <script src="assets/profit-metrics.js"></script>
+  <script src="assets/trade-history-core.js"></script>
   <script src="top/script.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

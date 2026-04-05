@@ -205,6 +205,7 @@ const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
 const profitMetrics = window.TradeScopeProfitMetrics;
+const historyCore = window.TradeScopeHistory;
 const LINKED_ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
   { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
@@ -469,6 +470,50 @@ function buildPortfolioAllocationFromAccounts(accounts) {
 }
 
 let portfolioData = buildPortfolioAllocationFromAccounts(accountData);
+
+function updateRiskSection() {
+  const maxEl = document.getElementById('riskMaxLoss');
+  const fxOneEl = document.getElementById('riskFxOne');
+  const fxZeroEl = document.getElementById('riskFxZero');
+  const cryptoZeroEl = document.getElementById('riskCryptoZero');
+  const noteEl = document.getElementById('riskNote');
+  if (!maxEl || !fxOneEl || !fxZeroEl || !cryptoZeroEl) return;
+
+  if (!historyCore?.calculateRiskSummary || !historyCore?.parseEntries) {
+    [maxEl, fxOneEl, fxZeroEl, cryptoZeroEl].forEach((el) => { el.textContent = '-'; });
+    return;
+  }
+
+  const entries = historyCore.parseEntries();
+  const cryptoValue = accountData.find((item) => item.label === 'SBI VC')?.amount || 0;
+  const riskSummary = historyCore.calculateRiskSummary(entries, cryptoValue);
+
+  const fxOneDisplayLoss = (riskSummary.fxOneYenLoss || 0) + (riskSummary.fxHufPointOneLoss || 0);
+
+  maxEl.textContent = fmtJPY(-riskSummary.maxLoss);
+  fxOneEl.textContent = fmtJPY(-fxOneDisplayLoss);
+  fxZeroEl.textContent = fmtJPY(-riskSummary.fxZeroYenLoss);
+  cryptoZeroEl.textContent = fmtJPY(-riskSummary.cryptoZeroYenLoss);
+
+  setSignClass(maxEl, -Math.abs(riskSummary.maxLoss || 0));
+  setSignClass(fxOneEl, -Math.abs(fxOneDisplayLoss || 0));
+  setSignClass(fxZeroEl, -Math.abs(riskSummary.fxZeroYenLoss || 0));
+  setSignClass(cryptoZeroEl, -Math.abs(riskSummary.cryptoZeroYenLoss || 0));
+
+  // 動的ノート: 現在保有中のキャリーと暗号資産を表示
+  if (noteEl) {
+    const carryTags = (riskSummary.activeCarrySymbols || []).map((s) => `【${s}】`).join('');
+    let cryptoTag = '';
+    if (cryptoValue > 0) {
+      const cryptoSymbols = riskSummary.activeCryptoSymbols || [];
+      cryptoTag = cryptoSymbols.length
+        ? cryptoSymbols.map((s) => `【${s}】`).join('')
+        : '【暗号資産（SBI VC）】';
+    }
+    const parts = [carryTags, cryptoTag].filter(Boolean).join('＋');
+    noteEl.textContent = parts ? `0円時想定: ${parts}` : '0円時想定（建玉未入力）';
+  }
+}
 
 // ===== KPI =====
 function updateKPIs() {
@@ -1230,9 +1275,99 @@ function updateDataByYear(inputYear = null) {
   accountData = topSeries.accountData?.length ? topSeries.accountData : [];
   portfolioData = buildPortfolioAllocationFromAccounts(accountData);
   renderPortfolio();
+  updateRiskSection();
 
   renderPerformanceChart();
 }
+
+// ===== Unified Backup: Export / Import All Data =====
+function exportAllData() {
+  if (!historyCore?.parseEntries) {
+    alert('データの読み込みに失敗しました。');
+    return;
+  }
+
+  const profitPayload = {
+    tradingData,
+    yearInitialFunds,
+    yearInitialUnrealized
+  };
+
+  const historyEntries = historyCore.parseEntries();
+
+  const payload = {
+    tradescope: 'all-backup',
+    exportedAt: new Date().toISOString(),
+    profitData: profitPayload,
+    historyData: { entries: historyEntries }
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `tradescope-all-backup-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importAllData(file) {
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      
+      if (parsed.tradescope !== 'all-backup') {
+        alert('ファイル形式が正しくありません。TradeScope の統合バックアップファイルを選択してください。');
+        return;
+      }
+
+      if (!confirm('現在のデータをインポートデータで上書きします。よろしいですか？')) return;
+
+      const { profitData, historyData } = parsed;
+
+      // Import profit data
+      if (profitData?.tradingData && profitData?.yearInitialFunds) {
+        tradingData = profitData.tradingData;
+        yearInitialFunds = profitData.yearInitialFunds;
+        yearInitialUnrealized = profitData.yearInitialUnrealized || {};
+        localStorage.setItem(PROFIT_STORAGE_KEY_TRADING, JSON.stringify(tradingData));
+        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL, JSON.stringify(yearInitialFunds));
+        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, JSON.stringify(yearInitialUnrealized));
+      }
+
+      // Import history data
+      if (historyData?.entries && historyCore?.saveEntries) {
+        historyCore.saveEntries(historyData.entries);
+      }
+
+      updateDataByYear();
+      updateRiskSection();
+
+      alert('インポートが完了しました。');
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('ファイルの読み込みに失敗しました。');
+    }
+  };
+  reader.readAsText(file);
+}
+
+window.addEventListener('storage', (event) => {
+  if (!historyCore?.STORAGE_KEY) return;
+  if (event.key !== historyCore.STORAGE_KEY) return;
+  updateRiskSection();
+});
+
+// Backup button listeners
+document.getElementById('exportAllDataBtn')?.addEventListener('click', exportAllData);
+document.getElementById('importAllDataInput')?.addEventListener('change', (e) => {
+  importAllData(e.target.files[0]);
+  e.target.value = '';
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeYearSelector);

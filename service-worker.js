@@ -1,11 +1,15 @@
-const CACHE_NAME = "tradescope-static-v84";
+const CACHE_NAME = "tradescope-static-v87";
 const CORE_ASSETS = [
   "./",
   "./index.html",
+  "./history.html",
   "./manifest.webmanifest",
   "./assets/app-gestures.js",
+  "./assets/trade-history-core.js",
   "./top/style.css",
   "./top/script.js",
+  "./history/history.css",
+  "./history/history.js",
   "./profit/soneki.html",
   "./profit/soneki.css",
   "./profit/soneki.js",
