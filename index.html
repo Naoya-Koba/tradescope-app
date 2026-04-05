@@ -107,10 +107,39 @@
 
   <main class="container">
 
+    <!-- ===== News Section ===== -->
+    <h2 class="heading-muted">News</h2>
+    <section class="section glass news-section">
+      <div class="news-block">
+        <div class="news-head">
+          <span class="news-label">トピックス</span>
+        </div>
+        <div class="ticker">
+          <div id="globalTickerTrack" class="ticker-track"></div>
+        </div>
+      </div>
+
+      <div class="country-news">
+        <div class="country-news-head">
+          <span class="news-label">国別</span>
+          <select id="countrySelect" class="select">
+            <option value="USD">USD</option><option value="JPY">JPY</option>
+            <option value="EUR">EUR</option><option value="GBP">GBP</option>
+            <option value="AUD">AUD</option><option value="NZD">NZD</option>
+            <option value="CHF">CHF</option><option value="CAD">CAD</option>
+            <option value="TRY">TRY</option><option value="MXN">MXN</option>
+          </select>
+        </div>
+        <div class="ticker">
+          <div id="countryTickerTrack" class="ticker-track"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== Summary Section ===== -->
     <div class="summary-header">
       <h2 class="heading-muted">Summary</h2>
-      <select id="topYearSelect" class="year-selector">
+      <select id="topYearSelect" class="year-chip">
         <option value="">読込中...</option>
       </select>
     </div>
@@ -208,35 +237,6 @@
         <div class="risk-row">
           <span class="risk-row-label">暗号資産0円時損失想定額</span>
           <span id="riskCryptoZero" class="risk-row-value negative">-¥0</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===== News Section ===== -->
-    <h2 class="heading-muted">News</h2>
-    <section class="section glass">
-      <div class="news-block">
-        <div class="news-head">
-          <span class="news-label">トピックス</span>
-        </div>
-        <div class="ticker">
-          <div id="globalTickerTrack" class="ticker-track"></div>
-        </div>
-      </div>
-
-      <div class="country-news">
-        <div class="country-news-head">
-          <span class="news-label">国別</span>
-          <select id="countrySelect" class="select">
-            <option value="USD">USD</option><option value="JPY">JPY</option>
-            <option value="EUR">EUR</option><option value="GBP">GBP</option>
-            <option value="AUD">AUD</option><option value="NZD">NZD</option>
-            <option value="CHF">CHF</option><option value="CAD">CAD</option>
-            <option value="TRY">TRY</option><option value="MXN">MXN</option>
-          </select>
-        </div>
-        <div class="ticker">
-          <div id="countryTickerTrack" class="ticker-track"></div>
         </div>
       </div>
     </section>
