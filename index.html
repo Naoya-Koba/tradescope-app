@@ -670,10 +670,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   window.setTimeout(() => {
+    bootTopPage();
     splashScreen?.classList.add('hide');
     window.setTimeout(() => {
       splashScreen?.remove();
-      bootTopPage();
     }, splashFadeMs);
   }, splashDisplayMs);
 });</script>
