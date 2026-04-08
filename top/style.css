@@ -935,20 +935,6 @@ body.drawer-open {
     grid-template-columns: 1fr;
   }
 
-  .risk-grid-two {
-    grid-template-columns: 1fr;
-  }
-
-  .risk-grid-two .risk-cell:first-child {
-    padding: 0 0 12px;
-    border-bottom: 1px solid rgba(255,255,255,.12);
-  }
-
-  .risk-grid-two .risk-cell:last-child {
-    padding: 12px 0 0;
-    border-left: none;
-  }
-
   .risk-header {
     align-items: flex-start;
     flex-direction: column;
@@ -967,6 +953,18 @@ body.drawer-open {
 
   .risk-row-value {
     font-size: 16px;
+  }
+
+  .risk-grid-two {
+    gap: 10px;
+  }
+
+  .risk-grid-two .risk-cell:first-child {
+    padding-right: 12px;
+  }
+
+  .risk-grid-two .risk-cell:last-child {
+    padding-left: 12px;
   }
 }
 

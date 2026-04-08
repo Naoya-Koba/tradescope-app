@@ -500,7 +500,7 @@ function updateRiskSection() {
   cryptoZeroEl.textContent = fmtJPY(cryptoZeroLoss);
 
   if (noteEl) {
-    noteEl.textContent = cryptoValue > 0 ? '0円時想定 FX + 暗号資産' : '0円時想定 FX';
+    noteEl.textContent = 'FX＋暗号資産 0円時';
   }
 }
 
