@@ -758,6 +758,8 @@ body::before {
 }
 
 .backup-section .form-actions {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
 }
 

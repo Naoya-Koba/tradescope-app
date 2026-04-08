@@ -569,6 +569,8 @@ body.drawer-open {
 }
 
 .backup-section .form-actions {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
 }
 
@@ -1807,6 +1809,12 @@ body.drawer-open {
   .form-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .backup-section .form-actions {
+    display: flex;
+    grid-template-columns: none;
+    justify-content: center;
   }
   .account-input-grid {
     grid-template-columns: 1fr;

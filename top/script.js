@@ -1335,7 +1335,7 @@ function updateDataByYear(inputYear = null) {
 }
 
 // ===== Unified Backup: Export / Import All Data =====
-function exportAllData() {
+async function exportAllData() {
   if (!historyCore?.parseEntries) {
     alert('データの読み込みに失敗しました。');
     return;
@@ -1356,12 +1356,36 @@ function exportAllData() {
     historyData: { entries: historyEntries }
   };
 
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const jsonText = JSON.stringify(payload, null, 2);
+  const blob = new Blob([jsonText], { type: 'application/json' });
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fileName = `tradescope-all-backup-${dateStr}.json`;
+
+  // iOS Safari/PWAではdownload属性が効かない場合があるため、共有シートを優先する
+  try {
+    if (navigator.share && navigator.canShare && typeof File !== 'undefined') {
+      const file = new File([blob], fileName, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'TradeScope Backup',
+          files: [file]
+        });
+        return;
+      }
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return;
+    }
+    console.warn('Share export fallback:', error);
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const dateStr = new Date().toISOString().slice(0, 10);
   a.href = url;
-  a.download = `tradescope-all-backup-${dateStr}.json`;
+  a.download = fileName;
+  a.target = '_blank';
+  a.rel = 'noopener';
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
