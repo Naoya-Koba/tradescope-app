@@ -16,6 +16,34 @@ const setSignClass = (el, val) => {
   el.classList.add(val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral');
 };
 
+const LASER_REVEAL_PLUGIN_ID = 'laserReveal';
+
+if (typeof Chart !== 'undefined' && !window.__tradeScopeLaserRevealRegistered) {
+  Chart.register({
+    id: LASER_REVEAL_PLUGIN_ID,
+    beforeDatasetsDraw(chart, _args, options) {
+      if (!options?.enabled) return;
+      const area = chart.chartArea;
+      if (!area) return;
+
+      const progress = Math.max(0, Math.min(1, Number(chart.$laserRevealProgress ?? 1)));
+      const revealX = area.left + (area.right - area.left) * progress;
+
+      chart.ctx.save();
+      chart.ctx.beginPath();
+      chart.ctx.rect(area.left, area.top, Math.max(0, revealX - area.left), area.bottom - area.top);
+      chart.ctx.clip();
+      chart.$laserClipActive = true;
+    },
+    afterDatasetsDraw(chart, _args, options) {
+      if (!options?.enabled || !chart.$laserClipActive) return;
+      chart.ctx.restore();
+      chart.$laserClipActive = false;
+    }
+  });
+  window.__tradeScopeLaserRevealRegistered = true;
+}
+
 // ===== Memo Box =====
 const memoList = document.getElementById('memoList');
 const addMemoBtn = document.getElementById('addMemoBtn');
@@ -953,33 +981,19 @@ function renderPerformanceChart() {
       maintainAspectRatio: false,
       responsive: true,
       animation: {
-        x: {
-          type: 'number',
-          easing: 'linear',
-          duration: 460,
-          from: (ctx) => {
-            if (ctx.type !== 'data') return undefined;
-            return ctx.chart.scales.x.getPixelForValue(0);
-          },
-          delay: (ctx) => {
-            if (ctx.type !== 'data') return 0;
-            return ctx.dataIndex * 52 + ctx.datasetIndex * 30;
-          }
+        duration: 900,
+        easing: 'linear',
+        onProgress: (ctx) => {
+          const steps = ctx.numSteps || 1;
+          const current = ctx.currentStep || 0;
+          ctx.chart.$laserRevealProgress = Math.max(0, Math.min(1, current / steps));
         },
-        y: {
-          type: 'number',
-          easing: 'linear',
-          duration: 0,
-          from: (ctx) => {
-            if (ctx.type !== 'data') return undefined;
-            const meta = ctx.chart.getDatasetMeta(ctx.datasetIndex);
-            const previous = meta?.data?.[ctx.index - 1];
-            if (previous) return previous.y;
-            return meta?.data?.[ctx.index]?.y;
-          }
+        onComplete: (ctx) => {
+          ctx.chart.$laserRevealProgress = 1;
         }
       },
       plugins: {
+        laserReveal: { enabled: true },
         legend: { display: false },
         tooltip: {
           callbacks: {
