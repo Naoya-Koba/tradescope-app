@@ -57,6 +57,28 @@ if (typeof Chart !== 'undefined' && !window.__tradeScopeLaserRevealRegistered) {
   window.__tradeScopeLaserRevealRegistered = true;
 }
 
+function playLaserReveal(chart, duration = 900) {
+  if (!chart) return;
+  if (chart.$laserRevealRaf) cancelAnimationFrame(chart.$laserRevealRaf);
+
+  const start = performance.now();
+  chart.$laserRevealProgress = 0;
+
+  const step = (now) => {
+    const progress = Math.max(0, Math.min(1, (now - start) / duration));
+    chart.$laserRevealProgress = progress;
+    chart.draw();
+
+    if (progress < 1) {
+      chart.$laserRevealRaf = requestAnimationFrame(step);
+    } else {
+      chart.$laserRevealRaf = null;
+    }
+  };
+
+  chart.$laserRevealRaf = requestAnimationFrame(step);
+}
+
 const ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
   { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
@@ -945,18 +967,7 @@ function renderPerformanceChart(options = {}) {
           intersect: false,
           axis: 'x'
         },
-        animation: {
-          duration: 900,
-          easing: 'linear',
-          onProgress: (ctx) => {
-            const steps = ctx.numSteps || 1;
-            const current = ctx.currentStep || 0;
-            ctx.chart.$laserRevealProgress = Math.max(0, Math.min(1, current / steps));
-          },
-          onComplete: (ctx) => {
-            ctx.chart.$laserRevealProgress = 1;
-          }
-        },
+        animation: false,
         plugins: {
           laserReveal: { enabled: true },
           legend: { display: false },
@@ -986,6 +997,9 @@ function renderPerformanceChart(options = {}) {
         }
       }
     });
+
+    const isMobile = window.matchMedia('(max-width: 480px)').matches;
+    playLaserReveal(assetsTrendChart, isMobile ? 760 : 900);
   };
 
   const createPnlChart = () => {
@@ -1279,6 +1293,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
     const accountTotal = (data.realizedPnL || 0) + (data.swapPnL || 0);
     const accountCashflow = (data.deposit || 0) - (data.withdrawal || 0);
     const netAssets = calculateAccountNetAssets(currentYear, month, account.key);
+    const hideSwapRow = account.key === 'sbi' || account.key === 'sbivc';
 
     if (account.bankOnly) {
       return `
@@ -1317,7 +1332,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
           <div class="detail-account-total" style="color:${colorBySign(accountTotal)}">${fmtJPY(accountTotal)}</div>
           <div class="detail-account-stats">
             <div class="item"><span class="k">決済</span><span class="v" style="color:${colorBySign(data.realizedPnL || 0)}">${fmtJPY(data.realizedPnL || 0)}</span></div>
-            <div class="item"><span class="k">スワップ</span><span class="v" style="color:${colorBySign(data.swapPnL || 0)}">${fmtJPY(data.swapPnL || 0)}</span></div>
+            ${hideSwapRow ? '' : `<div class="item"><span class="k">スワップ</span><span class="v" style="color:${colorBySign(data.swapPnL || 0)}">${fmtJPY(data.swapPnL || 0)}</span></div>`}
             <div class="item"><span class="k">評価損益</span><span class="v" style="color:${colorBySign(data.unrealizedPnL || 0)}">${fmtJPY(data.unrealizedPnL || 0)}</span></div>
           </div>
         </div>

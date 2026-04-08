@@ -44,6 +44,28 @@ if (typeof Chart !== 'undefined' && !window.__tradeScopeLaserRevealRegistered) {
   window.__tradeScopeLaserRevealRegistered = true;
 }
 
+function playLaserReveal(chart, duration = 900) {
+  if (!chart) return;
+  if (chart.$laserRevealRaf) cancelAnimationFrame(chart.$laserRevealRaf);
+
+  const start = performance.now();
+  chart.$laserRevealProgress = 0;
+
+  const step = (now) => {
+    const progress = Math.max(0, Math.min(1, (now - start) / duration));
+    chart.$laserRevealProgress = progress;
+    chart.draw();
+
+    if (progress < 1) {
+      chart.$laserRevealRaf = requestAnimationFrame(step);
+    } else {
+      chart.$laserRevealRaf = null;
+    }
+  };
+
+  chart.$laserRevealRaf = requestAnimationFrame(step);
+}
+
 // ===== Memo Box =====
 const memoList = document.getElementById('memoList');
 const addMemoBtn = document.getElementById('addMemoBtn');
@@ -980,18 +1002,7 @@ function renderPerformanceChart() {
     options: {
       maintainAspectRatio: false,
       responsive: true,
-      animation: {
-        duration: 900,
-        easing: 'linear',
-        onProgress: (ctx) => {
-          const steps = ctx.numSteps || 1;
-          const current = ctx.currentStep || 0;
-          ctx.chart.$laserRevealProgress = Math.max(0, Math.min(1, current / steps));
-        },
-        onComplete: (ctx) => {
-          ctx.chart.$laserRevealProgress = 1;
-        }
-      },
+      animation: false,
       plugins: {
         laserReveal: { enabled: true },
         legend: { display: false },
@@ -1017,6 +1028,8 @@ function renderPerformanceChart() {
       }
     }
   });
+
+  playLaserReveal(perfChart, isMobile ? 760 : 900);
 }
 
 function syncTopAssetTrendTabs() {
