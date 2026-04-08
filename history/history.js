@@ -21,6 +21,11 @@ const scrim = document.getElementById('scrim');
 const menuButton = document.getElementById('menuButton');
 const drawerClose = document.getElementById('drawerClose');
 
+drawer?.querySelectorAll('.menu-item').forEach((item, idx) => {
+  const order = item.dataset.order || idx;
+  item.style.setProperty('--menu-order', String(order));
+});
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')

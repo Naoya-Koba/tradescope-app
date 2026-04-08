@@ -56,7 +56,7 @@
         <p class="drawer-kicker">NAVIGATION</p>
         <h2 class="drawer-title">TradeScope Menu</h2>
       </div>
-      <button id="drawerClose" class="icon-btn drawer-x" aria-label="閉じる">✕</button>
+      <button id="drawerClose" class="icon-btn drawer-x" aria-label="閉じる">✕</button> 
     </div>
 
     <nav class="drawer-nav" aria-label="主要メニュー">
@@ -471,11 +471,15 @@
   <script src="assets/app-gestures.js"></script>
   <script src="assets/profit-metrics.js"></script>
   <script src="assets/trade-history-core.js"></script>
-  <script src="top/script.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  const ctx = document.getElementById("detailChart").getContext("2d");
+function initializeDetailChart() {
+  if (window.__tradeScopeDetailChartInitialized) return;
+  const detailChartCanvas = document.getElementById("detailChart");
+  if (!detailChartCanvas || typeof Chart === 'undefined') return;
+  const ctx = detailChartCanvas.getContext("2d");
+  if (!ctx || typeof Chart === 'undefined') return;
+  window.__tradeScopeDetailChartInitialized = true;
 
   // ▼ ダミーデータ例（月別）
   const labels = ["7月","8月","9月","10月","11月","12月"];
@@ -588,7 +592,7 @@ callback: (val) => val.toLocaleString(),
       chart.update();
     });
   });
-});
+}
 </script>
 <script>
 if ("serviceWorker" in navigator) {
@@ -598,17 +602,80 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
-// ===== Splash Screen Hidden After Load =====
+// ===== Top Boot Sequence =====
 document.addEventListener('DOMContentLoaded', () => {
   const splashScreen = document.getElementById('splashScreen');
-  // Show splash for 2.5 seconds then fade out
-  setTimeout(() => {
+  const splashSeenKey = 'tradeScopeTopSplashSeen';
+  const splashDisplayMs = 2500;
+  const splashFadeMs = 420;
+  let topScriptPromise = null;
+
+  const loadTopScript = () => {
+    if (topScriptPromise) return topScriptPromise;
+
+    topScriptPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector('script[data-tradescope-top-script="true"]');
+      if (existingScript) {
+        if (existingScript.dataset.loaded === 'true') {
+          resolve();
+          return;
+        }
+        existingScript.addEventListener('load', () => resolve(), { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('top-script-load-failed')), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'top/script.js';
+      script.dataset.tradescopeTopScript = 'true';
+      script.addEventListener('load', () => {
+        script.dataset.loaded = 'true';
+        resolve();
+      }, { once: true });
+      script.addEventListener('error', () => reject(new Error('top-script-load-failed')), { once: true });
+      document.body.appendChild(script);
+    });
+
+    return topScriptPromise;
+  };
+
+  const bootTopPage = () => {
+    loadTopScript()
+      .then(() => {
+        initializeDetailChart();
+      })
+      .catch(() => {
+        initializeDetailChart();
+      });
+  };
+
+  const hasSeenSplashThisSession = (() => {
+    try {
+      return sessionStorage.getItem(splashSeenKey) === '1';
+    } catch {
+      return false;
+    }
+  })();
+
+  if (hasSeenSplashThisSession) {
+    splashScreen?.remove();
+    bootTopPage();
+    return;
+  }
+
+  try {
+    sessionStorage.setItem(splashSeenKey, '1');
+  } catch {
+    // sessionStorageが使えない場合は毎回表示
+  }
+
+  window.setTimeout(() => {
     splashScreen?.classList.add('hide');
-    // Remove from DOM after fade out
-    setTimeout(() => {
+    window.setTimeout(() => {
       splashScreen?.remove();
-    }, 800);
-  }, 2500);
+      bootTopPage();
+    }, splashFadeMs);
+  }, splashDisplayMs);
 });</script>
 </body>
 </html>

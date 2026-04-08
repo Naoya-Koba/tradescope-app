@@ -2041,7 +2041,7 @@ body.drawer-open {
   align-items: center;
   justify-content: center;
   opacity: 1;
-  transition: opacity 0.8s ease-out;
+  transition: opacity 0.42s ease-out;
   pointer-events: all;
 }
 

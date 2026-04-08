@@ -2,6 +2,7 @@
   const EDGE_ZONE_PX = 32;
   const HORIZONTAL_TRIGGER_PX = 10;
   const HORIZONTAL_PRIORITY = 1.02;
+  const INTERACTIVE_TARGET_SELECTOR = 'button, a, input, select, textarea, label, summary, [role="button"], [role="link"], .menu-btn, .icon-btn';
   let edgeSwipe = null;
 
   document.documentElement.style.overscrollBehaviorX = 'none';
@@ -11,6 +12,10 @@
 
   function resetEdgeSwipe() {
     edgeSwipe = null;
+  }
+
+  function isInteractiveTarget(target) {
+    return target instanceof Element && Boolean(target.closest(INTERACTIVE_TARGET_SELECTOR));
   }
 
   document.addEventListener('touchstart', (event) => {
@@ -29,7 +34,10 @@
       return;
     }
 
-    event.preventDefault();
+    if (isInteractiveTarget(event.target)) {
+      resetEdgeSwipe();
+      return;
+    }
 
     edgeSwipe = {
       startX: touch.clientX,
