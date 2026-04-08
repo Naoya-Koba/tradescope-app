@@ -935,6 +935,16 @@ body.drawer-open {
     grid-template-columns: 1fr;
   }
 
+  .risk-grid-two {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 0 !important;
+  }
+
+  .risk-grid-two > .risk-cell {
+    width: auto;
+  }
+
   .risk-header {
     align-items: flex-start;
     flex-direction: column;
@@ -956,7 +966,9 @@ body.drawer-open {
   }
 
   .risk-grid-two {
-    gap: 10px;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 0 !important;
   }
 
   .risk-grid-two .risk-cell:first-child {
