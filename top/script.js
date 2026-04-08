@@ -66,6 +66,8 @@ function playLaserReveal(chart, duration = 900) {
   chart.$laserRevealRaf = requestAnimationFrame(step);
 }
 
+const TOP_BASE_YEAR = 2025;
+
 // ===== Memo Box =====
 const memoList = document.getElementById('memoList');
 const addMemoBtn = document.getElementById('addMemoBtn');
@@ -1029,7 +1031,7 @@ function renderPerformanceChart() {
     }
   });
 
-  playLaserReveal(perfChart, isMobile ? 760 : 900);
+  playLaserReveal(perfChart, isMobile ? 1520 : 1800);
 }
 
 function syncTopAssetTrendTabs() {
@@ -1268,20 +1270,29 @@ function resolveTopSeriesForYear(selectedYear) {
 
 function initializeYearSelector() {
   const tradingDataMap = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  let years = getNumericYears(tradingDataMap);
   const yearSelect = document.getElementById('topYearSelect');
 
   if (!yearSelect) return;
 
   const persistedYear = getPersistedSelectedYear();
+  const years = (() => {
+    const set = new Set([TOP_BASE_YEAR]);
+    getNumericYears(tradingDataMap)
+      .filter((year) => year >= TOP_BASE_YEAR)
+      .forEach((year) => set.add(year));
 
-  if (years.length === 0) {
-    years = [2025];
-  }
+    if (persistedYear && persistedYear >= TOP_BASE_YEAR) set.add(persistedYear);
 
-  if (persistedYear && !years.includes(persistedYear)) {
-    years = [...years, persistedYear].sort((a, b) => a - b);
-  }
+    let maxYear = Math.max(...set);
+    while (true) {
+      const yearData = tradingDataMap?.[maxYear] || tradingDataMap?.[String(maxYear)] || {};
+      if (!hasMeaningfulMonthData(yearData, 12)) break;
+      maxYear += 1;
+      set.add(maxYear);
+    }
+
+    return [...set].sort((a, b) => b - a);
+  })();
 
   yearSelect.innerHTML = years.map(year => 
     `<option value="${year}">${year}</option>`
@@ -1289,7 +1300,7 @@ function initializeYearSelector() {
 
   const defaultYear = persistedYear && years.includes(persistedYear)
     ? persistedYear
-    : years[years.length - 1];
+    : years[0];
 
   yearSelect.value = String(defaultYear);
   updateDataByYear(defaultYear);

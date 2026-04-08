@@ -397,6 +397,7 @@ const STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const STORAGE_KEY_SKIP_DEMO = 'profitSkipDemoSeed';
 const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
+const PROFIT_BASE_YEAR = 2025;
 
 function getSharedSelectedYear() {
   const raw = Number(localStorage.getItem(SHARED_SELECTED_YEAR_KEY));
@@ -785,12 +786,12 @@ function renderPerformanceChart(options = {}) {
 
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
-    realizedData.push(monthly.realizedSum);
-    swapData.push(monthly.swapSum);
-    totalPnlData.push(monthly.realizedSum + monthly.swapSum);
+    const isEnteredMonth = m <= latestMonth;
+    realizedData.push(isEnteredMonth ? monthly.realizedSum : null);
+    swapData.push(isEnteredMonth ? monthly.swapSum : null);
+    totalPnlData.push(isEnteredMonth ? (monthly.realizedSum + monthly.swapSum) : null);
     const monthEndAssets = calculateTotalNetAssets(currentYear, m);
     const monthEndConfirmed = calculateTotalConfirmedAssets(currentYear, m);
-    const isEnteredMonth = m <= latestMonth;
     confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
     assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
 
@@ -885,6 +886,13 @@ function renderPerformanceChart(options = {}) {
       ];
       chart.setActiveElements(active);
       if (chart.tooltip) chart.tooltip.setActiveElements(active, { x: 0, y: 0 });
+      chart.update('none');
+      return;
+    }
+
+    if (chart === pnlBarChart && monthIndex > latestMonth - 1) {
+      chart.setActiveElements([]);
+      if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
       chart.update('none');
       return;
     }
@@ -999,7 +1007,7 @@ function renderPerformanceChart(options = {}) {
     });
 
     const isMobile = window.matchMedia('(max-width: 480px)').matches;
-    playLaserReveal(assetsTrendChart, isMobile ? 760 : 900);
+    playLaserReveal(assetsTrendChart, isMobile ? 1520 : 1800);
   };
 
   const createPnlChart = () => {
@@ -1608,16 +1616,23 @@ function updateInputs() {
 
 
 function getSelectableYears() {
-  const years = new Set([2024, 2025, 2026, currentYear, new Date().getFullYear()]);
-  Object.keys(tradingData || {}).forEach(y => years.add(Number(y)));
-  Object.keys(yearInitialFunds || {}).forEach(y => years.add(Number(y)));
-  const now = new Date().getFullYear();
-  years.add(now - 1);
-  years.add(now + 1);
+  const years = new Set([PROFIT_BASE_YEAR, currentYear]);
+  Object.keys(tradingData || {}).forEach((y) => years.add(Number(y)));
+  Object.keys(yearInitialFunds || {}).forEach((y) => years.add(Number(y)));
+  Object.keys(yearInitialUnrealized || {}).forEach((y) => years.add(Number(y)));
 
-  return [...years]
-    .filter(y => Number.isInteger(y) && y >= 2000 && y <= 2100)
-    .sort((a, b) => b - a);
+  const normalizedYears = [...years]
+    .filter((y) => Number.isInteger(y) && y >= PROFIT_BASE_YEAR && y <= 2100);
+
+  if (!normalizedYears.length) normalizedYears.push(PROFIT_BASE_YEAR);
+
+  let maxYear = Math.max(...normalizedYears);
+  while (hasMeaningfulMonthData(maxYear, 12)) {
+    maxYear += 1;
+    normalizedYears.push(maxYear);
+  }
+
+  return [...new Set(normalizedYears)].sort((a, b) => b - a);
 }
 
 function fillYearOptions(selectEl, years) {

@@ -71,3 +71,92 @@
   document.addEventListener('touchend', resetEdgeSwipe, { passive: true });
   document.addEventListener('touchcancel', resetEdgeSwipe, { passive: true });
 })();
+
+(function () {
+  const COLLAPSE_STYLE_ID = 'ts-collapse-style';
+
+  function ensureCollapseStyle() {
+    if (document.getElementById(COLLAPSE_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = COLLAPSE_STYLE_ID;
+    style.textContent = `
+      .ts-collapse-heading {
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .ts-collapse-icon {
+        font-size: 11px;
+        color: rgba(170,181,208,.95);
+        transform: translateY(-1px);
+      }
+
+      .ts-collapsible-target.ts-collapsed {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function resolveToggleTarget(heading) {
+    const sectionHead = heading.closest('.summary-header, .annual-summary-head, .performance-head');
+    let node = (sectionHead || heading).nextElementSibling;
+
+    while (node) {
+      if (node.matches('.section, .chart-area, .memo-section')) return node;
+      node = node.nextElementSibling;
+    }
+    return null;
+  }
+
+  function toggleSection(target, iconEl) {
+    target.classList.toggle('ts-collapsed');
+    const collapsed = target.classList.contains('ts-collapsed');
+    iconEl.textContent = collapsed ? '▸' : '▾';
+
+    if (!collapsed) {
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+    }
+  }
+
+  function bindSectionCollapse() {
+    ensureCollapseStyle();
+    const headings = document.querySelectorAll('main .heading-muted');
+
+    headings.forEach((heading) => {
+      if (heading.dataset.tsCollapseBound === '1') return;
+
+      const target = resolveToggleTarget(heading);
+      if (!target) return;
+
+      heading.classList.add('ts-collapse-heading');
+      target.classList.add('ts-collapsible-target');
+
+      let iconEl = heading.querySelector('.ts-collapse-icon');
+      if (!iconEl) {
+        iconEl = document.createElement('span');
+        iconEl.className = 'ts-collapse-icon';
+        iconEl.textContent = '▾';
+        heading.appendChild(iconEl);
+      }
+
+      heading.addEventListener('click', (event) => {
+        if (event.target instanceof Element && event.target.closest('a, button, select, input, textarea, label')) return;
+        toggleSection(target, iconEl);
+      });
+
+      heading.dataset.tsCollapseBound = '1';
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindSectionCollapse, { once: true });
+  } else {
+    bindSectionCollapse();
+  }
+})();
