@@ -753,6 +753,14 @@ body::before {
   line-height: 1.5;
 }
 
+.backup-section .section-description {
+  text-align: center;
+}
+
+.backup-section .form-actions {
+  justify-content: center;
+}
+
 .memo-modal-backdrop {
   position: fixed;
   top: 0;

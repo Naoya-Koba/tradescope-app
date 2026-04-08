@@ -1362,8 +1362,11 @@ function exportAllData() {
   const dateStr = new Date().toISOString().slice(0, 10);
   a.href = url;
   a.download = `tradescope-all-backup-${dateStr}.json`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 function importAllData(file) {

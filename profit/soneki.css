@@ -564,6 +564,14 @@ body.drawer-open {
   margin: 0 0 12px 0;
 }
 
+.backup-section .section-description {
+  text-align: center;
+}
+
+.backup-section .form-actions {
+  justify-content: center;
+}
+
 /* ===== Summary Cards ===== */
 .annual-summary-list {
   display: flex;

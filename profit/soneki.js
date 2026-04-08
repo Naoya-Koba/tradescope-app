@@ -1025,8 +1025,8 @@ function renderPerformanceChart(options = {}) {
           syncHoverFromPnl(activeElements || []);
         },
         interaction: {
-          mode: 'index',
-          intersect: false,
+          mode: 'nearest',
+          intersect: true,
           axis: 'x'
         },
         animation: {
