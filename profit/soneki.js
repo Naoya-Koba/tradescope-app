@@ -366,7 +366,7 @@ const monthlyDetailScrim = document.getElementById('monthlyDetailScrim');
 let pnlBarChart = null;
 let assetsTrendChart = null;
 let assetTrendView = 'asset';
-let monthlyPnlView = 'breakdown';
+let monthlyPnlView = 'total';
 let monthlyDetailLockScrollY = 0;
 
 function dismissInputFocusOnOutsideTap(event) {
@@ -918,16 +918,30 @@ function renderPerformanceChart(options = {}) {
           axis: 'x'
         },
         animation: {
-          duration: 1800,
-          easing: 'easeInOutCubic',
-          delay: (ctx) => {
-            let delay = 0;
-            if (ctx.type === 'data') {
-              delay = ctx.dataIndex * 50 + ctx.datasetIndex * 100;
-            } else if (ctx.type !== 'none') {
-              delay = ctx.datasetIndex * 200;
+          x: {
+            type: 'number',
+            easing: 'linear',
+            duration: 480,
+            from: (ctx) => {
+              if (ctx.type !== 'data') return undefined;
+              return ctx.chart.scales.x.getPixelForValue(0);
+            },
+            delay: (ctx) => {
+              if (ctx.type !== 'data') return 0;
+              return ctx.dataIndex * 55 + ctx.datasetIndex * 35;
             }
-            return delay;
+          },
+          y: {
+            type: 'number',
+            easing: 'linear',
+            duration: 0,
+            from: (ctx) => {
+              if (ctx.type !== 'data') return undefined;
+              const meta = ctx.chart.getDatasetMeta(ctx.datasetIndex);
+              const previous = meta?.data?.[ctx.index - 1];
+              if (previous) return previous.y;
+              return meta?.data?.[ctx.index]?.y;
+            }
           }
         },
         plugins: {
@@ -1065,6 +1079,20 @@ function syncChartViewTabs() {
   const monthlySelect = document.getElementById('monthlyPnlViewSelect');
   if (assetSelect) assetSelect.value = assetTrendView;
   if (monthlySelect) monthlySelect.value = monthlyPnlView;
+  updateMonthlyPnlLegendVisibility();
+}
+
+function updateMonthlyPnlLegendVisibility() {
+  const monthlySelect = document.getElementById('monthlyPnlViewSelect');
+  if (!monthlySelect) return;
+  const legendEl = monthlySelect
+    .closest('.chart-panel-head-right')
+    ?.querySelector('.chart-legend');
+  if (!legendEl) return;
+
+  const shouldShow = monthlyPnlView === 'breakdown';
+  legendEl.hidden = !shouldShow;
+  legendEl.style.display = shouldShow ? '' : 'none';
 }
 
 function bindChartViewControls() {
@@ -1087,6 +1115,7 @@ function bindChartViewControls() {
       const nextView = event.target.value === 'total' ? 'total' : 'breakdown';
       if (monthlyPnlView === nextView) return;
       monthlyPnlView = nextView;
+      updateMonthlyPnlLegendVisibility();
       renderPerformanceChart({ renderAssets: false, renderPnl: true });
       syncChartViewTabs();
     });

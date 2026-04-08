@@ -952,6 +952,33 @@ function renderPerformanceChart() {
     options: {
       maintainAspectRatio: false,
       responsive: true,
+      animation: {
+        x: {
+          type: 'number',
+          easing: 'linear',
+          duration: 460,
+          from: (ctx) => {
+            if (ctx.type !== 'data') return undefined;
+            return ctx.chart.scales.x.getPixelForValue(0);
+          },
+          delay: (ctx) => {
+            if (ctx.type !== 'data') return 0;
+            return ctx.dataIndex * 52 + ctx.datasetIndex * 30;
+          }
+        },
+        y: {
+          type: 'number',
+          easing: 'linear',
+          duration: 0,
+          from: (ctx) => {
+            if (ctx.type !== 'data') return undefined;
+            const meta = ctx.chart.getDatasetMeta(ctx.datasetIndex);
+            const previous = meta?.data?.[ctx.index - 1];
+            if (previous) return previous.y;
+            return meta?.data?.[ctx.index]?.y;
+          }
+        }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
