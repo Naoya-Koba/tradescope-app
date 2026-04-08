@@ -608,6 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashSeenKey = 'tradeScopeTopSplashSeen';
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
+  const splashBootLeadMs = 520;
   let topScriptPromise = null;
 
   const loadTopScript = () => {
@@ -671,6 +672,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.setTimeout(() => {
     bootTopPage();
+  }, Math.max(0, splashDisplayMs - splashBootLeadMs));
+
+  window.setTimeout(() => {
     splashScreen?.classList.add('hide');
     window.setTimeout(() => {
       splashScreen?.remove();
