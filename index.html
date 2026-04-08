@@ -232,23 +232,29 @@
     <!-- ===== Risk Section ===== -->
     <h2 class="heading-muted">Risk</h2>
     <section class="section glass risk-section" aria-label="リスクセクション">
-      <div class="risk-header">
-        <span class="risk-header-label">最大損失想定額</span>
-        <span id="riskMaxLoss" class="risk-total-value negative">-¥0</span>
+      <div class="risk-block risk-block-main">
+        <div class="risk-header">
+          <div class="risk-header-copy">
+            <span class="risk-header-label">最大損失</span>
+            <p id="riskNote" class="risk-note">0円時想定 FX + 暗号資産</p>
+          </div>
+          <span id="riskMaxLoss" class="risk-total-value">¥0</span>
+        </div>
       </div>
-      <p id="riskNote" class="risk-note">-</p>
-      <div class="risk-rows">
-        <div class="risk-row">
-          <span class="risk-row-label">FX（主要キャリー）1円時損失想定額</span>
-          <span id="riskFxOne" class="risk-row-value negative">-¥0</span>
+      <div class="risk-block risk-grid-two">
+        <div class="risk-cell">
+          <span class="risk-row-label">FX 1円時損失</span>
+          <span id="riskFxOne" class="risk-row-value">¥0</span>
         </div>
-        <div class="risk-row">
-          <span class="risk-row-label">FX（主要キャリー）0円時損失想定額</span>
-          <span id="riskFxZero" class="risk-row-value negative">-¥0</span>
+        <div class="risk-cell">
+          <span class="risk-row-label">FX 0円時損失</span>
+          <span id="riskFxZero" class="risk-row-value">¥0</span>
         </div>
-        <div class="risk-row">
-          <span class="risk-row-label">暗号資産0円時損失想定額</span>
-          <span id="riskCryptoZero" class="risk-row-value negative">-¥0</span>
+      </div>
+      <div class="risk-block risk-block-last">
+        <div class="risk-cell risk-cell-wide">
+          <span class="risk-row-label">暗号資産 0円時損失</span>
+          <span id="riskCryptoZero" class="risk-row-value">¥0</span>
         </div>
       </div>
     </section>

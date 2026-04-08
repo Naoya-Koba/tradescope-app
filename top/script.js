@@ -489,29 +489,18 @@ function updateRiskSection() {
   const riskSummary = historyCore.calculateRiskSummary(entries, cryptoValue);
 
   const fxOneDisplayLoss = (riskSummary.fxOneYenLoss || 0) + (riskSummary.fxHufPointOneLoss || 0);
+  const maxLoss = Math.abs(riskSummary.maxLoss || 0);
+  const fxOneLoss = Math.abs(fxOneDisplayLoss || 0);
+  const fxZeroLoss = Math.abs(riskSummary.fxZeroYenLoss || 0);
+  const cryptoZeroLoss = Math.abs(riskSummary.cryptoZeroYenLoss || 0);
 
-  maxEl.textContent = fmtJPY(-riskSummary.maxLoss);
-  fxOneEl.textContent = fmtJPY(-fxOneDisplayLoss);
-  fxZeroEl.textContent = fmtJPY(-riskSummary.fxZeroYenLoss);
-  cryptoZeroEl.textContent = fmtJPY(-riskSummary.cryptoZeroYenLoss);
+  maxEl.textContent = fmtJPY(maxLoss);
+  fxOneEl.textContent = fmtJPY(fxOneLoss);
+  fxZeroEl.textContent = fmtJPY(fxZeroLoss);
+  cryptoZeroEl.textContent = fmtJPY(cryptoZeroLoss);
 
-  setSignClass(maxEl, -Math.abs(riskSummary.maxLoss || 0));
-  setSignClass(fxOneEl, -Math.abs(fxOneDisplayLoss || 0));
-  setSignClass(fxZeroEl, -Math.abs(riskSummary.fxZeroYenLoss || 0));
-  setSignClass(cryptoZeroEl, -Math.abs(riskSummary.cryptoZeroYenLoss || 0));
-
-  // 動的ノート: 現在保有中のキャリーと暗号資産を表示
   if (noteEl) {
-    const carryTags = (riskSummary.activeCarrySymbols || []).map((s) => `【${s}】`).join('');
-    let cryptoTag = '';
-    if (cryptoValue > 0) {
-      const cryptoSymbols = riskSummary.activeCryptoSymbols || [];
-      cryptoTag = cryptoSymbols.length
-        ? cryptoSymbols.map((s) => `【${s}】`).join('')
-        : '【暗号資産（SBI VC）】';
-    }
-    const parts = [carryTags, cryptoTag].filter(Boolean).join('＋');
-    noteEl.textContent = parts ? `0円時想定: ${parts}` : '0円時想定（建玉未入力）';
+    noteEl.textContent = cryptoValue > 0 ? '0円時想定 FX + 暗号資産' : '0円時想定 FX';
   }
 }
 
