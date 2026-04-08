@@ -1360,6 +1360,8 @@ async function exportAllData() {
   const blob = new Blob([jsonText], { type: 'application/json' });
   const dateStr = new Date().toISOString().slice(0, 10);
   const fileName = `tradescope-all-backup-${dateStr}.json`;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   // iOS Safari/PWAではdownload属性が効かない場合があるため、共有シートを優先する
   try {
@@ -1373,11 +1375,26 @@ async function exportAllData() {
         return;
       }
     }
+
+    if (navigator.share) {
+      await navigator.share({
+        title: 'TradeScope Backup',
+        text: jsonText
+      });
+      return;
+    }
   } catch (error) {
     if (error?.name === 'AbortError') {
       return;
     }
     console.warn('Share export fallback:', error);
+  }
+
+  if (isIOS) {
+    const url = URL.createObjectURL(blob);
+    window.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    return;
   }
 
   const url = URL.createObjectURL(blob);

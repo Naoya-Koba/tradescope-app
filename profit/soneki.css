@@ -568,9 +568,18 @@ body.drawer-open {
   text-align: center;
 }
 
-.backup-section .form-actions {
+.backup-section .backup-actions {
+  margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.backup-section .backup-actions .btn {
+  min-width: 140px;
+  text-align: center;
   justify-content: center;
 }
 
@@ -1811,10 +1820,17 @@ body.drawer-open {
     grid-template-columns: 1fr;
   }
 
-  .backup-section .form-actions {
-    display: flex;
-    grid-template-columns: none;
-    justify-content: center;
+  .backup-section .backup-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .backup-section .backup-actions .btn {
+    width: 100%;
+    min-width: 0;
   }
   .account-input-grid {
     grid-template-columns: 1fr;
