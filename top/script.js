@@ -966,17 +966,20 @@ function buildTopPerformanceSeries(year, latestMonth) {
   const yearInitialData = initialFunds?.[year] || initialFunds?.[String(year)] || {};
   const yearInitialUnrealData = initialUnrealized?.[year] || initialUnrealized?.[String(year)] || {};
 
+  const yearStartConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0);
+  }, 0);
+  const yearStartTotal = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialData?.[account.key]) || 0)
+      + (Number(yearInitialUnrealData?.[account.key]) || 0);
+  }, 0);
+
   let cumulativeDeposits = 0;
   let cumulativeWithdrawals = 0;
 
-  const confirmedSeries = [GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0);
-  }, 0)];
-
-  const totalSeries = [GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0)
-      + (Number(yearInitialUnrealData?.[account.key]) || 0);
-  }, 0)];
+  // Performanceモードは年初基準の差分表示とするため、基準点を必ず0に固定
+  const confirmedSeries = [0];
+  const totalSeries = [0];
 
   for (let month = 1; month <= 12; month += 1) {
     if (month > latestMonth) {
@@ -999,11 +1002,23 @@ function buildTopPerformanceSeries(year, latestMonth) {
       return sum + calculateLinkedAccountNetAssets(tradingData, initialFunds, year, month, account.key);
     }, 0);
 
-    confirmedSeries.push(growthConfirmed - cumulativeDeposits + cumulativeWithdrawals);
-    totalSeries.push(growthTotal - cumulativeDeposits + cumulativeWithdrawals);
+    confirmedSeries.push(growthConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals);
+    totalSeries.push(growthTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals);
   }
 
   return { confirmedSeries, totalSeries };
+}
+
+function updateTopAssetLegend() {
+  const legendEquity = document.getElementById('topLegendEquity');
+  const legendBalance = document.getElementById('topLegendBalance');
+  if (!legendEquity || !legendBalance) return;
+
+  const equityLabel = topAssetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
+  const balanceLabel = topAssetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
+
+  legendEquity.innerHTML = `<span class="dot dot-green"></span> ${equityLabel}`;
+  legendBalance.innerHTML = `<span class="dot dot-blue"></span> ${balanceLabel}`;
 }
 
 function renderPerformanceChart() {
@@ -1035,6 +1050,8 @@ function renderPerformanceChart() {
   const activeTotalEquitySeries = topAssetTrendView === 'performance'
     ? performanceSeries.totalSeries
     : totalEquitySeries;
+  const netLabel = topAssetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
+  const equityLabel = topAssetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
 
   const isMobile = window.innerWidth <= 480;
   const tickFontSize = isMobile ? 10 : 12;
@@ -1049,7 +1066,7 @@ function renderPerformanceChart() {
       labels: perfLabels,
       datasets: [
         {
-          label: 'Net Balance',
+          label: netLabel,
           data: activeNetBalanceSeries,
           borderColor: '#3DA2FF',
           backgroundColor: gradBlue,
@@ -1058,7 +1075,7 @@ function renderPerformanceChart() {
           pointRadius: 2
         },
         {
-          label: 'Total Equity',
+          label: equityLabel,
           data: activeTotalEquitySeries,
           borderColor: '#3EE08F',
           backgroundColor: gradGreen,
@@ -1098,6 +1115,7 @@ function renderPerformanceChart() {
     }
   });
 
+  updateTopAssetLegend();
   playLaserReveal(perfChart, isMobile ? 1520 : 1800);
 }
 
