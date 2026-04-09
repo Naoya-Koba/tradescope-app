@@ -754,6 +754,18 @@ function getLatestSavedMonth(year) {
   return 1;
 }
 
+function updateAssetTrendLegend() {
+  const legendEquity = document.getElementById('assetLegendEquity');
+  const legendBalance = document.getElementById('assetLegendBalance');
+  if (!legendEquity || !legendBalance) return;
+
+  const equityLabel = assetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
+  const balanceLabel = assetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
+
+  legendEquity.innerHTML = `<span class="dot dot-total-assets"></span> ${equityLabel}`;
+  legendBalance.innerHTML = `<span class="dot dot-confirmed-assets"></span> ${balanceLabel}`;
+}
+
 function renderPerformanceChart(options = {}) {
   const { renderAssets = true, renderPnl = true } = options;
   const assetsCanvas = document.getElementById('assetsTrendChart');
@@ -779,8 +791,9 @@ function renderPerformanceChart(options = {}) {
     return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0)
       + (Number(yearInitialUnrealized?.[currentYear]?.[account.key]) || 0);
   }, 0);
-  const performanceConfirmedTrendData = [growthInitialConfirmed];
-  const performanceAssetsTrendData = [growthInitialTotal];
+  // Performanceは年初比の差分表示に統一するため、年初基準点を0固定
+  const performanceConfirmedTrendData = [0];
+  const performanceAssetsTrendData = [0];
   let cumulativeGrowthDeposits = 0;
   let cumulativeGrowthWithdrawals = 0;
 
@@ -809,8 +822,8 @@ function renderPerformanceChart(options = {}) {
         return sum + calculateAccountConfirmedAssets(currentYear, m, account.key);
       }, 0);
 
-      performanceAssetsTrendData.push(growthAssets - cumulativeGrowthDeposits + cumulativeGrowthWithdrawals);
-      performanceConfirmedTrendData.push(growthConfirmed - cumulativeGrowthDeposits + cumulativeGrowthWithdrawals);
+      performanceAssetsTrendData.push(growthAssets - growthInitialTotal - cumulativeGrowthDeposits + cumulativeGrowthWithdrawals);
+      performanceConfirmedTrendData.push(growthConfirmed - growthInitialConfirmed - cumulativeGrowthDeposits + cumulativeGrowthWithdrawals);
     } else {
       performanceAssetsTrendData.push(null);
       performanceConfirmedTrendData.push(null);
@@ -823,6 +836,8 @@ function renderPerformanceChart(options = {}) {
   const activeAssetsTrend = assetTrendView === 'performance'
     ? performanceAssetsTrendData
     : assetsTrendData;
+  const balanceLabel = assetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
+  const equityLabel = assetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
 
   const buildPnlDatasets = () => {
     if (monthlyPnlView === 'total') {
@@ -943,7 +958,7 @@ function renderPerformanceChart(options = {}) {
         labels: assetsLabels,
         datasets: [
           {
-            label: 'Net Balance',
+            label: balanceLabel,
             data: activeConfirmedTrend,
             borderColor: '#3DA2FF',
             backgroundColor: gradBlue,
@@ -954,7 +969,7 @@ function renderPerformanceChart(options = {}) {
             pointHoverRadius: 5
           },
           {
-            label: 'Total Equity',
+            label: equityLabel,
             data: activeAssetsTrend,
             borderColor: '#3EE08F',
             backgroundColor: gradGreen,
@@ -1107,6 +1122,7 @@ function renderPerformanceChart(options = {}) {
   if (renderAssets) createAssetsChart();
   if (renderPnl) createPnlChart();
 
+  updateAssetTrendLegend();
   syncChartViewTabs();
 }
 

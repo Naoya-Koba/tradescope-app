@@ -1277,6 +1277,16 @@ body.drawer-open {
   justify-content: flex-end;
 }
 
+.chart-legend.chart-legend-top .legend-item {
+  gap: 0;
+  white-space: nowrap;
+}
+
+.chart-legend.chart-legend-top .legend-item .dot {
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 480px) {
   .chart-view-select {
     font-size: 10px;
