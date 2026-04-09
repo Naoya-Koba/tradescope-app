@@ -457,11 +457,12 @@
     <div id="memoModal" class="memo-modal" aria-hidden="true">
       <div class="memo-modal-content">
         <div class="memo-modal-header">
-          <h3>メモを追加</h3>
+          <h3 id="memoModalTitle">メモを追加</h3>
           <button id="closeMemoModal" class="close-btn">×</button>
         </div>
         <textarea id="memoInput" class="memo-input" placeholder="メモを入力してください..."></textarea>
         <div class="memo-modal-footer">
+          <button id="deleteMemoBtn" class="btn-secondary memo-modal-delete" hidden>削除</button>
           <button id="cancelMemoBtn" class="btn-secondary">キャンセル</button>
           <button id="saveMemoBtn" class="btn-primary">保存</button>
         </div>

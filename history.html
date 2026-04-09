@@ -155,11 +155,6 @@
       </div>
       <div class="form-actions">
         <button id="saveEntryBtn" class="btn btn-primary">追加</button>
-        <button id="exportHistoryBtn" class="btn btn-secondary" style="margin-left:8px">エクスポート</button>
-        <label class="btn btn-secondary" style="cursor:pointer;margin-left:8px">
-          インポート
-          <input type="file" id="importHistoryInput" accept=".json" style="display:none" />
-        </label>
       </div>
     </section>
 
@@ -210,6 +205,18 @@
           </thead>
           <tbody id="historyBody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <h2 class="heading-muted">Backup</h2>
+    <section class="section glass backup-section">
+      <p class="section-description">取引履歴ページのデータのみをバックアップ・復元します。</p>
+      <div class="backup-actions">
+        <button id="exportHistoryBtn" class="btn btn-secondary backup-action-btn" type="button">エクスポート</button>
+        <label class="btn btn-secondary backup-action-btn backup-action-label" for="importHistoryInput">
+          インポート
+        </label>
+        <input type="file" id="importHistoryInput" accept=".json" style="display:none" />
       </div>
     </section>
   </main>

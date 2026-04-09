@@ -77,34 +77,72 @@ const memoInput = document.getElementById('memoInput');
 const saveMemoBtn = document.getElementById('saveMemoBtn');
 const cancelMemoBtn = document.getElementById('cancelMemoBtn');
 const closeMemoModal = document.getElementById('closeMemoModal');
+const memoModalTitle = document.getElementById('memoModalTitle');
+const deleteMemoBtn = document.getElementById('deleteMemoBtn');
+let memoEditingIndex = null;
+
+function parseMemos() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('tradeScopeMemos') || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function loadMemos() {
-  const memos = JSON.parse(localStorage.getItem('tradeScopeMemos')) || [];
+  const memos = parseMemos();
   memoList.innerHTML = memos.length === 0 
     ? '<li style="color: var(--muted); padding: 12px 0; text-align: center; font-size: 12px;">メモはまだありません</li>'
     : memos.map((memo, idx) => `
       <li class="memo-item">
         <div class="memo-content">
-          <div class="memo-item-text">${memo.text}</div>
+          <div class="memo-item-text">${escapeHtml(memo.text)}</div>
           <div class="memo-item-time">${new Date(memo.date).toLocaleDateString('ja-JP')}</div>
         </div>
-        <button class="memo-delete-btn" data-idx="${idx}" aria-label="削除">−</button>
+        <button class="memo-edit-btn" data-idx="${idx}" aria-label="編集">✎</button>
       </li>
     `).join('');
   
-  document.querySelectorAll('.memo-delete-btn').forEach(btn => {
-    btn.addEventListener('click', deleteMemo);
+  document.querySelectorAll('.memo-edit-btn').forEach(btn => {
+    btn.addEventListener('click', openEditModal);
   });
 }
 
-function openModal() {
-  memoInput.value = '';
+function openModal(mode = 'create', editIndex = null) {
+  const memos = parseMemos();
+  const isEdit = mode === 'edit' && Number.isInteger(editIndex) && memos[editIndex];
+  memoEditingIndex = isEdit ? editIndex : null;
+
+  memoInput.value = isEdit ? memos[editIndex].text : '';
+  if (memoModalTitle) memoModalTitle.textContent = isEdit ? 'メモを編集' : 'メモを追加';
+  if (deleteMemoBtn) {
+    deleteMemoBtn.hidden = !isEdit;
+    deleteMemoBtn.disabled = !isEdit;
+  }
+
   memoModal.setAttribute('aria-hidden', 'false');
   memoModalBackdrop.setAttribute('aria-hidden', 'false');
   setTimeout(() => memoInput.focus(), 100);
 }
 
+function openEditModal(e) {
+  const idx = Number.parseInt(e.currentTarget?.dataset?.idx, 10);
+  if (!Number.isInteger(idx)) return;
+  openModal('edit', idx);
+}
+
 function closeModal() {
+  memoEditingIndex = null;
   memoModal.setAttribute('aria-hidden', 'true');
   memoModalBackdrop.setAttribute('aria-hidden', 'true');
 }
@@ -113,27 +151,42 @@ function saveMemo() {
   const text = memoInput.value.trim();
   if (!text) return;
   
-  const memos = JSON.parse(localStorage.getItem('tradeScopeMemos')) || [];
-  memos.unshift({ text, date: new Date().toISOString() });
+  const memos = parseMemos();
+  const nowIso = new Date().toISOString();
+
+  if (Number.isInteger(memoEditingIndex) && memos[memoEditingIndex]) {
+    memos[memoEditingIndex] = {
+      ...memos[memoEditingIndex],
+      text,
+      updatedAt: nowIso
+    };
+  } else {
+    memos.unshift({ text, date: nowIso });
+  }
+
   memos.splice(50);
   localStorage.setItem('tradeScopeMemos', JSON.stringify(memos));
   loadMemos();
   closeModal();
 }
 
-function deleteMemo(e) {
-  const idx = parseInt(e.target.dataset.idx);
-  const memos = JSON.parse(localStorage.getItem('tradeScopeMemos')) || [];
-  memos.splice(idx, 1);
+function deleteMemo() {
+  if (!Number.isInteger(memoEditingIndex)) return;
+  if (!confirm('このメモを削除しますか？')) return;
+
+  const memos = parseMemos();
+  memos.splice(memoEditingIndex, 1);
   localStorage.setItem('tradeScopeMemos', JSON.stringify(memos));
   loadMemos();
+  closeModal();
 }
 
-addMemoBtn.addEventListener('click', openModal);
+addMemoBtn.addEventListener('click', () => openModal('create'));
 saveMemoBtn.addEventListener('click', saveMemo);
 cancelMemoBtn.addEventListener('click', closeModal);
 closeMemoModal.addEventListener('click', closeModal);
 memoModalBackdrop.addEventListener('click', closeModal);
+deleteMemoBtn?.addEventListener('click', deleteMemo);
 memoInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.ctrlKey) saveMemo();
 });
@@ -236,16 +289,30 @@ const countryNews = {
 };
 function mountTicker(trackEl, items) {
   if (!trackEl) return;
-  trackEl.innerHTML = items.concat(items).map(t => `<span class="ticker-item">${t}</span>`).join('');
+  const tickerItems = (items && items.length ? items : ['ニュースはありません']).concat(items && items.length ? items : ['ニュースはありません']);
+  trackEl.innerHTML = tickerItems.map(t => `<span class="ticker-item">${t}</span>`).join('');
+  trackEl.style.animation = 'none';
+  void trackEl.offsetHeight;
+  trackEl.style.animation = '';
 }
 mountTicker(document.getElementById('globalTickerTrack'), globalTicker);
 const sel = document.getElementById('countrySelect');
 function refreshCountryTicker() {
-  const v = sel.value || 'USD';
+  const v = sel?.value || 'USD';
   mountTicker(document.getElementById('countryTickerTrack'), countryNews[v] || []);
 }
 sel?.addEventListener('change', refreshCountryTicker);
 refreshCountryTicker();
+
+function refreshAllTickers() {
+  mountTicker(document.getElementById('globalTickerTrack'), globalTicker);
+  refreshCountryTicker();
+}
+
+window.addEventListener('pageshow', refreshAllTickers);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshAllTickers();
+});
 
 // ===== Demo Data =====
 const demoMonthly = {
