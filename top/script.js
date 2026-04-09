@@ -1335,11 +1335,23 @@ function updateDataByYear(inputYear = null) {
 }
 
 // ===== Unified Backup: Export / Import All Data =====
-async function exportAllData() {
-  if (!historyCore?.parseEntries) {
-    alert('データの読み込みに失敗しました。');
-    return;
+function getHistoryEntriesForBackup() {
+  if (historyCore?.parseEntries) {
+    return historyCore.parseEntries();
   }
+
+  try {
+    const raw = JSON.parse(localStorage.getItem('tradeScopeTradeHistoryV1') || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function exportAllData() {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const yearInitialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
+  const yearInitialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
 
   const profitPayload = {
     tradingData,
@@ -1347,7 +1359,7 @@ async function exportAllData() {
     yearInitialUnrealized
   };
 
-  const historyEntries = historyCore.parseEntries();
+  const historyEntries = getHistoryEntriesForBackup();
 
   const payload = {
     tradescope: 'all-backup',
@@ -1356,58 +1368,16 @@ async function exportAllData() {
     historyData: { entries: historyEntries }
   };
 
-  const jsonText = JSON.stringify(payload, null, 2);
-  const blob = new Blob([jsonText], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const dateStr = new Date().toISOString().slice(0, 10);
   const fileName = `tradescope-all-backup-${dateStr}.json`;
-  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-  // iOS Safari/PWAではdownload属性が効かない場合があるため、共有シートを優先する
-  try {
-    if (navigator.share && navigator.canShare && typeof File !== 'undefined') {
-      const file = new File([blob], fileName, { type: 'application/json' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: 'TradeScope Backup',
-          files: [file]
-        });
-        return;
-      }
-    }
-
-    if (navigator.share) {
-      await navigator.share({
-        title: 'TradeScope Backup',
-        text: jsonText
-      });
-      return;
-    }
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      return;
-    }
-    console.warn('Share export fallback:', error);
-  }
-
-  if (isIOS) {
-    const url = URL.createObjectURL(blob);
-    window.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    return;
-  }
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = fileName;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  a.style.display = 'none';
-  document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 500);
+  URL.revokeObjectURL(url);
 }
 
 function importAllData(file) {
@@ -1429,12 +1399,12 @@ function importAllData(file) {
 
       // Import profit data
       if (profitData?.tradingData && profitData?.yearInitialFunds) {
-        tradingData = profitData.tradingData;
-        yearInitialFunds = profitData.yearInitialFunds;
-        yearInitialUnrealized = profitData.yearInitialUnrealized || {};
-        localStorage.setItem(PROFIT_STORAGE_KEY_TRADING, JSON.stringify(tradingData));
-        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL, JSON.stringify(yearInitialFunds));
-        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, JSON.stringify(yearInitialUnrealized));
+        const importedTradingData = profitData.tradingData;
+        const importedYearInitialFunds = profitData.yearInitialFunds;
+        const importedYearInitialUnrealized = profitData.yearInitialUnrealized || {};
+        localStorage.setItem(PROFIT_STORAGE_KEY_TRADING, JSON.stringify(importedTradingData));
+        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL, JSON.stringify(importedYearInitialFunds));
+        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, JSON.stringify(importedYearInitialUnrealized));
       }
 
       // Import history data
@@ -1462,6 +1432,9 @@ window.addEventListener('storage', (event) => {
 
 // Backup button listeners
 document.getElementById('exportAllDataBtn')?.addEventListener('click', exportAllData);
+document.getElementById('importAllDataBtn')?.addEventListener('click', () => {
+  document.getElementById('importAllDataInput')?.click();
+});
 document.getElementById('importAllDataInput')?.addEventListener('change', (e) => {
   importAllData(e.target.files[0]);
   e.target.value = '';

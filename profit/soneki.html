@@ -348,11 +348,9 @@
     <section class="section glass margin-bottom backup-section">
       <p class="section-description">データをJSONファイルに書き出してバックアップ、または復元できます。<br/>iOSアプリ再インストール前には必ずエクスポートしてください。</p>
       <div class="form-actions backup-actions">
-        <button class="btn btn-secondary" id="exportDataBtn">エクスポート</button>
-        <label class="btn btn-secondary" style="cursor:pointer">
-          インポート
-          <input type="file" id="importDataInput" accept=".json" style="display:none" />
-        </label>
+        <button type="button" class="btn btn-secondary backup-action-btn" id="exportDataBtn">エクスポート</button>
+        <button type="button" class="btn btn-secondary backup-action-btn" id="importDataBtn">インポート</button>
+        <input type="file" id="importDataInput" accept=".json" style="display:none" />
       </div>
     </section>
 

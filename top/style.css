@@ -759,29 +759,40 @@ body::before {
 
 .backup-section .backup-actions {
   margin-top: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.backup-section .backup-actions .btn {
-  min-width: 140px;
-  text-align: center;
+.backup-section .backup-actions .backup-action-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 10px 14px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  touch-action: manipulation;
 }
 
 @media (max-width: 480px) {
   .backup-section .backup-actions {
     display: grid;
     grid-template-columns: 1fr;
-    max-width: 320px;
+    max-width: 100%;
     margin-left: auto;
     margin-right: auto;
   }
 
-  .backup-section .backup-actions .btn {
+  .backup-section .backup-actions .backup-action-btn {
     width: 100%;
     min-width: 0;
   }

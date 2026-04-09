@@ -1810,6 +1810,9 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
 });
 
 document.getElementById('exportDataBtn')?.addEventListener('click', exportData);
+document.getElementById('importDataBtn')?.addEventListener('click', () => {
+  document.getElementById('importDataInput')?.click();
+});
 document.getElementById('importDataInput')?.addEventListener('change', (e) => {
   importData(e.target.files[0]);
   e.target.value = '';
