@@ -160,12 +160,18 @@
 
     <h2 class="heading-muted">Open Positions</h2>
     <section class="section glass">
-      <div id="openPositionsSummary" class="open-summary">保有建玉を集計中...</div>
+      <div class="open-positions-head">
+        <div id="openPositionsSummary" class="open-summary">保有建玉を集計中...</div>
+        <div class="open-view-switch" role="tablist" aria-label="Open Positions表示切替">
+          <button id="openViewMerged" class="open-view-btn active" type="button" data-open-view="merged" role="tab" aria-selected="true">統合表示</button>
+          <button id="openViewAccount" class="open-view-btn" type="button" data-open-view="account" role="tab" aria-selected="false">口座別表示</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>口座</th>
+              <th id="openPositionsPrimaryHeader">口座</th>
               <th>通貨ペア</th>
               <th>方向</th>
               <th>数量</th>
@@ -175,6 +181,7 @@
           <tbody id="openPositionsBody"></tbody>
         </table>
       </div>
+      <div id="openPositionDetail" class="open-position-detail" hidden></div>
     </section>
 
     <h2 class="heading-muted">History List</h2>

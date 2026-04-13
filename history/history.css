@@ -229,6 +229,75 @@ body::before {
   margin-bottom: 8px;
 }
 
+.open-positions-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.open-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+}
+
+.open-view-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.open-view-btn.active {
+  background: rgba(61,162,255,.2);
+  color: #eaf4ff;
+}
+
+.open-position-row {
+  cursor: pointer;
+}
+
+.open-position-row:hover {
+  background: rgba(255,255,255,.03);
+}
+
+.open-position-detail {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+}
+
+.open-position-detail-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.open-position-detail-meta {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.open-position-detail-meta strong {
+  color: #dce6ff;
+}
+
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -519,5 +588,10 @@ body.drawer-open {
 
   .backup-actions {
     grid-template-columns: 1fr;
+  }
+
+  .open-view-btn {
+    padding: 5px 8px;
+    font-size: 10px;
   }
 }

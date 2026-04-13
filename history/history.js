@@ -15,6 +15,9 @@ const STRATEGY_LABELS = {
   'キャリー': 'キャリー',
   'キャピタルゲイン': 'キャピタルゲイン'
 };
+const OPEN_POSITIONS_VIEW_KEY = 'tradeScopeOpenPositionsView';
+
+let openPositionsView = 'merged';
 
 const drawer = document.getElementById('drawer');
 const scrim = document.getElementById('scrim');
@@ -92,6 +95,39 @@ function uniqueSortedValues(entries, field) {
   return [...new Set((entries || []).map((entry) => entry[field]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
 }
 
+function normalizeOpenPositionsView(value) {
+  return value === 'account' ? 'account' : 'merged';
+}
+
+function loadOpenPositionsView() {
+  try {
+    const raw = localStorage.getItem(OPEN_POSITIONS_VIEW_KEY);
+    return normalizeOpenPositionsView(raw);
+  } catch {
+    return 'merged';
+  }
+}
+
+function saveOpenPositionsView(value) {
+  try {
+    localStorage.setItem(OPEN_POSITIONS_VIEW_KEY, normalizeOpenPositionsView(value));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function applyOpenViewSwitchState() {
+  const mergedBtn = document.getElementById('openViewMerged');
+  const accountBtn = document.getElementById('openViewAccount');
+  if (!mergedBtn || !accountBtn) return;
+
+  const isMerged = openPositionsView === 'merged';
+  mergedBtn.classList.toggle('active', isMerged);
+  accountBtn.classList.toggle('active', !isMerged);
+  mergedBtn.setAttribute('aria-selected', isMerged ? 'true' : 'false');
+  accountBtn.setAttribute('aria-selected', isMerged ? 'false' : 'true');
+}
+
 function buildBaseSelectOptions() {
   const accountSelect = document.getElementById('entryAccount');
   const assetTypeSelect = document.getElementById('entryAssetType');
@@ -142,24 +178,172 @@ function readFilters() {
   };
 }
 
+function aggregateOpenPositions(positions) {
+  const map = new Map();
+
+  (positions || []).forEach((position) => {
+    const symbolKey = historyCore.normalizeSymbolKey
+      ? historyCore.normalizeSymbolKey(position.symbol)
+      : String(position.symbol || '').toUpperCase().replace(/\s+/g, '');
+    const key = `${symbolKey}::${position.assetType || ''}`;
+    const signedQty = position.side === 'sell' ? -Math.abs(Number(position.absQuantity) || 0) : Math.abs(Number(position.absQuantity) || 0);
+    if (!Number.isFinite(signedQty) || Math.abs(signedQty) < 1e-12) return;
+
+    const current = map.get(key) || {
+      symbol: position.symbol,
+      assetType: position.assetType,
+      quantity: 0,
+      avgRate: 0,
+      accounts: new Set(),
+      strategies: new Set(),
+      parts: []
+    };
+
+    const nextQty = current.quantity + signedQty;
+
+    if (current.quantity === 0 || Math.sign(current.quantity) === Math.sign(signedQty)) {
+      const currentAbs = Math.abs(current.quantity);
+      const addAbs = Math.abs(signedQty);
+      const weighted = ((current.avgRate * currentAbs) + ((Number(position.avgRate) || 0) * addAbs)) / (currentAbs + addAbs);
+      current.quantity = nextQty;
+      current.avgRate = Number.isFinite(weighted) ? weighted : Number(position.avgRate) || 0;
+    } else if (Math.abs(nextQty) < 1e-12) {
+      current.quantity = 0;
+      current.avgRate = 0;
+    } else if (Math.sign(nextQty) === Math.sign(current.quantity)) {
+      current.quantity = nextQty;
+    } else {
+      current.quantity = nextQty;
+      current.avgRate = Number(position.avgRate) || 0;
+    }
+
+    if (position.account) current.accounts.add(position.account);
+    if (position.strategy) current.strategies.add(position.strategy);
+    current.parts.push({
+      account: position.account,
+      side: position.side,
+      quantity: Number(position.absQuantity) || 0,
+      avgRate: Number(position.avgRate) || 0,
+      strategy: position.strategy || ''
+    });
+
+    map.set(key, current);
+  });
+
+  return Array.from(map.values())
+    .filter((position) => Math.abs(position.quantity) > 1e-12)
+    .map((position) => {
+      const accountList = [...position.accounts].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+      const strategies = [...position.strategies].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+      return {
+        viewMode: 'merged',
+        symbol: position.symbol,
+        assetType: position.assetType,
+        side: position.quantity >= 0 ? 'buy' : 'sell',
+        absQuantity: Math.abs(position.quantity),
+        avgRate: position.avgRate,
+        accountLabel: `${accountList.length}口座`,
+        accountList,
+        strategyLabel: strategies.length === 0 ? '-' : (strategies.length === 1 ? strategies[0] : '複数'),
+        details: position.parts.sort((a, b) => String(a.account).localeCompare(String(b.account), 'ja'))
+      };
+    })
+    .sort((a, b) => {
+      const symbolCompare = String(a.symbol).localeCompare(String(b.symbol), 'ja');
+      if (symbolCompare !== 0) return symbolCompare;
+      return String(a.assetType).localeCompare(String(b.assetType), 'ja');
+    });
+}
+
+function normalizeAccountOpenPositions(positions) {
+  return (positions || [])
+    .map((position) => ({
+      viewMode: 'account',
+      accountLabel: position.account,
+      symbol: position.symbol,
+      assetType: position.assetType,
+      side: position.side,
+      absQuantity: position.absQuantity,
+      avgRate: position.avgRate,
+      strategyLabel: position.strategy || '-',
+      details: [{
+        account: position.account,
+        side: position.side,
+        quantity: Number(position.absQuantity) || 0,
+        avgRate: Number(position.avgRate) || 0,
+        strategy: position.strategy || ''
+      }]
+    }))
+    .sort((a, b) => {
+      const accountCompare = String(a.accountLabel).localeCompare(String(b.accountLabel), 'ja');
+      if (accountCompare !== 0) return accountCompare;
+      return String(a.symbol).localeCompare(String(b.symbol), 'ja');
+    });
+}
+
+function renderOpenPositionDetail(position) {
+  const detail = document.getElementById('openPositionDetail');
+  if (!detail || !position) return;
+
+  const sideLabel = position.side === 'buy' ? '買い' : '売り';
+  const accountsLabel = position.viewMode === 'merged'
+    ? (position.accountList?.join(' / ') || '-')
+    : (position.accountLabel || '-');
+  const breakdown = (position.details || []).map((row) => {
+    const rowSide = row.side === 'buy' ? '買い' : '売り';
+    return `<li>${escapeHtml(row.account)}: ${rowSide} ${fmtQuantity(row.quantity)} @ ${fmtRate(row.avgRate)}</li>`;
+  }).join('');
+
+  detail.innerHTML = `
+    <p class="open-position-detail-title">${escapeHtml(position.symbol)} / ${escapeHtml(position.assetType || '-')}</p>
+    <div class="open-position-detail-meta">
+      <span><strong>表示:</strong> ${position.viewMode === 'merged' ? '統合表示' : '口座別表示'}</span>
+      <span><strong>方向:</strong> ${sideLabel}</span>
+      <span><strong>数量:</strong> ${fmtQuantity(position.absQuantity)}</span>
+      <span><strong>平均レート:</strong> ${fmtRate(position.avgRate)}</span>
+      <span><strong>口座:</strong> ${escapeHtml(accountsLabel)}</span>
+      <span><strong>戦略:</strong> ${escapeHtml(position.strategyLabel || '-')}</span>
+      <span><strong>内訳:</strong></span>
+      <ul>${breakdown}</ul>
+    </div>
+  `;
+  detail.hidden = false;
+}
+
 function renderOpenPositions(entries) {
   const openPositions = historyCore.calculateOpenPositions(entries);
   const tbody = document.getElementById('openPositionsBody');
   const summary = document.getElementById('openPositionsSummary');
+  const primaryHeader = document.getElementById('openPositionsPrimaryHeader');
+  const detail = document.getElementById('openPositionDetail');
 
-  if (!openPositions.length) {
+  const rows = openPositionsView === 'merged'
+    ? aggregateOpenPositions(openPositions)
+    : normalizeAccountOpenPositions(openPositions);
+
+  if (primaryHeader) {
+    primaryHeader.textContent = openPositionsView === 'merged' ? '集計' : '口座';
+  }
+
+  if (!rows.length) {
     summary.textContent = '現在保有中の建玉はありません。';
     tbody.innerHTML = '<tr><td colspan="5" style="color:#aab5d0;">建玉がありません</td></tr>';
+    if (detail) detail.hidden = true;
     return;
   }
 
-  summary.textContent = `保有建玉: ${openPositions.length} 件`;
-  tbody.innerHTML = openPositions.map((position) => {
+  if (openPositionsView === 'merged') {
+    summary.textContent = `統合表示: ${rows.length} 銘柄`; 
+  } else {
+    summary.textContent = `口座別表示: ${rows.length} 件`;
+  }
+
+  tbody.innerHTML = rows.map((position, idx) => {
     const sideLabel = position.side === 'buy' ? '買い' : '売り';
     const sideClass = position.side === 'buy' ? 'tag-buy' : 'tag-sell';
     return `
-      <tr>
-        <td>${escapeHtml(position.account)}</td>
+      <tr class="open-position-row" data-open-position-index="${idx}">
+        <td>${escapeHtml(position.accountLabel)}</td>
         <td>${escapeHtml(position.symbol)}</td>
         <td><span class="${sideClass}">${sideLabel}</span></td>
         <td>${fmtQuantity(position.absQuantity)}</td>
@@ -167,6 +351,14 @@ function renderOpenPositions(entries) {
       </tr>
     `;
   }).join('');
+
+  tbody.querySelectorAll('[data-open-position-index]').forEach((rowEl) => {
+    rowEl.addEventListener('click', () => {
+      const idx = Number(rowEl.dataset.openPositionIndex);
+      if (!Number.isFinite(idx)) return;
+      renderOpenPositionDetail(rows[idx]);
+    });
+  });
 }
 
 function renderHistoryTable(entries) {
@@ -287,6 +479,17 @@ function bindEvents() {
     const entries = historyCore.parseEntries();
     buildFilters(entries);
   });
+
+  document.querySelectorAll('[data-open-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextView = normalizeOpenPositionsView(button.dataset.openView);
+      if (nextView === openPositionsView) return;
+      openPositionsView = nextView;
+      saveOpenPositionsView(openPositionsView);
+      applyOpenViewSwitchState();
+      renderOpenPositions(historyCore.parseEntries());
+    });
+  });
 }
 
 function renderAll() {
@@ -349,6 +552,8 @@ window.addEventListener('load', () => {
   }
 
   buildBaseSelectOptions();
+  openPositionsView = loadOpenPositionsView();
+  applyOpenViewSwitchState();
   document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);
   bindEvents();
   renderAll();
