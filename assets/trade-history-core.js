@@ -35,7 +35,8 @@
     const symbol = String(entry.symbol || '').trim();
     const side = entry.side === 'sell' ? 'sell' : 'buy';
     const category = String(entry.category || 'new').trim() || 'new';
-    const assetType = String(entry.assetType || 'FX').trim() || 'FX';
+    const rawAssetType = String(entry.assetType || 'FX').trim() || 'FX';
+    const assetType = rawAssetType === 'NISA' ? '証券' : rawAssetType;
     const strategy = String(entry.strategy || '').trim();
     const quantity = Number(entry.quantity);
     const rate = Number(entry.rate);

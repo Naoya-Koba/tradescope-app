@@ -1,7 +1,7 @@
 const historyCore = window.TradeScopeHistory;
 
 const ACCOUNTS = ['GMO', 'Light FX', 'みんなのFX', 'SBI', 'SBI VC', '三井住友銀行'];
-const ASSET_TYPES = ['FX', '暗号資産', 'NISA', 'その他'];
+const ASSET_TYPES = ['FX', '暗号資産', '証券', 'その他'];
 const CATEGORIES = ['new', 'add', 'partial_close', 'full_close'];
 const CATEGORY_LABELS = {
   new: '新規',

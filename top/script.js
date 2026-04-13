@@ -337,7 +337,9 @@ const GROWTH_TARGET_ACCOUNTS = LINKED_ACCOUNTS.filter((account) => !account.bank
 let perfChart = null;
 let portfolioChart = null;
 let accountChart = null;
+let currentPortfolioChart = null;
 let topAssetTrendView = 'asset';
+let activePortfolioAssetTab = 'FX';
 
 function parseStoredJson(key) {
   try {
@@ -567,7 +569,7 @@ let accountData = topSeries.accountData?.length ? topSeries.accountData : [];
 const fallbackPortfolioData = [
   { label: 'FX', amount: 4560000, color: '#3B6DFF' },
   { label: '暗号資産', amount: 568000, color: '#EAF1FF' },
-  { label: 'NISA', amount: 1260000, color: '#D95757' },
+  { label: '証券', amount: 1260000, color: '#D95757' },
   { label: '現金', amount: 710000, color: '#2F7A46' },
   { label: 'その他', amount: 202000, color: '#7E7A98' }
 ];
@@ -580,7 +582,7 @@ function buildPortfolioAllocationFromAccounts(accounts) {
 
   const data = [
     { label: 'FX', amount: (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0), color: '#3B6DFF' },
-    { label: 'NISA', amount: byKey['SBI'] || 0, color: '#D95757' },
+    { label: '証券', amount: byKey['SBI'] || 0, color: '#D95757' },
     { label: '暗号資産', amount: byKey['SBI VC'] || 0, color: '#EAF1FF' },
     { label: '現金', amount: byKey['三井住友銀行'] || 0, color: '#2F7A46' }
   ].filter((item) => item.amount > 0);
@@ -716,7 +718,6 @@ function updateSwap() {
 updateSwap();
 
 // ===== Position & Risk: Detail Panel (unified behavior) =====
-const pairCards = document.querySelectorAll('.pair-card');
 const detailPanel = document.getElementById('pairDetailPanel');
 const detailTitle = document.getElementById('detailTitle');
 const detailProfit = document.getElementById('detailProfit');
@@ -739,20 +740,6 @@ if (!detailScrim) {
   detailScrim.hidden = true;
   document.body.appendChild(detailScrim);
 }
-
-const pairDetails = {
-  'USDJPY': { profit: '¥25,000', rate: '+2.3%', lots: '300', avg: '3.250', now: '3.630', mmr: '265%', zero: '-¥3,280,000', half: '-¥1,640,000', note: '高スワップ維持中。利確目標は3.8。' },
-  'EURJPY': { profit: '¥14,000', rate: '+0.9%', lots: '220', avg: '168.200', now: '169.110', mmr: '278%', zero: '-¥1,840,000', half: '-¥920,000', note: '押し目待ち。利確と積み増しを分離。' },
-  'GBPJPY': { profit: '¥−6,000', rate: '-0.8%', lots: '180', avg: '201.800', now: '200.190', mmr: '241%', zero: '-¥2,120,000', half: '-¥1,060,000', note: 'ボラ高め。逆行時はロット調整優先。' },
-  'CHFJPY': { profit: '¥4,500', rate: '+0.3%', lots: '140', avg: '174.020', now: '174.550', mmr: '286%', zero: '-¥1,420,000', half: '-¥710,000', note: '中立。スワップ寄与を観察。' },
-  'AUDJPY': { profit: '¥18,000', rate: '+1.1%', lots: '200', avg: '96.800', now: '97.860', mmr: '268%', zero: '-¥1,760,000', half: '-¥880,000', note: '押し目で分割追加予定。' },
-  'NZDJPY': { profit: '¥12,000', rate: '+0.7%', lots: '170', avg: '89.500', now: '90.120', mmr: '276%', zero: '-¥1,520,000', half: '-¥760,000', note: '短期はレンジ想定。' },
-  'TRYJPY': { profit: '¥1,095,000', rate: '+4.1%', lots: '300', avg: '3.250', now: '3.630', mmr: '270%', zero: '-¥3,280,000', half: '-¥1,640,000', note: '安定推移中。' },
-  'HUFJPY': { profit: '¥−42,000', rate: '-0.5%', lots: '200', avg: '0.410', now: '0.445', mmr: '310%', zero: '-¥820,000', half: '-¥410,000', note: '金利低下懸念。' },
-  'MXNJPY': { profit: '¥265,000', rate: '+1.9%', lots: '150', avg: '8.710', now: '8.980', mmr: '289%', zero: '-¥1,260,000', half: '-¥630,000', note: '保有継続。急騰時は部分利確。' },
-  'ZARJPY': { profit: '¥85,000', rate: '+0.6%', lots: '110', avg: '8.020', now: '8.170', mmr: '295%', zero: '-¥960,000', half: '-¥480,000', note: 'ニュースイベント時は注意。' },
-  'EURUSD': { profit: '¥0', rate: '0.0%', lots: '0', avg: '1.080', now: '1.080', mmr: '---', zero: '---', half: '---', note: '現在ポジションなし。' }
-};
 
 function lockBackgroundScroll() {
   detailLockScrollY = window.scrollY || window.pageYOffset || 0;
@@ -780,31 +767,69 @@ function applyRateClass(el, rawText) {
   else el.classList.add('neutral');
 }
 
-function openDetail(card) {
-  if (!detailPanel || !card) return;
-  const pair = card.dataset.pair || '';
-  const title = card.querySelector('.pair-title')?.textContent || pair;
-  const fallbackProfit = card.querySelector('.pair-profit')?.textContent || '¥0';
-  const fallbackRate = card.querySelector('.pair-growth')?.textContent || '0.0%';
-  const data = pairDetails[pair] || {
-    profit: fallbackProfit,
-    rate: fallbackRate,
-    lots: detailLots?.textContent || '---',
-    avg: detailAvg?.textContent || '---',
-    now: detailNow?.textContent || '---',
-    mmr: detailMMR?.textContent || '---',
-    zero: detailZero?.textContent || '---',
-    half: detailHalf?.textContent || '---',
-    note: detailNote?.textContent || 'データ準備中。'
-  };
+function formatLossJPY(value) {
+  const abs = Math.round(Math.abs(Number(value) || 0)).toLocaleString();
+  return `-¥${abs}`;
+}
 
-  if (detailTitle) detailTitle.textContent = title;
+function buildDetailDataFromPosition(position) {
+  const absQuantity = Number(position?.absQuantity) || 0;
+  const avgRateValue = Number(position?.avgRate) || 0;
+  const contractSize = Number(position?.contractSize) || historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000;
+  const signedUnits = (position?.side === 'sell' ? -1 : 1) * absQuantity * contractSize;
+  const marketValue = estimateMarketValue(position);
+  const requiredMargin = estimateRequiredMargin(position);
+
+  let zeroLoss = 0;
+  let halfLoss = 0;
+  if (position?.assetType === 'FX') {
+    zeroLoss = Math.max(0, -((0 - avgRateValue) * signedUnits));
+    halfLoss = Math.max(0, -(((avgRateValue * 0.5) - avgRateValue) * signedUnits));
+  } else {
+    zeroLoss = marketValue;
+    halfLoss = marketValue * 0.5;
+  }
+
+  const accountsText = Array.isArray(position?.accounts) && position.accounts.length
+    ? position.accounts.join(' / ')
+    : '情報なし';
+  const noteText = `${position?.memo || 'メモなし'}\n口座: ${accountsText}`;
+  const headlineValue = position?.assetType === 'FX' ? requiredMargin : marketValue;
+
+  return {
+    title: `${position?.symbol || '-'} (${position?.assetType || '-'})`,
+    profit: fmtJPY(headlineValue),
+    rate: '0.0%',
+    lots: fmtQuantity(absQuantity),
+    avg: fmtRate(avgRateValue),
+    now: fmtRate(avgRateValue),
+    mmr: '---',
+    zero: formatLossJPY(zeroLoss),
+    half: formatLossJPY(halfLoss),
+    note: noteText
+  };
+}
+
+function openDetail(target) {
+  if (!detailPanel || !target) return;
+
+  const data = target instanceof Element
+    ? buildDetailDataFromPosition({
+      symbol: target.querySelector('.pair-title')?.textContent || '-',
+      assetType: activePortfolioAssetTab,
+      absQuantity: 0,
+      avgRate: 0,
+      side: 'buy',
+      memo: 'データ準備中。',
+      accounts: []
+    })
+    : buildDetailDataFromPosition(target);
+
+  if (detailTitle) detailTitle.textContent = data.title;
   if (detailProfit) {
     detailProfit.textContent = data.profit;
     detailProfit.classList.remove('positive', 'negative', 'neutral');
-    if (data.profit.includes('−') || data.profit.includes('-')) detailProfit.classList.add('negative');
-    else if (data.profit.includes('0')) detailProfit.classList.add('neutral');
-    else detailProfit.classList.add('positive');
+    detailProfit.classList.add('neutral');
   }
   if (detailRate) {
     detailRate.textContent = data.rate;
@@ -837,10 +862,6 @@ function closeDetail() {
     detailScrim.hidden = true;
   }, 250);
 }
-
-pairCards.forEach((card) => {
-  card.addEventListener('click', () => openDetail(card));
-});
 
 detailClose?.addEventListener('click', closeDetail);
 detailScrim?.addEventListener('click', closeDetail);
@@ -1211,7 +1232,7 @@ function dismissDoughnutTooltipsOnOutsideTap(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
 
-  [portfolioChart, accountChart].forEach((chart) => {
+  [portfolioChart, accountChart, currentPortfolioChart].forEach((chart) => {
     if (!chart?.canvas) return;
     if (chart.canvas.contains(target)) return;
     if (!chart.getActiveElements().length) return;
@@ -1342,6 +1363,245 @@ function renderPortfolio() {
 }
 renderPortfolio();
 
+function normalizeAssetTypeLabel(assetType) {
+  const normalized = String(assetType || '').trim();
+  if (!normalized) return 'その他';
+  if (normalized.toUpperCase() === 'FX') return 'FX';
+  if (normalized === 'NISA') return '証券';
+  return normalized;
+}
+
+function normalizeTopSymbolKey(symbol) {
+  if (historyCore?.normalizeSymbolKey) return historyCore.normalizeSymbolKey(symbol);
+  return String(symbol || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function estimateRequiredMargin(position) {
+  const qty = Number(position.absQuantity) || 0;
+  const avgRate = Number(position.avgRate) || 0;
+  const contractSize = Number(position.contractSize) || historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000;
+  const notional = qty * contractSize * Math.max(0, avgRate);
+  return notional * 0.04;
+}
+
+function estimateMarketValue(position) {
+  const qty = Number(position.absQuantity) || 0;
+  const avgRate = Number(position.avgRate) || 0;
+  const contractSize = Number(position.contractSize) || 1;
+  return qty * contractSize * Math.max(0, avgRate);
+}
+
+function getLatestMemoMap(entries) {
+  const map = new Map();
+  const sorted = historyCore?.getSortedEntries
+    ? historyCore.getSortedEntries(entries, 'newest')
+    : [...entries].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+  sorted.forEach((entry) => {
+    const key = `${normalizeAssetTypeLabel(entry.assetType)}::${normalizeTopSymbolKey(entry.symbol)}`;
+    if (map.has(key)) return;
+    const memo = String(entry.memo || '').trim();
+    if (memo) map.set(key, memo);
+  });
+
+  return map;
+}
+
+function aggregateOpenPositionsForTop(entries) {
+  if (!historyCore?.calculateOpenPositions) return [];
+  const openPositions = historyCore.calculateOpenPositions(entries || []);
+  const latestMemoMap = getLatestMemoMap(entries || []);
+  const map = new Map();
+
+  openPositions.forEach((position) => {
+    const assetType = normalizeAssetTypeLabel(position.assetType || 'その他');
+    const symbolKey = normalizeTopSymbolKey(position.symbol);
+    const key = `${assetType}::${symbolKey}`;
+    const signedQty = position.side === 'sell' ? -Math.abs(Number(position.absQuantity) || 0) : Math.abs(Number(position.absQuantity) || 0);
+    if (!Number.isFinite(signedQty) || Math.abs(signedQty) < 1e-12) return;
+
+    const current = map.get(key) || {
+      key,
+      symbol: position.symbol,
+      assetType,
+      quantity: 0,
+      avgRate: 0,
+      contractSize: Number(position.contractSize) || historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000,
+      accounts: new Set(),
+      strategies: new Set()
+    };
+
+    const nextQty = current.quantity + signedQty;
+    const positionRate = Number(position.avgRate) || 0;
+    if (current.quantity === 0 || Math.sign(current.quantity) === Math.sign(signedQty)) {
+      const currentAbs = Math.abs(current.quantity);
+      const addAbs = Math.abs(signedQty);
+      const weighted = ((current.avgRate * currentAbs) + (positionRate * addAbs)) / (currentAbs + addAbs);
+      current.quantity = nextQty;
+      current.avgRate = Number.isFinite(weighted) ? weighted : positionRate;
+    } else if (Math.abs(nextQty) < 1e-12) {
+      current.quantity = 0;
+      current.avgRate = 0;
+    } else if (Math.sign(nextQty) === Math.sign(current.quantity)) {
+      current.quantity = nextQty;
+    } else {
+      current.quantity = nextQty;
+      current.avgRate = positionRate;
+    }
+
+    if (position.account) current.accounts.add(position.account);
+    if (position.strategy) current.strategies.add(position.strategy);
+    current.contractSize = Number(position.contractSize) || current.contractSize;
+
+    map.set(key, current);
+  });
+
+  return Array.from(map.values())
+    .filter((position) => Math.abs(position.quantity) > 1e-12)
+    .map((position) => {
+      const side = position.quantity >= 0 ? 'buy' : 'sell';
+      const absQuantity = Math.abs(position.quantity);
+      const base = {
+        id: position.key,
+        symbol: position.symbol,
+        assetType: position.assetType,
+        side,
+        absQuantity,
+        avgRate: position.avgRate,
+        contractSize: position.contractSize,
+        accounts: [...position.accounts].sort((a, b) => String(a).localeCompare(String(b), 'ja')),
+        strategy: [...position.strategies][0] || '-',
+        memo: latestMemoMap.get(position.key) || 'メモなし'
+      };
+
+      const metricValue = position.assetType === 'FX'
+        ? estimateRequiredMargin(base)
+        : estimateMarketValue(base);
+
+      return {
+        ...base,
+        metricValue
+      };
+    })
+    .sort((a, b) => (Number(b.metricValue) || 0) - (Number(a.metricValue) || 0));
+}
+
+function getActivePortfolioRows() {
+  const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
+  const rows = aggregateOpenPositionsForTop(entries);
+  return rows.filter((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(activePortfolioAssetTab));
+}
+
+function bindPortfolioTabs() {
+  document.querySelectorAll('[data-asset-tab]').forEach((tab) => {
+    if (tab.dataset.bound === '1') return;
+    tab.addEventListener('click', () => {
+      const nextTab = tab.dataset.assetTab || 'FX';
+      if (nextTab === activePortfolioAssetTab) return;
+      activePortfolioAssetTab = nextTab;
+      renderCurrentPortfolioSection();
+    });
+    tab.dataset.bound = '1';
+  });
+}
+
+function syncPortfolioTabs() {
+  document.querySelectorAll('[data-asset-tab]').forEach((tab) => {
+    const isActive = tab.dataset.assetTab === activePortfolioAssetTab;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+}
+
+function bindCurrentPortfolioRows(rows) {
+  const list = document.getElementById('currentPortfolioList');
+  if (!list) return;
+  list.querySelectorAll('[data-open-id]').forEach((rowEl) => {
+    rowEl.addEventListener('click', () => {
+      const targetId = rowEl.dataset.openId;
+      const target = rows.find((row) => row.id === targetId);
+      if (!target) return;
+      openDetail(target);
+    });
+  });
+}
+
+function renderCurrentPortfolioSection() {
+  const list = document.getElementById('currentPortfolioList');
+  const chartCtx = document.getElementById('currentPortfolioChart')?.getContext('2d');
+  if (!list) return;
+
+  const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
+  const allRows = aggregateOpenPositionsForTop(entries);
+  const hasTabData = (tabName) => allRows.some((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(tabName));
+  if (!hasTabData(activePortfolioAssetTab)) {
+    const fallbackTab = ['FX', '証券', '暗号資産'].find((tabName) => hasTabData(tabName));
+    if (fallbackTab) activePortfolioAssetTab = fallbackTab;
+  }
+  syncPortfolioTabs();
+
+  const rows = allRows.filter((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(activePortfolioAssetTab));
+
+  if (!rows.length) {
+    list.innerHTML = '<li class="pair-card"><div class="pair-title">保有ポジションがありません</div><div class="pair-right"><div class="pair-profit neutral">-</div><div class="pair-growth neutral">0.0%</div></div></li>';
+    if (currentPortfolioChart) {
+      currentPortfolioChart.destroy();
+      currentPortfolioChart = null;
+    }
+    return;
+  }
+
+  const total = rows.reduce((sum, row) => sum + (Number(row.metricValue) || 0), 0);
+  list.innerHTML = rows.map((row) => {
+    const share = total > 0 ? ((row.metricValue / total) * 100) : 0;
+    const metricLabel = activePortfolioAssetTab === 'FX' ? '必要証拠金' : '評価額';
+    return `
+      <li class="pair-card" data-open-id="${escapeHtml(row.id)}">
+        <div class="pair-title">${escapeHtml(row.symbol)}</div>
+        <div class="pair-right">
+          <div class="pair-profit neutral">${metricLabel} ${fmtJPY(row.metricValue)}</div>
+          <div class="pair-growth neutral">${fmtQuantity(row.absQuantity)} / ${share.toFixed(1)}%</div>
+        </div>
+      </li>
+    `;
+  }).join('');
+
+  bindCurrentPortfolioRows(rows);
+
+  if (!chartCtx || typeof Chart === 'undefined') return;
+  if (currentPortfolioChart) currentPortfolioChart.destroy();
+
+  const palette = ['#3B6DFF', '#3EE08F', '#3DA2FF', '#D95757', '#E9C85E', '#7E7A98', '#F18E4F', '#8BC7FF'];
+  currentPortfolioChart = new Chart(chartCtx, {
+    type: 'doughnut',
+    data: {
+      labels: rows.map((row) => row.symbol),
+      datasets: [{
+        data: rows.map((row) => row.metricValue),
+        backgroundColor: rows.map((_, idx) => palette[idx % palette.length]),
+        borderColor: 'rgba(255,255,255,0.2)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      responsive: true,
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.label}: ${fmtJPY(ctx.parsed)} (${total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0.0'}%)`
+          }
+        }
+      }
+    }
+  });
+}
+
+bindPortfolioTabs();
+renderCurrentPortfolioSection();
+
 // ===== Year Selector =====
 function getPersistedSelectedYear() {
   const raw = Number(localStorage.getItem(SHARED_SELECTED_YEAR_KEY));
@@ -1427,6 +1687,7 @@ function updateDataByYear(inputYear = null) {
   portfolioData = buildPortfolioAllocationFromAccounts(accountData);
   renderPortfolio();
   updateRiskSection();
+  renderCurrentPortfolioSection();
 
   renderPerformanceChart();
 }
@@ -1525,6 +1786,7 @@ window.addEventListener('storage', (event) => {
   if (!historyCore?.STORAGE_KEY) return;
   if (event.key !== historyCore.STORAGE_KEY) return;
   updateRiskSection();
+  renderCurrentPortfolioSection();
 });
 
 // Backup button listeners

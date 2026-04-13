@@ -233,8 +233,8 @@
   <canvas id="perfChart" height="200"></canvas>
 </section>
 
-    <!-- ===== Portfolio Section ===== -->
-    <h2 class="heading-muted">Portfolio</h2>
+    <!-- ===== Asset Allocation Section ===== -->
+    <h2 class="heading-muted">Asset Allocation</h2>
     <section class="section glass">
       <div class="portfolio-columns">
         <div class="portfolio-column">
@@ -252,6 +252,28 @@
           </div>
           <div class="portfolio-items" id="accountItems"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== Portfolio Section ===== -->
+    <h2 class="heading-muted">Portfolio</h2>
+    <section class="section glass portfolio-current-section">
+      <div class="portfolio-tabs" role="tablist" aria-label="Portfolio種別切替">
+        <button id="portfolioTabFx" class="portfolio-tab active" type="button" data-asset-tab="FX" role="tab" aria-selected="true">FX</button>
+        <button id="portfolioTabSecurities" class="portfolio-tab" type="button" data-asset-tab="証券" role="tab" aria-selected="false">証券</button>
+        <button id="portfolioTabCrypto" class="portfolio-tab" type="button" data-asset-tab="暗号資産" role="tab" aria-selected="false">暗号資産</button>
+      </div>
+
+      <div class="portfolio-current-block">
+        <p class="portfolio-col-title">保有比率</p>
+        <div class="portfolio-chart-container">
+          <canvas id="currentPortfolioChart"></canvas>
+        </div>
+      </div>
+
+      <div class="portfolio-current-block">
+        <p class="portfolio-col-title">保有一覧</p>
+        <ul id="currentPortfolioList" class="sortable-list"></ul>
       </div>
     </section>
 
@@ -283,100 +305,6 @@
           <span id="riskCryptoZero" class="risk-row-value">¥0</span>
         </div>
       </div>
-    </section>
-
-    <!-- ===== Position ===== -->
-     <h2 class="heading-muted">Position</h2>
-<section class="section">
- <ul id="pairList" class="sortable-list glass">
-  <li class="pair-card" data-pair="USDJPY">
-    <div class="pair-title">USD/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥25,000</div>
-      <div class="pair-growth positive">+2.3%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="EURJPY">
-    <div class="pair-title">EUR/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥14,000</div>
-      <div class="pair-growth positive">+0.9%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="GBPJPY">
-    <div class="pair-title">GBP/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit negative">¥−6,000</div>
-      <div class="pair-growth negative">-0.8%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="CHFJPY">
-    <div class="pair-title">CHF/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥4,500</div>
-      <div class="pair-growth positive">+0.3%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="AUDJPY">
-    <div class="pair-title">AUD/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥18,000</div>
-      <div class="pair-growth positive">+1.1%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="NZDJPY">
-    <div class="pair-title">NZD/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥12,000</div>
-      <div class="pair-growth positive">+0.7%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="TRYJPY">
-    <div class="pair-title">TRY/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥1,095,000</div>
-      <div class="pair-growth positive">+4.1%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="HUFJPY">
-    <div class="pair-title">HUF/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit negative">¥−42,000</div>
-      <div class="pair-growth negative">-0.5%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="MXNJPY">
-    <div class="pair-title">MXN/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥265,000</div>
-      <div class="pair-growth positive">+1.9%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="ZARJPY">
-    <div class="pair-title">ZAR/JPY</div>
-    <div class="pair-right">
-      <div class="pair-profit positive">¥85,000</div>
-      <div class="pair-growth positive">+0.6%</div>
-    </div>
-  </li>
-
-  <li class="pair-card" data-pair="EURUSD">
-    <div class="pair-title">EUR/USD</div>
-    <div class="pair-right">
-      <div class="pair-profit neutral">¥0</div>
-      <div class="pair-growth neutral">0.0%</div>
-    </div>
-  </li>
-</ul>
     </section>
 
    <!-- ===== Detail Panel（右ペイン） ===== -->

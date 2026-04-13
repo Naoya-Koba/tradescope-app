@@ -2476,3 +2476,57 @@ body.drawer-open {
 
 /* 詳細表示中は背景スクロールを固定（iPad含む） */
 
+.portfolio-current-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.portfolio-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  width: fit-content;
+}
+
+.portfolio-tab {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.portfolio-tab.active {
+  background: rgba(61,162,255,.2);
+  color: #eaf4ff;
+}
+
+.portfolio-current-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#currentPortfolioList {
+  padding: 0;
+  margin: 0;
+}
+
+#currentPortfolioList .pair-card {
+  padding: 10px 8px;
+}
+
+@media (max-width: 480px) {
+  .portfolio-tab {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+}
+
