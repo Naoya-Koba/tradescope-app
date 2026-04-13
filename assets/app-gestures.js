@@ -74,15 +74,31 @@
 
 (function () {
   const COLLAPSE_STYLE_ID = 'ts-collapse-style';
+  const COLLAPSE_STORAGE_PREFIX = 'tradeScopeCollapseState:';
+  const COLLAPSE_HEADING_SELECTOR = 'h2.heading-muted, .summary-header, .annual-summary-head, .performance-head';
 
   function ensureCollapseStyle() {
     if (document.getElementById(COLLAPSE_STYLE_ID)) return;
     const style = document.createElement('style');
     style.id = COLLAPSE_STYLE_ID;
     style.textContent = `
-      .ts-collapse-heading {
+      .ts-collapse-clickable {
         cursor: pointer;
         user-select: none;
+      }
+
+      h2.heading-muted.ts-collapse-clickable {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        min-height: 34px;
+        margin: 0 0 6px;
+      }
+
+      .summary-header.ts-collapse-clickable .heading-muted,
+      .annual-summary-head.ts-collapse-clickable .heading-muted,
+      .performance-head.ts-collapse-clickable .heading-muted {
         display: inline-flex;
         align-items: center;
         gap: 6px;
@@ -101,21 +117,56 @@
     document.head.appendChild(style);
   }
 
-  function resolveToggleTarget(heading) {
-    const sectionHead = heading.closest('.summary-header, .annual-summary-head, .performance-head');
-    let node = (sectionHead || heading).nextElementSibling;
-
-    while (node) {
-      if (node.matches('.section, .chart-area, .memo-section')) return node;
-      node = node.nextElementSibling;
+  function readCollapseState() {
+    try {
+      const raw = localStorage.getItem(COLLAPSE_STORAGE_PREFIX + window.location.pathname);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
     }
-    return null;
   }
 
-  function toggleSection(target, iconEl) {
-    target.classList.toggle('ts-collapsed');
-    const collapsed = target.classList.contains('ts-collapsed');
+  function writeCollapseState(state) {
+    try {
+      localStorage.setItem(COLLAPSE_STORAGE_PREFIX + window.location.pathname, JSON.stringify(state));
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  function buildCollapseKey(heading, index) {
+    const rawLabel = heading.dataset.tsCollapseLabel || heading.textContent || '';
+    const normalized = rawLabel.replace(/\s+/g, ' ').trim().toLowerCase();
+    return `${index}:${normalized}`;
+  }
+
+  function resolveToggleTargets(heading) {
+    const sectionHead = heading.closest('.summary-header, .annual-summary-head, .performance-head');
+    let node = (sectionHead || heading).nextElementSibling;
+    const targets = [];
+
+    while (node) {
+      if (node.matches(COLLAPSE_HEADING_SELECTOR)) break;
+      targets.push(node);
+      node = node.nextElementSibling;
+    }
+    return targets;
+  }
+
+  function setTargetsCollapsed(targets, collapsed) {
+    targets.forEach((target) => {
+      target.classList.toggle('ts-collapsed', collapsed);
+    });
+  }
+
+  function toggleSection(targets, iconEl, collapseKey, collapseState) {
+    if (!targets.length) return;
+    const collapsed = !targets[0].classList.contains('ts-collapsed');
+    setTargetsCollapsed(targets, collapsed);
     iconEl.textContent = collapsed ? '▸' : '▾';
+    collapseState[collapseKey] = collapsed;
+    writeCollapseState(collapseState);
 
     if (!collapsed) {
       window.requestAnimationFrame(() => {
@@ -127,15 +178,18 @@
   function bindSectionCollapse() {
     ensureCollapseStyle();
     const headings = document.querySelectorAll('main .heading-muted');
+    const collapseState = readCollapseState();
 
-    headings.forEach((heading) => {
+    headings.forEach((heading, index) => {
       if (heading.dataset.tsCollapseBound === '1') return;
 
-      const target = resolveToggleTarget(heading);
-      if (!target) return;
+      heading.dataset.tsCollapseLabel = heading.textContent.trim();
+      const targets = resolveToggleTargets(heading);
+      if (!targets.length) return;
 
-      heading.classList.add('ts-collapse-heading');
-      target.classList.add('ts-collapsible-target');
+      const clickTarget = heading.closest('.summary-header, .annual-summary-head, .performance-head') || heading;
+      clickTarget.classList.add('ts-collapse-clickable');
+      targets.forEach((target) => target.classList.add('ts-collapsible-target'));
 
       let iconEl = heading.querySelector('.ts-collapse-icon');
       if (!iconEl) {
@@ -145,9 +199,15 @@
         heading.appendChild(iconEl);
       }
 
-      heading.addEventListener('click', (event) => {
+      const collapseKey = buildCollapseKey(heading, index);
+      if (collapseState[collapseKey]) {
+        setTargetsCollapsed(targets, true);
+        iconEl.textContent = '▸';
+      }
+
+      clickTarget.addEventListener('click', (event) => {
         if (event.target instanceof Element && event.target.closest('a, button, select, input, textarea, label')) return;
-        toggleSection(target, iconEl);
+        toggleSection(targets, iconEl, collapseKey, collapseState);
       });
 
       heading.dataset.tsCollapseBound = '1';
