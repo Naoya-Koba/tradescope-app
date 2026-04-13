@@ -10,6 +10,10 @@ const fmtMan = (n) => {
   const sign = n < 0 ? '−' : '';
   return sign + Math.round(Math.abs(n) / 10000).toLocaleString();
 };
+const fmtQuantity = (n) => {
+  if (!isFinite(n)) return '-';
+  return Number(n).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
+};
 const setSignClass = (el, val) => {
   if (!el) return;
   el.classList.remove('positive', 'negative', 'neutral');
@@ -607,6 +611,20 @@ function updateRiskSection() {
 
   const entries = historyCore.parseEntries();
   const cryptoValue = accountData.find((item) => item.label === 'SBI VC')?.amount || 0;
+  if (!entries.length) {
+    const fallbackFxZero = Math.abs(risk.zero || 0);
+    const fallbackFxOne = Math.abs(risk.half || 0);
+    const fallbackCrypto = Math.abs(cryptoValue || 0);
+    maxEl.textContent = fmtJPY(fallbackFxZero + fallbackCrypto);
+    fxOneEl.textContent = fmtJPY(fallbackFxOne);
+    fxZeroEl.textContent = fmtJPY(fallbackFxZero);
+    cryptoZeroEl.textContent = fmtJPY(fallbackCrypto);
+    if (noteEl) {
+      noteEl.textContent = 'FX＋暗号資産 0円時（フォールバック表示）';
+    }
+    return;
+  }
+
   const riskSummary = historyCore.calculateRiskSummary(entries, cryptoValue);
 
   const fxOneDisplayLoss = (riskSummary.fxOneYenLoss || 0) + (riskSummary.fxHufPointOneLoss || 0);
@@ -1486,6 +1504,66 @@ function aggregateOpenPositionsForTop(entries) {
     .sort((a, b) => (Number(b.metricValue) || 0) - (Number(a.metricValue) || 0));
 }
 
+function buildFallbackPortfolioRowsFromAccounts() {
+  const byKey = (accountData || []).reduce((acc, item) => {
+    acc[item.label] = Number(item.amount) || 0;
+    return acc;
+  }, {});
+
+  const fxAmount = (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0);
+  const securitiesAmount = byKey['SBI'] || 0;
+  const cryptoAmount = byKey['SBI VC'] || 0;
+
+  const rows = [];
+  if (fxAmount > 0) {
+    rows.push({
+      id: 'fallback::FX',
+      symbol: 'FX統合',
+      assetType: 'FX',
+      side: 'buy',
+      absQuantity: 1,
+      avgRate: 1,
+      contractSize: 1,
+      accounts: ['GMO', 'Light FX', 'みんなのFX'],
+      strategy: '-',
+      memo: 'Open Positions未登録のため資産配分から表示',
+      metricValue: fxAmount * 0.04
+    });
+  }
+  if (securitiesAmount > 0) {
+    rows.push({
+      id: 'fallback::証券',
+      symbol: '証券統合',
+      assetType: '証券',
+      side: 'buy',
+      absQuantity: 1,
+      avgRate: 1,
+      contractSize: 1,
+      accounts: ['SBI'],
+      strategy: '-',
+      memo: 'Open Positions未登録のため資産配分から表示',
+      metricValue: securitiesAmount
+    });
+  }
+  if (cryptoAmount > 0) {
+    rows.push({
+      id: 'fallback::暗号資産',
+      symbol: '暗号資産統合',
+      assetType: '暗号資産',
+      side: 'buy',
+      absQuantity: 1,
+      avgRate: 1,
+      contractSize: 1,
+      accounts: ['SBI VC'],
+      strategy: '-',
+      memo: 'Open Positions未登録のため資産配分から表示',
+      metricValue: cryptoAmount
+    });
+  }
+
+  return rows;
+}
+
 function getActivePortfolioRows() {
   const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
   const rows = aggregateOpenPositionsForTop(entries);
@@ -1532,7 +1610,10 @@ function renderCurrentPortfolioSection() {
   if (!list) return;
 
   const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
-  const allRows = aggregateOpenPositionsForTop(entries);
+  let allRows = aggregateOpenPositionsForTop(entries);
+  if (!allRows.length) {
+    allRows = buildFallbackPortfolioRowsFromAccounts();
+  }
   const hasTabData = (tabName) => allRows.some((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(tabName));
   if (!hasTabData(activePortfolioAssetTab)) {
     const fallbackTab = ['FX', '証券', '暗号資産'].find((tabName) => hasTabData(tabName));
