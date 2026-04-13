@@ -642,52 +642,64 @@ function updateKPIs() {
   elReal.textContent = fmtJPY(rLast);
 
   const elNet = document.getElementById('growthNet');
-
-  // 年間成長率: 入出金の影響を除いた実質ベースの計算
-  // 実質損益 = 現在純資産 - 年初純資産 - 累計入金額 + 累計出金額
-  // 年間成長率 = 実質損益 ÷ 年初純資産 × 100
-  const yearStartTotal = topSeries.yearStartTotal || 0;
-  const yearStartConfirmed = topSeries.yearStartConfirmed || 0;
+  const yearStartTotalActual = topSeries.chartStartTotalWithUnrealized || 0;
+  const yearStartConfirmedActual = topSeries.chartStartTotal || 0;
+  const yearStartTotalPerformance = topSeries.yearStartTotal || 0;
+  const yearStartConfirmedPerformance = topSeries.yearStartConfirmed || 0;
   const growthCurrentTotal = topSeries.growthCurrentTotal || tLast;
   const growthCurrentConfirmed = topSeries.growthCurrentConfirmed || rLast;
   const cumulativeDeposits = topSeries.cumulativeDeposits || 0;
   const cumulativeWithdrawals = topSeries.cumulativeWithdrawals || 0;
-  
-  let annualGrowthRate = 0;
-  let realPnL = 0;
-  if (yearStartTotal > 0) {
-    realPnL = growthCurrentTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
-    annualGrowthRate = (realPnL / yearStartTotal) * 100;
-  } else {
-    realPnL = growthCurrentTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals;
-  }
 
-  let confirmedAnnualGrowthRate = 0;
-  let confirmedRealPnL = 0;
-  if (yearStartConfirmed > 0) {
-    confirmedRealPnL = growthCurrentConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals;
-    confirmedAnnualGrowthRate = (confirmedRealPnL / yearStartConfirmed) * 100;
-  } else {
-    confirmedRealPnL = growthCurrentConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals;
-  }
+  const totalAssetDelta = tLast - yearStartTotalActual;
+  const confirmedAssetDelta = rLast - yearStartConfirmedActual;
+  const annualGrowthRate = yearStartTotalActual > 0 ? (totalAssetDelta / yearStartTotalActual) * 100 : 0;
+  const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : 0;
+
+  const annualNetPnL = growthCurrentTotal - yearStartTotalPerformance - cumulativeDeposits + cumulativeWithdrawals;
+  const annualConfirmedPnL = growthCurrentConfirmed - yearStartConfirmedPerformance - cumulativeDeposits + cumulativeWithdrawals;
+  const annualNetPnLGrowth = yearStartTotalPerformance > 0 ? (annualNetPnL / yearStartTotalPerformance) * 100 : 0;
+  const annualConfirmedPnLGrowth = yearStartConfirmedPerformance > 0 ? (annualConfirmedPnL / yearStartConfirmedPerformance) * 100 : 0;
 
   const elTotalDelta = document.getElementById('deltaTotal');
   const elNetDelta = document.getElementById('deltaNet');
   if (elTotalDelta) {
-    elTotalDelta.textContent = fmtDeltaNumber(realPnL);
-    setSignClass(elTotalDelta, realPnL);
+    elTotalDelta.textContent = fmtDeltaNumber(totalAssetDelta);
+    setSignClass(elTotalDelta, totalAssetDelta);
   }
   if (elNetDelta) {
-    elNetDelta.textContent = fmtDeltaNumber(confirmedRealPnL);
-    setSignClass(elNetDelta, confirmedRealPnL);
+    elNetDelta.textContent = fmtDeltaNumber(confirmedAssetDelta);
+    setSignClass(elNetDelta, confirmedAssetDelta);
   }
 
   elNet.textContent = (confirmedAnnualGrowthRate >= 0 ? '+' : '') + confirmedAnnualGrowthRate.toFixed(1) + '%';
   setSignClass(elNet, confirmedAnnualGrowthRate);
-  
+
   const elTotalGrowth = document.getElementById('growthTotal');
   elTotalGrowth.textContent = (annualGrowthRate >= 0 ? '+' : '') + annualGrowthRate.toFixed(1) + '%';
   setSignClass(elTotalGrowth, annualGrowthRate);
+
+  const elAnnualNetPnL = document.getElementById('annualNetPnL');
+  const elAnnualConfirmedPnL = document.getElementById('annualConfirmedPnL');
+  const elAnnualNetGrowth = document.getElementById('annualNetPnLGrowth');
+  const elAnnualConfirmedGrowth = document.getElementById('annualConfirmedPnLGrowth');
+
+  if (elAnnualNetPnL) {
+    elAnnualNetPnL.textContent = fmtJPY(annualNetPnL);
+    setSignClass(elAnnualNetPnL, annualNetPnL);
+  }
+  if (elAnnualConfirmedPnL) {
+    elAnnualConfirmedPnL.textContent = fmtJPY(annualConfirmedPnL);
+    setSignClass(elAnnualConfirmedPnL, annualConfirmedPnL);
+  }
+  if (elAnnualNetGrowth) {
+    elAnnualNetGrowth.textContent = (annualNetPnLGrowth >= 0 ? '+' : '') + annualNetPnLGrowth.toFixed(1) + '%';
+    setSignClass(elAnnualNetGrowth, annualNetPnLGrowth);
+  }
+  if (elAnnualConfirmedGrowth) {
+    elAnnualConfirmedGrowth.textContent = (annualConfirmedPnLGrowth >= 0 ? '+' : '') + annualConfirmedPnLGrowth.toFixed(1) + '%';
+    setSignClass(elAnnualConfirmedGrowth, annualConfirmedPnLGrowth);
+  }
 }
 updateKPIs();
 

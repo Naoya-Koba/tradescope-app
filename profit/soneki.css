@@ -595,10 +595,12 @@ body.drawer-open {
 }
 
 /* ===== Summary Cards ===== */
-.annual-summary-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.annual-summary-primary-card {
+  margin-bottom: 12px;
+}
+
+.annual-summary-performance-card {
+  margin-top: 0;
 }
 .annual-summary-row {
   display: flex;

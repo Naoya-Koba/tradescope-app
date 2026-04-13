@@ -115,78 +115,100 @@
         <select id="yearDisplay" class="year-toggle year-chip" aria-label="年度を選択"></select>
       </div>
     </div>
-    <section class="section glass margin-bottom">
-      <div class="annual-summary-list">
-        <div class="annual-summary-row annual-primary">
-          <span class="annual-summary-label">純資産 <span class="sub-en">Total Equity</span></span>
-          <div class="annual-summary-right">
-            <span id="totalAssets" class="annual-summary-value annual-main-value">¥0</span>
-            <div class="annual-metric-row">
-              <span class="annual-metric-label">変動額</span>
-              <span id="totalAssetsDelta" class="annual-growth-delta neutral">¥0</span>
-            </div>
-            <div class="annual-metric-row">
-              <span class="annual-metric-label">年間成長率</span>
-              <span id="yearGrowthRate" class="annual-growth-pill neutral">0%</span>
-            </div>
+    <section class="section glass annual-summary-primary-card">
+      <div class="annual-summary-row annual-primary">
+        <span class="annual-summary-label">純資産 <span class="sub-en">Total Equity</span></span>
+        <div class="annual-summary-right">
+          <span id="totalAssets" class="annual-summary-value annual-main-value">¥0</span>
+          <div class="annual-metric-row">
+            <span class="annual-metric-label">変動額</span>
+            <span id="totalAssetsDelta" class="annual-growth-delta neutral">¥0</span>
+          </div>
+          <div class="annual-metric-row">
+            <span class="annual-metric-label">年間成長率</span>
+            <span id="yearGrowthRate" class="annual-growth-pill neutral">0%</span>
           </div>
         </div>
-
-        <div class="annual-summary-row annual-primary">
-          <span class="annual-summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
-          <div class="annual-summary-right">
-            <span id="confirmedAssets" class="annual-summary-value annual-main-value">¥0</span>
-            <div class="annual-metric-row">
-              <span class="annual-metric-label">変動額</span>
-              <span id="confirmedAssetsDelta" class="annual-growth-delta neutral">¥0</span>
-            </div>
-            <div class="annual-metric-row">
-              <span class="annual-metric-label">年間成長率</span>
-              <span id="confirmedYearGrowthRate" class="annual-growth-pill neutral">0%</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="annual-summary-row">
-          <span class="annual-summary-label">年間決済 <span class="sub-en">Realized PnL</span></span>
-          <span id="yearRealizedSum" class="annual-summary-value">¥0</span>
-        </div>
-
-        <div class="annual-summary-row">
-          <span class="annual-summary-label">年間スワップ <span class="sub-en">Swap PnL</span></span>
-          <span id="yearSwapSum" class="annual-summary-value">¥0</span>
-        </div>
-
-        <details class="annual-minor-details">
-          <summary class="annual-minor-summary">入出金詳細</summary>
-          <div class="annual-minor-list">
-            <div class="annual-summary-row">
-              <span class="annual-summary-label">年初資金 <span class="sub-en">Initial Capital</span></span>
-              <span id="yearInitialCapital" class="annual-summary-value">¥0</span>
-            </div>
-
-            <div class="annual-summary-row">
-              <span class="annual-summary-label">年初評価損益 <span class="sub-en">Initial Unrealized</span></span>
-              <span id="yearInitialUnrealizedTotal" class="annual-summary-value">¥0</span>
-            </div>
-
-            <div class="annual-summary-row">
-              <span class="annual-summary-label">年間入金 <span class="sub-en">Deposit</span></span>
-              <span id="yearDepositSum" class="annual-summary-value">¥0</span>
-            </div>
-
-            <div class="annual-summary-row">
-              <span class="annual-summary-label">年間出金 <span class="sub-en">Withdrawal</span></span>
-              <span id="yearWithdrawSum" class="annual-summary-value">¥0</span>
-            </div>
-
-            <div class="annual-summary-row">
-              <span class="annual-summary-label">年間入出金差額 <span class="sub-en">Net Cash Flow</span></span>
-              <span id="yearNetCashFlow" class="annual-summary-value">¥0</span>
-            </div>
-          </div>
-        </details>
       </div>
+
+      <div class="annual-summary-row annual-primary">
+        <span class="annual-summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
+        <div class="annual-summary-right">
+          <span id="confirmedAssets" class="annual-summary-value annual-main-value">¥0</span>
+          <div class="annual-metric-row">
+            <span class="annual-metric-label">変動額</span>
+            <span id="confirmedAssetsDelta" class="annual-growth-delta neutral">¥0</span>
+          </div>
+          <div class="annual-metric-row">
+            <span class="annual-metric-label">年間成長率</span>
+            <span id="confirmedYearGrowthRate" class="annual-growth-pill neutral">0%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section glass margin-bottom annual-summary-performance-card">
+      <div class="annual-summary-row annual-primary">
+        <span class="annual-summary-label">純損益 <span class="sub-en">Net P/L</span></span>
+        <div class="annual-summary-right">
+          <span id="yearNetPnL" class="annual-summary-value annual-main-value">¥0</span>
+          <div class="annual-metric-row">
+            <span class="annual-metric-label">年間成長率</span>
+            <span id="yearNetPnLGrowthRate" class="annual-growth-pill neutral">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="annual-summary-row annual-primary">
+        <span class="annual-summary-label">確定損益 <span class="sub-en">Realized Net P/L</span></span>
+        <div class="annual-summary-right">
+          <span id="yearConfirmedPnL" class="annual-summary-value annual-main-value">¥0</span>
+          <div class="annual-metric-row">
+            <span class="annual-metric-label">年間成長率</span>
+            <span id="yearConfirmedPnLGrowthRate" class="annual-growth-pill neutral">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="annual-summary-row">
+        <span class="annual-summary-label">年間決済 <span class="sub-en">Realized PnL</span></span>
+        <span id="yearRealizedSum" class="annual-summary-value">¥0</span>
+      </div>
+
+      <div class="annual-summary-row">
+        <span class="annual-summary-label">年間スワップ <span class="sub-en">Swap PnL</span></span>
+        <span id="yearSwapSum" class="annual-summary-value">¥0</span>
+      </div>
+
+      <details class="annual-minor-details">
+        <summary class="annual-minor-summary">入出金詳細</summary>
+        <div class="annual-minor-list">
+          <div class="annual-summary-row">
+            <span class="annual-summary-label">年初資金 <span class="sub-en">Initial Capital</span></span>
+            <span id="yearInitialCapital" class="annual-summary-value">¥0</span>
+          </div>
+
+          <div class="annual-summary-row">
+            <span class="annual-summary-label">年初評価損益 <span class="sub-en">Initial Unrealized</span></span>
+            <span id="yearInitialUnrealizedTotal" class="annual-summary-value">¥0</span>
+          </div>
+
+          <div class="annual-summary-row">
+            <span class="annual-summary-label">年間入金 <span class="sub-en">Deposit</span></span>
+            <span id="yearDepositSum" class="annual-summary-value">¥0</span>
+          </div>
+
+          <div class="annual-summary-row">
+            <span class="annual-summary-label">年間出金 <span class="sub-en">Withdrawal</span></span>
+            <span id="yearWithdrawSum" class="annual-summary-value">¥0</span>
+          </div>
+
+          <div class="annual-summary-row">
+            <span class="annual-summary-label">年間入出金差額 <span class="sub-en">Net Cash Flow</span></span>
+            <span id="yearNetCashFlow" class="annual-summary-value">¥0</span>
+          </div>
+        </div>
+      </details>
     </section>
 
     <div class="performance-head">

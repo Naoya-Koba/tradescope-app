@@ -350,6 +350,14 @@ body::before {
   color: var(--neutral);
 }
 
+.summary-performance-section {
+  margin-top: -8px;
+}
+
+.summary-performance-list {
+  gap: 8px;
+}
+
 .risk-section {
   display: flex;
   flex-direction: column;
