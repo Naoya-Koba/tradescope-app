@@ -226,6 +226,22 @@
         <input type="file" id="importHistoryInput" accept=".json" style="display:none" />
       </div>
     </section>
+
+    <!-- ===== History Item Modal ===== -->
+    <div id="historyItemModal" class="memo-modal" aria-hidden="true">
+      <div class="memo-modal-content">
+        <div class="memo-modal-header">
+          <h3 id="historyItemModalTitle">取引履歴を編集</h3>
+          <button id="closeHistoryItemModal" class="close-btn">×</button>
+        </div>
+        <div id="historyItemDetail" style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;"></div>
+        <div class="memo-modal-footer">
+          <button id="deleteHistoryItemBtn" class="btn-secondary memo-modal-delete">削除</button>
+          <button id="closeHistoryItemModalBtn" class="btn-secondary">閉じる</button>
+        </div>
+      </div>
+    </div>
+    <div id="historyItemModalBackdrop" class="memo-modal-backdrop" aria-hidden="true"></div>
   </main>
 
   <script src="assets/app-gestures.js"></script>

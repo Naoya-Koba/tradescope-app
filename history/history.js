@@ -77,9 +77,27 @@ function fmtJPY(value) {
   return value < 0 ? `-¥${abs}` : `¥${abs}`;
 }
 
-function fmtRate(value) {
+function fmtRate(value, assetType, symbol) {
   if (!Number.isFinite(value)) return '-';
-  return Number(value).toLocaleString('ja-JP', { minimumFractionDigits: 3, maximumFractionDigits: 5 });
+  
+  // assetType に基づいて小数点の桁数を決定
+  let minDigits = 3, maxDigits = 5; // デフォルト: FX系
+  
+  if (assetType === '暗号資産') {
+    // 暗号資産は小数点以下表示なし
+    minDigits = 0;
+    maxDigits = 0;
+  } else if (assetType === '証券') {
+    // 証券（株式など）は小数点以下表示なし
+    minDigits = 0;
+    maxDigits = 0;
+  } else if (assetType === 'FX') {
+    // FX系は小数第3位まで
+    minDigits = 3;
+    maxDigits = 3;
+  }
+  
+  return Number(value).toLocaleString('ja-JP', { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits });
 }
 
 function fmtQuantity(value) {
@@ -291,7 +309,7 @@ function renderOpenPositionDetail(position) {
     : (position.accountLabel || '-');
   const breakdown = (position.details || []).map((row) => {
     const rowSide = row.side === 'buy' ? '買い' : '売り';
-    return `<li>${escapeHtml(row.account)}: ${rowSide} ${fmtQuantity(row.quantity)} @ ${fmtRate(row.avgRate)}</li>`;
+    return `<li>${escapeHtml(row.account)}: ${rowSide} ${fmtQuantity(row.quantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')} @ ${fmtRate(row.avgRate, position.assetType, position.symbol)}</li>`;
   }).join('');
 
   detail.innerHTML = `
@@ -299,8 +317,8 @@ function renderOpenPositionDetail(position) {
     <div class="open-position-detail-meta">
       <span><strong>表示:</strong> ${position.viewMode === 'merged' ? '統合表示' : '口座別表示'}</span>
       <span><strong>方向:</strong> ${sideLabel}</span>
-      <span><strong>数量:</strong> ${fmtQuantity(position.absQuantity)}</span>
-      <span><strong>平均レート:</strong> ${fmtRate(position.avgRate)}</span>
+      <span><strong>数量:</strong> ${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')}</span>
+      <span><strong>平均レート:</strong> ${fmtRate(position.avgRate, position.assetType, position.symbol)}</span>
       <span><strong>口座:</strong> ${escapeHtml(accountsLabel)}</span>
       <span><strong>戦略:</strong> ${escapeHtml(position.strategyLabel || '-')}</span>
       <span><strong>内訳:</strong></span>
@@ -346,8 +364,8 @@ function renderOpenPositions(entries) {
         <td>${escapeHtml(position.accountLabel)}</td>
         <td>${escapeHtml(position.symbol)}</td>
         <td><span class="${sideClass}">${sideLabel}</span></td>
-        <td>${fmtQuantity(position.absQuantity)}</td>
-        <td>${fmtRate(position.avgRate)}</td>
+        <td>${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')}</td>
+        <td>${fmtRate(position.avgRate, position.assetType, position.symbol)}</td>
       </tr>
     `;
   }).join('');
@@ -381,21 +399,57 @@ function renderHistoryTable(entries) {
       <td>${escapeHtml(entry.symbol)}</td>
       <td><span class="${entry.side === 'buy' ? 'tag-buy' : 'tag-sell'}">${entry.side === 'buy' ? '買い' : '売り'}</span></td>
       <td>${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}</td>
-      <td>${fmtQuantity(entry.quantity)}</td>
-      <td>${fmtRate(entry.rate)}</td>
+      <td>${fmtQuantity(entry.quantity)}${entry.assetType === 'FX' ? ' Lot' : (entry.assetType === '暗号資産' ? ' ' + entry.symbol.split('/')[0] : '')}</td>
+      <td>${fmtRate(entry.rate, entry.assetType, entry.symbol)}</td>
       <td>${escapeHtml(entry.strategy || '-')}</td>
       <td>${escapeHtml(entry.memo || '-')}</td>
-      <td><button type="button" class="delete-btn" data-delete-id="${escapeHtml(entry.id)}">削除</button></td>
+      <td><button type="button" class="edit-btn memo-edit-btn" data-entry-id="${escapeHtml(entry.id)}" aria-label="編集">✎</button></td>
     </tr>
   `).join('');
 
-  tbody.querySelectorAll('[data-delete-id]').forEach((button) => {
+  tbody.querySelectorAll('[data-entry-id]').forEach((button) => {
     button.addEventListener('click', () => {
-      if (!confirm('この履歴を削除しますか？')) return;
-      historyCore.removeEntry(button.dataset.deleteId);
-      renderAll();
+      const entryId = button.dataset.entryId;
+      const entry = entries.find((e) => e.id === entryId);
+      if (!entry) return;
+      openHistoryItemModal(entry);
     });
   });
+}
+
+function openHistoryItemModal(entry) {
+  const modal = document.getElementById('historyItemModal');
+  const backdrop = document.getElementById('historyItemModalBackdrop');
+  const detail = document.getElementById('historyItemDetail');
+  const deleteBtn = document.getElementById('deleteHistoryItemBtn');
+
+  if (!modal || !backdrop || !detail) return;
+
+  detail.innerHTML = `
+    <div><strong>日付:</strong> ${escapeHtml(entry.date)}</div>
+    <div><strong>口座:</strong> ${escapeHtml(entry.account)}</div>
+    <div><strong>資産区分:</strong> ${escapeHtml(entry.assetType)}</div>
+    <div><strong>通貨ペア:</strong> ${escapeHtml(entry.symbol)}</div>
+    <div><strong>売買:</strong> ${entry.side === 'buy' ? '買い' : '売り'}</div>
+    <div><strong>区分:</strong> ${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}</div>
+    <div><strong>数量:</strong> ${fmtQuantity(entry.quantity)}${entry.assetType === 'FX' ? ' Lot' : (entry.assetType === '暗号資産' ? ' ' + entry.symbol.split('/')[0] : '')}</div>
+    <div><strong>レート:</strong> ${fmtRate(entry.rate, entry.assetType, entry.symbol)}</div>
+    <div><strong>戦略:</strong> ${escapeHtml(entry.strategy || '-')}</div>
+    <div><strong>メモ:</strong> ${escapeHtml(entry.memo || '-')}</div>
+  `;
+
+  deleteBtn.dataset.entryId = entry.id;
+
+  modal.setAttribute('aria-hidden', 'false');
+  backdrop.setAttribute('aria-hidden', 'false');
+}
+
+function closeHistoryItemModal() {
+  const modal = document.getElementById('historyItemModal');
+  const backdrop = document.getElementById('historyItemModalBackdrop');
+  if (!modal || !backdrop) return;
+  modal.setAttribute('aria-hidden', 'true');
+  backdrop.setAttribute('aria-hidden', 'true');
 }
 
 function readFormEntry() {
@@ -489,6 +543,30 @@ function bindEvents() {
       applyOpenViewSwitchState();
       renderOpenPositions(historyCore.parseEntries());
     });
+  });
+
+  // ===== History Item Modal =====
+  const historyItemModal = document.getElementById('historyItemModal');
+  const historyItemModalBackdrop = document.getElementById('historyItemModalBackdrop');
+  const closeHistoryItemModal = document.getElementById('closeHistoryItemModal');
+  const closeHistoryItemModalBtn = document.getElementById('closeHistoryItemModalBtn');
+  const deleteHistoryItemBtn = document.getElementById('deleteHistoryItemBtn');
+
+  const closeHistoryModal = () => {
+    closeHistoryItemModal();
+  };
+
+  closeHistoryItemModal?.addEventListener('click', closeHistoryModal);
+  closeHistoryItemModalBtn?.addEventListener('click', closeHistoryModal);
+  historyItemModalBackdrop?.addEventListener('click', closeHistoryModal);
+
+  deleteHistoryItemBtn?.addEventListener('click', () => {
+    const entryId = deleteHistoryItemBtn.dataset.entryId;
+    if (!entryId) return;
+    if (!confirm('この履歴を削除しますか？')) return;
+    historyCore.removeEntry(entryId);
+    closeHistoryModal();
+    renderAll();
   });
 }
 
