@@ -1283,6 +1283,10 @@ function renderMonthlyDisplay() {
           <span class="monthly-stat-value" style="color: ${colorBySign(monthly.swapSum)}">${fmtJPY(monthly.swapSum)}</span>
         </div>
       </div>
+      <div class="monthly-unrealized-row">
+        <span class="monthly-stat monthly-unrealized-label">※評価損益</span>
+        <span class="monthly-stat-value" style="color: ${colorBySign(monthly.unrealizedSum)}">${fmtJPY(monthly.unrealizedSum)}</span>
+      </div>
     `;
     
     card.addEventListener('click', () => {
@@ -1291,6 +1295,75 @@ function renderMonthlyDisplay() {
     });
     container.appendChild(card);
   }
+}
+
+function renderMonthlyByAccount(accountKey) {
+  const account = ACCOUNTS.find((a) => a.key === accountKey && !a.bankOnly);
+  if (!account) {
+    renderMonthlyDisplay();
+    return;
+  }
+
+  const container = document.getElementById('monthlyDisplay');
+  container.innerHTML = '';
+
+  const accountSection = document.createElement('div');
+  accountSection.className = 'monthly-account-section';
+
+  const headerEl = document.createElement('div');
+  headerEl.className = 'monthly-account-section-header';
+  headerEl.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${account.name}</span>`;
+  accountSection.appendChild(headerEl);
+
+  const grid = document.createElement('div');
+  grid.className = 'monthly-grid monthly-grid-account';
+
+  const hideSwap = account.key === 'sbi' || account.key === 'sbivc';
+
+  for (let m = 1; m <= 12; m++) {
+    const data = (tradingData[currentYear]?.[m]?.[account.key]) || {};
+    const realized = data.realizedPnL || 0;
+    const swap = data.swapPnL || 0;
+    const unrealized = data.unrealizedPnL || 0;
+    const total = realized + (hideSwap ? 0 : swap);
+
+    const card = document.createElement('div');
+    card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
+    card.dataset.month = m;
+
+    const swapRow = hideSwap ? '' : `
+      <div class="monthly-stat-row">
+        <span class="monthly-stat">スワップ</span>
+        <span class="monthly-stat-value" style="color: ${colorBySign(swap)}">${fmtJPY(swap)}</span>
+      </div>
+    `;
+
+    card.innerHTML = `
+      <div class="monthly-label">${m}月</div>
+      <div class="monthly-total-label">合計</div>
+      <div class="monthly-total-value" style="color: ${colorBySign(total)}">${fmtJPY(total)}</div>
+      <div class="monthly-breakdown">
+        <div class="monthly-stat-row">
+          <span class="monthly-stat">決済</span>
+          <span class="monthly-stat-value" style="color: ${colorBySign(realized)}">${fmtJPY(realized)}</span>
+        </div>
+        ${swapRow}
+      </div>
+      <div class="monthly-unrealized-row">
+        <span class="monthly-stat monthly-unrealized-label">※評価損益</span>
+        <span class="monthly-stat-value" style="color: ${colorBySign(unrealized)}">${fmtJPY(unrealized)}</span>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      selectMonth(m);
+      openMonthlyDetailPane(m);
+    });
+    grid.appendChild(card);
+  }
+
+  accountSection.appendChild(grid);
+  container.appendChild(accountSection);
 }
 
 function renderMonthlyDetailPane(month = currentMonth) {
@@ -1454,7 +1527,7 @@ function renderMonthTabs() {
 
 function selectMonth(month) {
   currentMonth = month;
-  renderMonthlyDisplay();
+  renderMonthlySection();
   renderMonthTabs();
   renderAccountInputs();
   updateYearSelect();
@@ -1610,7 +1683,7 @@ function updateInputs() {
   });
 
   // サマリー更新
-  renderMonthlyDisplay();
+  renderMonthlySection();
   renderAnnualSummary();
   renderPerformanceChart();
   if (monthlyDetailPane.classList.contains('open')) {
@@ -1841,7 +1914,7 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
   saveToStorage();
   renderAnnualSummary();
   renderPerformanceChart();
-  renderMonthlyDisplay();
+  renderMonthlySection();
   if (monthlyDetailPane.classList.contains('open')) {
     renderMonthlyDetailPane(currentMonth);
   }
@@ -2006,13 +2079,69 @@ document.getElementById('reloadDemoData')?.addEventListener('click', () => {
   setTimeout(() => toast.remove(), 2000);
 });
 
+// ===== Monthly View Toggle =====
+let selectedMonthlyAccount = 'total'; // 'total' | account key
+
+function getMonthlyViewOptions() {
+  const accountOptions = ACCOUNTS
+    .filter((account) => !account.bankOnly)
+    .map((account) => ({ key: account.key, label: account.name }));
+  return [{ key: 'total', label: '全体' }, ...accountOptions];
+}
+
+function renderMonthlyViewButtons() {
+  const toggleGroup = document.getElementById('monthlyViewToggle');
+  if (!toggleGroup) return;
+  const options = getMonthlyViewOptions();
+  toggleGroup.innerHTML = options.map((option) => {
+    const isActive = option.key === selectedMonthlyAccount;
+    const activeClass = isActive ? ' active' : '';
+    return `<button class="monthly-view-btn${activeClass}" data-account="${option.key}" type="button">${option.label}</button>`;
+  }).join('');
+}
+
+function renderMonthlySection() {
+  if (selectedMonthlyAccount === 'total') {
+    renderMonthlyDisplay();
+  } else {
+    renderMonthlyByAccount(selectedMonthlyAccount);
+  }
+}
+
+function initMonthlyViewToggle() {
+  const toggleGroup = document.getElementById('monthlyViewToggle');
+  if (!toggleGroup) return;
+
+  const selectableKeys = new Set(getMonthlyViewOptions().map((option) => option.key));
+  if (!selectableKeys.has(selectedMonthlyAccount)) {
+    selectedMonthlyAccount = 'total';
+  }
+
+  renderMonthlyViewButtons();
+
+  if (toggleGroup.dataset.bound) return;
+  toggleGroup.dataset.bound = '1';
+  toggleGroup.addEventListener('click', (e) => {
+    const btn = e.target.closest('.monthly-view-btn');
+    if (!btn) return;
+    const accountKey = btn.dataset.account;
+    if (!accountKey || accountKey === selectedMonthlyAccount) return;
+    selectedMonthlyAccount = accountKey;
+    toggleGroup.querySelectorAll('.monthly-view-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.account === accountKey);
+    });
+    renderMonthlySection();
+  });
+}
+
 // ===== Initialization =====
 function renderAll() {
   updateYearSelect();
   renderAnnualSummary();
   renderPerformanceChart();
   bindChartViewControls();
-  renderMonthlyDisplay();
+  initMonthlyViewToggle();
+  renderMonthlySection();
   renderMonthTabs();
   renderAccountInputs();
   renderInitialCapitalForm();

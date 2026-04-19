@@ -779,6 +779,104 @@ body.drawer-open {
   box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 0 0 1px rgba(255,255,255,.1) inset;
   padding: 14px;
 }
+/* Monthly Summary ヘッダー行（見出し + 切替） */
+.monthly-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.monthly-summary-heading {
+  margin-bottom: 0 !important;
+}
+/* 全体 + 各口座トグル */
+.monthly-view-toggle {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  padding-bottom: 1px;
+}
+.monthly-view-toggle::-webkit-scrollbar {
+  display: none;
+}
+.monthly-view-btn {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: .15s ease;
+}
+.monthly-view-btn.active {
+  background: rgba(61,162,255,.18);
+  border-color: rgba(61,162,255,.5);
+  color: var(--blue);
+}
+/* 評価損益補足行 */
+.monthly-unrealized-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255,255,255,.1);
+}
+.monthly-unrealized-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+/* セクション下部注記 */
+.monthly-unrealized-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: .7;
+}
+/* 口座別グリッドのセクション */
+.monthly-account-section {
+  margin-bottom: 18px;
+}
+.monthly-account-section:last-child {
+  margin-bottom: 0;
+}
+.monthly-account-section-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.monthly-account-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.monthly-account-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+.monthly-grid-account {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+@media (max-width: 768px) {
+  .monthly-summary-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
 .monthly-card {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.12);

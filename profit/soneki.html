@@ -256,11 +256,15 @@
     </section>
 
     <!-- 2. 月別損益表示セクション -->
-    <h2 class="heading-muted">Monthly Summary</h2>
+    <div class="monthly-summary-head">
+      <h2 class="heading-muted monthly-summary-heading">Monthly Summary</h2>
+      <div class="monthly-view-toggle" id="monthlyViewToggle" role="group" aria-label="表示する口座"></div>
+    </div>
     <section class="section glass monthly-summary-section margin-bottom">
       <div class="monthly-grid" id="monthlyDisplay">
         <!-- 1月〜12月の月別カードが動的に生成される -->
       </div>
+      <p class="monthly-unrealized-note">※評価損益は合計に含みません。</p>
     </section>
 
     <!-- 3. 月別入力セクション -->
