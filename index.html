@@ -377,14 +377,20 @@
     <section class="section glass">
       <div class="swap-card">
         <div class="swap-main">
-          <div class="kpi-label small">本日のスワップ</div>
-          <div id="swapToday" class="kpi-value positive">+¥0</div>
-          <div id="swapTodayPairs" class="swap-mini"></div>
+          <div class="kpi-label small">前月スワップ</div>
+          <div id="swapPrevMonth" class="kpi-value positive">¥0</div>
+          <div id="swapPrevMonthAccounts" class="swap-mini"></div>
         </div>
 
         <div class="swap-sub">
-          <div class="kpi-label small">今年のスワップ予想</div>
-          <div id="swapYear" class="kpi-subvalue">¥0</div>
+          <div class="swap-sub-row">
+            <div class="kpi-label small">累計スワップ</div>
+            <div id="swapCumulative" class="kpi-subvalue">¥0</div>
+          </div>
+          <div class="swap-sub-row">
+            <div class="kpi-label small">年間スワップ想定</div>
+            <div id="swapYearEstimate" class="kpi-subvalue">¥0</div>
+          </div>
         </div>
       </div>
     </section>
