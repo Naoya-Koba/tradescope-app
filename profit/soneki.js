@@ -719,10 +719,11 @@ function calculateTotalConfirmedAssets(year, month) {
   return total;
 }
 
-function calculateInitialCapital(year) {
+function calculateInitialCapital(year, accountsFilter = null) {
+  const targetAccounts = accountsFilter || ACCOUNTS;
   let total = 0;
   if (yearInitialFunds[year]) {
-    ACCOUNTS.forEach(a => {
+    targetAccounts.forEach(a => {
       total += yearInitialFunds[year][a.key] || 0;
     });
   }
@@ -754,20 +755,49 @@ function getLatestSavedMonth(year) {
   return 1;
 }
 
-function updateAssetTrendLegend() {
+function updateAssetTrendLegend(effectiveView) {
   const legendEquity = document.getElementById('assetLegendEquity');
   const legendBalance = document.getElementById('assetLegendBalance');
   if (!legendEquity || !legendBalance) return;
 
-  const equityLabel = assetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
-  const balanceLabel = assetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
+  const viewToUse = effectiveView !== undefined ? effectiveView : assetTrendView;
+  const equityLabel = viewToUse === 'performance' ? 'Equity Growth' : 'Total Equity';
+  const balanceLabel = viewToUse === 'performance' ? 'Balance Growth' : 'Net Balance';
 
   legendEquity.innerHTML = `<span class="dot dot-total-assets"></span> ${equityLabel}`;
   legendBalance.innerHTML = `<span class="dot dot-confirmed-assets"></span> ${balanceLabel}`;
 }
 
+function updateChartTitles(accountKey) {
+  const assetLabel = document.querySelector('.chart-panel-label');
+  const pnlLabel = document.querySelectorAll('.chart-panel-label')[1];
+  
+  if (accountKey && accountKey !== 'total') {
+    const account = ACCOUNTS.find(a => a.key === accountKey);
+    if (account) {
+      const accountSuffix = ` <span style="color: ${account.color}; font-weight: 700;">●</span> <span style="color: rgba(255,255,255,0.85);">(${account.name})</span>`;
+      if (assetLabel) assetLabel.innerHTML = `Asset Trend${accountSuffix}`;
+      if (pnlLabel) pnlLabel.innerHTML = `Monthly P/L${accountSuffix}`;
+    }
+  } else {
+    if (assetLabel) assetLabel.textContent = 'Asset Trend';
+    if (pnlLabel) pnlLabel.textContent = 'Monthly P/L';
+  }
+}
+
+function updateAssetTrendViewSelectVisibility(accountKey) {
+  const select = document.getElementById('assetTrendViewSelect');
+  if (!select) return;
+  
+  if (accountKey && accountKey !== 'total') {
+    select.style.display = 'none';
+  } else {
+    select.style.display = '';
+  }
+}
+
 function renderPerformanceChart(options = {}) {
-  const { renderAssets = true, renderPnl = true } = options;
+  const { renderAssets = true, renderPnl = true, accountFilter = null } = options;
   const assetsCanvas = document.getElementById('assetsTrendChart');
   const pnlCanvas = document.getElementById('pnlBarChart');
   if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
@@ -778,16 +808,25 @@ function renderPerformanceChart(options = {}) {
   const realizedData = [];
   const swapData = [];
   const totalPnlData = [];
-  const yearStartUnrealizedTotal = ACCOUNTS.reduce((sum, a) => {
+  
+  // 口座フィルター適用
+  const targetAccounts = accountFilter && accountFilter !== 'total'
+    ? ACCOUNTS.filter(a => a.key === accountFilter)
+    : ACCOUNTS;
+  const targetGrowthAccounts = accountFilter && accountFilter !== 'total'
+    ? GROWTH_TARGET_ACCOUNTS.filter(a => a.key === accountFilter)
+    : GROWTH_TARGET_ACCOUNTS;
+  
+  const yearStartUnrealizedTotal = targetAccounts.reduce((sum, a) => {
     return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
   }, 0);
-  const confirmedTrendData = [calculateInitialCapital(currentYear)];
-  const assetsTrendData = [calculateInitialCapital(currentYear) + yearStartUnrealizedTotal];
+  const confirmedTrendData = [calculateInitialCapital(currentYear, targetAccounts)];
+  const assetsTrendData = [calculateInitialCapital(currentYear, targetAccounts) + yearStartUnrealizedTotal];
 
-  const growthInitialConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+  const growthInitialConfirmed = targetGrowthAccounts.reduce((sum, account) => {
     return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0);
   }, 0);
-  const growthInitialTotal = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+  const growthInitialTotal = targetGrowthAccounts.reduce((sum, account) => {
     return sum + (Number(yearInitialFunds?.[currentYear]?.[account.key]) || 0)
       + (Number(yearInitialUnrealized?.[currentYear]?.[account.key]) || 0);
   }, 0);
@@ -798,27 +837,44 @@ function renderPerformanceChart(options = {}) {
   let cumulativeGrowthWithdrawals = 0;
 
   for (let m = 1; m <= 12; m++) {
-    const monthly = calculateMonthlyTotals(currentYear, m);
     const isEnteredMonth = m <= latestMonth;
-    realizedData.push(isEnteredMonth ? monthly.realizedSum : null);
-    swapData.push(isEnteredMonth ? monthly.swapSum : null);
-    totalPnlData.push(isEnteredMonth ? (monthly.realizedSum + monthly.swapSum) : null);
-    const monthEndAssets = calculateTotalNetAssets(currentYear, m);
-    const monthEndConfirmed = calculateTotalConfirmedAssets(currentYear, m);
-    confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
-    assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
+    
+    // 口座別データ集計
+    if (accountFilter && accountFilter !== 'total') {
+      const row = tradingData?.[currentYear]?.[m]?.[accountFilter] || {};
+      const realized = Number(row.realizedPnL) || 0;
+      const swap = Number(row.swapPnL) || 0;
+      realizedData.push(isEnteredMonth ? realized : null);
+      swapData.push(isEnteredMonth ? swap : null);
+      totalPnlData.push(isEnteredMonth ? (realized + swap) : null);
+      
+      const monthEndAssets = calculateAccountNetAssets(currentYear, m, accountFilter);
+      const monthEndConfirmed = calculateAccountConfirmedAssets(currentYear, m, accountFilter);
+      confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
+      assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
+    } else {
+      // 全体データ集計
+      const monthly = calculateMonthlyTotals(currentYear, m);
+      realizedData.push(isEnteredMonth ? monthly.realizedSum : null);
+      swapData.push(isEnteredMonth ? monthly.swapSum : null);
+      totalPnlData.push(isEnteredMonth ? (monthly.realizedSum + monthly.swapSum) : null);
+      const monthEndAssets = calculateTotalNetAssets(currentYear, m);
+      const monthEndConfirmed = calculateTotalConfirmedAssets(currentYear, m);
+      confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
+      assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
+    }
 
     if (isEnteredMonth) {
-      GROWTH_TARGET_ACCOUNTS.forEach((account) => {
+      targetGrowthAccounts.forEach((account) => {
         const row = tradingData?.[currentYear]?.[m]?.[account.key] || {};
         cumulativeGrowthDeposits += Number(row.deposit) || 0;
         cumulativeGrowthWithdrawals += Number(row.withdrawal) || 0;
       });
 
-      const growthAssets = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+      const growthAssets = targetGrowthAccounts.reduce((sum, account) => {
         return sum + calculateAccountNetAssets(currentYear, m, account.key);
       }, 0);
-      const growthConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
+      const growthConfirmed = targetGrowthAccounts.reduce((sum, account) => {
         return sum + calculateAccountConfirmedAssets(currentYear, m, account.key);
       }, 0);
 
@@ -830,14 +886,17 @@ function renderPerformanceChart(options = {}) {
     }
   }
 
-  const activeConfirmedTrend = assetTrendView === 'performance'
+  // 口座別表示時はPerformanceビューを強制、全体表示時はユーザー選択を尊重
+  const effectiveAssetTrendView = (accountFilter && accountFilter !== 'total') ? 'performance' : assetTrendView;
+  
+  const activeConfirmedTrend = effectiveAssetTrendView === 'performance'
     ? performanceConfirmedTrendData
     : confirmedTrendData;
-  const activeAssetsTrend = assetTrendView === 'performance'
+  const activeAssetsTrend = effectiveAssetTrendView === 'performance'
     ? performanceAssetsTrendData
     : assetsTrendData;
-  const balanceLabel = assetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
-  const equityLabel = assetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
+  const balanceLabel = effectiveAssetTrendView === 'performance' ? 'Balance Growth' : 'Net Balance';
+  const equityLabel = effectiveAssetTrendView === 'performance' ? 'Equity Growth' : 'Total Equity';
 
   const buildPnlDatasets = () => {
     if (monthlyPnlView === 'total') {
@@ -1122,7 +1181,9 @@ function renderPerformanceChart(options = {}) {
   if (renderAssets) createAssetsChart();
   if (renderPnl) createPnlChart();
 
-  updateAssetTrendLegend();
+  updateAssetTrendLegend(effectiveAssetTrendView);
+  updateChartTitles(accountFilter);
+  updateAssetTrendViewSelectVisibility(accountFilter);
   syncChartViewTabs();
 }
 
@@ -1156,7 +1217,8 @@ function bindChartViewControls() {
       const nextView = event.target.value === 'performance' ? 'performance' : 'asset';
       if (assetTrendView === nextView) return;
       assetTrendView = nextView;
-      renderPerformanceChart({ renderAssets: true, renderPnl: false });
+      const currentAccountFilter = selectedMonthlyAccount !== 'total' ? selectedMonthlyAccount : null;
+      renderPerformanceChart({ renderAssets: true, renderPnl: false, accountFilter: currentAccountFilter });
       syncChartViewTabs();
     });
     assetSelect.dataset.bound = '1';
@@ -1168,7 +1230,8 @@ function bindChartViewControls() {
       if (monthlyPnlView === nextView) return;
       monthlyPnlView = nextView;
       updateMonthlyPnlLegendVisibility();
-      renderPerformanceChart({ renderAssets: false, renderPnl: true });
+      const currentAccountFilter = selectedMonthlyAccount !== 'total' ? selectedMonthlyAccount : null;
+      renderPerformanceChart({ renderAssets: false, renderPnl: true, accountFilter: currentAccountFilter });
       syncChartViewTabs();
     });
     monthlySelect.dataset.bound = '1';
@@ -2110,6 +2173,8 @@ function initMonthlyViewToggle() {
       b.classList.toggle('active', b.dataset.account === accountKey);
     });
     renderMonthlySection();
+    // グラフを口座別データで再描画
+    renderPerformanceChart({ accountFilter: accountKey });
   });
 }
 
