@@ -734,3 +734,30 @@ body.drawer-open {
 .history-edit-field-wide {
   grid-column: 1 / -1;
 }
+
+/* ===== Close Position Button ===== */
+.close-position-btn {
+  padding: 4px 12px;
+  background: rgba(255, 107, 107, 0.15);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: 6px;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.close-position-btn:hover {
+  background: rgba(255, 107, 107, 0.28);
+  border-color: rgba(255, 107, 107, 0.7);
+}
+
+.close-position-info {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}

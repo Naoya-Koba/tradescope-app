@@ -154,7 +154,7 @@ function buildBaseSelectOptions() {
 
   accountSelect.innerHTML = ACCOUNTS.map((v, idx) => toOptionHtml(v, v, idx === 0)).join('');
   assetTypeSelect.innerHTML = ASSET_TYPES.map((v, idx) => toOptionHtml(v, v, idx === 0)).join('');
-  categorySelect.innerHTML = CATEGORIES.map((v, idx) => toOptionHtml(v, CATEGORY_LABELS[v], idx === 0)).join('');
+  categorySelect.innerHTML = ['new', 'add'].map((v, idx) => toOptionHtml(v, CATEGORY_LABELS[v], idx === 0)).join('');
   strategySelect.innerHTML = STRATEGIES.map((v) => toOptionHtml(v, STRATEGY_LABELS[v] || v, v === '')).join('');
 }
 
@@ -299,6 +299,63 @@ function normalizeAccountOpenPositions(positions) {
     });
 }
 
+// ===== Close Position Modal (module scope) =====
+function openClosePositionModal(position) {
+  const closePositionModal = document.getElementById('closePositionModal');
+  const closePositionModalBackdrop = document.getElementById('closePositionModalBackdrop');
+  if (!closePositionModal || !closePositionModalBackdrop) return;
+
+  const titleEl = document.getElementById('closePositionModalTitle');
+  const infoEl = document.getElementById('closePositionInfo');
+  const accountSel = document.getElementById('closePositionAccount');
+  const accountRow = document.getElementById('closePositionAccountRow');
+  const qtyInput = document.getElementById('closePositionQty');
+  const dateInput = document.getElementById('closePositionDate');
+
+  if (titleEl) titleEl.textContent = `決済: ${position.symbol}`;
+  if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+  if (qtyInput) qtyInput.value = position.absQuantity;
+
+  const accountList = position.viewMode === 'merged'
+    ? (position.accountList || [])
+    : [position.accountLabel];
+
+  if (accountSel) accountSel.innerHTML = accountList.map((a) => toOptionHtml(a, a)).join('');
+
+  if (accountRow) {
+    accountRow.style.display = accountList.length <= 1 ? 'none' : '';
+  }
+
+  const closeSide = position.side === 'buy' ? '売り' : '買い';
+  if (infoEl) {
+    infoEl.textContent = `保有: ${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : ''} (平均建値 ${fmtRate(position.avgRate, position.assetType, position.symbol)}) → 決済方向: ${closeSide}`;
+  }
+
+  closePositionModal.dataset.positionSide = position.side;
+  closePositionModal.dataset.positionSymbol = position.symbol;
+  closePositionModal.dataset.positionAssetType = position.assetType;
+  closePositionModal.dataset.positionStrategy = position.strategyLabel === '-' ? '' : (position.strategyLabel || '');
+  closePositionModal.dataset.positionMaxQty = position.absQuantity;
+  closePositionModal.dataset.positionContractSize = position.assetType === 'FX'
+    ? (historyCore.normalizeSymbolKey && historyCore.normalizeSymbolKey(position.symbol) === 'HUF/JPY'
+        ? (historyCore.HUF_CONTRACT_SIZE || 100000)
+        : (historyCore.FX_CONTRACT_SIZE_DEFAULT || 10000))
+    : 1;
+
+  const memoEl = document.getElementById('closePositionMemo');
+  const rateEl = document.getElementById('closePositionRate');
+  if (memoEl) memoEl.value = '';
+  if (rateEl) rateEl.value = '';
+
+  closePositionModal.setAttribute('aria-hidden', 'false');
+  closePositionModalBackdrop.setAttribute('aria-hidden', 'false');
+}
+
+function dismissClosePositionModal() {
+  document.getElementById('closePositionModal')?.setAttribute('aria-hidden', 'true');
+  document.getElementById('closePositionModalBackdrop')?.setAttribute('aria-hidden', 'true');
+}
+
 function renderOpenPositionDetail(position) {
   const detail = document.getElementById('openPositionDetail');
   if (!detail || !position) return;
@@ -366,15 +423,26 @@ function renderOpenPositions(entries) {
         <td><span class="${sideClass}">${sideLabel}</span></td>
         <td>${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')}</td>
         <td>${fmtRate(position.avgRate, position.assetType, position.symbol)}</td>
+        <td><button type="button" class="close-position-btn" data-close-position-index="${idx}" aria-label="決済">決済</button></td>
       </tr>
     `;
   }).join('');
 
   tbody.querySelectorAll('[data-open-position-index]').forEach((rowEl) => {
-    rowEl.addEventListener('click', () => {
+    rowEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close-position-index]')) return;
       const idx = Number(rowEl.dataset.openPositionIndex);
       if (!Number.isFinite(idx)) return;
       renderOpenPositionDetail(rows[idx]);
+    });
+  });
+
+  tbody.querySelectorAll('[data-close-position-index]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = Number(btn.dataset.closePositionIndex);
+      if (!Number.isFinite(idx)) return;
+      openClosePositionModal(rows[idx]);
     });
   });
 }
@@ -633,6 +701,57 @@ function bindEvents() {
     if (!confirm('この履歴を削除しますか？')) return;
     historyCore.removeEntry(entryId);
     closeHistoryModal();
+    renderAll();
+  });
+
+  // ===== Close Position Modal event bindings =====
+  document.getElementById('closePositionModalClose')?.addEventListener('click', dismissClosePositionModal);
+  document.getElementById('closePositionModalCancel')?.addEventListener('click', dismissClosePositionModal);
+  document.getElementById('closePositionModalBackdrop')?.addEventListener('click', dismissClosePositionModal);
+
+  document.getElementById('closePositionModalSave')?.addEventListener('click', () => {
+    const closePositionModal = document.getElementById('closePositionModal');
+    if (!closePositionModal) return;
+
+    const date = document.getElementById('closePositionDate')?.value;
+    const account = document.getElementById('closePositionAccount')?.value;
+    const qty = Number(document.getElementById('closePositionQty')?.value);
+    const rate = Number(document.getElementById('closePositionRate')?.value);
+    const memo = document.getElementById('closePositionMemo')?.value.trim();
+
+    const positionSide = closePositionModal.dataset.positionSide;
+    const symbol = closePositionModal.dataset.positionSymbol;
+    const assetType = closePositionModal.dataset.positionAssetType;
+    const strategy = closePositionModal.dataset.positionStrategy || '';
+    const maxQty = Number(closePositionModal.dataset.positionMaxQty);
+    const contractSize = Number(closePositionModal.dataset.positionContractSize) || 1;
+
+    if (!date || !account || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(rate) || rate < 0) {
+      alert('日付・決済ロット数・決済レートを入力してください。');
+      return;
+    }
+    if (qty > maxQty + 1e-9) {
+      alert(`決済ロット数は保有数量（${fmtQuantity(maxQty)}）を超えられません。`);
+      return;
+    }
+
+    const closeSide = positionSide === 'buy' ? 'sell' : 'buy';
+    const isFullClose = Math.abs(qty - maxQty) < 1e-9;
+    const category = isFullClose ? 'full_close' : 'partial_close';
+
+    const saved = historyCore.addEntry({
+      date, account, assetType, symbol,
+      side: closeSide, category,
+      quantity: qty, rate, strategy, memo,
+      contractSize
+    });
+
+    if (!saved) {
+      alert('登録に失敗しました。');
+      return;
+    }
+
+    dismissClosePositionModal();
     renderAll();
   });
 }
