@@ -805,13 +805,13 @@ function updateSwap() {
 
   if (accountBreakdownEl) {
     if (!swapSummary.enteredMonthCount || swapSummary.prevMonth == null) {
-      accountBreakdownEl.textContent = '口座別内訳: データなし';
+      accountBreakdownEl.innerHTML = '<span class="swap-mini-title">口座別内訳</span><span class="swap-breakdown-item">データなし</span>';
     } else {
       const nonZeroBreakdown = swapSummary.prevMonthBreakdown.filter((item) => item.value !== 0);
       const breakdownItems = (nonZeroBreakdown.length ? nonZeroBreakdown : swapSummary.prevMonthBreakdown)
-        .map((item) => `${item.name} ${fmtJPY(item.value)}`)
-        .join(' / ');
-      accountBreakdownEl.textContent = `${swapSummary.prevMonth}月 口座別内訳: ${breakdownItems}`;
+        .map((item) => `<span class="swap-breakdown-item">${item.name}: ${fmtJPY(item.value)}</span>`)
+        .join('');
+      accountBreakdownEl.innerHTML = `<span class="swap-mini-title">口座別内訳</span>${breakdownItems}`;
     }
   }
 }
