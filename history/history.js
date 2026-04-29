@@ -409,28 +409,48 @@ function renderHistoryTable(entries) {
 
 }
 
+function populateEditSelects() {
+  const accountSel = document.getElementById('editEntryAccount');
+  const assetSel = document.getElementById('editEntryAssetType');
+  const categorySel = document.getElementById('editEntryCategory');
+  const strategySel = document.getElementById('editEntryStrategy');
+  if (accountSel && !accountSel.options.length) {
+    accountSel.innerHTML = ACCOUNTS.map((v) => toOptionHtml(v, v)).join('');
+  }
+  if (assetSel && !assetSel.options.length) {
+    assetSel.innerHTML = ASSET_TYPES.map((v) => toOptionHtml(v, v)).join('');
+  }
+  if (categorySel && !categorySel.options.length) {
+    categorySel.innerHTML = CATEGORIES.map((v) => toOptionHtml(v, CATEGORY_LABELS[v])).join('');
+  }
+  if (strategySel && !strategySel.options.length) {
+    strategySel.innerHTML = STRATEGIES.map((v) => toOptionHtml(v, STRATEGY_LABELS[v] || v)).join('');
+  }
+}
+
 function openHistoryItemModal(entry) {
   const modal = document.getElementById('historyItemModal');
   const backdrop = document.getElementById('historyItemModalBackdrop');
-  const detail = document.getElementById('historyItemDetail');
   const deleteBtn = document.getElementById('deleteHistoryItemBtn');
 
-  if (!modal || !backdrop || !detail) return;
+  if (!modal || !backdrop) return;
 
-  detail.innerHTML = `
-    <div><strong>日付:</strong> ${escapeHtml(entry.date)}</div>
-    <div><strong>口座:</strong> ${escapeHtml(entry.account)}</div>
-    <div><strong>資産区分:</strong> ${escapeHtml(entry.assetType)}</div>
-    <div><strong>通貨ペア:</strong> ${escapeHtml(entry.symbol)}</div>
-    <div><strong>売買:</strong> ${entry.side === 'buy' ? '買い' : '売り'}</div>
-    <div><strong>区分:</strong> ${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}</div>
-    <div><strong>数量:</strong> ${fmtQuantity(entry.quantity)}${entry.assetType === 'FX' ? ' Lot' : (entry.assetType === '暗号資産' ? ' ' + entry.symbol.split('/')[0] : '')}</div>
-    <div><strong>レート:</strong> ${fmtRate(entry.rate, entry.assetType, entry.symbol)}</div>
-    <div><strong>戦略:</strong> ${escapeHtml(entry.strategy || '-')}</div>
-    <div><strong>メモ:</strong> ${escapeHtml(entry.memo || '-')}</div>
-  `;
+  populateEditSelects();
 
-  deleteBtn.dataset.entryId = entry.id;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+  set('editEntryDate', entry.date);
+  set('editEntryAccount', entry.account);
+  set('editEntryAssetType', entry.assetType);
+  set('editEntrySymbol', entry.symbol);
+  set('editEntrySide', entry.side);
+  set('editEntryCategory', entry.category);
+  set('editEntryQuantity', entry.quantity);
+  set('editEntryRate', entry.rate);
+  set('editEntryStrategy', entry.strategy || '');
+  set('editEntryMemo', entry.memo || '');
+
+  if (deleteBtn) deleteBtn.dataset.entryId = entry.id;
+  modal.dataset.editingId = entry.id;
 
   modal.setAttribute('aria-hidden', 'false');
   backdrop.setAttribute('aria-hidden', 'false');
@@ -567,6 +587,45 @@ function bindEvents() {
   closeHistoryItemModalButton?.addEventListener('click', closeHistoryModal);
   closeHistoryItemModalBtn?.addEventListener('click', closeHistoryModal);
   historyItemModalBackdrop?.addEventListener('click', closeHistoryModal);
+
+  document.getElementById('saveHistoryItemBtn')?.addEventListener('click', () => {
+    const editingId = historyItemModal?.dataset.editingId;
+    if (!editingId) return;
+
+    const date = document.getElementById('editEntryDate')?.value;
+    const account = document.getElementById('editEntryAccount')?.value;
+    const assetType = document.getElementById('editEntryAssetType')?.value;
+    const symbol = document.getElementById('editEntrySymbol')?.value.trim();
+    const side = document.getElementById('editEntrySide')?.value;
+    const category = document.getElementById('editEntryCategory')?.value;
+    const quantity = Number(document.getElementById('editEntryQuantity')?.value);
+    const rate = Number(document.getElementById('editEntryRate')?.value);
+    const strategy = document.getElementById('editEntryStrategy')?.value;
+    const memo = document.getElementById('editEntryMemo')?.value.trim();
+
+    if (!date || !account || !assetType || !symbol || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(rate) || rate < 0) {
+      alert('必須項目を確認してください。');
+      return;
+    }
+
+    const entries = historyCore.parseEntries();
+    const idx = entries.findIndex((e) => e.id === editingId);
+    if (idx === -1) return;
+
+    const symbolKey = historyCore.normalizeSymbolKey ? historyCore.normalizeSymbolKey(symbol) : symbol.toUpperCase().trim();
+    const isHuf = symbolKey === 'HUF/JPY';
+    entries[idx] = {
+      ...entries[idx],
+      date, account, assetType, symbol, side, category, quantity, rate, strategy, memo,
+      contractSize: assetType === 'FX'
+        ? (isHuf ? (historyCore.HUF_CONTRACT_SIZE || 100000) : historyCore.FX_CONTRACT_SIZE_DEFAULT)
+        : 1
+    };
+
+    historyCore.saveEntries(entries);
+    closeHistoryModal();
+    renderAll();
+  });
 
   deleteHistoryItemBtn?.addEventListener('click', () => {
     const entryId = deleteHistoryItemBtn.dataset.entryId;

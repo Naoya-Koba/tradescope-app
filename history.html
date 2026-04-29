@@ -234,10 +234,57 @@
           <h3 id="historyItemModalTitle">取引履歴を編集</h3>
           <button id="closeHistoryItemModal" class="close-btn">×</button>
         </div>
-        <div id="historyItemDetail" style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;"></div>
+        <div id="historyItemDetail" class="history-edit-form">
+          <div class="history-edit-grid">
+            <label class="history-edit-field">
+              <span>日付</span>
+              <input id="editEntryDate" type="date" />
+            </label>
+            <label class="history-edit-field">
+              <span>口座</span>
+              <select id="editEntryAccount"></select>
+            </label>
+            <label class="history-edit-field">
+              <span>資産区分</span>
+              <select id="editEntryAssetType"></select>
+            </label>
+            <label class="history-edit-field">
+              <span>通貨ペア / 銘柄</span>
+              <input id="editEntrySymbol" type="text" />
+            </label>
+            <label class="history-edit-field">
+              <span>売買</span>
+              <select id="editEntrySide">
+                <option value="buy">買い</option>
+                <option value="sell">売り</option>
+              </select>
+            </label>
+            <label class="history-edit-field">
+              <span>区分</span>
+              <select id="editEntryCategory"></select>
+            </label>
+            <label class="history-edit-field">
+              <span>数量</span>
+              <input id="editEntryQuantity" type="number" min="0" step="0.0001" />
+            </label>
+            <label class="history-edit-field">
+              <span>レート</span>
+              <input id="editEntryRate" type="number" min="0" step="0.0001" />
+            </label>
+            <label class="history-edit-field">
+              <span>戦略区分</span>
+              <select id="editEntryStrategy"></select>
+            </label>
+            <label class="history-edit-field history-edit-field-wide">
+              <span>メモ</span>
+              <input id="editEntryMemo" type="text" />
+            </label>
+          </div>
+        </div>
         <div class="memo-modal-footer">
           <button id="deleteHistoryItemBtn" class="btn-secondary memo-modal-delete">削除</button>
           <button id="closeHistoryItemModalBtn" class="btn-secondary">閉じる</button>
+          <button id="saveHistoryItemBtn" class="btn btn-primary">保存</button>
         </div>
       </div>
     </div>

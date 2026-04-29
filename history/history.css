@@ -595,3 +595,142 @@ body.drawer-open {
     font-size: 10px;
   }
 }
+
+/* ============================
+   モーダル（取引履歴編集）
+============================ */
+.memo-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  background: rgba(10,12,26,.95);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 90vw;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(16px);
+}
+
+.memo-modal[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.memo-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.memo-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.memo-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.memo-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.memo-modal-delete {
+  margin-right: auto;
+  border-color: rgba(255,107,107,.35);
+  color: #ffd7d7;
+  background: rgba(255,107,107,.14);
+}
+
+.memo-modal-delete:active {
+  background: rgba(255,107,107,.24);
+}
+
+.memo-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 99;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.memo-modal-backdrop[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ============================
+   モーダル内編集フォーム
+============================ */
+.history-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.history-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-edit-field span {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.history-edit-field input,
+.history-edit-field select {
+  padding: 8px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.history-edit-field-wide {
+  grid-column: 1 / -1;
+}
