@@ -407,14 +407,6 @@ function renderHistoryTable(entries) {
     </tr>
   `).join('');
 
-  tbody.querySelectorAll('[data-entry-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const entryId = button.dataset.entryId;
-      const entry = entries.find((e) => e.id === entryId);
-      if (!entry) return;
-      openHistoryItemModal(entry);
-    });
-  });
 }
 
 function openHistoryItemModal(entry) {
@@ -548,15 +540,31 @@ function bindEvents() {
   // ===== History Item Modal =====
   const historyItemModal = document.getElementById('historyItemModal');
   const historyItemModalBackdrop = document.getElementById('historyItemModalBackdrop');
-  const closeHistoryItemModal = document.getElementById('closeHistoryItemModal');
+  const closeHistoryItemModalButton = document.getElementById('closeHistoryItemModal');
   const closeHistoryItemModalBtn = document.getElementById('closeHistoryItemModalBtn');
   const deleteHistoryItemBtn = document.getElementById('deleteHistoryItemBtn');
+  const historyBody = document.getElementById('historyBody');
+
+  historyBody?.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest('[data-entry-id]');
+    if (!button) return;
+
+    const entryId = button.dataset.entryId;
+    if (!entryId) return;
+
+    const entries = historyCore.parseEntries();
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry) return;
+    openHistoryItemModal(entry);
+  });
 
   const closeHistoryModal = () => {
     closeHistoryItemModal();
   };
 
-  closeHistoryItemModal?.addEventListener('click', closeHistoryModal);
+  closeHistoryItemModalButton?.addEventListener('click', closeHistoryModal);
   closeHistoryItemModalBtn?.addEventListener('click', closeHistoryModal);
   historyItemModalBackdrop?.addEventListener('click', closeHistoryModal);
 
