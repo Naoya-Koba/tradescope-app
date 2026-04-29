@@ -771,26 +771,21 @@ body.drawer-open {
 .monthly-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 0;
 }
 .monthly-summary-section {
   background: rgba(255,255,255,.05);
   box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 0 0 1px rgba(255,255,255,.1) inset;
-  padding: 14px;
+  padding: 16px;
 }
-/* Monthly Summary ヘッダー行（見出し + 切替） */
-.monthly-summary-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
+.monthly-summary-shell {
+  margin-bottom: 20px;
 }
-.monthly-summary-heading {
-  margin-bottom: 0 !important;
+.monthly-summary-shell {
+  /* \u81ea\u52d5\u6298\u308a\u305f\u305f\u307f\u30b7\u30b9\u30c6\u30e0\u3092\u4f7f\u7528 */
 }
-/* 全体 + 各口座トグル */
+/* \u5168\u4f53 + \u5404\u53e3\u5ea7\u30c8\u30b0\u30eb */
 .monthly-view-toggle {
   display: flex;
   gap: 6px;
@@ -799,7 +794,8 @@ body.drawer-open {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
-  padding-bottom: 1px;
+  margin: 0 0 12px;
+  padding: 0 1px 2px;
 }
 .monthly-view-toggle::-webkit-scrollbar {
   display: none;
@@ -816,6 +812,11 @@ body.drawer-open {
   flex: 0 0 auto;
   cursor: pointer;
   transition: .15s ease;
+}
+.monthly-view-btn:hover {
+  background: rgba(255,255,255,.1);
+  border-color: rgba(255,255,255,.18);
+  color: var(--text);
 }
 .monthly-view-btn.active {
   background: rgba(61,162,255,.18);
@@ -856,7 +857,8 @@ body.drawer-open {
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 8px;
+  margin: 0 0 12px;
+  padding: 0 1px;
 }
 .monthly-account-dot {
   width: 8px;
@@ -868,20 +870,22 @@ body.drawer-open {
   font-size: 12px;
   font-weight: 600;
 }
-.monthly-grid-account {
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-}
 @media (max-width: 768px) {
   .monthly-summary-head {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: flex-start;
+  }
+  .monthly-summary-section {
+    padding: 14px;
+  }
+  .monthly-view-toggle {
+    margin-bottom: 10px;
   }
 }
 .monthly-card {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 12px;
-  padding: 12px;
+  padding: 14px 14px 13px;
   cursor: pointer;
   transition: .2s ease;
 }
@@ -897,7 +901,7 @@ body.drawer-open {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 .monthly-total-label {
   font-size: 10px;
@@ -908,11 +912,11 @@ body.drawer-open {
   font-size: 23px;
   line-height: 1.1;
   font-weight: 700;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .monthly-breakdown {
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
 .monthly-stat-row {
   display: flex;
@@ -922,7 +926,7 @@ body.drawer-open {
 .monthly-stat {
   font-size: 12px;
   color: var(--muted);
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 .monthly-stat-value {
   font-size: 13px;
@@ -1838,10 +1842,10 @@ body.drawer-open {
   }
   .monthly-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
+    gap: 8px;
   }
   .monthly-card {
-    padding: 8px;
+    padding: 10px 9px 9px;
   }
   .monthly-label {
     font-size: 10px;

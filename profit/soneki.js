@@ -1258,36 +1258,48 @@ function renderAnnualSummary() {
   setSignClass(elConfirmedAssets, confirmedAssets);
 }
 
+function buildMonthlyCardHtml(month, { realized = 0, swap = 0, unrealized = 0 } = {}) {
+  const totalPnL = realized + swap;
+  return `
+    <div class="monthly-label">${month}月</div>
+    <div class="monthly-total-label">合計</div>
+    <div class="monthly-total-value" style="color: ${colorBySign(totalPnL)}">${fmtJPY(totalPnL)}</div>
+    <div class="monthly-breakdown">
+      <div class="monthly-stat-row">
+        <span class="monthly-stat">決済</span>
+        <span class="monthly-stat-value" style="color: ${colorBySign(realized)}">${fmtJPY(realized)}</span>
+      </div>
+      <div class="monthly-stat-row">
+        <span class="monthly-stat">スワップ</span>
+        <span class="monthly-stat-value" style="color: ${colorBySign(swap)}">${fmtJPY(swap)}</span>
+      </div>
+    </div>
+    <div class="monthly-unrealized-row">
+      <span class="monthly-stat monthly-unrealized-label">※評価損益</span>
+      <span class="monthly-stat-value" style="color: ${colorBySign(unrealized)}">${fmtJPY(unrealized)}</span>
+    </div>
+  `;
+}
+
 function renderMonthlyDisplay() {
   const container = document.getElementById('monthlyDisplay');
+  const accountHeader = document.getElementById('monthlyAccountHeader');
   container.innerHTML = '';
+  if (accountHeader) {
+    accountHeader.hidden = true;
+    accountHeader.innerHTML = '';
+  }
   
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
     const card = document.createElement('div');
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
-    
-    const totalPnL = monthly.realizedSum + monthly.swapSum;
-    card.innerHTML = `
-      <div class="monthly-label">${m}月</div>
-      <div class="monthly-total-label">合計</div>
-      <div class="monthly-total-value" style="color: ${colorBySign(totalPnL)}">${fmtJPY(totalPnL)}</div>
-      <div class="monthly-breakdown">
-        <div class="monthly-stat-row">
-          <span class="monthly-stat">決済</span>
-          <span class="monthly-stat-value" style="color: ${colorBySign(monthly.realizedSum)}">${fmtJPY(monthly.realizedSum)}</span>
-        </div>
-        <div class="monthly-stat-row">
-          <span class="monthly-stat">スワップ</span>
-          <span class="monthly-stat-value" style="color: ${colorBySign(monthly.swapSum)}">${fmtJPY(monthly.swapSum)}</span>
-        </div>
-      </div>
-      <div class="monthly-unrealized-row">
-        <span class="monthly-stat monthly-unrealized-label">※評価損益</span>
-        <span class="monthly-stat-value" style="color: ${colorBySign(monthly.unrealizedSum)}">${fmtJPY(monthly.unrealizedSum)}</span>
-      </div>
-    `;
+    card.innerHTML = buildMonthlyCardHtml(m, {
+      realized: monthly.realizedSum,
+      swap: monthly.swapSum,
+      unrealized: monthly.unrealizedSum
+    });
     
     card.addEventListener('click', () => {
       selectMonth(m);
@@ -1305,65 +1317,30 @@ function renderMonthlyByAccount(accountKey) {
   }
 
   const container = document.getElementById('monthlyDisplay');
+  const accountHeader = document.getElementById('monthlyAccountHeader');
   container.innerHTML = '';
-
-  const accountSection = document.createElement('div');
-  accountSection.className = 'monthly-account-section';
-
-  const headerEl = document.createElement('div');
-  headerEl.className = 'monthly-account-section-header';
-  headerEl.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${account.name}</span>`;
-  accountSection.appendChild(headerEl);
-
-  const grid = document.createElement('div');
-  grid.className = 'monthly-grid monthly-grid-account';
-
-  const hideSwap = account.key === 'sbi' || account.key === 'sbivc';
+  if (accountHeader) {
+    accountHeader.hidden = false;
+    accountHeader.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${account.name}</span>`;
+  }
 
   for (let m = 1; m <= 12; m++) {
     const data = (tradingData[currentYear]?.[m]?.[account.key]) || {};
     const realized = data.realizedPnL || 0;
     const swap = data.swapPnL || 0;
     const unrealized = data.unrealizedPnL || 0;
-    const total = realized + (hideSwap ? 0 : swap);
 
     const card = document.createElement('div');
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
-
-    const swapRow = hideSwap ? '' : `
-      <div class="monthly-stat-row">
-        <span class="monthly-stat">スワップ</span>
-        <span class="monthly-stat-value" style="color: ${colorBySign(swap)}">${fmtJPY(swap)}</span>
-      </div>
-    `;
-
-    card.innerHTML = `
-      <div class="monthly-label">${m}月</div>
-      <div class="monthly-total-label">合計</div>
-      <div class="monthly-total-value" style="color: ${colorBySign(total)}">${fmtJPY(total)}</div>
-      <div class="monthly-breakdown">
-        <div class="monthly-stat-row">
-          <span class="monthly-stat">決済</span>
-          <span class="monthly-stat-value" style="color: ${colorBySign(realized)}">${fmtJPY(realized)}</span>
-        </div>
-        ${swapRow}
-      </div>
-      <div class="monthly-unrealized-row">
-        <span class="monthly-stat monthly-unrealized-label">※評価損益</span>
-        <span class="monthly-stat-value" style="color: ${colorBySign(unrealized)}">${fmtJPY(unrealized)}</span>
-      </div>
-    `;
+    card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized });
 
     card.addEventListener('click', () => {
       selectMonth(m);
       openMonthlyDetailPane(m);
     });
-    grid.appendChild(card);
+    container.appendChild(card);
   }
-
-  accountSection.appendChild(grid);
-  container.appendChild(accountSection);
 }
 
 function renderMonthlyDetailPane(month = currentMonth) {
@@ -1810,6 +1787,8 @@ function setInitialCapitalPanelOpen(open) {
   header.classList.toggle('open', open);
   content.classList.toggle('open', open);
 }
+
+// 月別サマリー折りたたみはapp-gestures.jsの自動システムで処理
 
 function applyInitialCapitalDefaultOpen() {
   const shouldOpen = !hasAnyInitialCapital(currentYear);
