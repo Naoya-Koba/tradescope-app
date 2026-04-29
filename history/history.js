@@ -16,6 +16,62 @@ const STRATEGY_LABELS = {
   'キャピタルゲイン': 'キャピタルゲイン'
 };
 const OPEN_POSITIONS_VIEW_KEY = 'tradeScopeOpenPositionsView';
+const SYMBOL_LIST_KEY = 'tradeScopeSymbolListV1';
+
+function loadSymbolList() {
+  try {
+    const raw = localStorage.getItem(SYMBOL_LIST_KEY);
+    if (raw !== null) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+
+function saveSymbolList(list) {
+  localStorage.setItem(SYMBOL_LIST_KEY, JSON.stringify(list));
+}
+
+function initSymbolList() {
+  if (loadSymbolList() !== null) return;
+  const entries = historyCore.parseEntries();
+  const symbols = [...new Set(entries.map((e) => e.symbol).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
+  saveSymbolList(symbols);
+}
+
+function addSymbolToList(symbol) {
+  if (!symbol) return;
+  const trimmed = symbol.trim();
+  const list = loadSymbolList() || [];
+  if (!list.some((s) => s.toUpperCase() === trimmed.toUpperCase())) {
+    list.push(trimmed);
+    list.sort((a, b) => a.localeCompare(b, 'ja'));
+    saveSymbolList(list);
+  }
+}
+
+function removeSymbolFromList(symbol) {
+  const list = (loadSymbolList() || []).filter((s) => s !== symbol);
+  saveSymbolList(list);
+  renderSymbolDropdown(document.getElementById('entrySymbol')?.value || '');
+}
+
+function renderSymbolDropdown(filter) {
+  const dropdown = document.getElementById('symbolDropdown');
+  if (!dropdown) return;
+  const list = loadSymbolList() || [];
+  const f = filter.trim().toUpperCase();
+  const filtered = f ? list.filter((s) => s.toUpperCase().includes(f)) : list;
+  if (!filtered.length) {
+    dropdown.hidden = true;
+    return;
+  }
+  dropdown.innerHTML = filtered.map((s) => `
+    <div class="symbol-dropdown-item" data-symbol="${escapeHtml(s)}">
+      <span class="symbol-dropdown-label">${escapeHtml(s)}</span>
+      <button type="button" class="symbol-dropdown-delete" data-delete-symbol="${escapeHtml(s)}" aria-label="削除">×</button>
+    </div>
+  `).join('');
+  dropdown.hidden = false;
+}
 
 let openPositionsView = 'merged';
 
@@ -163,7 +219,6 @@ function buildFilters(entries) {
   const filterSymbol = document.getElementById('filterSymbol');
   const filterStrategy = document.getElementById('filterStrategy');
   const filterCategory = document.getElementById('filterCategory');
-  const symbolHints = document.getElementById('symbolHints');
 
   const current = {
     account: filterAccount.value,
@@ -182,9 +237,7 @@ function buildFilters(entries) {
   filterCategory.innerHTML = [toOptionHtml('', 'すべて', current.category === ''), ...CATEGORIES.map((v) => toOptionHtml(v, CATEGORY_LABELS[v], current.category === v))].join('');
 
   // symbolHints は入力フォームで選択中の資産区分に絞って候補を出す
-  const entryAssetType = document.getElementById('entryAssetType').value;
-  const hintSymbols = uniqueSortedValues(entries.filter(e => e.assetType === entryAssetType), 'symbol');
-  symbolHints.innerHTML = hintSymbols.map((symbol) => `<option value="${escapeHtml(symbol)}"></option>`).join('');
+  // (カスタムドロップダウンで管理するためここでは更新しない)
 }
 
 function readFilters() {
@@ -597,6 +650,7 @@ function bindEvents() {
       return;
     }
 
+    addSymbolToList(payload.symbol);
     resetForm();
     renderAll();
   });
@@ -612,6 +666,44 @@ function bindEvents() {
   document.getElementById('entryAssetType').addEventListener('change', () => {
     const entries = historyCore.parseEntries();
     buildFilters(entries);
+  });
+
+  // 通貨ペアカスタムドロップダウン
+  const entrySymbolInput = document.getElementById('entrySymbol');
+  const symbolDropdown = document.getElementById('symbolDropdown');
+
+  entrySymbolInput?.addEventListener('focus', () => {
+    renderSymbolDropdown(entrySymbolInput.value);
+  });
+
+  entrySymbolInput?.addEventListener('input', () => {
+    renderSymbolDropdown(entrySymbolInput.value);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (
+      symbolDropdown &&
+      !symbolDropdown.contains(e.target) &&
+      e.target !== entrySymbolInput
+    ) {
+      symbolDropdown.hidden = true;
+    }
+  });
+
+  symbolDropdown?.addEventListener('mousedown', (e) => {
+    const deleteBtn = e.target.closest('[data-delete-symbol]');
+    if (deleteBtn) {
+      e.preventDefault();
+      removeSymbolFromList(deleteBtn.dataset.deleteSymbol);
+      entrySymbolInput?.focus();
+      return;
+    }
+    const item = e.target.closest('[data-symbol]');
+    if (item) {
+      e.preventDefault();
+      entrySymbolInput.value = item.dataset.symbol;
+      symbolDropdown.hidden = true;
+    }
   });
 
   document.querySelectorAll('[data-open-view]').forEach((button) => {
@@ -819,6 +911,7 @@ window.addEventListener('load', () => {
   openPositionsView = loadOpenPositionsView();
   applyOpenViewSwitchState();
   document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);
+  initSymbolList();
   bindEvents();
   renderAll();
 
