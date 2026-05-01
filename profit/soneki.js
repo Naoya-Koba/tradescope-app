@@ -827,22 +827,53 @@ function renderHoldingsSection(accountKey, data) {
   
   // 各シンボルの入力フィールドを生成
   const holdingsHtml = allSymbols.map(symbol => {
-    const holding = holdingsMap.get(symbol) || { symbol, quantity: 0, unit: symbol === 'JPY' ? '円' : symbol };
+    const holding = holdingsMap.get(symbol) || { symbol, quantity: 0, unit: symbol === 'JPY' ? '円' : symbol, rate: 0, valueJPY: 0 };
     const isJPY = symbol === 'JPY';
     
     return `
-      <div class="holdings-row" data-symbol="${symbol}">
-        <label class="holdings-label">${symbol}:</label>
-        <input 
-          type="number" 
-          class="input-holdings" 
-          data-account="${accountKey}" 
-          data-symbol="${symbol}" 
-          value="${holding.quantity || 0}" 
-          placeholder="0"
-          step="${isJPY ? '1' : '0.00000001'}"
-        />
-        <span class="holdings-unit">${holding.unit}</span>
+      <div class="holdings-row" data-symbol="${symbol}" data-is-jpy="${isJPY}">
+        <label class="holdings-label">${symbol}</label>
+        <div class="holdings-cell">
+          <input 
+            type="number" 
+            class="input-holdings" 
+            data-account="${accountKey}" 
+            data-symbol="${symbol}" 
+            data-field="quantity"
+            value="${holding.quantity || 0}" 
+            placeholder="0"
+            step="${isJPY ? '1' : '0.00000001'}"
+          />
+          <span class="holdings-unit">${holding.unit}</span>
+        </div>
+        <div class="holdings-cell${isJPY ? ' holdings-cell-hidden' : ''}">
+          ${isJPY ? '' : `
+          <input 
+            type="number" 
+            class="input-holdings" 
+            data-account="${accountKey}" 
+            data-symbol="${symbol}" 
+            data-field="rate"
+            value="${holding.rate || 0}" 
+            placeholder="0"
+            step="0.01"
+          />
+          <span class="holdings-unit"></span>`}
+        </div>
+        <div class="holdings-cell${isJPY ? ' holdings-cell-hidden' : ''}">
+          ${isJPY ? '' : `
+          <input 
+            type="number" 
+            class="input-holdings" 
+            data-account="${accountKey}" 
+            data-symbol="${symbol}" 
+            data-field="valueJPY"
+            value="${holding.valueJPY || 0}" 
+            placeholder="0"
+            step="1"
+          />
+          <span class="holdings-unit">円</span>`}
+        </div>
       </div>
     `;
   }).join('');
@@ -851,6 +882,12 @@ function renderHoldingsSection(accountKey, data) {
     <div class="holdings-section" data-account="${accountKey}">
       <div class="holdings-header">
         <label>保有明細</label>
+      </div>
+      <div class="holdings-header-row">
+        <div class="holdings-header-cell"></div>
+        <div class="holdings-header-cell">数量</div>
+        <div class="holdings-header-cell">レート</div>
+        <div class="holdings-header-cell">円換算額</div>
       </div>
       <div class="holdings-list">
         ${holdingsHtml}
@@ -1834,6 +1871,7 @@ function renderAccountInputs() {
     el.addEventListener('input', updateInputs);
     el.addEventListener('focus', handleAccountInputFocus);
     el.addEventListener('blur', handleAccountInputBlur);
+    el.addEventListener('keydown', handleEnterKeyNavigation);
   });
   
   // 純資産額入力時に評価損益を自動計算
@@ -1847,8 +1885,9 @@ function renderAccountInputs() {
   
   // 保有明細入力のイベントリスナー
   document.querySelectorAll('.input-holdings').forEach(el => {
-    el.addEventListener('input', updateHoldingsInputs);
+    el.addEventListener('input', handleHoldingsInput);
     el.addEventListener('focus', handleAccountInputFocus);
+    el.addEventListener('keydown', handleHoldingsEnterKey);
     el.addEventListener('blur', (e) => {
       if (e.target.value.trim() === '') {
         e.target.value = '0';
@@ -1900,6 +1939,131 @@ function handleAccountInputBlur(event) {
   }
 }
 
+function handleEnterKeyNavigation(event) {
+  if (event.key !== 'Enter') return;
+  
+  event.preventDefault();
+  
+  // 現在の入力フィールドを含む口座カードを取得
+  const currentCard = event.target.closest('.account-card');
+  if (!currentCard) return;
+  
+  // 同じ口座カード内のすべての.input-accountフィールドを取得（保有明細は別処理）
+  const allInputs = Array.from(currentCard.querySelectorAll('.input-account'));
+  const currentIndex = allInputs.indexOf(event.target);
+  
+  if (currentIndex === -1) return;
+  
+  // 次の入力フィールドにフォーカス
+  const nextInput = allInputs[currentIndex + 1];
+  if (nextInput) {
+    nextInput.focus();
+    if (shouldSelectZeroForOverwrite(nextInput)) {
+      nextInput.select();
+    }
+  }
+}
+
+function handleHoldingsEnterKey(event) {
+  if (event.key !== 'Enter') return;
+  
+  event.preventDefault();
+  
+  const currentRow = event.target.closest('.holdings-row');
+  if (!currentRow) return;
+  
+  const isJPY = currentRow.dataset.isJpy === 'true';
+  
+  // 同じ行内の入力フィールドを取得（disabledじゃないものだけ）
+  const rowInputs = Array.from(currentRow.querySelectorAll('.input-holdings:not([disabled])'));
+  const currentIndex = rowInputs.indexOf(event.target);
+  
+  if (currentIndex !== -1 && currentIndex < rowInputs.length - 1) {
+    // 同じ行の次の入力欄へ
+    const nextInput = rowInputs[currentIndex + 1];
+    nextInput.focus();
+    if (shouldSelectZeroForOverwrite(nextInput)) {
+      nextInput.select();
+    }
+  } else {
+    // 行の最後の入力欄の場合、次の行の最初の入力欄へ
+    const allRows = Array.from(currentRow.closest('.holdings-list').querySelectorAll('.holdings-row'));
+    const rowIndex = allRows.indexOf(currentRow);
+    if (rowIndex !== -1 && rowIndex < allRows.length - 1) {
+      const nextRow = allRows[rowIndex + 1];
+      const firstInput = nextRow.querySelector('.input-holdings:not([disabled])');
+      if (firstInput) {
+        firstInput.focus();
+        if (shouldSelectZeroForOverwrite(firstInput)) {
+          firstInput.select();
+        }
+      }
+    } else {
+      // 最後の行の場合、次のセクションへ
+      const currentCard = event.target.closest('.account-card');
+      if (!currentCard) return;
+      
+      const allInputs = Array.from(currentCard.querySelectorAll('.input-account, .input-holdings'));
+      const currentGlobalIndex = allInputs.indexOf(event.target);
+      
+      if (currentGlobalIndex !== -1) {
+        const nextInput = allInputs[currentGlobalIndex + 1];
+        if (nextInput) {
+          nextInput.focus();
+          if (shouldSelectZeroForOverwrite(nextInput)) {
+            nextInput.select();
+          }
+        }
+      }
+    }
+  }
+}
+
+function handleHoldingsInput(event) {
+  const input = event.target;
+  const accountKey = input.dataset.account;
+  const symbol = input.dataset.symbol;
+  const field = input.dataset.field;
+  
+  // JPYは自動計算不要
+  if (symbol === 'JPY') {
+    updateHoldingsInputs();
+    return;
+  }
+  
+  // 暗号資産の場合：3つの値のうち2つから残り1つを自動計算
+  const row = input.closest('.holdings-row');
+  if (!row) {
+    updateHoldingsInputs();
+    return;
+  }
+  
+  const qtyInput = row.querySelector('[data-field="quantity"]');
+  const rateInput = row.querySelector('[data-field="rate"]');
+  const valueInput = row.querySelector('[data-field="valueJPY"]');
+  
+  const qty = Number(qtyInput.value) || 0;
+  const rate = Number(rateInput.value) || 0;
+  const value = Number(valueInput.value) || 0;
+  
+  // どの入力欄が変更されたかに応じて自動計算
+  if (field === 'quantity' || field === 'rate') {
+    // 数量またはレートが変更 → 円換算額を計算
+    if (qty > 0 && rate > 0) {
+      const calculatedValue = Math.round(qty * rate);
+      valueInput.value = String(calculatedValue);
+    }
+  } else if (field === 'valueJPY') {
+    // 円換算額が変更 → レートを計算（数量が入力済みの場合）
+    if (qty > 0 && value > 0) {
+      const calculatedRate = Math.round(value / qty * 100) / 100;
+      rateInput.value = String(calculatedRate);
+    }
+  }
+  
+  updateHoldingsInputs();
+}
+
 function updateInputs() {
   // 入力値をtradingDataに保存
   document.querySelectorAll('.input-account').forEach(el => {
@@ -1935,28 +2099,47 @@ function updateInputs() {
 
 function updateHoldingsInputs() {
   // 保有明細入力値をtradingDataに保存
+  const holdingsData = {};
+  
   document.querySelectorAll('.input-holdings').forEach(el => {
     const accountKey = el.dataset.account;
     const symbol = el.dataset.symbol;
-    const quantity = Number(el.value) || 0;
+    const field = el.dataset.field; // 'quantity', 'rate', or 'valueJPY'
+    const value = Number(el.value) || 0;
     
+    const key = `${accountKey}::${symbol}`;
+    if (!holdingsData[key]) {
+      holdingsData[key] = { accountKey, symbol };
+    }
+    holdingsData[key][field] = value;
+  });
+  
+  // holdingsDataを各口座のholdingsに反映
+  Object.values(holdingsData).forEach(({ accountKey, symbol, quantity, rate, valueJPY }) => {
     ensureHoldings(currentYear, currentMonth, accountKey);
     const holdings = tradingData[currentYear][currentMonth][accountKey].holdings;
     
-    // 既存の保有明細を更新または追加
     const existingIndex = holdings.findIndex(h => h.symbol === symbol);
     const unit = symbol === 'JPY' ? '円' : symbol;
+    const qty = quantity !== undefined ? quantity : 0;
+    const rt = rate !== undefined ? rate : 0;
+    const val = valueJPY !== undefined ? valueJPY : 0;
     
     if (existingIndex >= 0) {
-      holdings[existingIndex] = { symbol, quantity, unit };
+      holdings[existingIndex] = { symbol, quantity: qty, unit, rate: rt, valueJPY: val };
     } else {
-      holdings.push({ symbol, quantity, unit });
+      holdings.push({ symbol, quantity: qty, unit, rate: rt, valueJPY: val });
     }
     
-    // 数量が0の場合は削除
-    if (quantity === 0) {
+    // JPY以外で数量と評価額が両方とも0の場合は削除
+    if (symbol !== 'JPY' && qty === 0 && val === 0) {
       tradingData[currentYear][currentMonth][accountKey].holdings = 
-        holdings.filter(h => h.symbol !== symbol || h.quantity !== 0);
+        holdings.filter(h => h.symbol !== symbol);
+    }
+    // JPYで数量が0の場合は削除
+    if (symbol === 'JPY' && qty === 0) {
+      tradingData[currentYear][currentMonth][accountKey].holdings = 
+        holdings.filter(h => h.symbol !== symbol);
     }
   });
   
