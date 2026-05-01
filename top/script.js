@@ -71,7 +71,7 @@ function playLaserReveal(chart, duration = 900) {
 }
 
 const TOP_BASE_YEAR = 2025;
-const profitMetrics = window.TradeScopeProfitMetrics;
+const profitMetrics = window.TradeScopeProfitMetrics || {};
 
 // ===== Memo Box =====
 const memoList = document.getElementById('memoList');
@@ -328,7 +328,6 @@ const PROFIT_STORAGE_KEY_TRADING = 'tradingData';
 const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
-const profitMetrics = window.TradeScopeProfitMetrics;
 const historyCore = window.TradeScopeHistory;
 const LINKED_ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
