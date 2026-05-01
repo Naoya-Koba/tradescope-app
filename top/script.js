@@ -71,6 +71,7 @@ function playLaserReveal(chart, duration = 900) {
 }
 
 const TOP_BASE_YEAR = 2025;
+const profitMetrics = window.TradeScopeProfitMetrics;
 
 // ===== Memo Box =====
 const memoList = document.getElementById('memoList');
@@ -434,14 +435,16 @@ function hasMeaningfulMonthData(yearData, month) {
 
   return LINKED_ACCOUNTS.some((account) => {
     const row = monthData?.[account.key] || {};
+    // すべてのフィールドが0または空の場合のみfalseを返す
+    // monthEndBalanceやmaintenanceRateも値が0なら無視
     return (Number(row.realizedPnL) || 0) !== 0
       || (Number(row.swapPnL) || 0) !== 0
       || (Number(row.unrealizedPnL) || 0) !== 0
       || (Number(row.deposit) || 0) !== 0
       || (Number(row.withdrawal) || 0) !== 0
       || (Number(row.maintenanceRate) || 0) !== 0
-      || (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0)
-      || Object.prototype.hasOwnProperty.call(row, 'monthEndBalance');
+      || (Number(row.monthEndBalance) || 0) !== 0
+      || (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0 && row.unrealizedLegs.some(v => Number(v) !== 0));
   });
 }
 

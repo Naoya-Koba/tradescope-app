@@ -89,7 +89,7 @@ const ACCOUNTS = [
 ];
 const UNREALIZED_HELPER_ACCOUNTS = new Set(['lightfx', 'minano']);
 const GROWTH_TARGET_ACCOUNTS = ACCOUNTS.filter((account) => !account.bankOnly);
-const profitMetrics = window.TradeScopeProfitMetrics;
+const profitMetrics = window.TradeScopeProfitMetrics || {};
 
 function getUnrealizedLegs(year, month, accountKey) {
   ensureYearMonth(year, month);
