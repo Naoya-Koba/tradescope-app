@@ -122,13 +122,13 @@ function reindexUnrealizedLegRows(accountKey) {
 
     const addBtn = row.querySelector('.unrealized-leg-add');
     if (addBtn) {
-      addBtn.style.display = idx === rows.length - 1 ? 'inline-flex' : 'none';
+      addBtn.style.visibility = idx === rows.length - 1 ? 'visible' : 'hidden';
     }
   });
 
   const helperAddBtn = document.querySelector(`.unrealized-helper-add[data-account="${accountKey}"]`);
   if (helperAddBtn) {
-    helperAddBtn.style.display = rows.length === 0 ? 'inline-flex' : 'none';
+    helperAddBtn.style.visibility = rows.length === 0 ? 'visible' : 'hidden';
   }
 }
 
@@ -755,6 +755,108 @@ function getLatestSavedMonth(year) {
     if (hasMeaningfulMonthData(year, month)) return month;
   }
   return 1;
+}
+
+// ===== Holdings (保有明細) Management =====
+function getCryptoSymbolsFromHistory() {
+  const historyCore = window.TradeScopeHistory;
+  if (!historyCore?.parseEntries) return [];
+  
+  const entries = historyCore.parseEntries();
+  const cryptoSymbols = new Set();
+  
+  entries.forEach((entry) => {
+    if (entry.assetType === '暗号資産' && entry.symbol) {
+      // ETH/JPY → ETH に変換
+      const baseSymbol = entry.symbol.split('/')[0].trim().toUpperCase();
+      cryptoSymbols.add(baseSymbol);
+    }
+  });
+  
+  return Array.from(cryptoSymbols).sort();
+}
+
+function ensureHoldings(year, month, accountKey) {
+  ensureYearMonth(year, month);
+  const row = tradingData[year][month][accountKey];
+  if (!Array.isArray(row.holdings)) {
+    row.holdings = [];
+  }
+  return row.holdings;
+}
+
+function calculateUnrealizedFromNetAssets(year, month, accountKey) {
+  ensureYearMonth(year, month);
+  const row = tradingData[year][month][accountKey];
+  const netAssets = Number(row.netAssets) || 0;
+  const confirmedAssets = calculateAccountConfirmedAssets(year, month, accountKey);
+  return netAssets - confirmedAssets;
+}
+
+function syncUnrealizedFromNetAssets(accountKey) {
+  ensureYearMonth(currentYear, currentMonth);
+  const row = tradingData[currentYear][currentMonth][accountKey];
+  const netAssets = Number(row.netAssets) || 0;
+  
+  if (netAssets === 0) return; // 純資産額が未入力の場合はスキップ
+  
+  const autoUnrealized = calculateUnrealizedFromNetAssets(currentYear, currentMonth, accountKey);
+  row.unrealizedPnL = autoUnrealized;
+  
+  // 入力フィールドも更新
+  const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
+  if (unrealizedInput) {
+    unrealizedInput.value = String(autoUnrealized);
+  }
+}
+
+function renderHoldingsSection(accountKey, data) {
+  const holdings = ensureHoldings(currentYear, currentMonth, accountKey);
+  const cryptoSymbols = getCryptoSymbolsFromHistory();
+  
+  // JPYは常に表示
+  const allSymbols = ['JPY', ...cryptoSymbols];
+  
+  // 既存の保有明細からシンボルごとの値を取得
+  const holdingsMap = new Map();
+  holdings.forEach(h => {
+    if (h && h.symbol) {
+      holdingsMap.set(h.symbol, h);
+    }
+  });
+  
+  // 各シンボルの入力フィールドを生成
+  const holdingsHtml = allSymbols.map(symbol => {
+    const holding = holdingsMap.get(symbol) || { symbol, quantity: 0, unit: symbol === 'JPY' ? '円' : symbol };
+    const isJPY = symbol === 'JPY';
+    
+    return `
+      <div class="holdings-row" data-symbol="${symbol}">
+        <label class="holdings-label">${symbol}:</label>
+        <input 
+          type="number" 
+          class="input-holdings" 
+          data-account="${accountKey}" 
+          data-symbol="${symbol}" 
+          value="${holding.quantity || 0}" 
+          placeholder="0"
+          step="${isJPY ? '1' : '0.00000001'}"
+        />
+        <span class="holdings-unit">${holding.unit}</span>
+      </div>
+    `;
+  }).join('');
+  
+  return `
+    <div class="holdings-section" data-account="${accountKey}">
+      <div class="holdings-header">
+        <label>保有明細</label>
+      </div>
+      <div class="holdings-list">
+        ${holdingsHtml}
+      </div>
+    </div>
+  `;
 }
 
 function updateAssetTrendLegend(effectiveView) {
@@ -1660,6 +1762,17 @@ function renderAccountInputs() {
         </div>`
       : '';
     
+    // 暗号資産口座用の追加フィールド
+    const isCryptoAccount = account.key === 'sbivc';
+    const netAssetsField = isCryptoAccount ? `
+        <div class="form-group">
+          <label>純資産額</label>
+          <input type="number" class="input-account input-net-assets" data-account="${account.key}" data-field="netAssets" value="${data.netAssets || 0}" placeholder="0" />
+          <span class="suffix">¥</span>
+        </div>` : '';
+    
+    const holdingsSection = isCryptoAccount ? renderHoldingsSection(account.key, data) : '';
+    
     const card = document.createElement('div');
     card.className = 'account-card';
     const tradingFields = account.bankOnly ? `
@@ -1668,23 +1781,24 @@ function renderAccountInputs() {
           <input type="number" class="input-account" data-account="${account.key}" data-field="monthEndBalance" value="${Number.isFinite(Number(data.monthEndBalance)) ? Number(data.monthEndBalance) : getBankMonthEndBalance(currentYear, currentMonth, account.key)}" placeholder="0" />
           <span class="suffix">¥</span>
         </div>` : `
+        ${netAssetsField}
         <div class="form-group">
           <label>決済損益</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="realizedPnL" value="${data.realizedPnL}" placeholder="0" />
           <span class="suffix">¥</span>
         </div>
         <div class="form-group">
+          <label>評価損益</label>
+          <div class="unrealized-input-inline">
+            <input type="number" class="input-account${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? ' unrealized-main-input' : ''}${isCryptoAccount ? ' input-auto-unrealized' : ''}" data-account="${account.key}" data-field="unrealizedPnL" value="${data.unrealizedPnL}" placeholder="0" />
+          </div>
+          <span class="suffix">¥</span>
+        </div>${isCryptoAccount ? '' : `
+        <div class="form-group">
           <label>スワップ損益</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="swapPnL" value="${data.swapPnL}" placeholder="0" />
           <span class="suffix">¥</span>
-        </div>
-        <div class="form-group">
-          <label>評価損益</label>
-          <div class="unrealized-input-inline">
-            <input type="number" class="input-account${UNREALIZED_HELPER_ACCOUNTS.has(account.key) ? ' unrealized-main-input' : ''}" data-account="${account.key}" data-field="unrealizedPnL" value="${data.unrealizedPnL}" placeholder="0" />
-          </div>
-          <span class="suffix">¥</span>
-        </div>`;
+        </div>`}`;
     const cashflowFields = account.bankOnly ? '' : `
         <div class="form-group">
           <label>入金</label>
@@ -1707,6 +1821,7 @@ function renderAccountInputs() {
       <div class="account-body" data-account-body="${account.key}">
         ${tradingFields}
         ${unrealizedHelper}
+        ${holdingsSection}
         ${cashflowFields}
       </div>
     `;
@@ -1719,6 +1834,27 @@ function renderAccountInputs() {
     el.addEventListener('input', updateInputs);
     el.addEventListener('focus', handleAccountInputFocus);
     el.addEventListener('blur', handleAccountInputBlur);
+  });
+  
+  // 純資産額入力時に評価損益を自動計算
+  document.querySelectorAll('.input-net-assets').forEach(el => {
+    el.addEventListener('input', (e) => {
+      const accountKey = e.target.dataset.account;
+      syncUnrealizedFromNetAssets(accountKey);
+      updateInputs();
+    });
+  });
+  
+  // 保有明細入力のイベントリスナー
+  document.querySelectorAll('.input-holdings').forEach(el => {
+    el.addEventListener('input', updateHoldingsInputs);
+    el.addEventListener('focus', handleAccountInputFocus);
+    el.addEventListener('blur', (e) => {
+      if (e.target.value.trim() === '') {
+        e.target.value = '0';
+        updateHoldingsInputs();
+      }
+    });
   });
 
   document.querySelectorAll('.account-toggle').forEach(btn => {
@@ -1797,6 +1933,37 @@ function updateInputs() {
   }
 }
 
+function updateHoldingsInputs() {
+  // 保有明細入力値をtradingDataに保存
+  document.querySelectorAll('.input-holdings').forEach(el => {
+    const accountKey = el.dataset.account;
+    const symbol = el.dataset.symbol;
+    const quantity = Number(el.value) || 0;
+    
+    ensureHoldings(currentYear, currentMonth, accountKey);
+    const holdings = tradingData[currentYear][currentMonth][accountKey].holdings;
+    
+    // 既存の保有明細を更新または追加
+    const existingIndex = holdings.findIndex(h => h.symbol === symbol);
+    const unit = symbol === 'JPY' ? '円' : symbol;
+    
+    if (existingIndex >= 0) {
+      holdings[existingIndex] = { symbol, quantity, unit };
+    } else {
+      holdings.push({ symbol, quantity, unit });
+    }
+    
+    // 数量が0の場合は削除
+    if (quantity === 0) {
+      tradingData[currentYear][currentMonth][accountKey].holdings = 
+        holdings.filter(h => h.symbol !== symbol || h.quantity !== 0);
+    }
+  });
+  
+  // サマリー更新
+  renderMonthlySection();
+  renderAnnualSummary();
+}
 
 
 function getSelectableYears() {
@@ -2013,6 +2180,30 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
     const field = el.dataset.field;
     const value = Number(el.value) || 0;
     tradingData[currentYear][currentMonth][account][field] = normalizeCashflowValue(field, value);
+  });
+  
+  // 保有明細も保存
+  document.querySelectorAll('.input-holdings').forEach(el => {
+    const accountKey = el.dataset.account;
+    const symbol = el.dataset.symbol;
+    const quantity = Number(el.value) || 0;
+    
+    ensureHoldings(currentYear, currentMonth, accountKey);
+    const holdings = tradingData[currentYear][currentMonth][accountKey].holdings;
+    
+    const existingIndex = holdings.findIndex(h => h.symbol === symbol);
+    const unit = symbol === 'JPY' ? '円' : symbol;
+    
+    if (existingIndex >= 0) {
+      holdings[existingIndex] = { symbol, quantity, unit };
+    } else if (quantity !== 0) {
+      holdings.push({ symbol, quantity, unit });
+    }
+    
+    if (quantity === 0 && existingIndex >= 0) {
+      tradingData[currentYear][currentMonth][accountKey].holdings = 
+        holdings.filter(h => h.symbol !== symbol);
+    }
   });
 
   tradingData[currentYear][currentMonth].__saved = true;

@@ -1629,7 +1629,13 @@ function buildFallbackPortfolioRowsFromAccounts() {
       metricValue: securitiesAmount
     });
   }
-  if (cryptoAmount > 0) {
+  
+  // 暗号資産: 月次保有明細から詳細を取得
+  const cryptoRows = buildCryptoPortfolioFromMonthlyHoldings();
+  if (cryptoRows.length > 0) {
+    rows.push(...cryptoRows);
+  } else if (cryptoAmount > 0) {
+    // 保有明細がない場合のフォールバック
     rows.push({
       id: 'fallback::暗号資産',
       symbol: '暗号資産統合',
@@ -1646,6 +1652,45 @@ function buildFallbackPortfolioRowsFromAccounts() {
   }
 
   return rows;
+}
+
+function buildCryptoPortfolioFromMonthlyHoldings() {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const year = topSeries?.year || TOP_BASE_YEAR;
+  const month = topSeries?.month || 12;
+  
+  const sbivcData = tradingData?.[year]?.[month]?.['sbivc'];
+  if (!sbivcData || !Array.isArray(sbivcData.holdings)) return [];
+  
+  const cryptoHoldings = sbivcData.holdings.filter(h => h.symbol !== 'JPY' && Number(h.quantity) > 0);
+  if (!cryptoHoldings.length) return [];
+  
+  // 各通貨ごとに行を生成
+  return cryptoHoldings.map(holding => {
+    const symbol = holding.symbol;
+    const quantity = Number(holding.quantity) || 0;
+    
+    // 簡易評価額計算（実際の価格データがないため、純資産額から按分）
+    const totalCryptoQty = cryptoHoldings.reduce((sum, h) => sum + (Number(h.quantity) || 0), 0);
+    const netAssets = Number(sbivcData.netAssets) || 0;
+    const jpyAmount = sbivcData.holdings.find(h => h.symbol === 'JPY')?.quantity || 0;
+    const cryptoPortionValue = netAssets - jpyAmount;
+    const estimatedValue = totalCryptoQty > 0 ? (quantity / totalCryptoQty) * cryptoPortionValue : 0;
+    
+    return {
+      id: `monthly::${symbol}`,
+      symbol: `${symbol}/JPY`,
+      assetType: '暗号資産',
+      side: 'buy',
+      absQuantity: quantity,
+      avgRate: quantity > 0 ? estimatedValue / quantity : 0,
+      contractSize: 1,
+      accounts: ['SBI VC'],
+      strategy: '-',
+      memo: `月次報告書: ${quantity.toFixed(8)} ${symbol}`,
+      metricValue: estimatedValue
+    };
+  });
 }
 
 function getActivePortfolioRows() {
