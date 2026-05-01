@@ -737,14 +737,16 @@ function hasMeaningfulMonthData(year, month) {
 
   return ACCOUNTS.some((account) => {
     const row = monthData?.[account.key] || {};
+    // すべてのフィールドが0または空の場合のみfalseを返す
+    // monthEndBalanceやmaintenanceRateも値が0なら無視
     return (Number(row.realizedPnL) || 0) !== 0
       || (Number(row.swapPnL) || 0) !== 0
       || (Number(row.unrealizedPnL) || 0) !== 0
       || (Number(row.deposit) || 0) !== 0
       || (Number(row.withdrawal) || 0) !== 0
       || (Number(row.maintenanceRate) || 0) !== 0
-      || Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0
-      || Object.prototype.hasOwnProperty.call(row, 'monthEndBalance');
+      || (Number(row.monthEndBalance) || 0) !== 0
+      || (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0 && row.unrealizedLegs.some(v => Number(v) !== 0));
   });
 }
 
@@ -1485,6 +1487,14 @@ function renderMonthlyDetailPane(month = currentMonth) {
     `;
   }).join('');
 
+  const hasData = hasMeaningfulMonthData(currentYear, month);
+  const deleteButton = hasData ? `
+    <button type="button" class="detail-delete-button" data-delete-month="${month}">
+      <span class="detail-delete-icon">🗑</span>
+      <span class="detail-delete-text">この月のデータを削除</span>
+    </button>
+  ` : '';
+
   monthlyDetailBody.innerHTML = `
     <div class="detail-top-grid">
       <div class="detail-summary-card">
@@ -1526,7 +1536,17 @@ function renderMonthlyDetailPane(month = currentMonth) {
       </div>
     </div>
     <div class="detail-account-list">${accountCards}</div>
+    ${deleteButton}
   `;
+  
+  // 削除ボタンのイベントリスナーを設定
+  const deleteBtn = monthlyDetailBody.querySelector('.detail-delete-button');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => {
+      const month = Number(deleteBtn.dataset.deleteMonth);
+      deleteMonthData(month);
+    });
+  }
 }
 
 function openMonthlyDetailPane(month = currentMonth) {
@@ -1549,6 +1569,52 @@ function closeMonthlyDetailPane() {
   document.body.style.top = '';
   document.body.style.width = '';
   window.scrollTo(0, monthlyDetailLockScrollY);
+}
+
+function clearMonthData(year, month) {
+  ensureYearMonth(year, month);
+  
+  ACCOUNTS.forEach(account => {
+    const row = tradingData[year][month][account.key];
+    row.realizedPnL = 0;
+    row.swapPnL = 0;
+    row.unrealizedPnL = 0;
+    row.maintenanceRate = 0;
+    row.deposit = 0;
+    row.withdrawal = 0;
+    row.unrealizedLegs = [];
+    row.unrealizedBackup = undefined;
+    
+    // 銀行口座の月末残高も削除
+    if (account.bankOnly) {
+      delete row.monthEndBalance;
+    }
+  });
+  
+  // __savedフラグも削除
+  delete tradingData[year][month].__saved;
+  
+  saveToStorage();
+}
+
+function deleteMonthData(month) {
+  const confirmMessage = `${currentYear}年${month}月のすべてのデータを削除します。\n\nこの操作は元に戻せません。本当に削除しますか？`;
+  
+  if (!confirm(confirmMessage)) {
+    return;
+  }
+  
+  clearMonthData(currentYear, month);
+  closeMonthlyDetailPane();
+  
+  // 削除した月が現在選択中の月の場合、最新の有効な月に切り替え
+  if (month === currentMonth) {
+    const latestMonth = getLatestSavedMonth(currentYear);
+    currentMonth = latestMonth;
+  }
+  
+  // 全体を再レンダリング
+  renderAll();
 }
 
 function renderMonthTabs() {
