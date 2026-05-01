@@ -2020,47 +2020,6 @@ function handleHoldingsEnterKey(event) {
 }
 
 function handleHoldingsInput(event) {
-  const input = event.target;
-  const accountKey = input.dataset.account;
-  const symbol = input.dataset.symbol;
-  const field = input.dataset.field;
-  
-  // JPYは自動計算不要
-  if (symbol === 'JPY') {
-    updateHoldingsInputs();
-    return;
-  }
-  
-  // 暗号資産の場合：3つの値のうち2つから残り1つを自動計算
-  const row = input.closest('.holdings-row');
-  if (!row) {
-    updateHoldingsInputs();
-    return;
-  }
-  
-  const qtyInput = row.querySelector('[data-field="quantity"]');
-  const rateInput = row.querySelector('[data-field="rate"]');
-  const valueInput = row.querySelector('[data-field="valueJPY"]');
-  
-  const qty = Number(qtyInput.value) || 0;
-  const rate = Number(rateInput.value) || 0;
-  const value = Number(valueInput.value) || 0;
-  
-  // どの入力欄が変更されたかに応じて自動計算
-  if (field === 'quantity' || field === 'rate') {
-    // 数量またはレートが変更 → 円換算額を計算
-    if (qty > 0 && rate > 0) {
-      const calculatedValue = Math.round(qty * rate);
-      valueInput.value = String(calculatedValue);
-    }
-  } else if (field === 'valueJPY') {
-    // 円換算額が変更 → レートを計算（数量が入力済みの場合）
-    if (qty > 0 && value > 0) {
-      const calculatedRate = Math.round(value / qty * 100) / 100;
-      rateInput.value = String(calculatedRate);
-    }
-  }
-  
   updateHoldingsInputs();
 }
 
