@@ -1388,6 +1388,7 @@ function renderAnnualSummary() {
   const initialCapital = calculateInitialCapital(currentYear);
   const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
   const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
+  const growthAccounts = GROWTH_TARGET_ACCOUNTS;
 
   const fmtDeltaNumber = (value) => {
     const abs = Math.round(Math.abs(value)).toLocaleString();
@@ -1407,10 +1408,35 @@ function renderAnnualSummary() {
   const growthRate = yearStartTotal > 0 ? (totalAssetsDelta / yearStartTotal * 100) : 0;
   const confirmedGrowthRate = yearStartConfirmed > 0 ? (confirmedAssetsDelta / yearStartConfirmed * 100) : 0;
 
-  const yearNetPnL = totalAssetsDelta - yearly.depositSum + yearly.withdrawSum;
-  const yearConfirmedPnL = confirmedAssetsDelta - yearly.depositSum + yearly.withdrawSum;
-  const yearNetPnLGrowthRate = yearStartTotal > 0 ? (yearNetPnL / yearStartTotal * 100) : 0;
-  const yearConfirmedPnLGrowthRate = yearStartConfirmed > 0 ? (yearConfirmedPnL / yearStartConfirmed * 100) : 0;
+  // 純損益/確定損益は投資口座のみ（bankOnly除外）でトップページと定義を一致させる
+  const growthStartInitial = calculateInitialCapital(currentYear, growthAccounts);
+  const growthStartUnrealized = growthAccounts.reduce((sum, a) => {
+    return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
+  }, 0);
+  const growthYearStartTotal = growthStartInitial + growthStartUnrealized;
+  const growthYearStartConfirmed = growthStartInitial;
+
+  const growthCurrentTotal = growthAccounts.reduce((sum, a) => {
+    return sum + calculateAccountNetAssets(currentYear, latestMonth, a.key);
+  }, 0);
+  const growthCurrentConfirmed = growthAccounts.reduce((sum, a) => {
+    return sum + calculateAccountConfirmedAssets(currentYear, latestMonth, a.key);
+  }, 0);
+
+  let growthDepositSum = 0;
+  let growthWithdrawSum = 0;
+  for (let m = 1; m <= latestMonth; m += 1) {
+    growthAccounts.forEach((a) => {
+      const row = tradingData?.[currentYear]?.[m]?.[a.key] || {};
+      growthDepositSum += Number(row.deposit) || 0;
+      growthWithdrawSum += Number(row.withdrawal) || 0;
+    });
+  }
+
+  const yearNetPnL = growthCurrentTotal - growthYearStartTotal - growthDepositSum + growthWithdrawSum;
+  const yearConfirmedPnL = growthCurrentConfirmed - growthYearStartConfirmed - growthDepositSum + growthWithdrawSum;
+  const yearNetPnLGrowthRate = growthYearStartTotal > 0 ? (yearNetPnL / growthYearStartTotal * 100) : 0;
+  const yearConfirmedPnLGrowthRate = growthYearStartConfirmed > 0 ? (yearConfirmedPnL / growthYearStartConfirmed * 100) : 0;
   const netCashFlowYear = yearly.depositSum - yearly.withdrawSum;
 
   document.getElementById('yearRealizedSum').textContent = fmtJPY(yearly.realizedSum);
