@@ -327,6 +327,7 @@ const demoMonthly = {
 const PROFIT_STORAGE_KEY_TRADING = 'tradingData';
 const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
+const PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT = 'tradeScopeTopSummarySnapshotV1';
 const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
 const historyCore = window.TradeScopeHistory;
 const LINKED_ACCOUNTS = [
@@ -448,6 +449,21 @@ function hasMeaningfulMonthData(yearData, month) {
 }
 
 function buildTopLinkedData(selectedYear = null) {
+  const snapshotStore = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT);
+  const snapshotYears = getNumericYears(snapshotStore);
+  const snapshotTargetYear = selectedYear || (snapshotYears.length ? snapshotYears[snapshotYears.length - 1] : null);
+  if (snapshotTargetYear) {
+    const snapshot = snapshotStore?.[snapshotTargetYear] || snapshotStore?.[String(snapshotTargetYear)];
+    if (snapshot && Array.isArray(snapshot.realized) && Array.isArray(snapshot.total) && snapshot.realized.length === 12 && snapshot.total.length === 12) {
+      return {
+        ...snapshot,
+        year: Number(snapshot.year) || snapshotTargetYear,
+        month: Number(snapshot.month) || 1,
+        accountData: Array.isArray(snapshot.accountData) ? snapshot.accountData : []
+      };
+    }
+  }
+
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
   const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
@@ -1094,6 +1110,13 @@ setTimeout(adjustDetailHeight, 200);
 
 // ===== Chart =====
 function buildTopPerformanceSeries(year, latestMonth) {
+  if (Array.isArray(topSeries?.performanceConfirmedSeries) && Array.isArray(topSeries?.performanceTotalSeries)) {
+    return {
+      confirmedSeries: topSeries.performanceConfirmedSeries,
+      totalSeries: topSeries.performanceTotalSeries
+    };
+  }
+
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
   const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
@@ -1844,6 +1867,7 @@ function resolveTopSeriesForYear(selectedYear) {
 
 function initializeYearSelector() {
   const tradingDataMap = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const snapshotMap = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT);
   const yearSelect = document.getElementById('topYearSelect');
 
   if (!yearSelect) return;
@@ -1852,6 +1876,9 @@ function initializeYearSelector() {
   const years = (() => {
     const set = new Set([TOP_BASE_YEAR]);
     getNumericYears(tradingDataMap)
+      .filter((year) => year >= TOP_BASE_YEAR)
+      .forEach((year) => set.add(year));
+    getNumericYears(snapshotMap)
       .filter((year) => year >= TOP_BASE_YEAR)
       .forEach((year) => set.add(year));
 

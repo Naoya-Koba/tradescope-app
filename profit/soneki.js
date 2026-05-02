@@ -395,6 +395,7 @@ let yearInitialUnrealized = {}; // { year: { account: amount } }
 const STORAGE_KEY_TRADING = 'tradingData';
 const STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
+const STORAGE_KEY_TOP_SUMMARY_SNAPSHOT = 'tradeScopeTopSummarySnapshotV1';
 const STORAGE_KEY_SKIP_DEMO = 'profitSkipDemoSeed';
 const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
 const PROFIT_BASE_YEAR = 2025;
@@ -755,6 +756,108 @@ function getLatestSavedMonth(year) {
     if (hasMeaningfulMonthData(year, month)) return month;
   }
   return 1;
+}
+
+function readTopSummarySnapshotStore() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY_TOP_SUMMARY_SNAPSHOT) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function writeTopSummarySnapshotStore(store) {
+  localStorage.setItem(STORAGE_KEY_TOP_SUMMARY_SNAPSHOT, JSON.stringify(store || {}));
+}
+
+function buildTopSummarySnapshotForYear(year) {
+  const latestMonth = getLatestSavedMonth(year);
+  const realized = [];
+  const total = [];
+
+  for (let month = 1; month <= 12; month += 1) {
+    realized.push(calculateTotalConfirmedAssets(year, month));
+    total.push(calculateTotalNetAssets(year, month));
+  }
+
+  const growthAccounts = GROWTH_TARGET_ACCOUNTS;
+  const chartStartTotal = calculateInitialCapital(year);
+  const chartStartTotalWithUnrealized = chartStartTotal + ACCOUNTS.reduce((sum, account) => {
+    return sum + (Number(yearInitialUnrealized?.[year]?.[account.key]) || 0);
+  }, 0);
+
+  const yearStartConfirmed = calculateInitialCapital(year, growthAccounts);
+  const yearStartTotal = yearStartConfirmed + growthAccounts.reduce((sum, account) => {
+    return sum + (Number(yearInitialUnrealized?.[year]?.[account.key]) || 0);
+  }, 0);
+
+  let cumulativeDeposits = 0;
+  let cumulativeWithdrawals = 0;
+  const performanceConfirmedSeries = [0];
+  const performanceTotalSeries = [0];
+
+  for (let month = 1; month <= 12; month += 1) {
+    if (month > latestMonth) {
+      performanceConfirmedSeries.push(null);
+      performanceTotalSeries.push(null);
+      continue;
+    }
+
+    growthAccounts.forEach((account) => {
+      const row = tradingData?.[year]?.[month]?.[account.key] || {};
+      cumulativeDeposits += Number(row.deposit) || 0;
+      cumulativeWithdrawals += Number(row.withdrawal) || 0;
+    });
+
+    const growthConfirmedMonth = growthAccounts.reduce((sum, account) => {
+      return sum + calculateAccountConfirmedAssets(year, month, account.key);
+    }, 0);
+    const growthTotalMonth = growthAccounts.reduce((sum, account) => {
+      return sum + calculateAccountNetAssets(year, month, account.key);
+    }, 0);
+
+    performanceConfirmedSeries.push(growthConfirmedMonth - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals);
+    performanceTotalSeries.push(growthTotalMonth - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals);
+  }
+
+  const growthCurrentConfirmed = growthAccounts.reduce((sum, account) => {
+    return sum + calculateAccountConfirmedAssets(year, latestMonth, account.key);
+  }, 0);
+  const growthCurrentTotal = growthAccounts.reduce((sum, account) => {
+    return sum + calculateAccountNetAssets(year, latestMonth, account.key);
+  }, 0);
+
+  const accountData = ACCOUNTS.map((account) => ({
+    label: account.name,
+    amount: Math.max(0, calculateAccountNetAssets(year, latestMonth, account.key)),
+    color: account.color
+  })).filter((item) => item.amount > 0);
+
+  return {
+    year,
+    month: latestMonth,
+    realized,
+    total,
+    accountData,
+    yearStartTotal,
+    yearStartConfirmed,
+    growthCurrentTotal,
+    growthCurrentConfirmed,
+    chartStartTotal,
+    chartStartTotalWithUnrealized,
+    cumulativeDeposits,
+    cumulativeWithdrawals,
+    performanceConfirmedSeries,
+    performanceTotalSeries,
+    updatedAt: Date.now()
+  };
+}
+
+function saveTopSummarySnapshot(year) {
+  if (!Number.isFinite(Number(year))) return;
+  const store = readTopSummarySnapshotStore();
+  store[String(year)] = buildTopSummarySnapshotForYear(Number(year));
+  writeTopSummarySnapshotStore(store);
 }
 
 // ===== Holdings (保有明細) Management =====
@@ -1438,6 +1541,9 @@ function renderAnnualSummary() {
   const yearNetPnLGrowthRate = growthYearStartTotal > 0 ? (yearNetPnL / growthYearStartTotal * 100) : 0;
   const yearConfirmedPnLGrowthRate = growthYearStartConfirmed > 0 ? (yearConfirmedPnL / growthYearStartConfirmed * 100) : 0;
   const netCashFlowYear = yearly.depositSum - yearly.withdrawSum;
+
+  // トップページ共有用: この年のSummary/Asset Trend算出結果を保存
+  saveTopSummarySnapshot(currentYear);
 
   document.getElementById('yearRealizedSum').textContent = fmtJPY(yearly.realizedSum);
   document.getElementById('yearSwapSum').textContent = fmtJPY(yearly.swapSum);
