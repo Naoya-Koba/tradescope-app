@@ -1691,9 +1691,17 @@ function buildCryptoPortfolioFromMonthlyHoldings() {
   });
 }
 
+function applyMonthlyCryptoRows(rows) {
+  const monthlyCryptoRows = buildCryptoPortfolioFromMonthlyHoldings();
+  if (!monthlyCryptoRows.length) return rows;
+
+  const nonCryptoRows = rows.filter((row) => normalizeAssetTypeLabel(row.assetType) !== normalizeAssetTypeLabel('暗号資産'));
+  return [...nonCryptoRows, ...monthlyCryptoRows];
+}
+
 function getActivePortfolioRows() {
   const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
-  const rows = aggregateOpenPositionsForTop(entries);
+  const rows = applyMonthlyCryptoRows(aggregateOpenPositionsForTop(entries));
   return rows.filter((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(activePortfolioAssetTab));
 }
 
@@ -1741,6 +1749,7 @@ function renderCurrentPortfolioSection() {
   if (!allRows.length) {
     allRows = buildFallbackPortfolioRowsFromAccounts();
   }
+  allRows = applyMonthlyCryptoRows(allRows);
   const hasTabData = (tabName) => allRows.some((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(tabName));
   if (!hasTabData(activePortfolioAssetTab)) {
     const fallbackTab = ['FX', '証券', '暗号資産'].find((tabName) => hasTabData(tabName));

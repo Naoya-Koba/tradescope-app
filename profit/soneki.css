@@ -1496,6 +1496,14 @@ body.drawer-open {
   letter-spacing: 0.3px;
   font-weight: 600;
 }
+.auto-label {
+  font-size: 9px;
+  color: rgba(62, 224, 143, 0.7);
+  font-weight: 500;
+  text-transform: lowercase;
+  font-style: italic;
+  margin-left: 4px;
+}
 .form-label-row {
   display: flex;
   align-items: center;
@@ -1522,6 +1530,22 @@ body.drawer-open {
   outline: none;
   border-color: var(--blue);
   background: rgba(255,255,255,.08);
+}
+.form-group input.input-auto-calculated {
+  background: rgba(255,255,255,.025);
+  border-color: rgba(255,255,255,.08);
+  color: var(--neutral);
+  -webkit-text-fill-color: var(--neutral);
+  font-weight: 600;
+  caret-color: transparent;
+  cursor: default;
+}
+.form-group input.input-auto-calculated:focus {
+  border-color: rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+}
+.suffix.suffix-auto {
+  color: rgba(170,181,208,.8);
 }
 .form-group select {
   cursor: pointer;
