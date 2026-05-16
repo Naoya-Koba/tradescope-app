@@ -16,6 +16,13 @@
     return CARRY_PAIRS.some(p => normalizeSymbolKey(p) === key);
   }
 
+  function resolveDefaultContractSize(assetType, symbol) {
+    if (assetType !== 'FX') return 1;
+    return normalizeSymbolKey(symbol) === normalizeSymbolKey(HUF_PAIR)
+      ? HUF_CONTRACT_SIZE
+      : FX_CONTRACT_SIZE_DEFAULT;
+  }
+
   function parseEntries() {
     try {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -44,6 +51,7 @@
     const createdAt = Number(entry.createdAt) || Date.now() + idx;
     const id = String(entry.id || `${createdAt}-${idx}`);
     const contractSize = Number(entry.contractSize);
+    const defaultContractSize = resolveDefaultContractSize(assetType, symbol);
 
     if (!date || !account || !symbol || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(rate) || rate < 0) {
       return null;
@@ -62,7 +70,7 @@
       rate,
       memo,
       createdAt,
-      contractSize: Number.isFinite(contractSize) && contractSize > 0 ? contractSize : FX_CONTRACT_SIZE_DEFAULT
+      contractSize: Number.isFinite(contractSize) && contractSize > 0 ? contractSize : defaultContractSize
     };
   }
 
@@ -133,7 +141,7 @@
         strategy: entry.strategy,
         quantity: 0,
         avgRate: 0,
-        contractSize: entry.contractSize || FX_CONTRACT_SIZE_DEFAULT
+        contractSize: entry.contractSize || resolveDefaultContractSize(entry.assetType, entry.symbol)
       };
 
       const nextQty = current.quantity + signedQty;
@@ -157,7 +165,7 @@
       }
 
       if (entry.strategy) current.strategy = entry.strategy;
-      current.contractSize = entry.contractSize || current.contractSize || FX_CONTRACT_SIZE_DEFAULT;
+      current.contractSize = entry.contractSize || current.contractSize || resolveDefaultContractSize(entry.assetType, entry.symbol);
       map.set(key, current);
     });
 

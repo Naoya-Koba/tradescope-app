@@ -1501,19 +1501,92 @@ function normalizeTopSymbolKey(symbol) {
   return String(symbol || '').trim().toUpperCase().replace(/\s+/g, '');
 }
 
+function resolveTopDefaultContractSize(assetType, symbol) {
+  if (assetType !== 'FX') return 1;
+  const symbolKey = normalizeTopSymbolKey(symbol);
+  const hufKey = historyCore?.normalizeSymbolKey
+    ? historyCore.normalizeSymbolKey(historyCore?.HUF_PAIR || 'HUF/JPY')
+    : normalizeTopSymbolKey(historyCore?.HUF_PAIR || 'HUF/JPY');
+  if (symbolKey === hufKey) return historyCore?.HUF_CONTRACT_SIZE || 100000;
+  return historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000;
+}
+
+function getLatestFxRate(entries, symbol) {
+  const targetKey = normalizeTopSymbolKey(symbol);
+  const sorted = historyCore?.getSortedEntries
+    ? historyCore.getSortedEntries(entries || [], 'newest')
+    : [...(entries || [])].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+  const hit = sorted.find((entry) => {
+    const assetType = normalizeAssetTypeLabel(entry?.assetType);
+    const rate = Number(entry?.rate);
+    return assetType === 'FX'
+      && normalizeTopSymbolKey(entry?.symbol) === targetKey
+      && Number.isFinite(rate)
+      && rate > 0;
+  });
+
+  return Number(hit?.rate) || 0;
+}
+
+const QUOTE_TO_JPY_FALLBACK_RATES = {
+  USD: 150,
+  EUR: 165,
+  GBP: 195,
+  AUD: 100,
+  NZD: 90,
+  CAD: 110,
+  CHF: 170,
+  TRY: 4,
+  MXN: 8,
+  ZAR: 8,
+  CZK: 7,
+  HUF: 0.4
+};
+
+function resolveQuoteToJpyRate(symbol, entries) {
+  const normalized = String(symbol || '').trim().toUpperCase();
+  const parts = normalized.split('/');
+  if (parts.length !== 2) return 1;
+  const quote = parts[1];
+  if (!quote || quote === 'JPY') return 1;
+
+  const direct = getLatestFxRate(entries, `${quote}/JPY`);
+  if (direct > 0) return direct;
+
+  const inverse = getLatestFxRate(entries, `JPY/${quote}`);
+  if (inverse > 0) return 1 / inverse;
+
+  const fallback = Number(QUOTE_TO_JPY_FALLBACK_RATES[quote]);
+  if (fallback > 0) return fallback;
+
+  return 1;
+}
+
+function resolveSecuritiesUnitDivider(position) {
+  if (normalizeAssetTypeLabel(position?.assetType) !== '証券') return 1;
+  const symbol = String(position?.symbol || '').toUpperCase();
+  const trustLikeKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス'];
+  const isTrustLike = trustLikeKeywords.some((keyword) => symbol.includes(keyword));
+  return isTrustLike ? 10000 : 1;
+}
+
 function estimateRequiredMargin(position) {
   const qty = Number(position.absQuantity) || 0;
   const avgRate = Number(position.avgRate) || 0;
-  const contractSize = Number(position.contractSize) || historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000;
-  const notional = qty * contractSize * Math.max(0, avgRate);
-  return notional * 0.04;
+  const contractSize = Number(position.contractSize)
+    || resolveTopDefaultContractSize(position?.assetType, position?.symbol);
+  const quoteToJpyRate = Number(position.quoteToJpyRate) || 1;
+  const notionalJpy = qty * contractSize * Math.max(0, avgRate) * Math.max(0, quoteToJpyRate);
+  return notionalJpy * 0.04;
 }
 
 function estimateMarketValue(position) {
   const qty = Number(position.absQuantity) || 0;
   const avgRate = Number(position.avgRate) || 0;
   const contractSize = Number(position.contractSize) || 1;
-  return qty * contractSize * Math.max(0, avgRate);
+  const unitDivider = resolveSecuritiesUnitDivider(position);
+  return (qty * contractSize * Math.max(0, avgRate)) / unitDivider;
 }
 
 function getLatestMemoMap(entries) {
@@ -1551,7 +1624,7 @@ function aggregateOpenPositionsForTop(entries) {
       assetType,
       quantity: 0,
       avgRate: 0,
-      contractSize: Number(position.contractSize) || historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000,
+      contractSize: Number(position.contractSize) || resolveTopDefaultContractSize(assetType, position.symbol),
       accounts: new Set(),
       strategies: new Set()
     };
@@ -1576,7 +1649,9 @@ function aggregateOpenPositionsForTop(entries) {
 
     if (position.account) current.accounts.add(position.account);
     if (position.strategy) current.strategies.add(position.strategy);
-    current.contractSize = Number(position.contractSize) || current.contractSize;
+    current.contractSize = Number(position.contractSize)
+      || current.contractSize
+      || resolveTopDefaultContractSize(assetType, position.symbol);
 
     map.set(key, current);
   });
@@ -1594,6 +1669,7 @@ function aggregateOpenPositionsForTop(entries) {
         absQuantity,
         avgRate: position.avgRate,
         contractSize: position.contractSize,
+        quoteToJpyRate: position.assetType === 'FX' ? resolveQuoteToJpyRate(position.symbol, entries) : 1,
         accounts: [...position.accounts].sort((a, b) => String(a).localeCompare(String(b), 'ja')),
         strategy: [...position.strategies][0] || '-',
         memo: latestMemoMap.get(position.key) || 'メモなし'

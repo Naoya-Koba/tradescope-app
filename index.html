@@ -576,6 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
   const splashBootLeadMs = 520;
+  const topScriptVersion = '20260516-2';
   let topScriptPromise = null;
 
   const loadTopScript = () => {
@@ -594,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const script = document.createElement('script');
-      script.src = 'top/script.js';
+      script.src = `top/script.js?v=${topScriptVersion}`;
       script.dataset.tradescopeTopScript = 'true';
       script.addEventListener('load', () => {
         script.dataset.loaded = 'true';
