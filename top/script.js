@@ -1607,11 +1607,26 @@ function getLatestMemoMap(entries) {
 
 function aggregateOpenPositionsForTop(entries) {
   if (!historyCore?.calculateOpenPositions) return [];
-  const openPositions = historyCore.calculateOpenPositions(entries || []);
+
+  // SBI証券以外をTrade Historyから計算
+  const nonSbiSecuritiesEntries = (entries || []).filter((e) => {
+    const acct = String(e.account || '').trim().toUpperCase().replace(/\s+/g, '');
+    const isSbi = acct === 'SBI' || acct.includes('SBI証券');
+    const isSec = e.assetType === '証券' || e.assetType === 'NISA';
+    return !(isSbi && isSec);
+  });
+  const baseOpenPositions = historyCore.calculateOpenPositions(nonSbiSecuritiesEntries);
+
+  // SBI証券はスナップショット＋差分で計算
+  const securitiesPositions = historyCore.buildSecuritiesOpenPositions
+    ? historyCore.buildSecuritiesOpenPositions(entries)
+    : [];
+
+  const allOpenPositions = [...baseOpenPositions, ...securitiesPositions];
   const latestMemoMap = getLatestMemoMap(entries || []);
   const map = new Map();
 
-  openPositions.forEach((position) => {
+  allOpenPositions.forEach((position) => {
     const assetType = normalizeAssetTypeLabel(position.assetType || 'その他');
     const symbolKey = normalizeTopSymbolKey(position.symbol);
     const key = `${assetType}::${symbolKey}`;
@@ -1796,6 +1811,30 @@ function applyMonthlyCryptoRows(rows) {
 
   const nonCryptoRows = rows.filter((row) => normalizeAssetTypeLabel(row.assetType) !== normalizeAssetTypeLabel('暗号資産'));
   return [...nonCryptoRows, ...monthlyCryptoRows];
+}
+
+function applyMonthlySecuritiesValues(rows) {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const year = topSeries?.year || TOP_BASE_YEAR;
+  const month = topSeries?.month || 12;
+
+  const sbiData = tradingData?.[year]?.[month]?.['sbi'];
+  if (!sbiData || !Array.isArray(sbiData.holdings)) return rows;
+
+  const holdingsMap = new Map();
+  sbiData.holdings.forEach((h) => {
+    if (h?.symbol && h.valueFilled === true) {
+      holdingsMap.set(String(h.symbol).trim(), Number(h.valueJPY) || 0);
+    }
+  });
+  if (!holdingsMap.size) return rows;
+
+  return rows.map((row) => {
+    if (normalizeAssetTypeLabel(row.assetType) !== '証券') return row;
+    const valueJPY = holdingsMap.get(String(row.symbol).trim());
+    if (valueJPY == null) return row;
+    return { ...row, metricValue: valueJPY };
+  });
 }
 
 function getActivePortfolioRows() {

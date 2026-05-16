@@ -239,6 +239,144 @@
     };
   }
 
+  const TRADING_DATA_STORAGE_KEY = 'tradingData';
+  const SBI_ACCOUNT_NAMES = ['SBI', 'SBI証券'];
+
+  function isSbiAccount(accountName) {
+    const normalized = String(accountName || '').trim().toUpperCase().replace(/\s+/g, '');
+    return normalized === 'SBI' || normalized.includes('SBI証券');
+  }
+
+  function isSecuritiesAssetType(assetType) {
+    const t = String(assetType || '').trim();
+    return t === '証券' || t === 'NISA';
+  }
+
+  /**
+   * SBI証券のOpen Positionsを「月次スナップショット＋差分」で構築する。
+   *
+   * ロジック:
+   *   1. tradingDataから最新の保存済み月(snapshot)を検索
+   *   2. snapshotのsbi.holdingsをベースラインとして取得
+   *   3. Trade HistoryからsnapshotのYYYY-MM以降のSBI証券エントリのみ抽出して差分計算
+   *   4. ベースライン + 差分 = Open Positions として返す
+   *
+   * snapshotがない場合はTrade History全件でcalculateOpenPositions()を使う（従来通り）。
+   */
+  function buildSecuritiesOpenPositions(entries) {
+    const tradingData = (function () {
+      try { return JSON.parse(localStorage.getItem(TRADING_DATA_STORAGE_KEY) || '{}'); } catch { return {}; }
+    })();
+
+    // --- 最新の保存済み月を探す ---
+    let snapshotYear = null;
+    let snapshotMonth = null;
+    let snapshotHoldings = null;
+
+    const years = Object.keys(tradingData)
+      .map(Number).filter(Number.isFinite).sort((a, b) => b - a);
+
+    outer: for (const year of years) {
+      const yearData = tradingData[year] || tradingData[String(year)] || {};
+      for (let month = 12; month >= 1; month -= 1) {
+        const monthData = yearData[month] || yearData[String(month)];
+        if (!monthData?.__saved) continue;
+        const holdings = monthData?.sbi?.holdings;
+        if (!Array.isArray(holdings) || holdings.length === 0) continue;
+        snapshotYear = year;
+        snapshotMonth = month;
+        snapshotHoldings = holdings;
+        break outer;
+      }
+    }
+
+    // --- snapshotがない場合は従来通り ---
+    if (!snapshotHoldings) {
+      return calculateOpenPositions(
+        (entries || []).filter(e => isSbiAccount(e.account) && isSecuritiesAssetType(e.assetType))
+      );
+    }
+
+    // スナップショット月の末日（YYYY-MM形式の比較用）
+    const snapshotYM = `${snapshotYear}-${String(snapshotMonth).padStart(2, '0')}`;
+
+    // --- ベースラインをMapに展開 ---
+    // スナップショットのacquisitionRateを信頼できる基準値として使用する。
+    // avgRateの単位: 万口単位（例: 34,715円/万口）で統一。
+    const TRUST_KEYWORDS_UC = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス', 'ファンド', 'スリム'];
+    const posMap = new Map();
+    snapshotHoldings.forEach((h) => {
+      const symbol = String(h?.symbol || '').trim();
+      if (!symbol) return;
+      const qty = Number(h.quantity) || 0;
+      if (qty <= 0) return;
+      const isTrust = TRUST_KEYWORDS_UC.some((kw) => symbol.toUpperCase().includes(kw));
+      const unitMultiplier = isTrust ? 10000 : 1;
+      const valueJPY = h.valueFilled === true ? (Number(h.valueJPY) || 0) : 0;
+      // avgRate優先順: acquisitionRate（万口単位） → valueJPY÷qty×unitMultiplier → rate×unitMultiplier
+      let avgRate = 0;
+      if (h.acquisitionRate != null && Number(h.acquisitionRate) > 0) {
+        avgRate = Number(h.acquisitionRate); // 万口単位のまま使用
+      } else if (valueJPY > 0 && qty > 0) {
+        avgRate = (valueJPY / qty) * unitMultiplier; // per口→万口単位に変換
+      } else {
+        avgRate = (Number(h.rate) || 0) * unitMultiplier; // per口→万口単位に変換
+      }
+      posMap.set(symbol, { symbol, quantity: qty, avgRate, valueJPY, fromSnapshot: true });
+    });
+
+    // --- snapshot月より後のTrade Historyエントリを差分として適用 ---
+    // 買い増しは加重平均でavgRateを更新、売りは数量のみ減算
+    const deltaEntries = (entries || []).filter((e) => {
+      if (!isSbiAccount(e.account)) return false;
+      if (!isSecuritiesAssetType(e.assetType)) return false;
+      const entryYM = String(e.date || '').slice(0, 7); // YYYY-MM
+      return entryYM > snapshotYM;
+    });
+
+    const sortedDelta = getSortedEntries(deltaEntries, 'oldest');
+    sortedDelta.forEach((e) => {
+      const symbol = String(e.symbol || '').trim();
+      if (!symbol) return;
+      const signedQty = e.side === 'buy' ? Number(e.quantity) : -Number(e.quantity);
+      if (!Number.isFinite(signedQty) || signedQty === 0) return;
+      const entryRate = Number(e.rate) || 0; // Trade Historyのrateは万口単位
+
+      if (posMap.has(symbol)) {
+        const current = posMap.get(symbol);
+        if (signedQty > 0) {
+          // 買い増し: 加重平均でavgRateを更新
+          const currentAbs = Math.abs(current.quantity);
+          const addAbs = signedQty;
+          const weighted = ((current.avgRate * currentAbs) + (entryRate * addAbs)) / (currentAbs + addAbs);
+          current.avgRate = Number.isFinite(weighted) ? weighted : entryRate;
+        }
+        current.quantity += signedQty;
+        if (Math.abs(current.quantity) < 1e-12) current.quantity = 0;
+      } else {
+        // スナップショットにない銘柄がdeltaで登場した場合
+        posMap.set(symbol, { symbol, quantity: signedQty, avgRate: entryRate, valueJPY: 0, fromSnapshot: false });
+      }
+    });
+
+    // --- 結果を返す ---
+    return Array.from(posMap.values())
+      .filter((p) => Math.abs(p.quantity) > 1e-12)
+      .map((p) => ({
+        account: 'SBI',
+        symbol: p.symbol,
+        assetType: '証券',
+        side: p.quantity >= 0 ? 'buy' : 'sell',
+        absQuantity: Math.abs(p.quantity),
+        quantity: p.quantity,
+        avgRate: p.avgRate,
+        contractSize: 1,
+        strategy: '',
+        valueJPY: p.valueJPY,
+        fromSnapshot: p.fromSnapshot === true
+      }));
+  }
+
   window.TradeScopeHistory = {
     STORAGE_KEY,
     FX_CONTRACT_SIZE_DEFAULT,
@@ -255,6 +393,7 @@
     filterEntries,
     getSortedEntries,
     calculateOpenPositions,
-    calculateRiskSummary
+    calculateRiskSummary,
+    buildSecuritiesOpenPositions
   };
 })();

@@ -1740,6 +1740,13 @@ body.drawer-open {
   background: rgba(255,255,255,.12);
 }
 
+.input-holdings.input-auto-calculated {
+  background: rgba(255,255,255,.035);
+  border-color: rgba(255,255,255,.08);
+  color: var(--muted);
+  cursor: default;
+}
+
 .holdings-unit {
   font-size: 10px;
   color: var(--muted);

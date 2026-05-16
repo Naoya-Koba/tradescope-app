@@ -879,6 +879,231 @@ function getCryptoSymbolsFromHistory() {
   return Array.from(cryptoSymbols).sort();
 }
 
+function getAccountNameByKey(accountKey) {
+  return ACCOUNTS.find((account) => account.key === accountKey)?.name || '';
+}
+
+function isMatchedSbiAccount(accountName) {
+  const normalized = String(accountName || '').toUpperCase().replace(/\s+/g, '');
+  return normalized === 'SBI' || normalized.includes('SBI証券');
+}
+
+function getMergedSecuritiesOpenPositionMap() {
+  const historyCore = window.TradeScopeHistory;
+  const result = new Map();
+  if (!historyCore?.parseEntries || !historyCore?.calculateOpenPositions) return result;
+
+  const entries = historyCore.parseEntries();
+  const openPositions = historyCore.calculateOpenPositions(entries);
+  const quantityBySymbol = new Map();
+
+  const isSecurityLikePosition = (position) => {
+    const symbol = String(position?.symbol || '').trim();
+    if (!symbol) return false;
+
+    const normalizedAsset = String(position?.assetType || '').trim().toUpperCase();
+    if (normalizedAsset === 'FX') return false;
+    if (symbol.includes('/')) return false;
+    return true;
+  };
+
+  openPositions.forEach((position) => {
+    if (!isSecurityLikePosition(position)) return;
+    const symbol = String(position.symbol || '').trim();
+    if (!symbol) return;
+
+    const signedQty = position.side === 'sell'
+      ? -Math.abs(Number(position.absQuantity) || 0)
+      : Math.abs(Number(position.absQuantity) || 0);
+    const nextQty = (quantityBySymbol.get(symbol) || 0) + signedQty;
+    quantityBySymbol.set(symbol, nextQty);
+  });
+
+  quantityBySymbol.forEach((qty, symbol) => {
+    if (qty > 1e-12) result.set(symbol, qty);
+  });
+
+  return result;
+}
+
+function toSafeNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const normalized = String(value ?? '').replace(/,/g, '').trim();
+  if (!normalized) return 0;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getSbiSecuritiesQuantityMapFromRawStorage() {
+  const result = new Map();
+  let rawEntries = [];
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem('tradeScopeTradeHistoryV1') || '[]');
+    if (Array.isArray(parsed)) rawEntries = parsed;
+  } catch {
+    rawEntries = [];
+  }
+
+  rawEntries.forEach((entry) => {
+    const account = String(entry?.account || '').trim();
+    if (!isMatchedSbiAccount(account)) return;
+
+    const symbol = String(entry?.symbol || '').trim();
+    if (!symbol || symbol.includes('/')) return;
+
+    const rawAssetType = String(entry?.assetType || '').trim().toUpperCase();
+    if (rawAssetType === 'FX') return;
+
+    const qty = toSafeNumber(entry?.quantity);
+    if (qty <= 0) return;
+
+    const side = entry?.side === 'sell' ? 'sell' : 'buy';
+    const signed = side === 'sell' ? -qty : qty;
+    const next = (result.get(symbol) || 0) + signed;
+    result.set(symbol, next);
+  });
+
+  const positiveOnly = new Map();
+  result.forEach((qty, symbol) => {
+    if (qty > 1e-12) positiveOnly.set(symbol, qty);
+  });
+  return positiveOnly;
+}
+
+function getSecuritiesOpenPositionMap(accountKey = 'sbi') {
+  const historyCore = window.TradeScopeHistory;
+  const accountName = getAccountNameByKey(accountKey);
+  const result = new Map();
+  if (!accountName || !historyCore?.parseEntries || !historyCore?.calculateOpenPositions) return result;
+
+  // SBIはOpen Positionsの証券建玉集約を最優先で採用（口座名ゆれの影響を受けない）
+  if (accountKey === 'sbi') {
+    const rawSbiMap = getSbiSecuritiesQuantityMapFromRawStorage();
+    if (rawSbiMap.size > 0) return rawSbiMap;
+
+    const merged = getMergedSecuritiesOpenPositionMap();
+    if (merged.size > 0) return merged;
+  }
+
+  const matchAccount = (value) => {
+    if (accountKey !== 'sbi') return value === accountName;
+    return isMatchedSbiAccount(value);
+  };
+
+  const isSecurityLikePosition = (position) => {
+    const symbol = String(position?.symbol || '').trim();
+    if (!symbol) return false;
+
+    const normalizedAsset = String(position?.assetType || '').trim().toUpperCase();
+    if (normalizedAsset === 'FX') return false;
+    if (symbol.includes('/')) return false;
+    return true;
+  };
+
+  const openPositions = historyCore.calculateOpenPositions(historyCore.parseEntries());
+  openPositions.forEach((position) => {
+    if (!matchAccount(position.account)) return;
+    if (!isSecurityLikePosition(position)) return;
+    const symbol = String(position.symbol || '').trim();
+    const qty = Number(position.absQuantity) || 0;
+    if (!symbol || qty <= 0) return;
+    result.set(symbol, qty);
+  });
+
+  if (result.size > 0) return result;
+
+  // Fallback: 履歴明細から数量を再集計（口座名ゆれ対応）
+  const entries = historyCore.parseEntries();
+  const sorted = historyCore.getSortedEntries
+    ? historyCore.getSortedEntries(entries, 'oldest')
+    : [...entries].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+  const quantityBySymbol = new Map();
+
+  sorted.forEach((entry) => {
+    if (!matchAccount(entry.account)) return;
+    const assetType = String(entry.assetType || '').trim();
+    if (assetType !== '証券' && assetType !== 'NISA') return;
+    const symbol = String(entry.symbol || '').trim();
+    const qty = Number(entry.quantity) || 0;
+    if (!symbol || qty <= 0) return;
+
+    const signed = entry.side === 'sell' ? -qty : qty;
+    const next = (quantityBySymbol.get(symbol) || 0) + signed;
+    quantityBySymbol.set(symbol, next);
+  });
+
+  quantityBySymbol.forEach((qty, symbol) => {
+    if (qty > 1e-12) result.set(symbol, qty);
+  });
+
+  if (result.size > 0) return result;
+
+  return result;
+}
+
+function getSecuritiesSymbolsFromHistory(accountKey = 'sbi') {
+  const historyCore = window.TradeScopeHistory;
+  const accountName = getAccountNameByKey(accountKey);
+  const openQtyMap = getSecuritiesOpenPositionMap(accountKey);
+  if (!accountName || !historyCore?.parseEntries) return Array.from(openQtyMap.keys());
+
+  const matchAccount = (value) => {
+    if (accountKey !== 'sbi') return value === accountName;
+    return isMatchedSbiAccount(value);
+  };
+
+  const entries = historyCore.parseEntries();
+  const sorted = historyCore.getSortedEntries
+    ? historyCore.getSortedEntries(entries, 'oldest')
+    : [...entries].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+
+  const ordered = [];
+  const seen = new Set();
+  sorted.forEach((entry) => {
+    if (!matchAccount(entry.account)) return;
+    const symbol = String(entry.symbol || '').trim();
+    if (!symbol || seen.has(symbol)) return;
+    if (!openQtyMap.has(symbol)) return;
+    seen.add(symbol);
+    ordered.push(symbol);
+  });
+
+  openQtyMap.forEach((_qty, symbol) => {
+    if (seen.has(symbol)) return;
+    seen.add(symbol);
+    ordered.push(symbol);
+  });
+
+  return ordered;
+}
+
+function getLatestHoldingQuantityFromTradingData(accountKey, symbol, year, month) {
+  const targetSymbol = String(symbol || '').trim();
+  if (!targetSymbol) return 0;
+
+  const years = Object.keys(tradingData || {})
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => b - a);
+
+  for (const y of years) {
+    for (let m = 12; m >= 1; m -= 1) {
+      if (y > year) continue;
+      if (y === year && m >= month) continue;
+
+      const holdings = tradingData?.[y]?.[m]?.[accountKey]?.holdings;
+      if (!Array.isArray(holdings)) continue;
+      const hit = holdings.find((holding) => String(holding?.symbol || '').trim() === targetSymbol);
+      if (!hit) continue;
+      const qty = Number(hit.quantity) || 0;
+      if (qty > 0) return qty;
+    }
+  }
+
+  return 0;
+}
+
 function ensureHoldings(year, month, accountKey) {
   ensureYearMonth(year, month);
   const row = tradingData[year][month][accountKey];
@@ -913,7 +1138,126 @@ function syncUnrealizedFromNetAssets(accountKey) {
   }
 }
 
+function resolveHoldingsUnitMultiplier(symbol) {
+  const upper = String(symbol || '').toUpperCase();
+  const trustKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス', 'ファンド', 'スリム'];
+  return trustKeywords.some((kw) => upper.includes(kw)) ? 10000 : 1;
+}
+
 function renderHoldingsSection(accountKey, data) {
+  if (accountKey === 'sbi') {
+    const holdings = ensureHoldings(currentYear, currentMonth, accountKey);
+    const openQtyMap = getSecuritiesOpenPositionMap(accountKey);
+    const symbolsFromHistory = getSecuritiesSymbolsFromHistory(accountKey);
+    const existingSymbols = holdings
+      .map((holding) => String(holding?.symbol || '').trim())
+      .filter(Boolean);
+
+    const allSymbols = [...symbolsFromHistory];
+    existingSymbols.forEach((symbol) => {
+      if (!allSymbols.includes(symbol)) allSymbols.push(symbol);
+    });
+
+    const holdingsMap = new Map();
+    holdings.forEach((holding) => {
+      if (!holding?.symbol) return;
+      holdingsMap.set(holding.symbol, holding);
+    });
+
+    const holdingsHtml = allSymbols.map((symbol) => {
+      const openQty = Number(openQtyMap.get(symbol)) || 0;
+      const fallbackQty = openQty > 0
+        ? openQty
+        : getLatestHoldingQuantityFromTradingData(accountKey, symbol, currentYear, currentMonth);
+
+      let existing = holdingsMap.get(symbol);
+      if (!existing) {
+        const seeded = { symbol, quantity: fallbackQty, unit: '株', rate: 0, valueJPY: 0, valueFilled: false, quantityManual: false };
+        holdings.push(seeded);
+        holdingsMap.set(symbol, seeded);
+        existing = seeded;
+      } else if (fallbackQty > 0) {
+        const existingQty = Number(existing.quantity) || 0;
+        const canAutoBackfill = existing.quantityManual !== true || existingQty <= 0;
+        if (canAutoBackfill) {
+          existing.quantity = fallbackQty;
+          if (existingQty <= 0) existing.quantityManual = false;
+        }
+      }
+
+      const quantity = Number(existing.quantity) || 0;
+      const quantityDisplay = quantity > 0 ? quantity : '';
+      const hasValue = existing.valueFilled === true;
+      const valueDisplay = hasValue ? (Number(existing.valueJPY) || 0) : '';
+      const unitMultiplier = resolveHoldingsUnitMultiplier(symbol);
+      const isTrust = unitMultiplier > 1;
+      const quantityUnit = isTrust ? '口' : '株';
+      const acquisitionDisplay = existing.acquisitionRate != null && existing.acquisitionRate !== '' ? existing.acquisitionRate : '';
+
+      return `
+        <div class="holdings-row" data-symbol="${symbol}">
+          <label class="holdings-label">${symbol}</label>
+          <div class="holdings-cell">
+            <input
+              type="number"
+              class="input-holdings"
+              data-account="${accountKey}"
+              data-symbol="${symbol}"
+              data-field="quantity"
+              value="${quantityDisplay}"
+              placeholder=""
+              step="1"
+            />
+            <span class="holdings-unit">${quantityUnit}</span>
+          </div>
+          <div class="holdings-cell">
+            <input
+              type="number"
+              class="input-holdings"
+              data-account="${accountKey}"
+              data-symbol="${symbol}"
+              data-field="acquisitionRate"
+              value="${acquisitionDisplay}"
+              placeholder=""
+              step="1"
+            />
+            <span class="holdings-unit">円</span>
+          </div>
+          <div class="holdings-cell">
+            <input
+              type="number"
+              class="input-holdings"
+              data-account="${accountKey}"
+              data-symbol="${symbol}"
+              data-field="valueJPY"
+              value="${valueDisplay}"
+              placeholder=""
+              step="1"
+            />
+            <span class="holdings-unit">円</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="holdings-section" data-account="${accountKey}">
+        <div class="holdings-header">
+          <label>保有明細</label>
+        </div>
+        <div class="holdings-header-row">
+          <div class="holdings-header-cell"></div>
+          <div class="holdings-header-cell">数量</div>
+          <div class="holdings-header-cell">取得単価</div>
+          <div class="holdings-header-cell">評価額</div>
+        </div>
+        <div class="holdings-list">
+          ${holdingsHtml}
+        </div>
+      </div>
+    `;
+  }
+
   const holdings = ensureHoldings(currentYear, currentMonth, accountKey);
   const cryptoSymbols = getCryptoSymbolsFromHistory();
   
@@ -1933,6 +2277,8 @@ function renderAccountInputs() {
     
     // 暗号資産口座用の追加フィールド
     const isCryptoAccount = account.key === 'sbivc';
+    const isSecuritiesAccount = account.key === 'sbi';
+    const autoUnrealizedAccount = isCryptoAccount || isSecuritiesAccount;
     const netAssetsField = isCryptoAccount ? `
         <div class="form-group">
           <label>純資産額</label>
@@ -1940,10 +2286,10 @@ function renderAccountInputs() {
           <span class="suffix suffix-auto">¥</span>
         </div>` : '';
     
-    const holdingsSection = isCryptoAccount ? renderHoldingsSection(account.key, data) : '';
+    const holdingsSection = (isCryptoAccount || isSecuritiesAccount) ? renderHoldingsSection(account.key, data) : '';
     
     // 暗号資産口座の評価損益フィールド（保有明細の下に移動）
-    const cryptoUnrealizedField = isCryptoAccount ? `
+    const autoUnrealizedField = autoUnrealizedAccount ? `
         <div class="form-group">
           <label>評価損益</label>
           <div class="unrealized-input-inline">
@@ -1966,9 +2312,9 @@ function renderAccountInputs() {
           <input type="number" class="input-account" data-account="${account.key}" data-field="realizedPnL" value="${data.realizedPnL}" placeholder="0" />
           <span class="suffix">¥</span>
         </div>
-        ${cryptoUnrealizedField}
+        ${autoUnrealizedField}
         ${holdingsSection}
-        ${isCryptoAccount ? '' : `
+        ${autoUnrealizedAccount ? '' : `
         <div class="form-group">
           <label>評価損益</label>
           <div class="unrealized-input-inline">
@@ -1976,6 +2322,8 @@ function renderAccountInputs() {
           </div>
           <span class="suffix">¥</span>
         </div>
+        `}
+        ${(isCryptoAccount || isSecuritiesAccount) ? '' : `
         <div class="form-group">
           <label>スワップ損益</label>
           <input type="number" class="input-account" data-account="${account.key}" data-field="swapPnL" value="${data.swapPnL}" placeholder="0" />
@@ -2031,19 +2379,26 @@ function renderAccountInputs() {
   document.querySelectorAll('.input-holdings').forEach(el => {
     el.addEventListener('input', () => {
       handleHoldingsInput();
-      // SBI VCの場合、評価損益を自動計算
       if (el.dataset.account === 'sbivc') {
         updateCryptoUnrealizedPnL('sbivc');
+      }
+      if (el.dataset.account === 'sbi') {
+        updateSecuritiesUnrealizedPnL('sbi');
       }
     });
     el.addEventListener('focus', handleAccountInputFocus);
     el.addEventListener('keydown', handleHoldingsEnterKey);
     el.addEventListener('blur', (e) => {
       if (e.target.value.trim() === '') {
-        e.target.value = '0';
+        const isSbiQuantityOrValueField = e.target.dataset.account === 'sbi'
+          && (e.target.dataset.field === 'valueJPY' || e.target.dataset.field === 'quantity');
+        if (!isSbiQuantityOrValueField) e.target.value = '0';
         handleHoldingsInput();
         if (e.target.dataset.account === 'sbivc') {
           updateCryptoUnrealizedPnL('sbivc');
+        }
+        if (e.target.dataset.account === 'sbi') {
+          updateSecuritiesUnrealizedPnL('sbi');
         }
       }
     });
@@ -2214,6 +2569,26 @@ function updateCryptoUnrealizedPnL(accountKey) {
   }
 }
 
+function updateSecuritiesUnrealizedPnL(accountKey) {
+  ensureYearMonth(currentYear, currentMonth);
+  const holdings = tradingData[currentYear][currentMonth][accountKey]?.holdings || [];
+  const securitiesTotalValue = holdings
+    .filter((holding) => holding.symbol !== 'JPY')
+    .reduce((sum, holding) => {
+      if (holding.valueFilled !== true) return sum;
+      return sum + (Number(holding.valueJPY) || 0);
+    }, 0);
+
+  const confirmedAssets = calculateAccountConfirmedAssets(currentYear, currentMonth, accountKey);
+  const unrealizedPnL = securitiesTotalValue - confirmedAssets;
+
+  tradingData[currentYear][currentMonth][accountKey].netAssets = securitiesTotalValue;
+  tradingData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
+
+  const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
+  if (unrealizedInput) unrealizedInput.value = String(unrealizedPnL);
+}
+
 function updateInputs() {
   // 入力値をtradingDataに保存
   document.querySelectorAll('.input-account').forEach(el => {
@@ -2255,32 +2630,63 @@ function updateHoldingsInputs() {
     const accountKey = el.dataset.account;
     const symbol = el.dataset.symbol;
     const field = el.dataset.field; // 'quantity', 'rate', or 'valueJPY'
-    const value = Number(el.value) || 0;
+    const rawValue = String(el.value ?? '').trim();
+    const numericValue = rawValue === '' ? null : Number(rawValue);
+    const value = Number.isFinite(numericValue) ? numericValue : null;
     
     const key = `${accountKey}::${symbol}`;
     if (!holdingsData[key]) {
       holdingsData[key] = { accountKey, symbol };
     }
     holdingsData[key][field] = value;
+    holdingsData[key][`raw_${field}`] = rawValue;
   });
   
   // holdingsDataを各口座のholdingsに反映
-  Object.values(holdingsData).forEach(({ accountKey, symbol, quantity, rate, valueJPY }) => {
+  Object.values(holdingsData).forEach(({ accountKey, symbol, quantity, acquisitionRate, rate, valueJPY, raw_valueJPY, raw_quantity }) => {
     ensureHoldings(currentYear, currentMonth, accountKey);
     const holdings = tradingData[currentYear][currentMonth][accountKey].holdings;
     
     const existingIndex = holdings.findIndex(h => h.symbol === symbol);
-    const unit = symbol === 'JPY' ? '円' : symbol;
-    const qty = quantity !== undefined ? quantity : 0;
-    const rt = rate !== undefined ? rate : 0;
-    const val = valueJPY !== undefined ? valueJPY : 0;
-    
-    if (existingIndex >= 0) {
-      holdings[existingIndex] = { symbol, quantity: qty, unit, rate: rt, valueJPY: val };
-    } else {
-      holdings.push({ symbol, quantity: qty, unit, rate: rt, valueJPY: val });
+    const existing = existingIndex >= 0 ? holdings[existingIndex] : null;
+    const isSecurities = accountKey === 'sbi';
+    const isTrust = isSecurities && resolveHoldingsUnitMultiplier(symbol) > 1;
+    const unit = isSecurities ? (isTrust ? '口' : '株') : (symbol === 'JPY' ? '円' : symbol);
+    const qty = quantity != null ? quantity : 0;
+    let quantityManual = existing?.quantityManual === true;
+    if (isSecurities && existing) {
+      const prevQty = Number(existing.quantity) || 0;
+      if (raw_quantity !== '' && Math.abs(prevQty - qty) > 1e-12) {
+        quantityManual = true;
+      }
     }
-    
+    const hasValueInput = isSecurities ? raw_valueJPY !== '' : valueJPY != null;
+    const val = hasValueInput ? (valueJPY != null ? valueJPY : 0) : 0;
+
+    if (isSecurities) {
+      // 取得単価はユーザー入力値をそのまま保存（SBI表示単位: 円/万口 or 円/株）
+      const acqRate = acquisitionRate != null ? acquisitionRate : (existing?.acquisitionRate ?? null);
+      // 内部rate: 取得単価をper-unit換算（avgRate用）
+      const unitMultiplier = resolveHoldingsUnitMultiplier(symbol);
+      const rt = acqRate != null && acqRate > 0
+        ? acqRate / unitMultiplier
+        : (hasValueInput && qty > 0 ? val / qty : (existing?.rate || 0));
+      if (existingIndex >= 0) {
+        holdings[existingIndex] = { symbol, quantity: qty, unit, rate: rt, acquisitionRate: acqRate, valueJPY: val, valueFilled: hasValueInput, quantityManual };
+      } else {
+        holdings.push({ symbol, quantity: qty, unit, rate: rt, acquisitionRate: acqRate, valueJPY: val, valueFilled: hasValueInput, quantityManual: false });
+      }
+      return;
+    }
+
+    const rt = rate != null ? rate : 0;
+
+    if (existingIndex >= 0) {
+      holdings[existingIndex] = { symbol, quantity: qty, unit, rate: rt, valueJPY: val, valueFilled: hasValueInput, quantityManual };
+    } else {
+      holdings.push({ symbol, quantity: qty, unit, rate: rt, valueJPY: val, valueFilled: hasValueInput, quantityManual: false });
+    }
+
     // JPY以外で数量と評価額が両方とも0の場合は削除
     if (symbol !== 'JPY' && qty === 0 && val === 0) {
       tradingData[currentYear][currentMonth][accountKey].holdings = 
@@ -2515,50 +2921,8 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
     tradingData[currentYear][currentMonth][account][field] = normalizeCashflowValue(field, value);
   });
   
-  // 保有明細も保存（正しいロジック）
-  const holdingsData = {};
-  
-  document.querySelectorAll('.input-holdings').forEach(el => {
-    const accountKey = el.dataset.account;
-    const symbol = el.dataset.symbol;
-    const field = el.dataset.field; // 'quantity', 'rate', or 'valueJPY'
-    const value = Number(el.value) || 0;
-    
-    const key = `${accountKey}::${symbol}`;
-    if (!holdingsData[key]) {
-      holdingsData[key] = { accountKey, symbol };
-    }
-    holdingsData[key][field] = value;
-  });
-  
-  // holdingsDataを各口座のholdingsに反映
-  Object.values(holdingsData).forEach(({ accountKey, symbol, quantity, rate, valueJPY }) => {
-    ensureHoldings(currentYear, currentMonth, accountKey);
-    const holdings = tradingData[currentYear][currentMonth][accountKey].holdings;
-    
-    const existingIndex = holdings.findIndex(h => h.symbol === symbol);
-    const unit = symbol === 'JPY' ? '円' : symbol;
-    const qty = quantity !== undefined ? quantity : 0;
-    const rt = rate !== undefined ? rate : 0;
-    const val = valueJPY !== undefined ? valueJPY : 0;
-    
-    if (existingIndex >= 0) {
-      holdings[existingIndex] = { symbol, quantity: qty, unit, rate: rt, valueJPY: val };
-    } else {
-      holdings.push({ symbol, quantity: qty, unit, rate: rt, valueJPY: val });
-    }
-    
-    // JPY以外で数量と評価額が両方とも0の場合は削除
-    if (symbol !== 'JPY' && qty === 0 && val === 0) {
-      tradingData[currentYear][currentMonth][accountKey].holdings = 
-        holdings.filter(h => h.symbol !== symbol);
-    }
-    // JPYで数量が0の場合は削除
-    if (symbol === 'JPY' && qty === 0) {
-      tradingData[currentYear][currentMonth][accountKey].holdings = 
-        holdings.filter(h => h.symbol !== symbol);
-    }
-  });
+  // 保有明細は入力状態をそのまま同期（SBIの評価額空欄状態も保持）
+  updateHoldingsInputs();
 
   tradingData[currentYear][currentMonth].__saved = true;
 

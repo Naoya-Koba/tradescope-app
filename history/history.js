@@ -140,15 +140,16 @@ function fmtRate(value, assetType, symbol) {
   let minDigits = 3, maxDigits = 5; // デフォルト: FX系
   
   if (assetType === '暗号資産') {
-    // 暗号資産は小数点以下表示なし
     minDigits = 0;
     maxDigits = 0;
-  } else if (assetType === '証券') {
-    // 証券（株式など）は小数点以下表示なし
-    minDigits = 0;
-    maxDigits = 0;
+  } else if (assetType === '証券' || assetType === 'NISA') {
+    // 証券: 取引履歴のrateは万口単位で保存されているので変換不要。整数円で表示。
+    const sym = String(symbol || '').toUpperCase();
+    const trustKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス', 'ファンド', 'スリム'];
+    const isTrust = trustKeywords.some((kw) => sym.includes(kw));
+    // 投資信託も株式も整数円で表示
+    return Number(value).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: isTrust ? 0 : 0 });
   } else if (assetType === 'FX') {
-    // FX系は小数第3位まで
     minDigits = 3;
     maxDigits = 3;
   }
@@ -439,7 +440,20 @@ function renderOpenPositionDetail(position) {
 }
 
 function renderOpenPositions(entries) {
-  const openPositions = historyCore.calculateOpenPositions(entries);
+  const nonSecuritiesSbiEntries = (entries || []).filter(
+    (e) => !(String(e.account || '').trim().toUpperCase().replace(/\s+/g, '') === 'SBI' &&
+             (e.assetType === '証券' || e.assetType === 'NISA'))
+  );
+  const baseOpenPositions = historyCore.calculateOpenPositions(nonSecuritiesSbiEntries);
+  const securitiesPositions = historyCore.buildSecuritiesOpenPositions
+    ? historyCore.buildSecuritiesOpenPositions(entries)
+    : historyCore.calculateOpenPositions(
+        (entries || []).filter(e =>
+          String(e.account || '').trim().toUpperCase().replace(/\s+/g, '') === 'SBI' &&
+          (e.assetType === '証券' || e.assetType === 'NISA')
+        )
+      );
+  const openPositions = [...baseOpenPositions, ...securitiesPositions];
   const tbody = document.getElementById('openPositionsBody');
   const summary = document.getElementById('openPositionsSummary');
   const primaryHeader = document.getElementById('openPositionsPrimaryHeader');
