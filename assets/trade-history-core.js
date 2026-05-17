@@ -5,7 +5,8 @@
   const CARRY_PAIRS = ['TRY/JPY', 'HUF/JPY', 'MXN/JPY', 'ZAR/JPY', 'CZK/JPY'];
   const HUF_PAIR = 'HUF/JPY';
   const HUF_CONTRACT_SIZE = 100000;
-  const HUF_RISK_RATE = 0.1; // 1円では利益方向のため0.1円時を基準に  const LARGE_LOT_PAIRS = ['HUF/JPY', 'ZAR/JPY', 'MXN/JPY']; // 10万通貨/ロット
+  const HUF_RISK_RATE = 0.1;
+  const LARGE_LOT_PAIRS = ['HUF/JPY', 'ZAR/JPY', 'MXN/JPY'];
   function normalizeSymbolKey(symbol) {
     return String(symbol || '').trim().toUpperCase().replace(/\s+/g, '');
   }
