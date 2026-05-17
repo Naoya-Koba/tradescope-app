@@ -1,7 +1,7 @@
 const historyCore = window.TradeScopeHistory;
 
 const ACCOUNTS = ['GMO', 'Light FX', 'みんなのFX', 'SBI', 'SBI VC', '三井住友銀行'];
-const ASSET_TYPES = ['FX', '暗号資産', '証券', 'その他'];
+const ASSET_TYPES = ['FX', '証券', '暗号資産', 'その他'];
 const CATEGORIES = ['new', 'add', 'partial_close', 'full_close'];
 const CATEGORY_LABELS = {
   new: '新規',
@@ -17,6 +17,17 @@ const STRATEGY_LABELS = {
 };
 const OPEN_POSITIONS_VIEW_KEY = 'tradeScopeOpenPositionsView';
 const SYMBOL_LIST_KEY = 'tradeScopeSymbolListV1';
+
+const FX_PAIRS = [
+  'USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'NZD/JPY',
+  'CAD/JPY', 'CHF/JPY', 'TRY/JPY', 'ZAR/JPY', 'MXN/JPY',
+  'HUF/JPY', 'CZK/JPY', 'PLN/JPY',
+  'EUR/USD', 'USD/CHF'
+];
+const CRYPTO_PAIRS = [
+  'BTC/JPY', 'ETH/JPY', 'XRP/JPY', 'SOL/JPY', 'AVAX/JPY',
+  'BNB/JPY', 'ADA/JPY', 'DOGE/JPY'
+];
 
 function loadSymbolList() {
   try {
@@ -52,6 +63,25 @@ function removeSymbolFromList(symbol) {
   const list = (loadSymbolList() || []).filter((s) => s !== symbol);
   saveSymbolList(list);
   renderSymbolDropdown(document.getElementById('entrySymbol')?.value || '');
+}
+
+function updateSymbolMode(assetType) {
+  const textInput = document.getElementById('entrySymbol');
+  const selectInput = document.getElementById('entrySymbolSelect');
+  const dropdown = document.getElementById('symbolDropdown');
+  if (!textInput || !selectInput) return;
+
+  const useSelect = assetType === 'FX' || assetType === '暗号資産';
+  textInput.hidden = useSelect;
+  selectInput.hidden = !useSelect;
+  if (dropdown) dropdown.hidden = true;
+
+  if (useSelect) {
+    const pairs = assetType === 'FX' ? FX_PAIRS : CRYPTO_PAIRS;
+    selectInput.innerHTML =
+      pairs.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('') +
+      '<option value="">その他（手入力）</option>';
+  }
 }
 
 function renderSymbolDropdown(filter) {
@@ -603,7 +633,10 @@ function readFormEntry() {
   const date = document.getElementById('entryDate').value;
   const account = document.getElementById('entryAccount').value;
   const assetType = document.getElementById('entryAssetType').value;
-  const symbol = document.getElementById('entrySymbol').value.trim();
+  const selectEl = document.getElementById('entrySymbolSelect');
+  const symbol = (!selectEl || selectEl.hidden)
+    ? document.getElementById('entrySymbol').value.trim()
+    : selectEl.value.trim();
   const side = document.getElementById('entrySide').value;
   const category = document.getElementById('entryCategory').value;
   const quantity = Number(document.getElementById('entryQuantity').value);
@@ -615,9 +648,12 @@ function readFormEntry() {
     return null;
   }
 
-  // HUF/JPY は1ロット10万通貨
+  // HUF/JPY, ZAR/JPY, MXN/JPY は1ロット10万通貨
   const symbolKey = historyCore.normalizeSymbolKey ? historyCore.normalizeSymbolKey(symbol) : symbol.toUpperCase().trim();
-  const isHuf = symbolKey === 'HUF/JPY';
+  const LARGE_LOT_FX_PAIRS = ['HUF/JPY', 'ZAR/JPY', 'MXN/JPY'];
+  const isLargeLot = LARGE_LOT_FX_PAIRS.some(p =>
+    (historyCore.normalizeSymbolKey ? historyCore.normalizeSymbolKey(p) : p.toUpperCase().trim()) === symbolKey
+  );
   const payload = {
     date,
     account,
@@ -630,7 +666,7 @@ function readFormEntry() {
     strategy,
     memo,
     contractSize: assetType === 'FX'
-      ? (isHuf ? (historyCore.HUF_CONTRACT_SIZE || 100000) : historyCore.FX_CONTRACT_SIZE_DEFAULT)
+      ? (isLargeLot ? (historyCore.HUF_CONTRACT_SIZE || 100000) : historyCore.FX_CONTRACT_SIZE_DEFAULT)
       : 1
   };
 
@@ -664,7 +700,6 @@ function bindEvents() {
       return;
     }
 
-    addSymbolToList(payload.symbol);
     resetForm();
     renderAll();
   });
@@ -680,43 +715,18 @@ function bindEvents() {
   document.getElementById('entryAssetType').addEventListener('change', () => {
     const entries = historyCore.parseEntries();
     buildFilters(entries);
+    updateSymbolMode(document.getElementById('entryAssetType').value);
   });
 
-  // 通貨ペアカスタムドロップダウン
-  const entrySymbolInput = document.getElementById('entrySymbol');
-  const symbolDropdown = document.getElementById('symbolDropdown');
-
-  entrySymbolInput?.addEventListener('focus', () => {
-    renderSymbolDropdown(entrySymbolInput.value);
-  });
-
-  entrySymbolInput?.addEventListener('input', () => {
-    renderSymbolDropdown(entrySymbolInput.value);
-  });
-
-  document.addEventListener('mousedown', (e) => {
-    if (
-      symbolDropdown &&
-      !symbolDropdown.contains(e.target) &&
-      e.target !== entrySymbolInput
-    ) {
-      symbolDropdown.hidden = true;
-    }
-  });
-
-  symbolDropdown?.addEventListener('mousedown', (e) => {
-    const deleteBtn = e.target.closest('[data-delete-symbol]');
-    if (deleteBtn) {
-      e.preventDefault();
-      removeSymbolFromList(deleteBtn.dataset.deleteSymbol);
-      entrySymbolInput?.focus();
-      return;
-    }
-    const item = e.target.closest('[data-symbol]');
-    if (item) {
-      e.preventDefault();
-      entrySymbolInput.value = item.dataset.symbol;
-      symbolDropdown.hidden = true;
+  // 「その他（手入力）」選択時にテキスト入力に切り替え
+  document.getElementById('entrySymbolSelect')?.addEventListener('change', function () {
+    if (this.value === '') {
+      this.hidden = true;
+      const textInput = document.getElementById('entrySymbol');
+      textInput.value = '';
+      textInput.placeholder = '通貨ペア / 銘柄を入力';
+      textInput.hidden = false;
+      textInput.focus();
     }
   });
 
@@ -922,6 +932,7 @@ window.addEventListener('load', () => {
   }
 
   buildBaseSelectOptions();
+  updateSymbolMode(document.getElementById('entryAssetType').value);
   openPositionsView = loadOpenPositionsView();
   applyOpenViewSwitchState();
   document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);

@@ -1,4 +1,4 @@
-const CACHE_NAME = "tradescope-static-v174";
+const CACHE_NAME = "tradescope-static-v179";
 const CORE_ASSETS = [
   "./",
   "./index.html",
