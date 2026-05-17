@@ -1504,10 +1504,9 @@ function normalizeTopSymbolKey(symbol) {
 function resolveTopDefaultContractSize(assetType, symbol) {
   if (assetType !== 'FX') return 1;
   const symbolKey = normalizeTopSymbolKey(symbol);
-  const hufKey = historyCore?.normalizeSymbolKey
-    ? historyCore.normalizeSymbolKey(historyCore?.HUF_PAIR || 'HUF/JPY')
-    : normalizeTopSymbolKey(historyCore?.HUF_PAIR || 'HUF/JPY');
-  if (symbolKey === hufKey) return historyCore?.HUF_CONTRACT_SIZE || 100000;
+  const largeLotPairs = ['HUF/JPY', 'ZAR/JPY', 'MXN/JPY'];
+  const isLargeLot = largeLotPairs.some(p => normalizeTopSymbolKey(p) === symbolKey);
+  if (isLargeLot) return historyCore?.HUF_CONTRACT_SIZE || 100000;
   return historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000;
 }
 
@@ -1776,19 +1775,36 @@ function buildCryptoPortfolioFromMonthlyHoldings() {
   const sbivcData = tradingData?.[year]?.[month]?.['sbivc'];
   if (!sbivcData || !Array.isArray(sbivcData.holdings)) return [];
   
-  const cryptoHoldings = sbivcData.holdings.filter(h => h.symbol !== 'JPY' && Number(h.quantity) > 0);
-  if (!cryptoHoldings.length) return [];
-  
+  const allHoldings = sbivcData.holdings.filter(h => Number(h.quantity) > 0);
+  if (!allHoldings.length) return [];
+
   // 各通貨ごとに行を生成（円換算額を使用）
-  return cryptoHoldings.map(holding => {
+  return allHoldings.map(holding => {
     const symbol = holding.symbol;
     const quantity = Number(holding.quantity) || 0;
+
+    // JPY現金は1:1で円換算
+    if (symbol === 'JPY') {
+      return {
+        id: 'monthly::JPY',
+        symbol: 'JPY',
+        assetType: '暗号資産',
+        side: 'buy',
+        absQuantity: quantity,
+        avgRate: 1,
+        contractSize: 1,
+        accounts: ['SBI VC'],
+        strategy: '-',
+        memo: `月次報告書: ${quantity.toLocaleString()} JPY`,
+        metricValue: quantity
+      };
+    }
+
     const rate = Number(holding.rate) || 0;
     const valueJPY = Number(holding.valueJPY) || 0;
-    
     // レートが入力されている場合は優先、なければ円換算額から計算
     const avgRate = rate > 0 ? rate : (quantity > 0 ? valueJPY / quantity : 0);
-    
+
     return {
       id: `monthly::${symbol}`,
       symbol: `${symbol}/JPY`,
@@ -1864,6 +1880,19 @@ function syncPortfolioTabs() {
   });
 }
 
+function resolvePortfolioUnit(row) {
+  const assetType = normalizeAssetTypeLabel(row.assetType);
+  if (assetType === 'FX') return 'Lot';
+  if (assetType === '暗号資産') {
+    const base = String(row.symbol || '').split('/')[0].trim();
+    return base || '';
+  }
+  if (assetType === '証券') {
+    return resolveSecuritiesUnitDivider(row) === 10000 ? '口' : '株';
+  }
+  return '';
+}
+
 function bindCurrentPortfolioRows(rows) {
   const list = document.getElementById('currentPortfolioList');
   if (!list) return;
@@ -1907,15 +1936,18 @@ function renderCurrentPortfolioSection() {
   }
 
   const total = rows.reduce((sum, row) => sum + (Number(row.metricValue) || 0), 0);
-  list.innerHTML = rows.map((row) => {
+  const palette = ['#3B6DFF', '#3EE08F', '#3DA2FF', '#D95757', '#E9C85E', '#7E7A98', '#F18E4F', '#8BC7FF'];
+  list.innerHTML = rows.map((row, idx) => {
     const share = total > 0 ? ((row.metricValue / total) * 100) : 0;
     const metricLabel = activePortfolioAssetTab === 'FX' ? '必要証拠金' : '評価額';
+    const color = palette[idx % palette.length];
+    const unit = resolvePortfolioUnit(row);
     return `
-      <li class="pair-card" data-open-id="${escapeHtml(row.id)}">
+      <li class="pair-card" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
         <div class="pair-title">${escapeHtml(row.symbol)}</div>
         <div class="pair-right">
           <div class="pair-profit neutral">${metricLabel} ${fmtJPY(row.metricValue)}</div>
-          <div class="pair-growth neutral">${fmtQuantity(row.absQuantity)} / ${share.toFixed(1)}%</div>
+          <div class="pair-growth neutral">${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%</div>
         </div>
       </li>
     `;
@@ -1925,8 +1957,6 @@ function renderCurrentPortfolioSection() {
 
   if (!chartCtx || typeof Chart === 'undefined') return;
   if (currentPortfolioChart) currentPortfolioChart.destroy();
-
-  const palette = ['#3B6DFF', '#3EE08F', '#3DA2FF', '#D95757', '#E9C85E', '#7E7A98', '#F18E4F', '#8BC7FF'];
   currentPortfolioChart = new Chart(chartCtx, {
     type: 'doughnut',
     data: {

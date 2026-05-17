@@ -5,8 +5,7 @@
   const CARRY_PAIRS = ['TRY/JPY', 'HUF/JPY', 'MXN/JPY', 'ZAR/JPY', 'CZK/JPY'];
   const HUF_PAIR = 'HUF/JPY';
   const HUF_CONTRACT_SIZE = 100000;
-  const HUF_RISK_RATE = 0.1; // 1円では利益方向のため0.1円時を基準に
-
+  const HUF_RISK_RATE = 0.1; // 1円では利益方向のため0.1円時を基準に  const LARGE_LOT_PAIRS = ['HUF/JPY', 'ZAR/JPY', 'MXN/JPY']; // 10万通貨/ロット
   function normalizeSymbolKey(symbol) {
     return String(symbol || '').trim().toUpperCase().replace(/\s+/g, '');
   }
@@ -18,7 +17,8 @@
 
   function resolveDefaultContractSize(assetType, symbol) {
     if (assetType !== 'FX') return 1;
-    return normalizeSymbolKey(symbol) === normalizeSymbolKey(HUF_PAIR)
+    const key = normalizeSymbolKey(symbol);
+    return LARGE_LOT_PAIRS.some(p => normalizeSymbolKey(p) === key)
       ? HUF_CONTRACT_SIZE
       : FX_CONTRACT_SIZE_DEFAULT;
   }
@@ -190,8 +190,9 @@
 
     carryPositions.forEach((position) => {
       const isHuf = normalizeSymbolKey(position.symbol) === normalizeSymbolKey(HUF_PAIR);
-      // HUF/JPYは10万通貨/ロット。履歴入力時にcontractSize=100000が設定されているが念のため上書き
-      const contractSize = isHuf
+      const isLargeLot = LARGE_LOT_PAIRS.some(p => normalizeSymbolKey(p) === normalizeSymbolKey(position.symbol));
+      // HUF/ZAR/MXN等の10万通貨ペアは過去の登録内容にかかわらず常に100000で上書き
+      const contractSize = isLargeLot
         ? HUF_CONTRACT_SIZE
         : (Number(position.contractSize) || FX_CONTRACT_SIZE_DEFAULT);
       const signedUnits = Number(position.quantity) * contractSize;

@@ -2631,7 +2631,19 @@ body.drawer-open {
 }
 
 #currentPortfolioList .pair-card {
-  padding: 10px 8px;
+  position: relative;
+  padding: 10px 8px 10px 14px;
+}
+
+#currentPortfolioList .pair-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background-color: var(--item-color, #AAB5D0);
 }
 
 @media (max-width: 480px) {
