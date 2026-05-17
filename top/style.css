@@ -137,7 +137,7 @@ body::before {
 .container {
   width: min(100%, 960px);
   margin: 0 auto;
-  padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(88px + env(safe-area-inset-bottom));
   box-sizing: border-box;
   overflow-x: visible;
 }

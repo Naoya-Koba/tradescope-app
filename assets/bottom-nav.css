@@ -1,0 +1,64 @@
+/* ============================================================
+   フローティングボトムナビゲーション
+   assets/bottom-nav.css
+============================================================ */
+
+.bottom-nav {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 420px;
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  background: rgba(8, 10, 22, 0.84);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 22px;
+  padding: 5px 6px;
+  box-sizing: border-box;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.50),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.bn-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px 6px;
+  border-radius: 17px;
+  text-decoration: none;
+  color: rgba(170, 181, 208, 0.58);
+  transition: color 0.18s ease, background 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.bn-item.bn-active {
+  color: rgba(238, 241, 255, 0.95);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07) inset;
+}
+
+.bn-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.bn-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  white-space: nowrap;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}

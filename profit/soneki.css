@@ -162,7 +162,7 @@ body::before {
   width: min(100%, 900px);
   max-width: 100%;
   margin: 0 auto;
-  padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(88px + env(safe-area-inset-bottom));
 }
 .section.glass {
   background: var(--glass-bg);
@@ -1936,7 +1936,7 @@ body.drawer-open {
     background-position: calc(100% - 12px) calc(50% - 2px), calc(100% - 8px) calc(50% - 2px);
   }
   .container {
-    padding: 0 10px calc(14px + env(safe-area-inset-bottom));
+    padding: 0 10px calc(88px + env(safe-area-inset-bottom));
   }
   .section.glass {
     padding: 10px;
