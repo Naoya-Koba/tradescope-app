@@ -1368,23 +1368,6 @@ function dismissDoughnutTooltipsOnOutsideTap(event) {
 document.addEventListener('pointerdown', dismissDoughnutTooltipsOnOutsideTap, true);
 
 // ===== Portfolio Chart & List =====
-
-/**
- * ドーナツグラフのアニメーション再生。
- * キャンバスをクリアしてから表示 → 回転アニメーション開始。
- */
-function triggerDoughnutAnim(chart) {
-  if (!chart?.canvas) return;
-  chart.options.animation = { animateRotate: true, duration: 900, easing: 'easeInOutQuart' };
-  chart.reset();
-  // clearRect でキャンバスバッファを完全に空にしてから表示する
-  chart.canvas.getContext('2d').clearRect(0, 0, chart.canvas.width, chart.canvas.height);
-  requestAnimationFrame(() => {
-    chart.canvas.style.opacity = '';
-    chart.update();
-  });
-}
-
 function renderPortfolio() {
   // Calculate total
   const total = portfolioData.reduce((sum, item) => sum + item.amount, 0);
@@ -1421,7 +1404,7 @@ function renderPortfolio() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
-      animation: false,
+      animation: { animateRotate: true, duration: 900, easing: 'easeInOutQuart' },
       events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
       interaction: {
         mode: 'nearest',
@@ -1501,34 +1484,6 @@ function renderPortfolio() {
         options: doughnutOpts(accountTotal)
       });
       bindDoughnutTooltipInteractions(accountChart, () => portfolioChart);
-    }
-
-    // ── ドーナツアニメーション制御 ──
-    // セクションが既に表示済みなら即アニメーション、未表示なら animationend を待つ
-    {
-      const allocSection = portfolioChart?.canvas?.closest('.section')
-                        ?? accountChart?.canvas?.closest('.section');
-      if (allocSection) {
-        if (allocSection.dataset.revealed === '1') {
-          // 年度変更など: セクションは既に可視 → 即アニメーション
-          triggerDoughnutAnim(portfolioChart);
-          triggerDoughnutAnim(accountChart);
-        } else {
-          // 初回ロード: セクション出現まで canvas を非表示
-          if (portfolioChart?.canvas) portfolioChart.canvas.style.opacity = '0';
-          if (accountChart?.canvas) accountChart.canvas.style.opacity = '0';
-          if (!allocSection.dataset.listenerAdded) {
-            allocSection.dataset.listenerAdded = '1';
-            allocSection.addEventListener('animationend', (e) => {
-              if (e.animationName !== 'section-reveal') return;
-              allocSection.dataset.revealed = '1';
-              delete allocSection.dataset.listenerAdded;
-              triggerDoughnutAnim(portfolioChart);
-              triggerDoughnutAnim(accountChart);
-            }, { once: true });
-          }
-        }
-      }
     }
   }
 }
@@ -2018,7 +1973,7 @@ function renderCurrentPortfolioSection() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
-      animation: false,
+      animation: { animateRotate: true, duration: 900, easing: 'easeInOutQuart' },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -2029,29 +1984,6 @@ function renderCurrentPortfolioSection() {
       }
     }
   });
-
-  // ── ドーナツアニメーション制御 ──
-  {
-    const portSection = currentPortfolioChart.canvas?.closest('.section');
-    if (portSection) {
-      if (portSection.dataset.revealed === '1') {
-        // タブ切替・年度変更など: セクションは既に可視 → 即アニメーション
-        triggerDoughnutAnim(currentPortfolioChart);
-      } else {
-        // 初回ロード: セクション出現まで canvas を非表示
-        currentPortfolioChart.canvas.style.opacity = '0';
-        if (!portSection.dataset.listenerAdded) {
-          portSection.dataset.listenerAdded = '1';
-          portSection.addEventListener('animationend', (e) => {
-            if (e.animationName !== 'section-reveal') return;
-            portSection.dataset.revealed = '1';
-            delete portSection.dataset.listenerAdded;
-            triggerDoughnutAnim(currentPortfolioChart);
-          }, { once: true });
-        }
-      }
-    }
-  }
 }
 
 bindPortfolioTabs();
