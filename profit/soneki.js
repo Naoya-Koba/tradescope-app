@@ -81,14 +81,14 @@ function playLaserReveal(chart, duration = 900) {
 
 function buildPnlBarAnimation() {
   return {
-    duration: 1600,
+    duration: 1350,
     easing: 'easeInOutQuad',
     delay: (ctx) => {
       let delay = 0;
       if (ctx.type === 'data') {
-        delay = ctx.dataIndex * 40 + ctx.datasetIndex * 80;
+        delay = ctx.dataIndex * 12 + ctx.datasetIndex * 24;
       } else if (ctx.type !== 'none') {
-        delay = ctx.datasetIndex * 150;
+        delay = ctx.datasetIndex * 40;
       }
       return delay;
     }
@@ -114,6 +114,15 @@ function bindPnlBarRevealToSection(section) {
   section.addEventListener('animationstart', (e) => {
     if (e.animationName !== 'section-reveal') return;
     playPnlBarReveal(pnlBarChart);
+  });
+}
+
+function bindAssetsTrendRevealToSection(section) {
+  if (!section || section.dataset.assetsRevealBound === '1') return;
+  section.dataset.assetsRevealBound = '1';
+  section.addEventListener('animationstart', (e) => {
+    if (e.animationName !== 'section-reveal') return;
+    playLaserReveal(assetsTrendChart, 2300);
   });
 }
 
@@ -1706,8 +1715,15 @@ function renderPerformanceChart(options = {}) {
       }
     });
 
-    const isMobile = window.matchMedia('(max-width: 480px)').matches;
-    playLaserReveal(assetsTrendChart, 2300);
+    // 可視前の進行を防ぐため、初期状態はレーザー進捗 0 で待機。
+    assetsTrendChart.$laserRevealProgress = 0;
+    assetsTrendChart.draw();
+
+    const assetsSection = assetsCanvas.closest('.chart-panel') || assetsCanvas.closest('.chart-area');
+    bindAssetsTrendRevealToSection(assetsSection);
+    if (assetsSection?.classList.contains('reveal-anim') && isElementInViewport(assetsSection)) {
+      playLaserReveal(assetsTrendChart, 2300);
+    }
   };
 
   const createPnlChart = () => {
@@ -1791,7 +1807,7 @@ function renderPerformanceChart(options = {}) {
       }
     });
 
-    const pnlSection = pnlCanvas.closest('.chart-area');
+    const pnlSection = pnlCanvas.closest('.chart-panel') || pnlCanvas.closest('.chart-area');
     bindPnlBarRevealToSection(pnlSection);
     if (pnlSection?.classList.contains('reveal-anim') && isElementInViewport(pnlSection)) {
       playPnlBarReveal(pnlBarChart);

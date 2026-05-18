@@ -56,6 +56,11 @@
   from { opacity: 0; }
 }
 
+/* 監視中（未表示）の要素は先に隠して、1フレーム表示のチラつきを防ぐ */
+.reveal-pending {
+  opacity: 0;
+}
+
 .reveal-anim {
   animation-name: section-reveal;
   animation-duration: var(--reveal-duration, 620ms);

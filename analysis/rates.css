@@ -18,7 +18,7 @@ html, body {
   font-family: Inter, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   color: var(--text);
   background: linear-gradient(160deg, var(--bg-from), var(--bg-to)) fixed;
-  padding-top: 70px;
+  padding-top: 44px;
   box-sizing: border-box;
   overflow-x: hidden;
 }
@@ -41,19 +41,39 @@ html, body {
   background: transparent;
   color: var(--text);
   font-size: 22px;
+  padding: 6px 10px;
   cursor: pointer;
 }
+
+.icon-btn.menu-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-btn-lines {
+  display: grid;
+  gap: 4px;
+}
+
+.menu-btn-line {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: #eef1ff;
+}
+
 .app-logo { width: 24px; height: 24px; margin-right: 4px; }
 .app-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   flex: 1;
+  letter-spacing: .4px;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.05;
-  gap: 1px;
 }
 
 .brand-link {
@@ -65,19 +85,56 @@ html, body {
   opacity: 0.9;
 }
 
-.page-current {
+
+.heading-muted {
   color: var(--muted);
-  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.2px;
+  font-size: 15px;
+  margin: 0 0 6px;
+  letter-spacing: 0.3px;
 }
-.year-btn {
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.summary-header .heading-muted {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.year-chip {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 1px solid rgba(255,255,255,.2);
   background: rgba(255,255,255,.08);
   color: var(--text);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 8px;
-  padding: 6px 10px;
+  border-radius: 999px;
+  padding: 6px 28px 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  min-width: 94px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 9px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
   cursor: pointer;
+}
+
+.year-chip:hover {
+  background: rgba(255,255,255,.12);
+}
+
+.year-chip:focus-visible {
+  outline: 2px solid rgba(61,162,255,.7);
+  outline-offset: 2px;
 }
 
 /* ========== Layout ========== */

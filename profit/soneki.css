@@ -111,17 +111,16 @@ body::before {
 
 .annual-summary-head {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 4px;
+  gap: 16px;
+  margin: 0 0 12px;
 }
 
 .year-switch-row {
   display: flex;
   justify-content: flex-end;
   margin: 0;
-  transform: translateY(-1px);
 }
 
 .year-toggle {
@@ -159,7 +158,7 @@ body::before {
 
 /* ===== Container ===== */
 .container {
-  width: min(100%, 900px);
+  width: min(100%, 960px);
   max-width: 100%;
   margin: 0 auto;
   padding: 0 16px calc(88px + env(safe-area-inset-bottom));
@@ -182,6 +181,7 @@ body::before {
 }
 .annual-summary-heading {
   margin: 0;
+  flex-shrink: 0;
 }
 .positive { color: var(--green); }
 .negative { color: var(--red); }
@@ -1923,17 +1923,14 @@ body.drawer-open {
   html, body {
     padding-top: 42px;
   }
-  .app-header {
-    padding: 10px 12px;
-  }
 
   .year-switch-row {
     margin: 0;
   }
 
   .annual-summary-head {
-    gap: 8px;
-    margin: 0 0 3px;
+    gap: 10px;
+    margin: 0 0 12px;
   }
 
   .year-chip {

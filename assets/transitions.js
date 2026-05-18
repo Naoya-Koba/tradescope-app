@@ -44,7 +44,28 @@
      IntersectionObserver + 初期ビューポート スタッガー
   ────────────────────────────────────── */
   function doReveal() {
-    var items = Array.from(document.querySelectorAll('.section.glass, .chart-area'));
+    var baseItems = Array.from(document.querySelectorAll('.section.glass, .chart-area'));
+    var items = [];
+    var seen = new Set();
+
+    baseItems.forEach(function (el) {
+      var childSelector = el.dataset.revealChildren;
+      if (childSelector) {
+        var children = Array.from(el.querySelectorAll(childSelector));
+        if (children.length) {
+          children.forEach(function (child) {
+            if (seen.has(child)) return;
+            seen.add(child);
+            items.push(child);
+          });
+          return;
+        }
+      }
+      if (seen.has(el)) return;
+      seen.add(el);
+      items.push(el);
+    });
+
     if (!items.length) return;
 
     function parseMsValue(value, fallback) {
@@ -81,6 +102,7 @@
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
+          entry.target.classList.remove('reveal-pending');
           applyRevealVars(entry.target, 0, false);
           entry.target.classList.add('reveal-anim');
           if (entry.target.dataset.revealRepeat !== 'true') {
@@ -88,18 +110,21 @@
           }
         } else if (entry.target.dataset.revealRepeat === 'true') {
           entry.target.classList.remove('reveal-anim');
+          entry.target.classList.add('reveal-pending');
         }
       });
-    }, { threshold: 0, rootMargin: '0px 0px -60px 0px' });
+    }, { threshold: 0, rootMargin: '0px 0px -120px 0px' });
 
     var vh = window.innerHeight;
     items.forEach(function (el, i) {
       if (el.getBoundingClientRect().top < vh) {
         /* 初期ビューポート内: インデックス順に時差表示（最大 350ms でキャップ）*/
+        el.classList.remove('reveal-pending');
         applyRevealVars(el, i, true);
         el.classList.add('reveal-anim');
       } else {
         /* スクロール圏外: Intersection Observer に委譲 */
+        el.classList.add('reveal-pending');
         observer.observe(el);
       }
     });
