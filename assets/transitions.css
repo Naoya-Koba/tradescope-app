@@ -57,7 +57,11 @@
 }
 
 .reveal-anim {
-  animation: section-reveal 0.48s ease-out var(--reveal-delay, 0ms) both;
+  animation-name: section-reveal;
+  animation-duration: var(--reveal-duration, 620ms);
+  animation-timing-function: ease-out;
+  animation-delay: var(--reveal-delay, 0ms);
+  animation-fill-mode: both;
 }
 
 /* モーション軽減の尊重 */

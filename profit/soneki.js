@@ -79,6 +79,44 @@ function playLaserReveal(chart, duration = 900) {
   chart.$laserRevealRaf = requestAnimationFrame(step);
 }
 
+function buildPnlBarAnimation() {
+  return {
+    duration: 1600,
+    easing: 'easeInOutQuad',
+    delay: (ctx) => {
+      let delay = 0;
+      if (ctx.type === 'data') {
+        delay = ctx.dataIndex * 40 + ctx.datasetIndex * 80;
+      } else if (ctx.type !== 'none') {
+        delay = ctx.datasetIndex * 150;
+      }
+      return delay;
+    }
+  };
+}
+
+function isElementInViewport(el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
+function playPnlBarReveal(chart) {
+  if (!chart) return;
+  chart.options.animation = buildPnlBarAnimation();
+  chart.reset();
+  chart.update();
+}
+
+function bindPnlBarRevealToSection(section) {
+  if (!section || section.dataset.pnlRevealBound === '1') return;
+  section.dataset.pnlRevealBound = '1';
+  section.addEventListener('animationstart', (e) => {
+    if (e.animationName !== 'section-reveal') return;
+    playPnlBarReveal(pnlBarChart);
+  });
+}
+
 const ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
   { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
@@ -1691,19 +1729,7 @@ function renderPerformanceChart(options = {}) {
           intersect: true,
           axis: 'x'
         },
-        animation: {
-          duration: 1500,
-          easing: 'easeInOutQuad',
-          delay: (ctx) => {
-            let delay = 0;
-            if (ctx.type === 'data') {
-              delay = ctx.dataIndex * 40 + ctx.datasetIndex * 80;
-            } else if (ctx.type !== 'none') {
-              delay = ctx.datasetIndex * 150;
-            }
-            return delay;
-          }
-        },
+        animation: false,
         plugins: {
           legend: {
             display: false
@@ -1764,6 +1790,12 @@ function renderPerformanceChart(options = {}) {
         }
       }
     });
+
+    const pnlSection = pnlCanvas.closest('.chart-area');
+    bindPnlBarRevealToSection(pnlSection);
+    if (pnlSection?.classList.contains('reveal-anim') && isElementInViewport(pnlSection)) {
+      playPnlBarReveal(pnlBarChart);
+    }
   };
 
   if (renderAssets) createAssetsChart();

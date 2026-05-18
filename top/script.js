@@ -1367,6 +1367,35 @@ function dismissDoughnutTooltipsOnOutsideTap(event) {
 
 document.addEventListener('pointerdown', dismissDoughnutTooltipsOnOutsideTap, true);
 
+const DONUT_REVEAL_ANIMATION = {
+  animateRotate: true,
+  animateScale: false,
+  duration: 1500,
+  easing: 'easeInOutQuart'
+};
+
+function isElementInViewport(el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
+function playDonutReveal(chart) {
+  if (!chart) return;
+  chart.options.animation = { ...DONUT_REVEAL_ANIMATION };
+  chart.reset();
+  chart.update();
+}
+
+function bindSectionDonutReveal(section, chartResolver) {
+  if (!section || section.dataset.donutRevealBound === '1') return;
+  section.dataset.donutRevealBound = '1';
+  section.addEventListener('animationstart', (e) => {
+    if (e.animationName !== 'section-reveal') return;
+    chartResolver().forEach(playDonutReveal);
+  });
+}
+
 // ===== Portfolio Chart & List =====
 function renderPortfolio() {
   // Calculate total
@@ -1404,7 +1433,7 @@ function renderPortfolio() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
-      animation: { animateRotate: true, animateScale: false, duration: 1500, easing: 'easeInOutQuart' },
+      animation: false,
       events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
       interaction: {
         mode: 'nearest',
@@ -1484,6 +1513,12 @@ function renderPortfolio() {
         options: doughnutOpts(accountTotal)
       });
       bindDoughnutTooltipInteractions(accountChart, () => portfolioChart);
+    }
+
+    const allocSection = portfolioChart?.canvas?.closest('.section') || accountChart?.canvas?.closest('.section');
+    bindSectionDonutReveal(allocSection, () => [portfolioChart, accountChart]);
+    if (allocSection?.classList.contains('reveal-anim') && isElementInViewport(allocSection)) {
+      [portfolioChart, accountChart].forEach(playDonutReveal);
     }
   }
 }
@@ -1973,7 +2008,7 @@ function renderCurrentPortfolioSection() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
-      animation: { animateRotate: true, animateScale: false, duration: 1500, easing: 'easeInOutQuart' },
+      animation: false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1984,6 +2019,12 @@ function renderCurrentPortfolioSection() {
       }
     }
   });
+
+  const currentSection = currentPortfolioChart.canvas?.closest('.section');
+  bindSectionDonutReveal(currentSection, () => [currentPortfolioChart]);
+  if (currentSection?.classList.contains('reveal-anim') && isElementInViewport(currentSection)) {
+    playDonutReveal(currentPortfolioChart);
+  }
 }
 
 bindPortfolioTabs();
