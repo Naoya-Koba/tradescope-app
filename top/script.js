@@ -56,6 +56,11 @@ function playLaserReveal(chart, duration = 900) {
   chart.$laserRevealProgress = 0;
 
   const step = (now) => {
+    // チャートが既に destroy() されている場合はループを止める
+    if (!chart.canvas || !chart.ctx) {
+      chart.$laserRevealRaf = null;
+      return;
+    }
     const progress = Math.max(0, Math.min(1, (now - start) / duration));
     chart.$laserRevealProgress = progress;
     chart.draw();
@@ -278,8 +283,8 @@ drawer?.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 // ===== News =====
-const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV9';
-const NEWS_COUNTRY_CACHE_PREFIX = 'tradeScopeNewsCountryV2:';
+const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV10';
+const NEWS_COUNTRY_CACHE_PREFIX = 'tradeScopeNewsCountryV3:';
 const NEWS_CACHE_TTL_MS = 30 * 60 * 1000;
 const NEWS_TRANSLATION_CACHE_KEY = 'tradeScopeNewsTranslationCacheV1';
 const NEWS_TRANSLATION_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -552,17 +557,20 @@ function setNewsUpdatedAt(timestamp, isFallback) {
 
 async function fetchFeedHeadlines(feedUrl, sourceHint) {
   let rawItems = [];
-  try {
-    rawItems = isGoogleFeedUrl(feedUrl)
-      ? await fetchFeedItemsViaAllOriginsRaw(feedUrl)
-      : await fetchFeedItemsViaRss2Json(feedUrl);
-  } catch (error) {
-    if (!isGoogleSearchFeedUrl(feedUrl)) throw error;
-    try {
-      rawItems = await fetchFeedItemsViaAllOriginsRaw(NEWS_GOOGLE_TOP_FEED);
-    } catch {
-      rawItems = await fetchFeedItemsViaRss2Json(NEWS_GOOGLE_TOP_FEED);
+  if (isGoogleFeedUrl(feedUrl)) {
+    if (isGoogleSearchFeedUrl(feedUrl)) {
+      // 通貨別検索RSS: alloriginsのみ試行。失敗時は空配列（一般ニュースへのフォールバック不可）
+      rawItems = await fetchFeedItemsViaAllOriginsRaw(feedUrl);
+    } else {
+      // トップRSS: allorigins → rss2json の順で試行（iPhoneでalloriginsが失敗する場合の保険）
+      try {
+        rawItems = await fetchFeedItemsViaAllOriginsRaw(feedUrl);
+      } catch {
+        rawItems = await fetchFeedItemsViaRss2Json(feedUrl);
+      }
     }
+  } else {
+    rawItems = await fetchFeedItemsViaRss2Json(feedUrl);
   }
 
   return rawItems.map((item) => {
@@ -1624,6 +1632,11 @@ function renderPerformanceChart() {
   const tickFontSize = isMobile ? 10 : 12;
 
   if (perfChart) {
+    // destroy前にrAFループを必ずキャンセル（破棄済みcanvasへのアクセスを防ぐ）
+    if (perfChart.$laserRevealRaf) {
+      cancelAnimationFrame(perfChart.$laserRevealRaf);
+      perfChart.$laserRevealRaf = null;
+    }
     perfChart.destroy();
   }
 

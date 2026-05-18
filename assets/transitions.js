@@ -168,8 +168,13 @@
      pagereveal (VT 対応) or DOMContentLoaded (非 VT)
   ────────────────────────────────────── */
   if ('onpagereveal' in window) {
-    /* VT 対応ブラウザ: 初回/遷移時ともにリビールを実行 */
-    window.addEventListener('pagereveal', function () {
+    /* VT 対応ブラウザ:
+       - VTナビゲーション時は即時表示（リビールをスキップ）
+         理由: VTフェードイン中にreveal-pendingでopacity:0→フェードが
+              二段階になりカクつく
+       - 初回ロード時のみリビールを実行 */
+    window.addEventListener('pagereveal', function (e) {
+      if (e && e.viewTransition) return;
       initSectionReveals();
     });
   } else {
