@@ -1404,6 +1404,7 @@ function renderPortfolio() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
+      animation: false,
       events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
       interaction: {
         mode: 'nearest',
@@ -1487,6 +1488,28 @@ function renderPortfolio() {
   }
 }
 renderPortfolio();
+
+// Asset Allocation ドーナツグラフ: セクション出現後にアニメーション再生
+{
+  const canvas = document.getElementById('portfolioChart');
+  const section = canvas?.closest('.section');
+  if (section) {
+    section.addEventListener('animationend', (e) => {
+      if (e.animationName !== 'section-reveal') return;
+      const animCfg = { animateRotate: true, duration: 900, easing: 'easeInOutQuart' };
+      [portfolioChart, accountChart].forEach(chart => {
+        if (!chart) return;
+        chart.canvas.style.opacity = '0';
+        chart.options.animation = animCfg;
+        chart.reset();
+        requestAnimationFrame(() => {
+          chart.canvas.style.opacity = '';
+          chart.update();
+        });
+      });
+    }, { once: true });
+  }
+}
 
 function normalizeAssetTypeLabel(assetType) {
   const normalized = String(assetType || '').trim();
@@ -1972,6 +1995,11 @@ function renderCurrentPortfolioSection() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
+      animation: {
+        animateRotate: true,
+        duration: 900,
+        easing: 'easeInOutQuart'
+      },
       plugins: {
         legend: { display: false },
         tooltip: {

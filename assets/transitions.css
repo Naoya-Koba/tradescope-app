@@ -1,0 +1,75 @@
+/* ============================================================
+   ページトランジション & セクションリビール
+   assets/transitions.css
+============================================================ */
+
+/* ──────────────────────────────────────
+   クロスドキュメント View Transitions
+   Chrome 126+ / Safari 18.2+
+────────────────────────────────────── */
+@view-transition {
+  navigation: auto;
+}
+
+/* ページ全体をシンプルにクロスフェード */
+::view-transition-old(root) {
+  animation: 210ms ease-in both vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: 280ms ease-out 60ms both vt-fade-in;
+}
+
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+
+/* ──────────────────────────────────────
+   非VT ブラウザ向け フォールバック
+   JS が <html> に .no-vt クラスをセット
+────────────────────────────────────── */
+.no-vt body {
+  animation: page-enter 0.25s ease-out both;
+}
+
+.no-vt body.page-exit {
+  opacity: 0 !important;
+  transition: opacity 0.18s ease !important;
+  pointer-events: none;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ──────────────────────────────────────
+   セクション リビール
+   JS が .reveal-anim を付与 → CSS animation で表示
+   ※ transform は使わず opacity のみ（Grid 列幅計算への影響を防ぐ）
+────────────────────────────────────── */
+@keyframes section-reveal {
+  from { opacity: 0; }
+}
+
+.reveal-anim {
+  animation: section-reveal 0.62s ease-out var(--reveal-delay, 0ms) both;
+}
+
+/* モーション軽減の尊重 */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-anim {
+    animation-duration: 0.01ms;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms;
+  }
+  .no-vt body {
+    animation: none;
+  }
+}

@@ -888,6 +888,7 @@ body.drawer-open {
   padding: 14px 14px 13px;
   cursor: pointer;
   transition: .2s ease;
+  overflow: hidden;
 }
 .monthly-card:hover {
   background: rgba(255,255,255,.07);
@@ -909,10 +910,13 @@ body.drawer-open {
   margin-bottom: 2px;
 }
 .monthly-total-value {
-  font-size: 23px;
-  line-height: 1.1;
+  font-size: 18px;
+  line-height: 1.2;
   font-weight: 700;
   margin-bottom: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .monthly-breakdown {
   display: grid;
@@ -932,6 +936,9 @@ body.drawer-open {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== Monthly Detail Pane ===== */
