@@ -2046,7 +2046,8 @@ body.drawer-open {
   align-items: center;
   justify-content: center;
   padding: 12px;
-  backdrop-filter: blur(8px);
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .portfolio-chart-container canvas {

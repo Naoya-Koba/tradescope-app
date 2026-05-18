@@ -1274,7 +1274,7 @@ function renderPerformanceChart() {
   });
 
   updateTopAssetLegend();
-  playLaserReveal(perfChart, isMobile ? 1520 : 1800);
+  playLaserReveal(perfChart, 2300);
 }
 
 function syncTopAssetTrendTabs() {
@@ -1404,7 +1404,7 @@ function renderPortfolio() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
-      animation: { animateRotate: true, duration: 900, easing: 'easeInOutQuart' },
+      animation: { animateRotate: true, animateScale: false, duration: 1500, easing: 'easeInOutQuart' },
       events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
       interaction: {
         mode: 'nearest',
@@ -1973,7 +1973,7 @@ function renderCurrentPortfolioSection() {
       maintainAspectRatio: false,
       responsive: true,
       cutout: '68%',
-      animation: { animateRotate: true, duration: 900, easing: 'easeInOutQuart' },
+      animation: { animateRotate: true, animateScale: false, duration: 1500, easing: 'easeInOutQuart' },
       plugins: {
         legend: { display: false },
         tooltip: {

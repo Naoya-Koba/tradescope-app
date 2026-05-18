@@ -1669,7 +1669,7 @@ function renderPerformanceChart(options = {}) {
     });
 
     const isMobile = window.matchMedia('(max-width: 480px)').matches;
-    playLaserReveal(assetsTrendChart, isMobile ? 1520 : 1800);
+    playLaserReveal(assetsTrendChart, 2300);
   };
 
   const createPnlChart = () => {
