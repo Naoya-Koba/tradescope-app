@@ -124,28 +124,27 @@
 
     <!-- ===== News Section ===== -->
     <h2 class="heading-muted">News</h2>
-    <section class="section glass news-section">
-      <div class="news-block">
-        <div class="news-head">
-          <span class="news-label">トピックス</span>
-        </div>
-        <div class="ticker">
-          <div id="globalTickerTrack" class="ticker-track"></div>
-        </div>
+    <section class="section news-section" aria-label="マーケットニュース速報">
+      <div class="news-head">
+        <span class="news-label">総合ニュース</span>
+        <span id="newsUpdatedAt" class="news-updated" aria-live="polite"></span>
       </div>
-
+      <div class="ticker" role="status" aria-live="polite">
+        <div id="globalTickerTrack" class="ticker-track"></div>
+      </div>
       <div class="country-news">
         <div class="country-news-head">
-          <span class="news-label">国別</span>
-          <select id="countrySelect" class="select">
+          <span class="news-label">通貨別ニュース</span>
+          <select id="countrySelect" class="select" aria-label="国別ニュース切り替え">
             <option value="USD">USD</option><option value="JPY">JPY</option>
             <option value="EUR">EUR</option><option value="GBP">GBP</option>
             <option value="AUD">AUD</option><option value="NZD">NZD</option>
             <option value="CHF">CHF</option><option value="CAD">CAD</option>
+            <option value="HUF">HUF</option>
             <option value="TRY">TRY</option><option value="MXN">MXN</option>
           </select>
         </div>
-        <div class="ticker">
+        <div class="ticker" role="status" aria-live="polite">
           <div id="countryTickerTrack" class="ticker-track"></div>
         </div>
       </div>

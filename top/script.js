@@ -278,42 +278,451 @@ drawer?.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 // ===== News =====
-const globalTicker = [
-  'ドルは主要通貨に対して小幅高。',
-  '円は安全資産として買い戻し優勢。',
-  'ユーロは景気懸念で上値重い。',
-  'トルコリラは中銀会合を控え小動き。',
-  'メキシコペソは高金利を背景に堅調。'
+const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV9';
+const NEWS_COUNTRY_CACHE_PREFIX = 'tradeScopeNewsCountryV2:';
+const NEWS_CACHE_TTL_MS = 30 * 60 * 1000;
+const NEWS_TRANSLATION_CACHE_KEY = 'tradeScopeNewsTranslationCacheV1';
+const NEWS_TRANSLATION_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const NEWS_GOOGLE_TOP_FEED = 'https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja';
+const NEWS_GOOGLE_PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
+const NEWS_LIMIT = 12;
+const NEWS_EXCLUDE_HEADLINE_PATTERNS = [
+  /議事録/i,
+  /議事要旨/i,
+  /minutes of/i,
+  /meeting minutes/i,
+  /transcript/i,
+  /remarks by/i,
+  /speech by/i,
+  /workshop/i,
+  /newsletter/i,
+  /operation schedule/i,
+  /timetable/i,
+  /schedule updates/i,
+  /取扱開始/i,
+  /取り扱い開始/i,
+  /キャンペーン/i,
+  /口座開設/i,
+  /キャッシュバック/i,
+  /ポイント/i,
+  /セミナー/i,
+  /ウェビナー/i,
+  /ツアー/i,
+  /旅行/i,
+  /観光/i,
+  /プレゼント/i,
+  /抽選/i,
+  /タイアップ/i,
+  /スポンサー/i
 ];
-const countryNews = {
-  USD: ['米CPI発表を控えドル小動き。', 'FOMCメンバーの発言に注目。'],
-  JPY: ['日銀は賃金動向を注視。', '輸出の持ち直しで円買い。'],
-  EUR: ['ECB理事会議事要旨を公表。', '域内PMIはまちまちの結果。'],
-  GBP: ['BOEの物価見通し発表へ。', '英小売売上は横ばい。'],
-  TRY: ['トルコ中銀は金利据え置き見通し。', 'インフレ鈍化の兆し。']
+const FALLBACK_HEADLINES = [
+  { title: '現在ニュースを取得できません。', link: '', source: '' },
+  { title: '接続状況により更新が遅れる場合があります。', link: '', source: '' }
+];
+const NEWS_GLOBAL_SOURCES = [
+  {
+    key: 'global_top',
+    sourceLabel: 'Google News',
+    feedUrl: NEWS_GOOGLE_TOP_FEED
+  }
+];
+const NEWS_COUNTRY_FEEDS = {
+  USD: 'https://news.google.com/rss/search?q=USD+OR+%E3%83%89%E3%83%AB+OR+FOMC&hl=ja&gl=JP&ceid=JP:ja',
+  JPY: 'https://news.google.com/rss/search?q=JPY+OR+%E5%86%86+OR+%E6%97%A5%E9%8A%80&hl=ja&gl=JP&ceid=JP:ja',
+  EUR: 'https://news.google.com/rss/search?q=EUR+OR+%E3%83%A6%E3%83%BC%E3%83%AD+OR+ECB&hl=ja&gl=JP&ceid=JP:ja',
+  GBP: 'https://news.google.com/rss/search?q=GBP+OR+%E3%83%9D%E3%83%B3%E3%83%89+OR+BOE&hl=ja&gl=JP&ceid=JP:ja',
+  AUD: 'https://news.google.com/rss/search?q=AUD+OR+%E8%B1%AA%E3%83%89%E3%83%AB+OR+RBA&hl=ja&gl=JP&ceid=JP:ja',
+  NZD: 'https://news.google.com/rss/search?q=NZD+OR+NZ%E3%83%89%E3%83%AB+OR+RBNZ&hl=ja&gl=JP&ceid=JP:ja',
+  CHF: 'https://news.google.com/rss/search?q=CHF+OR+%E3%82%B9%E3%82%A4%E3%82%B9%E3%83%95%E3%83%A9%E3%83%B3+OR+SNB&hl=ja&gl=JP&ceid=JP:ja',
+  CAD: 'https://news.google.com/rss/search?q=CAD+OR+%E5%8A%A0%E3%83%89%E3%83%AB+OR+BOC&hl=ja&gl=JP&ceid=JP:ja',
+  HUF: 'https://news.google.com/rss/search?q=HUF+OR+%E3%83%8F%E3%83%B3%E3%82%AC%E3%83%AA%E3%83%BC%E3%83%95%E3%82%A9%E3%83%AA%E3%83%B3%E3%83%88+OR+MNB&hl=ja&gl=JP&ceid=JP:ja',
+  TRY: 'https://news.google.com/rss/search?q=TRY+OR+%E3%83%88%E3%83%AB%E3%82%B3%E3%83%AA%E3%83%A9+OR+%E3%83%88%E3%83%AB%E3%82%B3%E4%B8%AD%E9%8A%80&hl=ja&gl=JP&ceid=JP:ja',
+  MXN: 'https://news.google.com/rss/search?q=MXN+OR+%E3%83%A1%E3%82%AD%E3%82%B7%E3%82%B3%E3%83%9A%E3%82%BD+OR+Banxico&hl=ja&gl=JP&ceid=JP:ja'
 };
+
+function escapeTickerText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeHeadline(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+const CURRENCY_RELEVANCE_TERMS = {
+  USD: ['usd', 'ドル', '米ドル', 'fomc', 'frb', '米金利', '米国債'],
+  JPY: ['jpy', '円', '日銀', 'boj', 'ycc'],
+  EUR: ['eur', 'ユーロ', 'ecb', 'ユーロ圏', '独金利'],
+  GBP: ['gbp', 'ポンド', 'boe', '英国', 'イングランド銀行'],
+  AUD: ['aud', '豪ドル', 'rba', '豪州'],
+  NZD: ['nzd', 'nzドル', 'ニュージーランド', 'rbnz'],
+  CHF: ['chf', 'スイスフラン', 'snb', 'スイス国立銀行'],
+  CAD: ['cad', '加ドル', 'カナダドル', 'boc'],
+  HUF: ['huf', 'フォリント', 'ハンガリー', 'mnb', 'magyar nemzeti bank'],
+  TRY: ['try', 'トルコリラ', 'リラ', 'トルコ', 'cbrt', 'tcmb'],
+  MXN: ['mxn', 'メキシコペソ', 'ペソ', 'banxico', 'メキシコ']
+};
+const GLOBAL_RELEVANCE_TERMS = [
+  'fx', '為替', 'ドル円', 'usdjpy', 'eurusd', 'ユーロ', 'ドル', '円', 'スイスフラン',
+  '政策金利', '利上げ', '利下げ', 'fomc', 'frb', 'ecb', '日銀', 'boj', 'snb', 'boe',
+  'cbrt', 'tcmb', 'mnb', 'トルコリラ', 'フォリント', 'try', 'huf', 'キャリートレード'
+];
+
+function isLikelyDocumentLink(url) {
+  return /\.pdf(?:$|[?#])/i.test(String(url || '').trim());
+}
+
+function isGoogleSearchFeedUrl(url) {
+  return /news\.google\.com\/rss\/search\?/i.test(String(url || ''));
+}
+
+function isGoogleFeedUrl(url) {
+  return /news\.google\.com\/rss/i.test(String(url || ''));
+}
+
+function parseRssXmlItems(xmlText) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(String(xmlText || ''), 'application/xml');
+  const parseError = xml.querySelector('parsererror');
+  if (parseError) return [];
+
+  return Array.from(xml.querySelectorAll('item')).map((node) => {
+    const title = normalizeHeadline(node.querySelector('title')?.textContent || '');
+    const link = String(node.querySelector('link')?.textContent || '').trim();
+    const source = normalizeHeadline(
+      node.querySelector('source')?.textContent
+      || node.querySelector('dc\\:creator')?.textContent
+      || node.querySelector('author')?.textContent
+      || ''
+    );
+    return { title, link, source };
+  }).filter((item) => item.title);
+}
+
+async function fetchFeedItemsViaAllOriginsRaw(feedUrl) {
+  const endpoint = `${NEWS_GOOGLE_PROXY_PREFIX}${encodeURIComponent(feedUrl)}`;
+  const res = await fetch(endpoint, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`proxy feed fetch failed: ${res.status}`);
+  const xmlText = await res.text();
+  return parseRssXmlItems(xmlText);
+}
+
+async function fetchFeedItemsViaRss2Json(feedUrl) {
+  const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
+  const res = await fetch(endpoint, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`feed fetch failed: ${res.status}`);
+  const json = await res.json();
+  if (!Array.isArray(json?.items)) return [];
+  return json.items;
+}
+
+function isPracticalHeadline(item) {
+  const title = normalizeHeadline(item?.title || '');
+  if (!title) return false;
+  if (NEWS_EXCLUDE_HEADLINE_PATTERNS.some((pattern) => pattern.test(title))) return false;
+  if (isLikelyDocumentLink(item?.link)) return false;
+  return true;
+}
+
+function isCurrencyRelevantHeadline(currency, item) {
+  const title = normalizeHeadline(item?.title || '').toLowerCase();
+  if (!title) return false;
+  if (!isPracticalHeadline(item)) return false;
+  const terms = CURRENCY_RELEVANCE_TERMS[currency] || [];
+  if (!terms.length) return true;
+  return terms.some((term) => title.includes(String(term).toLowerCase()));
+}
+
+function isGlobalRelevantHeadline(item) {
+  const title = normalizeHeadline(item?.title || '').toLowerCase();
+  if (!title) return false;
+  if (!isPracticalHeadline(item)) return false;
+  return GLOBAL_RELEVANCE_TERMS.some((term) => title.includes(String(term).toLowerCase()));
+}
+
+function shouldTranslateToJapanese(text) {
+  const value = normalizeHeadline(text);
+  if (!value) return false;
+  // 既に日本語文字が含まれる場合は翻訳しない
+  if (/[\u3040-\u30ff\u3400-\u9fff]/.test(value)) return false;
+  // ラテン文字が含まれる場合のみ翻訳対象にする
+  return /[A-Za-z]/.test(value);
+}
+
+function readTranslationCache() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NEWS_TRANSLATION_CACHE_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function writeTranslationCache(cache) {
+  try {
+    localStorage.setItem(NEWS_TRANSLATION_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // localStorageが使えない環境ではキャッシュを諦める
+  }
+}
+
+async function translateToJapanese(text) {
+  const value = normalizeHeadline(text);
+  if (!shouldTranslateToJapanese(value)) return value;
+
+  const cache = readTranslationCache();
+  const cached = cache[value];
+  const now = Date.now();
+  if (cached && typeof cached === 'object') {
+    const translated = normalizeHeadline(cached.text);
+    const ts = Number(cached.fetchedAt || 0);
+    if (translated && now - ts < NEWS_TRANSLATION_CACHE_TTL_MS) {
+      return translated;
+    }
+  }
+
+  try {
+    const endpoint = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(value)}&langpair=en|ja`;
+    const res = await fetch(endpoint, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`translate failed: ${res.status}`);
+    const json = await res.json();
+    const translated = normalizeHeadline(json?.responseData?.translatedText || '');
+    if (!translated) return value;
+
+    cache[value] = {
+      text: translated,
+      fetchedAt: now
+    };
+    writeTranslationCache(cache);
+    return translated;
+  } catch {
+    return value;
+  }
+}
+
+async function localizeHeadlineItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  return Promise.all(list.map(async (item) => {
+    const translatedTitle = await translateToJapanese(item?.title || '');
+    return {
+      ...item,
+      title: translatedTitle || item?.title || ''
+    };
+  }));
+}
+
+function readNewsCache(key) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    if (!parsed || !Array.isArray(parsed.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeNewsCache(key, items) {
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      fetchedAt: Date.now(),
+      items
+    }));
+  } catch {
+    // localStorageが使えない環境ではキャッシュを諦める
+  }
+}
+
+function setNewsUpdatedAt(timestamp, isFallback) {
+  const updatedEl = document.getElementById('newsUpdatedAt');
+  if (!updatedEl) return;
+  if (!timestamp || isFallback) {
+    updatedEl.textContent = '更新: --';
+    return;
+  }
+  const d = new Date(timestamp);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  updatedEl.textContent = `更新: ${hh}:${mm}`;
+}
+
+async function fetchFeedHeadlines(feedUrl, sourceHint) {
+  let rawItems = [];
+  try {
+    rawItems = isGoogleFeedUrl(feedUrl)
+      ? await fetchFeedItemsViaAllOriginsRaw(feedUrl)
+      : await fetchFeedItemsViaRss2Json(feedUrl);
+  } catch (error) {
+    if (!isGoogleSearchFeedUrl(feedUrl)) throw error;
+    try {
+      rawItems = await fetchFeedItemsViaAllOriginsRaw(NEWS_GOOGLE_TOP_FEED);
+    } catch {
+      rawItems = await fetchFeedItemsViaRss2Json(NEWS_GOOGLE_TOP_FEED);
+    }
+  }
+
+  return rawItems.map((item) => {
+    let title = normalizeHeadline(item?.title);
+    let source = normalizeHeadline(item?.author || item?.source?.title || '');
+    const link = String(item?.link || '').trim();
+
+    if (!source) {
+      const idx = title.lastIndexOf(' - ');
+      if (idx > 0) {
+        source = title.slice(idx + 3).trim();
+        title = title.slice(0, idx).trim();
+      }
+    }
+
+    return {
+      title,
+      link,
+      source: source || sourceHint || 'News'
+    };
+  }).filter((item) => item.title);
+}
+
+async function fetchLatestHeadlines() {
+  const settled = await Promise.allSettled(
+    NEWS_GLOBAL_SOURCES.map((source) => fetchFeedHeadlines(source.feedUrl, source.sourceLabel))
+  );
+  const merged = [];
+  settled.forEach((result) => {
+    if (result.status !== 'fulfilled') return;
+    merged.push(...result.value);
+  });
+
+  const seen = new Set();
+  const unique = [];
+  merged.forEach((item) => {
+    const key = item.title.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(item);
+  });
+  const practical = unique.filter((item) => isPracticalHeadline(item));
+  const relevant = practical.filter((item) => isGlobalRelevantHeadline(item));
+  const picked = (relevant.length ? relevant : practical.length ? practical : unique).slice(0, NEWS_LIMIT);
+  return localizeHeadlineItems(picked);
+}
+
+async function fetchCountryHeadlines(currency) {
+  const feedUrl = NEWS_COUNTRY_FEEDS[currency] || NEWS_COUNTRY_FEEDS.USD;
+  const items = await fetchFeedHeadlines(feedUrl, 'Google News');
+  const seen = new Set();
+  const unique = [];
+  items.forEach((item) => {
+    const key = item.title.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(item);
+  });
+  const relevant = unique.filter((item) => isCurrencyRelevantHeadline(currency, item));
+  const picked = (relevant.length ? relevant : unique).slice(0, NEWS_LIMIT);
+  return localizeHeadlineItems(picked);
+}
+
+function renderTickerItem(item) {
+  const title = escapeTickerText(item?.title || 'ニュースはありません');
+  const source = escapeTickerText(item?.source || 'News');
+  const sourceMarkup = item?.source ? `<span class="ticker-source">[${source}]</span>` : '';
+  const link = String(item?.link || '').trim();
+  if (!link) {
+    return `<span class="ticker-link"><span class="ticker-title">${title}</span>${sourceMarkup}</span>`;
+  }
+  return `<a class="ticker-link" href="${escapeTickerText(link)}" target="_blank" rel="noopener noreferrer"><span class="ticker-title">${title}</span>${sourceMarkup}</a>`;
+}
+
 function mountTicker(trackEl, items) {
   if (!trackEl) return;
-  const tickerItems = (items && items.length ? items : ['ニュースはありません']).concat(items && items.length ? items : ['ニュースはありません']);
-  trackEl.innerHTML = tickerItems.map(t => `<span class="ticker-item">${t}</span>`).join('');
+  const source = items && items.length ? items : FALLBACK_HEADLINES;
+  const tickerItems = source.concat(source);
+  trackEl.innerHTML = tickerItems.map((item) => `<span class="ticker-item">${renderTickerItem(item)}</span>`).join('');
   trackEl.style.animation = 'none';
   void trackEl.offsetHeight;
   trackEl.style.animation = '';
 }
-mountTicker(document.getElementById('globalTickerTrack'), globalTicker);
-const sel = document.getElementById('countrySelect');
-function refreshCountryTicker() {
-  const v = sel?.value || 'USD';
-  mountTicker(document.getElementById('countryTickerTrack'), countryNews[v] || []);
+
+async function initNewsTicker(forceRefresh = false) {
+  await Promise.all([
+    initGlobalNewsTicker(forceRefresh),
+    initCountryNewsTicker(forceRefresh)
+  ]);
 }
-sel?.addEventListener('change', refreshCountryTicker);
-refreshCountryTicker();
+
+async function initGlobalNewsTicker(forceRefresh = false) {
+  const track = document.getElementById('globalTickerTrack');
+  if (!track) return;
+
+  const cached = readNewsCache(NEWS_GLOBAL_CACHE_KEY);
+  const cachedItems = cached?.items || [];
+  if (cachedItems.length) {
+    mountTicker(track, cachedItems);
+    setNewsUpdatedAt(cached.fetchedAt, false);
+  } else {
+    mountTicker(track, FALLBACK_HEADLINES);
+    setNewsUpdatedAt(null, true);
+  }
+
+  const isCacheFresh = cached && (Date.now() - Number(cached.fetchedAt || 0) < NEWS_CACHE_TTL_MS);
+  if (isCacheFresh && !forceRefresh) return;
+
+  try {
+    const latest = await fetchLatestHeadlines();
+    if (!latest.length) throw new Error('no headlines');
+    mountTicker(track, latest);
+    writeNewsCache(NEWS_GLOBAL_CACHE_KEY, latest);
+    setNewsUpdatedAt(Date.now(), false);
+  } catch {
+    if (!cachedItems.length) {
+      mountTicker(track, FALLBACK_HEADLINES);
+      setNewsUpdatedAt(null, true);
+    }
+  }
+}
+
+async function initCountryNewsTicker(forceRefresh = false) {
+  const track = document.getElementById('countryTickerTrack');
+  const select = document.getElementById('countrySelect');
+  if (!track || !select) return;
+
+  const currency = select.value || 'USD';
+  const cacheKey = `${NEWS_COUNTRY_CACHE_PREFIX}${currency}`;
+  const cached = readNewsCache(cacheKey);
+  const cachedItems = cached?.items || [];
+
+  if (cachedItems.length) {
+    mountTicker(track, cachedItems);
+  } else {
+    mountTicker(track, FALLBACK_HEADLINES);
+  }
+
+  const isCacheFresh = cached && (Date.now() - Number(cached.fetchedAt || 0) < NEWS_CACHE_TTL_MS);
+  if (isCacheFresh && !forceRefresh) return;
+
+  try {
+    const latest = await fetchCountryHeadlines(currency);
+    if (!latest.length) throw new Error('no country headlines');
+    mountTicker(track, latest);
+    writeNewsCache(cacheKey, latest);
+  } catch {
+    if (!cachedItems.length) mountTicker(track, FALLBACK_HEADLINES);
+  }
+}
 
 function refreshAllTickers() {
-  mountTicker(document.getElementById('globalTickerTrack'), globalTicker);
-  refreshCountryTicker();
+  initNewsTicker(false);
 }
 
+document.getElementById('countrySelect')?.addEventListener('change', () => {
+  initCountryNewsTicker(false);
+});
+
+initNewsTicker(false);
 window.addEventListener('pageshow', refreshAllTickers);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) refreshAllTickers();

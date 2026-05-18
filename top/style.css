@@ -581,10 +581,32 @@ body::before {
 /* ============================
    ニュースティッカー
 ============================ */
+.news-section {
+  margin-bottom: 18px;
+  padding: 2px 0 0;
+  border-top: 1px solid rgba(255,255,255,.1);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.news-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.news-updated {
+  color: rgba(170,181,208,.82);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
 .ticker {
   overflow: hidden;
   border: none;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  border-bottom: none;
   border-radius: 0;
   max-height: 32px;
 }
@@ -592,13 +614,30 @@ body::before {
   display: inline-block;
   white-space: nowrap;
   padding: 4px 0;
-  animation: ticker 24s linear infinite;
+  animation: ticker 64s linear infinite;
 }
 .ticker-item {
   display: inline-block;
-  margin: 0 24px;
-  color: var(--text);   /* ← サマリー金額と完全同一の白 #eef1ff */
+  margin: 0 20px;
+  color: var(--text);
   font-size: 13px;
+}
+
+.ticker-link {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticker-link:hover {
+  opacity: 0.9;
+}
+
+.ticker-source {
+  color: rgba(170,181,208,.92);
+  font-size: 11px;
 }
 
 /* プルダウン調整 */
@@ -617,14 +656,20 @@ body::before {
   -moz-appearance: none;           
 }
 
-/* 国別ニュース間隔 */
-.country-news {
-  margin-top: 10px;
-}
-
 @keyframes ticker {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
+}
+
+.country-news {
+  margin-top: 8px;
+}
+
+.country-news-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
 }
 
 /* ============================

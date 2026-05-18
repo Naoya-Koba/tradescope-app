@@ -13,6 +13,23 @@
 (function () {
   'use strict';
 
+  /* 同一ページへのリンククリックは再読込しない */
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('a[href]');
+    if (!link) return;
+    var url;
+    try { url = new URL(link.href, location.href); } catch (ex) { return; }
+    if (url.origin !== location.origin) return;
+
+    var samePath = (url.pathname === location.pathname && url.search === location.search);
+    var hashOnlyMove = (samePath && url.hash && url.hash !== location.hash);
+    if (hashOnlyMove) return;
+
+    if (samePath) {
+      e.preventDefault();
+    }
+  }, true);
+
   /* ── クロスドキュメント VT のサポート検出 ── */
   /* 'onpageswap' は cross-document VT 対応ブラウザにのみ存在 */
   var hasCrossDocVT = ('onpageswap' in window);
@@ -75,11 +92,11 @@
     }
 
     function applyRevealVars(el, index, isInitialViewport) {
-      var duration = parseMsValue(el.dataset.revealDuration, 620);
+      var duration = parseMsValue(el.dataset.revealDuration, 420);
       var explicitDelay = parseMsValue(el.dataset.revealDelay, null);
-      var baseDelay = parseMsValue(el.dataset.revealBaseDelay, 60);
-      var stagger = parseMsValue(el.dataset.revealStagger, 75);
-      var maxDelay = parseMsValue(el.dataset.revealMaxDelay, 420);
+      var baseDelay = parseMsValue(el.dataset.revealBaseDelay, 20);
+      var stagger = parseMsValue(el.dataset.revealStagger, 45);
+      var maxDelay = parseMsValue(el.dataset.revealMaxDelay, 180);
 
       var delay = explicitDelay;
       if (delay == null) {

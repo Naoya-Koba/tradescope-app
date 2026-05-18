@@ -13,10 +13,10 @@
 
 /* ページ全体をシンプルにクロスフェード */
 ::view-transition-old(root) {
-  animation: 210ms ease-in both vt-fade-out;
+  animation: 140ms ease-in both vt-fade-out;
 }
 ::view-transition-new(root) {
-  animation: 280ms ease-out 60ms both vt-fade-in;
+  animation: 190ms ease-out both vt-fade-in;
 }
 
 @keyframes vt-fade-out {
@@ -31,7 +31,7 @@
    JS が <html> に .no-vt クラスをセット
 ────────────────────────────────────── */
 .no-vt body {
-  animation: page-enter 0.25s ease-out both;
+  animation: page-enter 0.16s ease-out both;
 }
 
 .no-vt body.page-exit {
