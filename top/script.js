@@ -283,7 +283,7 @@ drawer?.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 // ===== News =====
-const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV10';
+const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV11';
 const NEWS_COUNTRY_CACHE_PREFIX = 'tradeScopeNewsCountryV3:';
 const NEWS_CACHE_TTL_MS = 30 * 60 * 1000;
 const NEWS_TRANSLATION_CACHE_KEY = 'tradeScopeNewsTranslationCacheV1';
@@ -372,9 +372,11 @@ const CURRENCY_RELEVANCE_TERMS = {
   MXN: ['mxn', 'メキシコペソ', 'ペソ', 'banxico', 'メキシコ']
 };
 const GLOBAL_RELEVANCE_TERMS = [
-  'fx', '為替', 'ドル円', 'usdjpy', 'eurusd', 'ユーロ', 'ドル', '円', 'スイスフラン',
-  '政策金利', '利上げ', '利下げ', 'fomc', 'frb', 'ecb', '日銀', 'boj', 'snb', 'boe',
-  'cbrt', 'tcmb', 'mnb', 'トルコリラ', 'フォリント', 'try', 'huf', 'キャリートレード'
+  'fx', '為替', 'ドル円', 'ドル安', 'ドル高', 'usdjpy', 'eurusd', 'gbpusd', 'usdchf', 'audusd',
+  'ユーロ安', 'ユーロ高', 'ユーロ圏', '円安', '円高', '円相場', 'スイスフラン',
+  '政策金利', '利上げ', '利下げ', '金融政策', 'fomc', 'frb', 'ecb', '日銀', 'boj', 'snb', 'boe',
+  'cbrt', 'tcmb', 'mnb', 'トルコリラ', 'フォリント', 'try', 'huf', 'キャリートレード',
+  '為替介入', '外国為替', '通貨', '外貨'
 ];
 
 function isLikelyDocumentLink(url) {
@@ -652,7 +654,10 @@ function mountTicker(trackEl, items) {
   trackEl.innerHTML = tickerItems.map((item) => `<span class="ticker-item">${renderTickerItem(item)}</span>`).join('');
   trackEl.style.animation = 'none';
   void trackEl.offsetHeight;
-  trackEl.style.animation = '';
+  // コンテンツ幅に比例した速度で流す（80px/s 基準）
+  const loopWidth = trackEl.scrollWidth / 2;
+  const duration = Math.max(8, Math.round(loopWidth / 80));
+  trackEl.style.animation = `ticker ${duration}s linear infinite`;
 }
 
 async function initNewsTicker(forceRefresh = false) {
