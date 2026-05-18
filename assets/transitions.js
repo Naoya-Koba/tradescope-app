@@ -44,7 +44,7 @@
      IntersectionObserver + 初期ビューポート スタッガー
   ────────────────────────────────────── */
   function doReveal() {
-    var items = Array.from(document.querySelectorAll('.section.glass, .chart-area'));
+    var items = Array.from(document.querySelectorAll('.section.glass'));
     if (!items.length) return;
 
     /*
@@ -63,7 +63,7 @@
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0, rootMargin: '0px 0px -60px 0px' });
+    }, { threshold: 0.08, rootMargin: '0px 0px -16px 0px' });
 
     var vh = window.innerHeight;
     items.forEach(function (el, i) {
@@ -99,9 +99,12 @@
      pagereveal (VT 対応) or DOMContentLoaded (非 VT)
   ────────────────────────────────────── */
   if ('onpagereveal' in window) {
-    /* VT 対応ブラウザ: 毎回リビールを実行（VT ナビゲーション時も含む）*/
+    /* VT 対応ブラウザ: 初回ロード時のみリビールを実行 */
+    /* VT ナビゲーション時は e.viewTransition が設定されるのでスキップ */
     window.addEventListener('pagereveal', function (e) {
-      initSectionReveals();
+      if (!e.viewTransition) {
+        initSectionReveals();
+      }
     });
   } else {
     /* 非VT ブラウザ: DOMContentLoaded でリビールを開始 */
