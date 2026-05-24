@@ -81,3 +81,29 @@
     animation: none;
   }
 }
+
+/* ──────────────────────────────────────
+   タブ・コンテンツ切り替えアニメーション
+   JS: window.animateTabSwitch(el, fn) で使用
+────────────────────────────────────── */
+@keyframes tab-out {
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(5px); }
+}
+
+.tab-switching-out {
+  animation: tab-out 80ms ease-in forwards;
+  pointer-events: none;
+}
+.tab-switching-in {
+  animation: tab-in 150ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-switching-out,
+  .tab-switching-in {
+    animation-duration: 0.01ms;
+  }
+}

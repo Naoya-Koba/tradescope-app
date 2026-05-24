@@ -229,4 +229,37 @@
       initSectionReveals();
     }
   }
+
+  /* ──────────────────────────────────────
+     タブ切り替えアニメーション ユーティリティ
+     使い方: window.animateTabSwitch(containerEl, renderFn)
+       containerEl: コンテンツ部分のラッパー要素
+       renderFn   : コンテンツを更新する関数
+  ────────────────────────────────────── */
+  window.animateTabSwitch = function (containerEl, renderFn) {
+    if (!containerEl) { renderFn(); return; }
+
+    /* prefers-reduced-motion 対応: アニメーションなしで即時切り替え */
+    var prefersReduced = typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) { renderFn(); return; }
+
+    /* OUT フェーズ (80ms) */
+    containerEl.classList.add('tab-switching-out');
+
+    setTimeout(function () {
+      /* コンテンツ更新 */
+      renderFn();
+
+      /* OUT クラスを外して IN クラスを付与 */
+      containerEl.classList.remove('tab-switching-out');
+      containerEl.classList.add('tab-switching-in');
+
+      /* IN アニメーション完了後にクラスを掃除 */
+      containerEl.addEventListener('animationend', function onEnd() {
+        containerEl.removeEventListener('animationend', onEnd);
+        containerEl.classList.remove('tab-switching-in');
+      });
+    }, 80); /* tab-out アニメーション時間に合わせる */
+  };
 })();

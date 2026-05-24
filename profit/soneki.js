@@ -3195,9 +3195,16 @@ function initMonthlyViewToggle() {
     toggleGroup.querySelectorAll('.monthly-view-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.account === accountKey);
     });
-    renderMonthlySection();
-    // グラフを口座別データで再描画
-    renderPerformanceChart({ accountFilter: accountKey });
+    const contentEl = document.getElementById('monthlyDisplay');
+    if (window.animateTabSwitch && contentEl) {
+      window.animateTabSwitch(contentEl, () => {
+        renderMonthlySection();
+        renderPerformanceChart({ accountFilter: accountKey });
+      });
+    } else {
+      renderMonthlySection();
+      renderPerformanceChart({ accountFilter: accountKey });
+    }
   });
 }
 

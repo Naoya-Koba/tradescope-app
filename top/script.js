@@ -2344,6 +2344,34 @@ function syncPortfolioTabs() {
     tab.classList.toggle('active', isActive);
     tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
+  movePillIndicator();
+}
+
+/* ピルインジケーターをアクティブタブへ移動
+   初回はアニメーションなし、以降は CSS transition でスライド */
+function movePillIndicator() {
+  const indicator = document.querySelector('.portfolio-pill-indicator');
+  const activeTab  = document.querySelector('.portfolio-tab.active');
+  if (!indicator || !activeTab) return;
+
+  const doMove = () => {
+    indicator.style.transform = `translateX(${activeTab.offsetLeft}px)`;
+    indicator.style.width     = `${activeTab.offsetWidth}px`;
+  };
+
+  if (!indicator.dataset.ready) {
+    /* 初回: 描画前に transition を切ってから位置をセット */
+    indicator.style.transition = 'none';
+    requestAnimationFrame(() => {
+      doMove();
+      requestAnimationFrame(() => {
+        indicator.style.transition = '';
+        indicator.dataset.ready = '1';
+      });
+    });
+  } else {
+    doMove();
+  }
 }
 
 function resolvePortfolioUnit(row) {
