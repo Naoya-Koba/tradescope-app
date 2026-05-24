@@ -283,8 +283,8 @@ drawer?.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 // ===== News =====
-const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV11';
-const NEWS_COUNTRY_CACHE_PREFIX = 'tradeScopeNewsCountryV3:';
+const NEWS_GLOBAL_CACHE_KEY = 'tradeScopeNewsHeadlinesV12';
+const NEWS_COUNTRY_CACHE_PREFIX = 'tradeScopeNewsCountryV4:';
 const NEWS_CACHE_TTL_MS = 30 * 60 * 1000;
 const NEWS_TRANSLATION_CACHE_KEY = 'tradeScopeNewsTranslationCacheV1';
 const NEWS_TRANSLATION_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -323,6 +323,9 @@ const NEWS_EXCLUDE_HEADLINE_PATTERNS = [
 const FALLBACK_HEADLINES = [
   { title: '現在ニュースを取得できません。', link: '', source: '' },
   { title: '接続状況により更新が遅れる場合があります。', link: '', source: '' }
+];
+const LOADING_HEADLINES = [
+  { title: 'ニュースを読み込み中...', link: '', source: '' }
 ];
 const NEWS_GLOBAL_SOURCES = [
   {
@@ -616,7 +619,7 @@ async function fetchLatestHeadlines() {
   });
   const practical = unique.filter((item) => isPracticalHeadline(item));
   const relevant = practical.filter((item) => isGlobalRelevantHeadline(item));
-  const picked = (relevant.length ? relevant : practical.length ? practical : unique).slice(0, NEWS_LIMIT);
+  const picked = relevant.slice(0, NEWS_LIMIT);
   return localizeHeadlineItems(picked);
 }
 
@@ -632,7 +635,7 @@ async function fetchCountryHeadlines(currency) {
     unique.push(item);
   });
   const relevant = unique.filter((item) => isCurrencyRelevantHeadline(currency, item));
-  const picked = (relevant.length ? relevant : unique).slice(0, NEWS_LIMIT);
+  const picked = relevant.slice(0, NEWS_LIMIT);
   return localizeHeadlineItems(picked);
 }
 
@@ -677,7 +680,7 @@ async function initGlobalNewsTicker(forceRefresh = false) {
     mountTicker(track, cachedItems);
     setNewsUpdatedAt(cached.fetchedAt, false);
   } else {
-    mountTicker(track, FALLBACK_HEADLINES);
+    mountTicker(track, LOADING_HEADLINES);
     setNewsUpdatedAt(null, true);
   }
 
@@ -711,7 +714,7 @@ async function initCountryNewsTicker(forceRefresh = false) {
   if (cachedItems.length) {
     mountTicker(track, cachedItems);
   } else {
-    mountTicker(track, FALLBACK_HEADLINES);
+    mountTicker(track, LOADING_HEADLINES);
   }
 
   const isCacheFresh = cached && (Date.now() - Number(cached.fetchedAt || 0) < NEWS_CACHE_TTL_MS);

@@ -30,6 +30,8 @@ html, body {
   min-height: 100vh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -621,6 +623,8 @@ body::before {
   margin: 0 20px;
   color: var(--text);
   font-size: 13px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .ticker-link {
@@ -672,8 +676,7 @@ body::before {
   margin-bottom: 4px;
 }
 
-/* ============================
-   Newsセクション
+/* Newsセクション
 ============================ */
 .news-label {
   color: var(--muted);
@@ -681,18 +684,6 @@ body::before {
   font-size: 14px;
   letter-spacing: 0.3px;
   font-family: inherit;
-}
-
-.select {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.15);
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-family: inherit;
-  appearance: none;
 }
 
 /* ============================

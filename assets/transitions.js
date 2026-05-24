@@ -60,7 +60,9 @@
      セクション リビール
      IntersectionObserver + 初期ビューポート スタッガー
   ────────────────────────────────────── */
-  function doReveal() {
+
+  /* リビール対象要素の収集（doReveal / preHide で共用） */
+  function collectRevealItems() {
     var baseItems = Array.from(document.querySelectorAll('.section.glass, .chart-area'));
     var items = [];
     var seen = new Set();
@@ -82,6 +84,24 @@
       seen.add(el);
       items.push(el);
     });
+    return items;
+  }
+
+  /*
+   * VT スナップショット撮影前にセクションを事前隠蔽する。
+   * pagereveal（描画前）で呼ぶことで:
+   *   1. VT の new-page スナップショットにセクションが opacity:0 で写り込む
+   *   2. VT フェードイン中はセクションが不可視のまま
+   *   3. VT 完了後にリビールが走り、スムーズにフェードインする
+   */
+  function preHideRevealItems() {
+    collectRevealItems().forEach(function (el) {
+      el.classList.add('reveal-pending');
+    });
+  }
+
+  function doReveal() {
+    var items = collectRevealItems();
 
     if (!items.length) return;
 
@@ -168,20 +188,44 @@
      pagereveal (VT 対応) or DOMContentLoaded (非 VT)
   ────────────────────────────────────── */
   if ('onpagereveal' in window) {
-    /* VT 対応ブラウザ:
-       - VTナビゲーション時は即時表示（リビールをスキップ）
-         理由: VTフェードイン中にreveal-pendingでopacity:0→フェードが
-              二段階になりカクつく
-       - 初回ロード時のみリビールを実行 */
+    /*
+     * VT 対応ブラウザ（Chrome 126+ / Safari 18.2+）:
+     *
+     * pagereveal は「最初のフレームが描画される前」に発火する。
+     * このタイミングで preHideRevealItems() を呼ぶことで、
+     * VT の new-page スナップショットにセクションが opacity:0 で
+     * 写り込み、VT フェードイン中は背景のみが見える状態になる。
+     *
+     * VT ナビゲーション時: VT 完了後（finished）にリビール開始
+     *   → 旧ページフェードアウト → 新ページ背景のみフェードイン
+     *     → セクションがスタッガーで登場、という自然な流れになる。
+     *
+     * 初回ロード時（viewTransition なし）: 直ちにリビール開始
+     *   → スプラッシュスクリーンがある場合はその消去後に実行。
+     */
     window.addEventListener('pagereveal', function (e) {
-      if (e && e.viewTransition) return;
-      initSectionReveals();
+      /* 描画前にセクションを隠す（VT・初回ロード共通） */
+      preHideRevealItems();
+
+      if (e && e.viewTransition) {
+        /* VT ナビゲーション: トランジション完了後にリビール */
+        e.viewTransition.finished.then(function () {
+          initSectionReveals();
+        });
+      } else {
+        /* 初回ロード */
+        initSectionReveals();
+      }
     });
   } else {
     /* 非VT ブラウザ: DOMContentLoaded でリビールを開始 */
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initSectionReveals);
+      document.addEventListener('DOMContentLoaded', function () {
+        preHideRevealItems();
+        initSectionReveals();
+      });
     } else {
+      preHideRevealItems();
       initSectionReveals();
     }
   }
