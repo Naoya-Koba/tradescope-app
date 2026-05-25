@@ -291,6 +291,23 @@ const NEWS_TRANSLATION_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const NEWS_GOOGLE_TOP_FEED = 'https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja';
 const NEWS_GOOGLE_PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
 const NEWS_LIMIT = 12;
+const NEWS_EXCLUDE_SOURCE_PATTERNS = [
+  /日本経済新聞/i,
+  /日経/i,
+  /nikkei/i,
+  /bloomberg/i,
+  /wall street journal/i,
+  /\bwsj\b/i,
+  /financial times/i,
+  /\bft\.com\b/i
+];
+const NEWS_EXCLUDE_LINK_PATTERNS = [
+  /nikkei\.com/i,
+  /bloomberg\.co\.jp/i,
+  /bloomberg\.com/i,
+  /wsj\.com/i,
+  /ft\.com/i
+];
 const NEWS_EXCLUDE_HEADLINE_PATTERNS = [
   /議事録/i,
   /議事要旨/i,
@@ -435,6 +452,10 @@ function isPracticalHeadline(item) {
   if (!title) return false;
   if (NEWS_EXCLUDE_HEADLINE_PATTERNS.some((pattern) => pattern.test(title))) return false;
   if (isLikelyDocumentLink(item?.link)) return false;
+  const source = normalizeHeadline(item?.source || '');
+  if (NEWS_EXCLUDE_SOURCE_PATTERNS.some((pattern) => pattern.test(source))) return false;
+  const link = String(item?.link || '');
+  if (NEWS_EXCLUDE_LINK_PATTERNS.some((pattern) => pattern.test(link))) return false;
   return true;
 }
 
