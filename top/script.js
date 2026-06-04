@@ -2432,6 +2432,7 @@ function renderCurrentPortfolioSection() {
     allRows = buildFallbackPortfolioRowsFromAccounts();
   }
   allRows = applyMonthlyCryptoRows(allRows);
+  allRows = applyMonthlySecuritiesValues(allRows);
   const hasTabData = (tabName) => allRows.some((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(tabName));
   if (!hasTabData(activePortfolioAssetTab)) {
     const fallbackTab = ['FX', '証券', '暗号資産'].find((tabName) => hasTabData(tabName));
