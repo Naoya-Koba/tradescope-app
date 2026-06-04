@@ -55,13 +55,6 @@
 
     const currentRow = getMonthRow(yearData, targetMonth, accountKey);
 
-    // 保有明細から netAssets が計算済みの場合はそれを直接使用
-    // （取得単価ベースの評価損益と口座残高を独立して管理するため）
-    const storedNetAssets = Number(currentRow.netAssets);
-    if (Number.isFinite(storedNetAssets) && storedNetAssets > 0) {
-      return storedNetAssets;
-    }
-
     const unrealized = Number(currentRow.unrealizedPnL) || 0;
     return initial + realized + swap + deposit - withdrawal + unrealized;
   }
