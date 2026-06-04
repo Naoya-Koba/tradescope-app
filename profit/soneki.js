@@ -1200,6 +1200,7 @@ function renderHoldingsSection(accountKey, data) {
       .map((holding) => String(holding?.symbol || '').trim())
       .filter(Boolean);
 
+    const CASH_RESERVE_SYMBOL = '預り金';
     const allSymbols = [...symbolsFromHistory];
     existingSymbols.forEach((symbol) => {
       if (!allSymbols.includes(symbol)) allSymbols.push(symbol);
@@ -1211,7 +1212,41 @@ function renderHoldingsSection(accountKey, data) {
       holdingsMap.set(holding.symbol, holding);
     });
 
-    const holdingsHtml = allSymbols.map((symbol) => {
+    // 預り金を holdings に事前登録
+    if (!holdingsMap.has(CASH_RESERVE_SYMBOL)) {
+      const cashEntry = { symbol: CASH_RESERVE_SYMBOL, quantity: 0, unit: '円', rate: 0, acquisitionRate: null, valueJPY: 0, valueFilled: false, quantityManual: false };
+      holdings.push(cashEntry);
+      holdingsMap.set(CASH_RESERVE_SYMBOL, cashEntry);
+    }
+
+    // 預り金は先頭固定なので通常ループから除外
+    const regularSymbols = allSymbols.filter((s) => s !== CASH_RESERVE_SYMBOL);
+
+    // 預り金行（先頭固定）
+    const cashReserve = holdingsMap.get(CASH_RESERVE_SYMBOL);
+    const cashValueDisplay = cashReserve.valueFilled === true ? (Number(cashReserve.valueJPY) || 0) : '';
+    const cashReserveRow = `
+      <div class="holdings-row" data-symbol="${CASH_RESERVE_SYMBOL}">
+        <label class="holdings-label">${CASH_RESERVE_SYMBOL}</label>
+        <div class="holdings-cell"></div>
+        <div class="holdings-cell"></div>
+        <div class="holdings-cell">
+          <input
+            type="number"
+            class="input-holdings"
+            data-account="${accountKey}"
+            data-symbol="${CASH_RESERVE_SYMBOL}"
+            data-field="valueJPY"
+            value="${cashValueDisplay}"
+            placeholder=""
+            step="1"
+          />
+          <span class="holdings-unit">円</span>
+        </div>
+      </div>
+    `;
+
+    const holdingsHtml = regularSymbols.map((symbol) => {
       const openQty = Number(openQtyMap.get(symbol)) || 0;
       const fallbackQty = openQty > 0
         ? openQty
@@ -1299,6 +1334,7 @@ function renderHoldingsSection(accountKey, data) {
           <div class="holdings-header-cell">評価額</div>
         </div>
         <div class="holdings-list">
+          ${cashReserveRow}
           ${holdingsHtml}
         </div>
       </div>
@@ -2620,21 +2656,34 @@ function updateCryptoUnrealizedPnL(accountKey) {
 function updateSecuritiesUnrealizedPnL(accountKey) {
   ensureYearMonth(currentYear, currentMonth);
   const holdings = tradingData[currentYear][currentMonth][accountKey]?.holdings || [];
-  const securitiesTotalValue = holdings
-    .filter((holding) => holding.symbol !== 'JPY')
-    .reduce((sum, holding) => {
-      if (holding.valueFilled !== true) return sum;
-      return sum + (Number(holding.valueJPY) || 0);
-    }, 0);
 
-  const confirmedAssets = calculateAccountConfirmedAssets(currentYear, currentMonth, accountKey);
-  const unrealizedPnL = securitiesTotalValue - confirmedAssets;
+  let securitiesTotalValue = 0;
+  let holdingsPnL = 0;
+
+  holdings
+    .filter((holding) => holding.symbol !== 'JPY')
+    .forEach((holding) => {
+      if (holding.valueFilled !== true) return;
+      const valueJPY = Number(holding.valueJPY) || 0;
+      securitiesTotalValue += valueJPY;
+
+      // 取得単価が入力済みの銘柄のみ評価損益を計算（預り金等はスキップ）
+      const acqRate = Number(holding.acquisitionRate);
+      if (Number.isFinite(acqRate) && acqRate > 0) {
+        const qty = Number(holding.quantity) || 0;
+        const unitMultiplier = resolveHoldingsUnitMultiplier(holding.symbol);
+        const cost = acqRate * qty / unitMultiplier;
+        holdingsPnL += valueJPY - cost;
+      }
+    });
+
+  const holdingsPnLRounded = Math.round(holdingsPnL);
 
   tradingData[currentYear][currentMonth][accountKey].netAssets = securitiesTotalValue;
-  tradingData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
+  tradingData[currentYear][currentMonth][accountKey].unrealizedPnL = holdingsPnLRounded;
 
   const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
-  if (unrealizedInput) unrealizedInput.value = String(unrealizedPnL);
+  if (unrealizedInput) unrealizedInput.value = String(holdingsPnLRounded);
 }
 
 function updateInputs() {
@@ -2699,7 +2748,7 @@ function updateHoldingsInputs() {
     const existing = existingIndex >= 0 ? holdings[existingIndex] : null;
     const isSecurities = accountKey === 'sbi';
     const isTrust = isSecurities && resolveHoldingsUnitMultiplier(symbol) > 1;
-    const unit = isSecurities ? (isTrust ? '口' : '株') : (symbol === 'JPY' ? '円' : symbol);
+    const unit = isSecurities ? (symbol === '預り金' ? '円' : (isTrust ? '口' : '株')) : (symbol === 'JPY' ? '円' : symbol);
     const qty = quantity != null ? quantity : 0;
     let quantityManual = existing?.quantityManual === true;
     if (isSecurities && existing) {
