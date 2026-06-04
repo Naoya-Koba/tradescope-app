@@ -2396,6 +2396,12 @@ function renderAccountInputs() {
           <input type="number" class="input-account" data-account="${account.key}" data-field="realizedPnL" value="${data.realizedPnL}" placeholder="0" />
           <span class="suffix">¥</span>
         </div>
+        ${(isCryptoAccount || isSecuritiesAccount) ? '' : `
+        <div class="form-group">
+          <label>スワップ損益</label>
+          <input type="number" class="input-account" data-account="${account.key}" data-field="swapPnL" value="${data.swapPnL}" placeholder="0" />
+          <span class="suffix">¥</span>
+        </div>`}
         ${autoUnrealizedField}
         ${holdingsSection}
         ${autoUnrealizedAccount ? '' : `
@@ -2406,13 +2412,7 @@ function renderAccountInputs() {
           </div>
           <span class="suffix">¥</span>
         </div>
-        `}
-        ${(isCryptoAccount || isSecuritiesAccount) ? '' : `
-        <div class="form-group">
-          <label>スワップ損益</label>
-          <input type="number" class="input-account" data-account="${account.key}" data-field="swapPnL" value="${data.swapPnL}" placeholder="0" />
-          <span class="suffix">¥</span>
-        </div>`}`;
+        `}`;
     const cashflowFields = account.bankOnly ? '' : `
         <div class="form-group">
           <label>入金</label>
