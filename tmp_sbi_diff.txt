@@ -1,0 +1,12 @@
+﻿init=0
+confirmed7=0
+cumDeposit7=0
+netAssets7=0
+unrealized7=0
+holdingsTotal7=0
+expectedUnrealized7=0
+sbiAppUnrealized=398128
+gap=-398128
+neededConfirmedForApp=-398128
+--- holdings july ---
+ | qty= | acq= | value= | filled=

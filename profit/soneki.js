@@ -1185,10 +1185,39 @@ function syncUnrealizedFromNetAssets(accountKey) {
   }
 }
 
-function resolveHoldingsUnitMultiplier(symbol) {
+function isEtfLikeSecuritySymbol(symbol) {
   const upper = String(symbol || '').toUpperCase();
-  const trustKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス', 'ファンド', 'スリム'];
-  return trustKeywords.some((kw) => upper.includes(kw)) ? 10000 : 1;
+  if (!upper) return false;
+  return upper.includes('ETF')
+    || upper.includes('上場投信')
+    || (upper.includes('MAXIS') && !upper.includes('EMAXIS'));
+}
+
+function isTrustLikeSecuritySymbol(symbol) {
+  const upper = String(symbol || '').toUpperCase();
+  if (!upper || isEtfLikeSecuritySymbol(symbol)) return false;
+  const trustKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投資信託', 'インデックス・ファンド', 'インデックスファンド', 'ファンド', 'スリム'];
+  return trustKeywords.some((kw) => upper.includes(kw));
+}
+
+function resolveHoldingsUnitMultiplier(symbol) {
+  return isTrustLikeSecuritySymbol(symbol) ? 10000 : 1;
+}
+
+function calculateSecuritiesHoldingPnl(holding) {
+  if (!holding || String(holding.symbol || '').trim() === '預り金' || holding.valueFilled !== true) return null;
+
+  const valueJPY = Number(holding.valueJPY) || 0;
+  const quantity = Number(holding.quantity) || 0;
+  const acquisitionRate = Number(holding.acquisitionRate);
+  if (!Number.isFinite(acquisitionRate) || acquisitionRate <= 0 || quantity <= 0) return null;
+
+  const unitMultiplier = resolveHoldingsUnitMultiplier(holding.symbol);
+  const cost = acquisitionRate * quantity / unitMultiplier;
+  const pnl = valueJPY - cost;
+  const pnlRate = cost > 0 ? (pnl / cost) * 100 : null;
+
+  return { cost, pnl, pnlRate };
 }
 
 function renderHoldingsSection(accountKey, data) {
@@ -2658,28 +2687,21 @@ function updateSecuritiesUnrealizedPnL(accountKey) {
   const holdings = tradingData[currentYear][currentMonth][accountKey]?.holdings || [];
 
   let securitiesTotalValue = 0;
+  let holdingsPnL = 0;
 
   holdings
     .filter((holding) => holding.symbol !== 'JPY')
     .forEach((holding) => {
       if (holding.valueFilled !== true) return;
       securitiesTotalValue += Number(holding.valueJPY) || 0;
+
+      const pnlSummary = calculateSecuritiesHoldingPnl(holding);
+      if (pnlSummary) holdingsPnL += pnlSummary.pnl;
     });
 
   tradingData[currentYear][currentMonth][accountKey].netAssets = securitiesTotalValue;
 
-  let unrealizedPnL;
-  if (securitiesTotalValue > 0) {
-    // 保有明細が入力済みの場合は SBI VC と同方式
-    // 評価損益 = 純資産額（保有明細の合計） - 確定資産（年初資金＋累計損益＋入出金）
-    // これにより取得単価の入力有無・年初資金の設定方式によらず
-    // calculateAccountNetAssets が純資産額と一致する
-    const confirmedAssets = calculateAccountConfirmedAssets(currentYear, currentMonth, accountKey);
-    unrealizedPnL = Math.round(securitiesTotalValue - confirmedAssets);
-  } else {
-    // 保有明細未入力の場合は 0（確定資産ベースで表示）
-    unrealizedPnL = 0;
-  }
+  const unrealizedPnL = securitiesTotalValue > 0 ? Math.round(holdingsPnL) : 0;
 
   tradingData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
 

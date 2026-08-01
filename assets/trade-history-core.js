@@ -24,6 +24,21 @@
       : FX_CONTRACT_SIZE_DEFAULT;
   }
 
+  function isEtfLikeSecuritySymbol(symbol) {
+    const upper = String(symbol || '').toUpperCase();
+    if (!upper) return false;
+    return upper.includes('ETF')
+      || upper.includes('上場投信')
+      || (upper.includes('MAXIS') && !upper.includes('EMAXIS'));
+  }
+
+  function isTrustLikeSecuritySymbol(symbol) {
+    const upper = String(symbol || '').toUpperCase();
+    if (!upper || isEtfLikeSecuritySymbol(symbol)) return false;
+    const trustKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投資信託', 'インデックス・ファンド', 'インデックスファンド', 'ファンド', 'スリム'];
+    return trustKeywords.some((kw) => upper.includes(kw));
+  }
+
   function parseEntries() {
     try {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -305,14 +320,13 @@
     // --- ベースラインをMapに展開 ---
     // スナップショットのacquisitionRateを信頼できる基準値として使用する。
     // avgRateの単位: 万口単位（例: 34,715円/万口）で統一。
-    const TRUST_KEYWORDS_UC = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス', 'ファンド', 'スリム'];
     const posMap = new Map();
     snapshotHoldings.forEach((h) => {
       const symbol = String(h?.symbol || '').trim();
       if (!symbol) return;
       const qty = Number(h.quantity) || 0;
       if (qty <= 0) return;
-      const isTrust = TRUST_KEYWORDS_UC.some((kw) => symbol.toUpperCase().includes(kw));
+      const isTrust = isTrustLikeSecuritySymbol(symbol);
       const unitMultiplier = isTrust ? 10000 : 1;
       const valueJPY = h.valueFilled === true ? (Number(h.valueJPY) || 0) : 0;
       // avgRate優先順: acquisitionRate（万口単位） → valueJPY÷qty×unitMultiplier → rate×unitMultiplier

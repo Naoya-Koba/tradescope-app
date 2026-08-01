@@ -2066,10 +2066,7 @@ function resolveQuoteToJpyRate(symbol, entries) {
 
 function resolveSecuritiesUnitDivider(position) {
   if (normalizeAssetTypeLabel(position?.assetType) !== '証券') return 1;
-  const symbol = String(position?.symbol || '').toUpperCase();
-  const trustLikeKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投信', 'インデックス'];
-  const isTrustLike = trustLikeKeywords.some((keyword) => symbol.includes(keyword));
-  return isTrustLike ? 10000 : 1;
+  return isTrustLikeSecuritiesSymbol(position?.symbol) ? 10000 : 1;
 }
 
 function estimateRequiredMargin(position) {
@@ -2331,27 +2328,74 @@ function applyMonthlyCryptoRows(rows) {
   return [...nonCryptoRows, ...monthlyCryptoRows];
 }
 
-function applyMonthlySecuritiesValues(rows) {
+function isEtfLikeSecuritiesSymbol(symbol) {
+  const upper = String(symbol || '').toUpperCase();
+  if (!upper) return false;
+  return upper.includes('ETF')
+    || upper.includes('上場投信')
+    || (upper.includes('MAXIS') && !upper.includes('EMAXIS'));
+}
+
+function isTrustLikeSecuritiesSymbol(symbol) {
+  const upper = String(symbol || '').toUpperCase();
+  if (!upper || isEtfLikeSecuritiesSymbol(symbol)) return false;
+  const trustLikeKeywords = ['オール・カントリー', 'オールカントリー', 'EMAXIS', '投資信託', 'インデックス・ファンド', 'インデックスファンド', 'ファンド', 'スリム'];
+  return trustLikeKeywords.some((keyword) => upper.includes(keyword));
+}
+
+function calculateTopSecuritiesHoldingPnl(holding) {
+  if (!holding || String(holding.symbol || '').trim() === '預り金' || holding.valueFilled !== true) return null;
+
+  const valueJPY = Number(holding.valueJPY) || 0;
+  const quantity = Number(holding.quantity) || 0;
+  const acquisitionRate = Number(holding.acquisitionRate);
+  if (!Number.isFinite(acquisitionRate) || acquisitionRate <= 0 || quantity <= 0) return null;
+
+  const unitDivider = isTrustLikeSecuritiesSymbol(holding.symbol) ? 10000 : 1;
+  const cost = acquisitionRate * quantity / unitDivider;
+  const pnl = valueJPY - cost;
+  const pnlRate = cost > 0 ? (pnl / cost) * 100 : null;
+  return { cost, pnl, pnlRate };
+}
+
+function buildMonthlySecuritiesHoldingsMap() {
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const year = topSeries?.year || TOP_BASE_YEAR;
   const month = topSeries?.month || 12;
 
   const sbiData = tradingData?.[year]?.[month]?.['sbi'];
-  if (!sbiData || !Array.isArray(sbiData.holdings)) return rows;
+  const map = new Map();
+  if (!sbiData || !Array.isArray(sbiData.holdings)) return map;
 
-  const holdingsMap = new Map();
-  sbiData.holdings.forEach((h) => {
-    if (h?.symbol && h.valueFilled === true) {
-      holdingsMap.set(String(h.symbol).trim(), Number(h.valueJPY) || 0);
-    }
+  sbiData.holdings.forEach((holding) => {
+    const symbol = String(holding?.symbol || '').trim();
+    if (!symbol || holding.valueFilled !== true) return;
+
+    const pnlSummary = calculateTopSecuritiesHoldingPnl(holding);
+    map.set(symbol, {
+      valueJPY: Number(holding.valueJPY) || 0,
+      holdingPnl: pnlSummary ? Math.round(pnlSummary.pnl) : null,
+      holdingPnlRate: pnlSummary?.pnlRate ?? null
+    });
   });
+
+  return map;
+}
+
+function applyMonthlySecuritiesValues(rows) {
+  const holdingsMap = buildMonthlySecuritiesHoldingsMap();
   if (!holdingsMap.size) return rows;
 
   return rows.map((row) => {
     if (normalizeAssetTypeLabel(row.assetType) !== '証券') return row;
-    const valueJPY = holdingsMap.get(String(row.symbol).trim());
-    if (valueJPY == null) return row;
-    return { ...row, metricValue: valueJPY };
+    const holdingInfo = holdingsMap.get(String(row.symbol).trim());
+    if (!holdingInfo) return row;
+    return {
+      ...row,
+      metricValue: holdingInfo.valueJPY,
+      holdingPnl: holdingInfo.holdingPnl,
+      holdingPnlRate: holdingInfo.holdingPnlRate
+    };
   });
 }
 
@@ -2423,6 +2467,16 @@ function resolvePortfolioUnit(row) {
   return '';
 }
 
+function fmtSignedJPY(value) {
+  if (!Number.isFinite(value)) return '-';
+  return value > 0 ? `+${fmtJPY(value)}` : fmtJPY(value);
+}
+
+function fmtSignedPercent(value) {
+  if (!Number.isFinite(value)) return '--';
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
 function bindCurrentPortfolioRows(rows) {
   const list = document.getElementById('currentPortfolioList');
   if (!list) return;
@@ -2473,12 +2527,19 @@ function renderCurrentPortfolioSection() {
     const metricLabel = activePortfolioAssetTab === 'FX' ? '必要証拠金' : '評価額';
     const color = palette[idx % palette.length];
     const unit = resolvePortfolioUnit(row);
+    const hasHoldingPnl = activePortfolioAssetTab === '証券' && Number.isFinite(row.holdingPnl);
+    const secondaryClass = hasHoldingPnl
+      ? (row.holdingPnl > 0 ? 'positive' : row.holdingPnl < 0 ? 'negative' : 'neutral')
+      : 'neutral';
+    const secondaryText = hasHoldingPnl
+      ? `評価損益 ${fmtSignedJPY(row.holdingPnl)} (${fmtSignedPercent(row.holdingPnlRate)})`
+      : `${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%`;
     return `
       <li class="pair-card" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
         <div class="pair-title">${escapeHtml(row.symbol)}</div>
         <div class="pair-right">
           <div class="pair-profit neutral">${metricLabel} ${fmtJPY(row.metricValue)}</div>
-          <div class="pair-growth neutral">${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%</div>
+          <div class="pair-growth ${secondaryClass}">${secondaryText}</div>
         </div>
       </li>
     `;
