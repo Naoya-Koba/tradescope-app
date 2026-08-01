@@ -2467,11 +2467,6 @@ function resolvePortfolioUnit(row) {
   return '';
 }
 
-function fmtSignedJPY(value) {
-  if (!Number.isFinite(value)) return '-';
-  return value > 0 ? `+${fmtJPY(value)}` : fmtJPY(value);
-}
-
 function fmtSignedPercent(value) {
   if (!Number.isFinite(value)) return '--';
   return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -2528,18 +2523,33 @@ function renderCurrentPortfolioSection() {
     const color = palette[idx % palette.length];
     const unit = resolvePortfolioUnit(row);
     const hasHoldingPnl = activePortfolioAssetTab === '証券' && Number.isFinite(row.holdingPnl);
-    const secondaryClass = hasHoldingPnl
-      ? (row.holdingPnl > 0 ? 'positive' : row.holdingPnl < 0 ? 'negative' : 'neutral')
-      : 'neutral';
-    const secondaryText = hasHoldingPnl
-      ? `評価損益 ${fmtSignedJPY(row.holdingPnl)} (${fmtSignedPercent(row.holdingPnlRate)})`
-      : `${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%`;
+
+    if (hasHoldingPnl) {
+      const pnlClass = row.holdingPnl > 0 ? 'positive' : row.holdingPnl < 0 ? 'negative' : 'neutral';
+      const pnlPercentText = fmtSignedPercent(row.holdingPnlRate);
+      return `
+        <li class="pair-card portfolio-row-3col" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
+          <div class="pair-title">${escapeHtml(row.symbol)}</div>
+          <div class="portfolio-col">
+            <span class="portfolio-col-label">評価額</span>
+            <span class="portfolio-col-amount">${fmtJPY(row.metricValue)}</span>
+          </div>
+          <div class="portfolio-col">
+            <span class="portfolio-col-label">評価損益</span>
+            <span class="portfolio-col-amount ${pnlClass}">${fmtJPY(row.holdingPnl)}</span>
+            <span class="growth-pill ${pnlClass}">${pnlPercentText}</span>
+          </div>
+        </li>
+      `;
+    }
+
+    const secondaryText = `${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%`;
     return `
       <li class="pair-card" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
         <div class="pair-title">${escapeHtml(row.symbol)}</div>
         <div class="pair-right">
           <div class="pair-profit neutral">${metricLabel} ${fmtJPY(row.metricValue)}</div>
-          <div class="pair-growth ${secondaryClass}">${secondaryText}</div>
+          <div class="pair-growth neutral">${secondaryText}</div>
         </div>
       </li>
     `;

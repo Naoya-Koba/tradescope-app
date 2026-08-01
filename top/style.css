@@ -1651,6 +1651,62 @@ body.drawer-open {
 .sortable-list .pair-card:last-child {
   border-bottom: none !important;
 }
+
+/* =========================
+   ▼ Portfolio 証券タブ: 評価額 / 評価損益 3列レイアウト
+   ========================= */
+.portfolio-row-3col {
+  display: grid !important;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.portfolio-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 84px;
+}
+
+.portfolio-col-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.portfolio-col-amount {
+  font-family: "Inter", "Roboto Mono", monospace;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.portfolio-col-amount.positive { color: var(--text); }
+.portfolio-col-amount.negative { color: var(--red); }
+.portfolio-col-amount.neutral  { color: var(--muted); }
+
+.portfolio-col .growth-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .portfolio-row-3col {
+    gap: 10px;
+  }
+  .portfolio-col {
+    min-width: 68px;
+  }
+  .portfolio-col-amount {
+    font-size: 0.85rem;
+  }
+}
+
 /* =========================
    ▼ モバイル時の右ペイン修正版（左を10%残す）
    ========================= */
