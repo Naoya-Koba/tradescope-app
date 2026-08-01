@@ -585,8 +585,12 @@ async function fetchFeedHeadlines(feedUrl, sourceHint) {
   let rawItems = [];
   if (isGoogleFeedUrl(feedUrl)) {
     if (isGoogleSearchFeedUrl(feedUrl)) {
-      // 通貨別検索RSS: alloriginsのみ試行。失敗時は空配列（一般ニュースへのフォールバック不可）
-      rawItems = await fetchFeedItemsViaAllOriginsRaw(feedUrl);
+      // 通貨別検索RSS: allorigins → rss2json の順で試行（iPhoneでalloriginsが失敗する場合の保険）
+      try {
+        rawItems = await fetchFeedItemsViaAllOriginsRaw(feedUrl);
+      } catch {
+        rawItems = await fetchFeedItemsViaRss2Json(feedUrl);
+      }
     } else {
       // トップRSS: allorigins → rss2json の順で試行（iPhoneでalloriginsが失敗する場合の保険）
       try {
@@ -1681,7 +1685,9 @@ function renderPerformanceChart() {
           backgroundColor: gradBlue,
           fill: true,
           tension: 0.35,
-          pointRadius: 2
+          pointRadius: 2,
+          pointHitRadius: 20,
+          pointHoverRadius: 5
         },
         {
           label: equityLabel,
@@ -1690,18 +1696,27 @@ function renderPerformanceChart() {
           backgroundColor: gradGreen,
           fill: true,
           tension: 0.35,
-          pointRadius: 2
+          pointRadius: 2,
+          pointHitRadius: 20,
+          pointHoverRadius: 5
         }
       ]
     },
     options: {
       maintainAspectRatio: false,
       responsive: true,
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+      interaction: {
+        mode: 'index',
+        intersect: false,
+        axis: 'x'
+      },
       animation: false,
       plugins: {
         laserReveal: { enabled: true },
         legend: { display: false },
         tooltip: {
+          itemSort: (a, b) => (Number(b.parsed?.y) || 0) - (Number(a.parsed?.y) || 0),
           callbacks: {
             label: (ctx) => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`
           }
