@@ -20,20 +20,38 @@
 
 **Current**：`tradeScopeTradeHistoryV1`相当の`entries`だけをJSON出力する。
 
-### トップの統合バックアップ
+### トップの完全バックアップ
 
-**Current**：次を一つのJSONへ出力する。
+**Current**：`backupVersion: 1`を持つ完全バックアップとして、次を一つのJSONへ出力する。
+
+- `tradingData`
+- `yearInitialFunds`
+- `yearInitialUnrealized`
+- `tradeScopeTradeHistoryV1`
+- `tradeScopeMemos`
+- `tradeScopeSymbolListV1`
+- localStorageに実在する場合のみLegacy `tradeInfo`
+
+**Current**：Risk設定、Account設定、Raw Transactionsは現在存在しないため、v1エクスポートでは新設していない。
+
+**Current**：v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。旧形式のRestore planは、収録項目だけを対象にし、未収録項目を維持するLegacy部分復元として表現する。
+
+**Known issue**：v1完全バックアップの復元実行は未実装である。トップの現行インポート処理は旧`tradescope: "all-backup"`形式だけを実際にlocalStorageへ復元し、復元前退避、ロールバック、Snapshot無効化もまだ行わない。
+
+### 旧トップ統合バックアップ
+
+**Legacy**：旧形式は、次を`profitData`と`historyData`に分けて出力していた。
 
 - `tradingData`
 - `yearInitialFunds`
 - `yearInitialUnrealized`
 - 取引履歴`entries`
 
-**Known issue**：統合バックアップは完全バックアップではない。Memo、銘柄リスト、Legacy tradeInfo、将来のRisk設定、Account設定等を含まない。
+Memo、銘柄リスト、Legacy `tradeInfo`は含まれない。
 
 **Current / Confirmed**：2026年9月23日に、現行の統合バックアップ形式で `tradescope-all-backup-2026-09-23.json` を出力済みである。
 
-**Current / Confirmed**：このファイルにはMemo、銘柄リスト等が含まれず、本仕様で定義する「完全バックアップ」の要件を満たさない。新仕様上の完全バックアップはまだ存在しない。
+**Current / Confirmed**：このファイルにはMemo、銘柄リスト等が含まれず、本仕様で定義する「完全バックアップ」の要件を満たさない。新しいv1エクスポートとは別形式である。
 
 **Unknown**：上記ファイルの外部媒体上の恒久的な保存場所は未確認である。
 

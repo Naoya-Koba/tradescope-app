@@ -400,12 +400,12 @@
     </section>
 
     <!-- ===== Backup ===== -->
-    <h2 class="heading-muted">Backup</h2>
+    <h2 class="heading-muted">完全バックアップ</h2>
     <section class="section glass margin-bottom backup-section">
-      <p class="section-description">損益管理と取引履歴のデータをまとめてバックアップ・復元できます。<br/>iOSアプリ再インストール前には必ずエクスポートしてください。</p>
+      <p class="section-description">損益管理、取引履歴、Memo、銘柄リスト等を完全バックアップv1として書き出します。<br/>インポートは現在、旧統合バックアップ形式のみ対応しています。iOSアプリ再インストール前には必ずエクスポートしてください。</p>
       <div class="form-actions backup-actions">
-        <button type="button" class="btn btn-secondary backup-action-btn" id="exportAllDataBtn">エクスポート</button>
-        <button type="button" class="btn btn-secondary backup-action-btn" id="importAllDataBtn">インポート</button>
+        <button type="button" class="btn btn-secondary backup-action-btn" id="exportAllDataBtn">完全バックアップをエクスポート</button>
+        <button type="button" class="btn btn-secondary backup-action-btn" id="importAllDataBtn">旧統合バックアップをインポート</button>
         <input type="file" id="importAllDataInput" accept=".json" style="display:none" />
       </div>
     </section>
@@ -577,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
   const splashBootLeadMs = 520;
-  const topScriptVersion = '20260516-4';
+  const topScriptVersion = '20260926-1';
   let topScriptPromise = null;
 
   const loadTopScript = () => {

@@ -2691,43 +2691,330 @@ function updateDataByYear(inputYear = null) {
   renderPerformanceChart();
 }
 
-// ===== Unified Backup: Export / Import All Data =====
-function getHistoryEntriesForBackup() {
-  if (historyCore?.parseEntries) {
-    return historyCore.parseEntries();
+// ===== Backup Format Core (pure functions; no storage writes) =====
+const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
+const COMPLETE_BACKUP_VERSION = 1;
+const COMPLETE_BACKUP_FORMATS = Object.freeze({
+  V1: 'v1-complete',
+  LEGACY_ALL: 'legacy-all',
+  LEGACY_PROFIT: 'legacy-profit',
+  LEGACY_HISTORY: 'legacy-history',
+  UNSUPPORTED_VERSION: 'unsupported-version',
+  INVALID: 'invalid'
+});
+
+function isPlainRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function isIso8601Timestamp(value) {
+  if (typeof value !== 'string') return false;
+  const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})$/;
+  return isoPattern.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function detectBackupFormat(value) {
+  if (!isPlainRecord(value)) return COMPLETE_BACKUP_FORMATS.INVALID;
+
+  if (hasOwn(value, 'product') || hasOwn(value, 'backupVersion')) {
+    if (value.product !== COMPLETE_BACKUP_PRODUCT) return COMPLETE_BACKUP_FORMATS.INVALID;
+    if (value.backupVersion !== COMPLETE_BACKUP_VERSION) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
+    return COMPLETE_BACKUP_FORMATS.V1;
   }
 
+  if (value.tradescope === 'all-backup') return COMPLETE_BACKUP_FORMATS.LEGACY_ALL;
+  if (value.tradescope === 'history-backup') return COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY;
+
+  if (hasOwn(value, 'tradingData')
+    && hasOwn(value, 'yearInitialFunds')
+    && isIso8601Timestamp(value.exportedAt)) {
+    return COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT;
+  }
+
+  return COMPLETE_BACKUP_FORMATS.INVALID;
+}
+
+function validateBackupValue(value, format = detectBackupFormat(value)) {
+  const errors = [];
+  const requireRecord = (target, path) => {
+    if (!isPlainRecord(target)) errors.push(`${path} must be an object`);
+  };
+  const requireArray = (target, path) => {
+    if (!Array.isArray(target)) errors.push(`${path} must be an array`);
+  };
+
+  if (format === COMPLETE_BACKUP_FORMATS.INVALID) {
+    return ['not a supported TradeScope backup'];
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION) {
+    if (value?.product !== COMPLETE_BACKUP_PRODUCT) {
+      return ['product must be TradeScope'];
+    }
+    return [`unsupported backupVersion: ${String(value?.backupVersion)}`];
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.V1) {
+    if (value.product !== COMPLETE_BACKUP_PRODUCT) errors.push('product must be TradeScope');
+    if (value.backupVersion !== COMPLETE_BACKUP_VERSION) errors.push(`backupVersion must be ${COMPLETE_BACKUP_VERSION}`);
+    if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
+    requireRecord(value.data, 'data');
+
+    if (isPlainRecord(value.data)) {
+      requireRecord(value.data.monthly, 'data.monthly');
+      requireRecord(value.data.initialFunds, 'data.initialFunds');
+      requireRecord(value.data.initialUnrealized, 'data.initialUnrealized');
+      requireArray(value.data.transactions, 'data.transactions');
+      requireArray(value.data.memos, 'data.memos');
+      requireArray(value.data.symbols, 'data.symbols');
+
+      if (hasOwn(value.data, 'legacy')) {
+        requireRecord(value.data.legacy, 'data.legacy');
+        if (isPlainRecord(value.data.legacy) && hasOwn(value.data.legacy, 'tradeInfo')) {
+          requireArray(value.data.legacy.tradeInfo, 'data.legacy.tradeInfo');
+        }
+      }
+    }
+
+    if (hasOwn(value, 'source')) {
+      requireRecord(value.source, 'source');
+      if (isPlainRecord(value.source) && hasOwn(value.source, 'origin') && typeof value.source.origin !== 'string') {
+        errors.push('source.origin must be a string');
+      }
+    }
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.LEGACY_ALL) {
+    if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
+    requireRecord(value.profitData, 'profitData');
+    requireRecord(value.historyData, 'historyData');
+    if (isPlainRecord(value.profitData)) {
+      requireRecord(value.profitData.tradingData, 'profitData.tradingData');
+      requireRecord(value.profitData.yearInitialFunds, 'profitData.yearInitialFunds');
+      if (hasOwn(value.profitData, 'yearInitialUnrealized')) {
+        requireRecord(value.profitData.yearInitialUnrealized, 'profitData.yearInitialUnrealized');
+      }
+    }
+    if (isPlainRecord(value.historyData)) requireArray(value.historyData.entries, 'historyData.entries');
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT) {
+    if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
+    requireRecord(value.tradingData, 'tradingData');
+    requireRecord(value.yearInitialFunds, 'yearInitialFunds');
+    if (hasOwn(value, 'yearInitialUnrealized')) {
+      requireRecord(value.yearInitialUnrealized, 'yearInitialUnrealized');
+    }
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY) {
+    if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
+    requireArray(value.entries, 'entries');
+  }
+
+  return errors;
+}
+
+function normalizeBackupValue(value, format = detectBackupFormat(value)) {
+  const emptyCoverage = {
+    monthly: false,
+    initialFunds: false,
+    initialUnrealized: false,
+    transactions: false,
+    memos: false,
+    symbols: false,
+    legacyTradeInfo: false
+  };
+  const normalized = {
+    format,
+    restoreMode: format === COMPLETE_BACKUP_FORMATS.V1 ? 'complete' : 'legacy-partial',
+    coverage: { ...emptyCoverage },
+    data: {},
+    warnings: []
+  };
+
+  if (format === COMPLETE_BACKUP_FORMATS.V1) {
+    normalized.coverage = {
+      monthly: true,
+      initialFunds: true,
+      initialUnrealized: true,
+      transactions: true,
+      memos: true,
+      symbols: true,
+      legacyTradeInfo: isPlainRecord(value.data.legacy) && hasOwn(value.data.legacy, 'tradeInfo')
+    };
+    normalized.data = {
+      monthly: value.data.monthly,
+      initialFunds: value.data.initialFunds,
+      initialUnrealized: value.data.initialUnrealized,
+      transactions: value.data.transactions,
+      memos: value.data.memos,
+      symbols: value.data.symbols,
+      legacy: normalized.coverage.legacyTradeInfo ? { tradeInfo: value.data.legacy.tradeInfo } : {}
+    };
+    return normalized;
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.LEGACY_ALL) {
+    normalized.coverage.monthly = true;
+    normalized.coverage.initialFunds = true;
+    normalized.coverage.initialUnrealized = hasOwn(value.profitData, 'yearInitialUnrealized');
+    normalized.coverage.transactions = true;
+    normalized.data = {
+      monthly: value.profitData.tradingData,
+      initialFunds: value.profitData.yearInitialFunds,
+      transactions: value.historyData.entries
+    };
+    if (normalized.coverage.initialUnrealized) {
+      normalized.data.initialUnrealized = value.profitData.yearInitialUnrealized;
+    }
+    normalized.warnings.push('Legacy統合バックアップに含まれないMemo・銘柄リスト等は維持する');
+    return normalized;
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT) {
+    normalized.coverage.monthly = true;
+    normalized.coverage.initialFunds = true;
+    normalized.coverage.initialUnrealized = hasOwn(value, 'yearInitialUnrealized');
+    normalized.data = {
+      monthly: value.tradingData,
+      initialFunds: value.yearInitialFunds
+    };
+    if (normalized.coverage.initialUnrealized) {
+      normalized.data.initialUnrealized = value.yearInitialUnrealized;
+    }
+    normalized.warnings.push('Legacy損益バックアップに含まれない項目は維持する');
+    return normalized;
+  }
+
+  if (format === COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY) {
+    normalized.coverage.transactions = true;
+    normalized.data = { transactions: value.entries };
+    normalized.warnings.push('Legacy履歴バックアップに含まれない項目は維持する');
+  }
+
+  return normalized;
+}
+
+function buildBackupRestorePlan(normalized) {
+  const mappings = [
+    ['monthly', 'tradingData', normalized.data.monthly],
+    ['initialFunds', 'yearInitialFunds', normalized.data.initialFunds],
+    ['initialUnrealized', 'yearInitialUnrealized', normalized.data.initialUnrealized],
+    ['transactions', 'tradeScopeTradeHistoryV1', normalized.data.transactions],
+    ['memos', 'tradeScopeMemos', normalized.data.memos],
+    ['symbols', 'tradeScopeSymbolListV1', normalized.data.symbols],
+    ['legacyTradeInfo', 'tradeInfo', normalized.data.legacy?.tradeInfo]
+  ];
+
+  return {
+    mode: normalized.restoreMode,
+    preserveUnspecified: normalized.restoreMode === 'legacy-partial',
+    operations: mappings
+      .filter(([coverageKey]) => normalized.coverage[coverageKey])
+      .map(([, storageKey, value]) => ({ type: 'set', storageKey, value })),
+    warnings: [...normalized.warnings]
+  };
+}
+
+function inspectBackupValue(value) {
+  const format = detectBackupFormat(value);
+  const errors = validateBackupValue(value, format);
+  if (errors.length) return { ok: false, format, errors };
+
+  const normalized = normalizeBackupValue(value, format);
+  return {
+    ok: true,
+    format,
+    normalized,
+    restorePlan: buildBackupRestorePlan(normalized)
+  };
+}
+
+function inspectBackupJson(jsonText) {
+  if (typeof jsonText !== 'string') {
+    return { ok: false, format: COMPLETE_BACKUP_FORMATS.INVALID, errors: ['backup JSON must be a string'] };
+  }
   try {
-    const raw = JSON.parse(localStorage.getItem('tradeScopeTradeHistoryV1') || '[]');
-    return Array.isArray(raw) ? raw : [];
+    return inspectBackupValue(JSON.parse(jsonText));
   } catch {
-    return [];
+    return { ok: false, format: COMPLETE_BACKUP_FORMATS.INVALID, errors: ['invalid JSON'] };
   }
 }
 
-function exportAllData() {
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const yearInitialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
-  const yearInitialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
+window.TradeScopeBackupFormat = Object.freeze({
+  product: COMPLETE_BACKUP_PRODUCT,
+  currentVersion: COMPLETE_BACKUP_VERSION,
+  formats: COMPLETE_BACKUP_FORMATS,
+  detect: detectBackupFormat,
+  validate: validateBackupValue,
+  normalize: normalizeBackupValue,
+  buildRestorePlan: buildBackupRestorePlan,
+  inspectValue: inspectBackupValue,
+  inspectJson: inspectBackupJson
+});
 
-  const profitPayload = {
-    tradingData,
-    yearInitialFunds,
-    yearInitialUnrealized
-  };
+// ===== Complete Backup v1 Export =====
+function readStoredBackupValue(storageKey, fallbackValue, expectedType) {
+  const raw = localStorage.getItem(storageKey);
+  if (raw === null) return fallbackValue;
 
-  const historyEntries = getHistoryEntriesForBackup();
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${storageKey} is not valid JSON`);
+  }
 
-  const payload = {
-    tradescope: 'all-backup',
+  const valid = expectedType === 'array' ? Array.isArray(parsed) : isPlainRecord(parsed);
+  if (!valid) throw new Error(`${storageKey} has an invalid data type`);
+  return parsed;
+}
+
+function buildCompleteBackupPayload() {
+  const legacy = {};
+  if (localStorage.getItem('tradeInfo') !== null) {
+    legacy.tradeInfo = readStoredBackupValue('tradeInfo', [], 'array');
+  }
+
+  return {
+    product: COMPLETE_BACKUP_PRODUCT,
+    backupVersion: COMPLETE_BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    profitData: profitPayload,
-    historyData: { entries: historyEntries }
+    source: {
+      origin: window.location.origin
+    },
+    data: {
+      monthly: readStoredBackupValue(PROFIT_STORAGE_KEY_TRADING, {}, 'object'),
+      initialFunds: readStoredBackupValue(PROFIT_STORAGE_KEY_INITIAL, {}, 'object'),
+      initialUnrealized: readStoredBackupValue(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, {}, 'object'),
+      transactions: readStoredBackupValue('tradeScopeTradeHistoryV1', [], 'array'),
+      memos: readStoredBackupValue('tradeScopeMemos', [], 'array'),
+      symbols: readStoredBackupValue('tradeScopeSymbolListV1', [], 'array'),
+      legacy
+    }
   };
+}
+
+function exportAllData() {
+  let payload;
+  try {
+    payload = buildCompleteBackupPayload();
+    const inspection = inspectBackupValue(payload);
+    if (!inspection.ok) throw new Error(inspection.errors.join('; '));
+  } catch (error) {
+    console.error('Complete backup export error:', error);
+    alert('完全バックアップを作成できませんでした。保存データの形式を確認してください。');
+    return;
+  }
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const fileName = `tradescope-all-backup-${dateStr}.json`;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fileName = `tradescope-complete-backup-v1-${timestamp}.json`;
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
