@@ -84,6 +84,7 @@ TradeScopeのデータは、概念上次の4層に分類する。
 | `tradeScopeOpenPositionsView` | UI状態 | 統合／口座別表示 | 任意 |
 | `tradeScopeCollapseState:<path>` | UI状態 | セクション折りたたみ | 任意 |
 | `profitSkipDemoSeed` | UI・動作状態 | ダミー再投入抑止 | 原則不要 |
+| `tradeScopeRestoreJournalV1` | 復元安全制御 | 復元対象キーの適用前生文字列と存在有無。成功後に削除 | 不要 |
 | `tradeScopeNewsHeadlinesV12` | キャッシュ | News | 不要 |
 | `tradeScopeNewsCountryV4:*` | キャッシュ | 通貨別News | 不要 |
 | `tradeScopeNewsTranslationCacheV1` | キャッシュ | 翻訳結果 | 不要 |

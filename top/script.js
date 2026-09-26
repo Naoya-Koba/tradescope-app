@@ -2694,6 +2694,26 @@ function updateDataByYear(inputYear = null) {
 // ===== Backup Format Core (pure functions; no storage writes) =====
 const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
 const COMPLETE_BACKUP_VERSION = 1;
+const COMPLETE_BACKUP_RESTORE_JOURNAL_KEY = 'tradeScopeRestoreJournalV1';
+const COMPLETE_BACKUP_SKIP_DEMO_KEY = 'profitSkipDemoSeed';
+const COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS = Object.freeze([
+  'tradingData',
+  'yearInitialFunds',
+  'yearInitialUnrealized',
+  'tradeScopeTradeHistoryV1',
+  'tradeScopeMemos',
+  'tradeScopeSymbolListV1',
+  'tradeInfo'
+]);
+const COMPLETE_BACKUP_STORAGE_LABELS = Object.freeze({
+  tradingData: '月次データ',
+  yearInitialFunds: '年初資金',
+  yearInitialUnrealized: '年初評価損益',
+  tradeScopeTradeHistoryV1: '取引履歴',
+  tradeScopeMemos: 'Memo',
+  tradeScopeSymbolListV1: '銘柄リスト',
+  tradeInfo: 'Legacy tradeInfo'
+});
 const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V1: 'v1-complete',
   LEGACY_ALL: 'legacy-all',
@@ -2746,6 +2766,20 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
   const requireArray = (target, path) => {
     if (!Array.isArray(target)) errors.push(`${path} must be an array`);
   };
+  const requireRecordArray = (target, path) => {
+    requireArray(target, path);
+    if (!Array.isArray(target)) return;
+    target.forEach((item, index) => {
+      if (!isPlainRecord(item)) errors.push(`${path}[${index}] must be an object`);
+    });
+  };
+  const requireStringArray = (target, path) => {
+    requireArray(target, path);
+    if (!Array.isArray(target)) return;
+    target.forEach((item, index) => {
+      if (typeof item !== 'string') errors.push(`${path}[${index}] must be a string`);
+    });
+  };
 
   if (format === COMPLETE_BACKUP_FORMATS.INVALID) {
     return ['not a supported TradeScope backup'];
@@ -2768,14 +2802,14 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
       requireRecord(value.data.monthly, 'data.monthly');
       requireRecord(value.data.initialFunds, 'data.initialFunds');
       requireRecord(value.data.initialUnrealized, 'data.initialUnrealized');
-      requireArray(value.data.transactions, 'data.transactions');
-      requireArray(value.data.memos, 'data.memos');
-      requireArray(value.data.symbols, 'data.symbols');
+      requireRecordArray(value.data.transactions, 'data.transactions');
+      requireRecordArray(value.data.memos, 'data.memos');
+      requireStringArray(value.data.symbols, 'data.symbols');
 
       if (hasOwn(value.data, 'legacy')) {
         requireRecord(value.data.legacy, 'data.legacy');
         if (isPlainRecord(value.data.legacy) && hasOwn(value.data.legacy, 'tradeInfo')) {
-          requireArray(value.data.legacy.tradeInfo, 'data.legacy.tradeInfo');
+          requireRecordArray(value.data.legacy.tradeInfo, 'data.legacy.tradeInfo');
         }
       }
     }
@@ -2799,7 +2833,7 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
         requireRecord(value.profitData.yearInitialUnrealized, 'profitData.yearInitialUnrealized');
       }
     }
-    if (isPlainRecord(value.historyData)) requireArray(value.historyData.entries, 'historyData.entries');
+    if (isPlainRecord(value.historyData)) requireRecordArray(value.historyData.entries, 'historyData.entries');
   }
 
   if (format === COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT) {
@@ -2813,7 +2847,7 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
 
   if (format === COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY) {
     if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
-    requireArray(value.entries, 'entries');
+    requireRecordArray(value.entries, 'entries');
   }
 
   return errors;
@@ -2831,6 +2865,7 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   };
   const normalized = {
     format,
+    exportedAt: typeof value?.exportedAt === 'string' ? value.exportedAt : '',
     restoreMode: format === COMPLETE_BACKUP_FORMATS.V1 ? 'complete' : 'legacy-partial',
     coverage: { ...emptyCoverage },
     data: {},
@@ -2838,6 +2873,8 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   };
 
   if (format === COMPLETE_BACKUP_FORMATS.V1) {
+    const data = isPlainRecord(value.data) ? value.data : {};
+    const legacy = isPlainRecord(data.legacy) ? data.legacy : {};
     normalized.coverage = {
       monthly: true,
       initialFunds: true,
@@ -2845,32 +2882,37 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
       transactions: true,
       memos: true,
       symbols: true,
-      legacyTradeInfo: isPlainRecord(value.data.legacy) && hasOwn(value.data.legacy, 'tradeInfo')
+      legacyTradeInfo: hasOwn(legacy, 'tradeInfo')
     };
     normalized.data = {
-      monthly: value.data.monthly,
-      initialFunds: value.data.initialFunds,
-      initialUnrealized: value.data.initialUnrealized,
-      transactions: value.data.transactions,
-      memos: value.data.memos,
-      symbols: value.data.symbols,
-      legacy: normalized.coverage.legacyTradeInfo ? { tradeInfo: value.data.legacy.tradeInfo } : {}
+      monthly: data.monthly,
+      initialFunds: data.initialFunds,
+      initialUnrealized: data.initialUnrealized,
+      transactions: data.transactions,
+      memos: data.memos,
+      symbols: data.symbols,
+      legacy: normalized.coverage.legacyTradeInfo ? { tradeInfo: legacy.tradeInfo } : {}
     };
+    if (!normalized.coverage.legacyTradeInfo) {
+      normalized.warnings.push('バックアップにLegacy tradeInfoがないため、現在値を維持する');
+    }
     return normalized;
   }
 
   if (format === COMPLETE_BACKUP_FORMATS.LEGACY_ALL) {
+    const profitData = isPlainRecord(value.profitData) ? value.profitData : {};
+    const historyData = isPlainRecord(value.historyData) ? value.historyData : {};
     normalized.coverage.monthly = true;
     normalized.coverage.initialFunds = true;
-    normalized.coverage.initialUnrealized = hasOwn(value.profitData, 'yearInitialUnrealized');
+    normalized.coverage.initialUnrealized = hasOwn(profitData, 'yearInitialUnrealized');
     normalized.coverage.transactions = true;
     normalized.data = {
-      monthly: value.profitData.tradingData,
-      initialFunds: value.profitData.yearInitialFunds,
-      transactions: value.historyData.entries
+      monthly: profitData.tradingData,
+      initialFunds: profitData.yearInitialFunds,
+      transactions: historyData.entries
     };
     if (normalized.coverage.initialUnrealized) {
-      normalized.data.initialUnrealized = value.profitData.yearInitialUnrealized;
+      normalized.data.initialUnrealized = profitData.yearInitialUnrealized;
     }
     normalized.warnings.push('Legacy統合バックアップに含まれないMemo・銘柄リスト等は維持する');
     return normalized;
@@ -2912,6 +2954,8 @@ function buildBackupRestorePlan(normalized) {
   ];
 
   return {
+    format: normalized.format,
+    exportedAt: normalized.exportedAt,
     mode: normalized.restoreMode,
     preserveUnspecified: normalized.restoreMode === 'legacy-partial',
     operations: mappings
@@ -2923,10 +2967,14 @@ function buildBackupRestorePlan(normalized) {
 
 function inspectBackupValue(value) {
   const format = detectBackupFormat(value);
+  if (format === COMPLETE_BACKUP_FORMATS.INVALID || format === COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION) {
+    return { ok: false, format, errors: validateBackupValue(value, format) };
+  }
+
+  const normalized = normalizeBackupValue(value, format);
   const errors = validateBackupValue(value, format);
   if (errors.length) return { ok: false, format, errors };
 
-  const normalized = normalizeBackupValue(value, format);
   return {
     ok: true,
     format,
@@ -2956,6 +3004,245 @@ window.TradeScopeBackupFormat = Object.freeze({
   buildRestorePlan: buildBackupRestorePlan,
   inspectValue: inspectBackupValue,
   inspectJson: inspectBackupJson
+});
+
+// ===== Safe Restore Transaction =====
+function getBackupFormatLabel(format) {
+  const labels = {
+    [COMPLETE_BACKUP_FORMATS.V1]: '完全バックアップv1',
+    [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: '旧統合バックアップ',
+    [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: '旧損益バックアップ',
+    [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: '旧履歴バックアップ'
+  };
+  return labels[format] || '不明な形式';
+}
+
+function describeBackupRestore(inspection) {
+  const restoredKeys = inspection.restorePlan.operations.map((operation) => operation.storageKey);
+  const restoredKeySet = new Set(restoredKeys);
+  const preservedKeys = COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.filter((key) => !restoredKeySet.has(key));
+  return {
+    formatLabel: getBackupFormatLabel(inspection.format),
+    exportedAt: inspection.normalized.exportedAt,
+    modeLabel: inspection.restorePlan.mode === 'complete' ? '完全復元' : 'Legacy部分復元',
+    restoredKeys,
+    preservedKeys,
+    warnings: [...inspection.restorePlan.warnings]
+  };
+}
+
+function buildRestoreConfirmationMessage(inspection) {
+  const description = describeBackupRestore(inspection);
+  const restoredLabels = description.restoredKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key);
+  const preservedLabels = description.preservedKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key);
+  const lines = [
+    'バックアップを復元します。内容を確認してください。',
+    '',
+    `形式: ${description.formatLabel}`,
+    `出力日時: ${description.exportedAt || '不明'}`,
+    `方式: ${description.modeLabel}`,
+    `復元するデータ: ${restoredLabels.join('、') || 'なし'}`,
+    `維持するデータ: ${preservedLabels.join('、') || 'なし'}`
+  ];
+  if (description.warnings.length) {
+    lines.push('', '警告:', ...description.warnings.map((warning) => `・${warning}`));
+  }
+  lines.push('', '復元を開始しますか？');
+  return lines.join('\n');
+}
+
+function isEmptyPlainRecord(value) {
+  return isPlainRecord(value) && Object.keys(value).length === 0;
+}
+
+function prepareBackupRestoreActions(restorePlan, storage) {
+  const actions = restorePlan.operations.map((operation) => {
+    const rawValue = JSON.stringify(operation.value);
+    if (typeof rawValue !== 'string') {
+      throw new Error(`${operation.storageKey} could not be serialized`);
+    }
+    return { type: 'set', storageKey: operation.storageKey, rawValue };
+  });
+
+  const actionKeys = new Set(actions.map((action) => action.storageKey));
+  if (actionKeys.size !== actions.length) throw new Error('restore plan contains duplicate storage keys');
+
+  const profitKeys = [
+    PROFIT_STORAGE_KEY_TRADING,
+    PROFIT_STORAGE_KEY_INITIAL,
+    PROFIT_STORAGE_KEY_INITIAL_UNREALIZED
+  ];
+  const restoresProfitData = profitKeys.some((key) => actionKeys.has(key));
+  if (restoresProfitData) {
+    const effectiveProfitValues = profitKeys.map((key) => {
+      const planned = actions.find((action) => action.storageKey === key);
+      const rawValue = planned ? planned.rawValue : storage.getItem(key);
+      if (rawValue === null) return {};
+      try {
+        return JSON.parse(rawValue);
+      } catch {
+        return null;
+      }
+    });
+    const restoresEmptyProfitData = effectiveProfitValues.every(isEmptyPlainRecord);
+    if (restoresEmptyProfitData && storage.getItem(COMPLETE_BACKUP_SKIP_DEMO_KEY) !== '1') {
+      actions.push({ type: 'set', storageKey: COMPLETE_BACKUP_SKIP_DEMO_KEY, rawValue: '1' });
+    }
+  }
+
+  actions.push({ type: 'remove', storageKey: PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT });
+  return actions;
+}
+
+function createBackupRestoreJournal(actions, storage) {
+  if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
+    throw new Error('未完了の復元ジャーナルが残っています');
+  }
+
+  const journal = {
+    product: COMPLETE_BACKUP_PRODUCT,
+    journalVersion: 1,
+    createdAt: new Date().toISOString(),
+    entries: actions.map((action) => {
+      const previousRawValue = storage.getItem(action.storageKey);
+      return {
+        storageKey: action.storageKey,
+        existed: previousRawValue !== null,
+        previousRawValue
+      };
+    })
+  };
+  const journalRaw = JSON.stringify(journal);
+
+  try {
+    storage.setItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY, journalRaw);
+    if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== journalRaw) {
+      throw new Error('復元ジャーナルを再読込できません');
+    }
+  } catch (error) {
+    try {
+      storage.removeItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
+    } catch {
+      // The restore has not started; retain the original storage error.
+    }
+    throw new Error(`復元ジャーナルを保存できません: ${error.message}`);
+  }
+
+  return journal;
+}
+
+function validateBackupRestoreJournal(journal) {
+  if (!isPlainRecord(journal)
+    || journal.product !== COMPLETE_BACKUP_PRODUCT
+    || journal.journalVersion !== 1
+    || !Array.isArray(journal.entries)) {
+    throw new Error('復元ジャーナルの形式が不正です');
+  }
+  journal.entries.forEach((entry, index) => {
+    if (!isPlainRecord(entry)
+      || typeof entry.storageKey !== 'string'
+      || typeof entry.existed !== 'boolean'
+      || (entry.existed && typeof entry.previousRawValue !== 'string')
+      || (!entry.existed && entry.previousRawValue !== null)) {
+      throw new Error(`復元ジャーナルのentries[${index}]が不正です`);
+    }
+  });
+}
+
+function rollbackBackupRestore(journal, storage) {
+  validateBackupRestoreJournal(journal);
+  const rollbackErrors = [];
+
+  [...journal.entries].reverse().forEach((entry) => {
+    try {
+      if (entry.existed) storage.setItem(entry.storageKey, entry.previousRawValue);
+      else storage.removeItem(entry.storageKey);
+    } catch (error) {
+      rollbackErrors.push(`${entry.storageKey}: ${error.message}`);
+    }
+  });
+
+  journal.entries.forEach((entry) => {
+    try {
+      const restoredRawValue = storage.getItem(entry.storageKey);
+      const matches = entry.existed
+        ? restoredRawValue === entry.previousRawValue
+        : restoredRawValue === null;
+      if (!matches) rollbackErrors.push(`${entry.storageKey}: rollback verification failed`);
+    } catch (error) {
+      rollbackErrors.push(`${entry.storageKey}: ${error.message}`);
+    }
+  });
+
+  if (rollbackErrors.length) {
+    throw new Error(rollbackErrors.join('; '));
+  }
+
+  storage.removeItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
+  if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
+    throw new Error('復元ジャーナルを削除できません');
+  }
+}
+
+function recoverPendingBackupRestore(storage) {
+  const journalRaw = storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
+  if (journalRaw === null) return false;
+
+  let journal;
+  try {
+    journal = JSON.parse(journalRaw);
+  } catch {
+    throw new Error('未完了の復元ジャーナルが壊れています');
+  }
+  rollbackBackupRestore(journal, storage);
+  return true;
+}
+
+function executeBackupRestore(restorePlan, storage) {
+  const actions = prepareBackupRestoreActions(restorePlan, storage);
+  const journal = createBackupRestoreJournal(actions, storage);
+
+  try {
+    actions.forEach((action) => {
+      if (action.type === 'set') storage.setItem(action.storageKey, action.rawValue);
+      else storage.removeItem(action.storageKey);
+    });
+
+    actions.forEach((action) => {
+      const storedRawValue = storage.getItem(action.storageKey);
+      const matches = action.type === 'set'
+        ? storedRawValue === action.rawValue
+        : storedRawValue === null;
+      if (!matches) throw new Error(`${action.storageKey}の書き込み検証に失敗しました`);
+    });
+
+    storage.removeItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
+    if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
+      throw new Error('復元ジャーナルを削除できません');
+    }
+  } catch (restoreError) {
+    try {
+      rollbackBackupRestore(journal, storage);
+    } catch (rollbackError) {
+      throw new Error(`復元に失敗し、ロールバックにも失敗しました: ${restoreError.message}; ${rollbackError.message}`);
+    }
+    throw new Error(`復元に失敗したため元の状態へ戻しました: ${restoreError.message}`);
+  }
+
+  return {
+    restoredKeys: restorePlan.operations.map((operation) => operation.storageKey),
+    snapshotInvalidated: true,
+    demoSeedSuppressed: actions.some((action) => action.storageKey === COMPLETE_BACKUP_SKIP_DEMO_KEY)
+  };
+}
+
+window.TradeScopeBackupRestore = Object.freeze({
+  journalKey: COMPLETE_BACKUP_RESTORE_JOURNAL_KEY,
+  describe: describeBackupRestore,
+  buildConfirmationMessage: buildRestoreConfirmationMessage,
+  prepareActions: prepareBackupRestoreActions,
+  execute: executeBackupRestore,
+  recoverPending: recoverPendingBackupRestore
 });
 
 // ===== Complete Backup v1 Export =====
@@ -3026,44 +3313,52 @@ function exportAllData() {
 
 function importAllData(file) {
   if (!file) return;
-  
+
+  if (localStorage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
+    const shouldRecover = confirm('前回中断された復元のジャーナルがあります。新しい復元を始める前に、復元前の状態へ戻しますか？');
+    if (!shouldRecover) return;
+    try {
+      recoverPendingBackupRestore(localStorage);
+      alert('前回の復元前の状態へ戻しました。もう一度バックアップファイルを選択してください。');
+    } catch (error) {
+      console.error('Restore journal recovery error:', error);
+      alert('復元ジャーナルから元の状態へ戻せませんでした。新しい復元は開始していません。');
+    }
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const parsed = JSON.parse(e.target.result);
-      
-      if (parsed.tradescope !== 'all-backup') {
-        alert('ファイル形式が正しくありません。TradeScope の統合バックアップファイルを選択してください。');
+      const inspection = inspectBackupJson(String(e.target.result));
+      if (!inspection.ok) {
+        const detail = inspection.errors.join('\n');
+        alert(`バックアップを読み込めません。\n${detail}`);
         return;
       }
 
-      if (!confirm('現在のデータをインポートデータで上書きします。よろしいですか？')) return;
+      if (!confirm(buildRestoreConfirmationMessage(inspection))) return;
 
-      const { profitData, historyData } = parsed;
-
-      // Import profit data
-      if (profitData?.tradingData && profitData?.yearInitialFunds) {
-        const importedTradingData = profitData.tradingData;
-        const importedYearInitialFunds = profitData.yearInitialFunds;
-        const importedYearInitialUnrealized = profitData.yearInitialUnrealized || {};
-        localStorage.setItem(PROFIT_STORAGE_KEY_TRADING, JSON.stringify(importedTradingData));
-        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL, JSON.stringify(importedYearInitialFunds));
-        localStorage.setItem(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, JSON.stringify(importedYearInitialUnrealized));
+      const result = executeBackupRestore(inspection.restorePlan, localStorage);
+      const description = describeBackupRestore(inspection);
+      const resultLines = [
+        `${description.modeLabel}が完了しました。`,
+        `復元したデータ: ${description.restoredKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key).join('、')}`
+      ];
+      if (description.preservedKeys.length) {
+        resultLines.push(`維持したデータ: ${description.preservedKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key).join('、')}`);
       }
-
-      // Import history data
-      if (historyData?.entries && historyCore?.saveEntries) {
-        historyCore.saveEntries(historyData.entries);
-      }
-
-      updateDataByYear();
-      updateRiskSection();
-
-      alert('インポートが完了しました。');
+      if (description.warnings.length) resultLines.push(...description.warnings);
+      if (result.snapshotInvalidated) resultLines.push('古いSummary Snapshotを無効化しました。');
+      alert(resultLines.join('\n'));
+      window.location.reload();
     } catch (error) {
       console.error('Import error:', error);
-      alert('ファイルの読み込みに失敗しました。');
+      alert(error.message || 'バックアップの復元に失敗しました。');
     }
+  };
+  reader.onerror = () => {
+    alert('バックアップファイルを読み込めませんでした。');
   };
   reader.readAsText(file);
 }
