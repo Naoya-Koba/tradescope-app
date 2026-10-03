@@ -18,8 +18,7 @@
 
 ### Service Workerの欠損ファイル参照
 
-- **Current**：`service-worker.js`は`assets/chart.js`をprecacheする。
-- **Known issue**：同ファイルは存在しない。`cache.addAll()`全体が失敗し、Service Workerのinstallが失敗する可能性がある。
+- **Current**：存在しない`assets/chart.js`はprecache対象から除外済み。トップ画面のCSS / JavaScriptはHTMLと同じバージョン付きURLをprecacheし、Cache version更新時に旧キャッシュを削除する。
 - **Decided**：precache対象の存在検証を必須とする。
 
 ### ZAR/MXNのcontractSize不整合
@@ -109,9 +108,7 @@
 
 ### Manifestの重複と不整合
 
-- **Current**：HTMLは`manifest.webmanifest`を参照する一方、別の`manifest.json`も存在する。
-- **Known issue**：`manifest.json`は存在しないルート直下`icon-100.png`を参照する。現在は未使用と見られるが、役割が不明瞭。
-- **Under consideration**：利用実態確認後に一本化する。
+- **Current**：Active Manifestは`manifest.webmanifest`へ一本化済み。未参照だった`manifest.json`は削除し、192x192宣言には実寸192x192の`assets/icon-192.png`を使用する。
 
 ### 公開環境とリポジトリ内デプロイ設定
 

@@ -136,7 +136,7 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 - Cache version更新時は旧キャッシュ削除とデータ保存を混同しない。
 - Cache Storage削除は`localStorage`正本を削除してはならない。
 
-**Known issue**：`service-worker.js`は存在しない`assets/chart.js`をprecacheしている。
+**Current**：`service-worker.js`のprecache対象は実在するファイルに限定し、トップ画面が読み込むCSS / JavaScriptと同じバージョン付きURLを使用する。PWA資産を変更した場合はCache versionも更新する。
 
 ## 11. Git運用
 
