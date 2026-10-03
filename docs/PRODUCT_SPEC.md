@@ -82,13 +82,13 @@
 
 | 対象 | 分類 | 現状 |
 |---|---|---|
-| `tradeinfo/` | Legacy | 独自`tradeInfo`キーを使う旧式の取引管理。現在ユーザーは利用していない。localStorageに過去データが残存するかは未確認 |
-| 政策金利予測 | Experimental | 固定サンプル値。ライブデータではない |
-| 転換（反転）シグナル | Experimental | 現行UI名は「転換シグナル」。USD/JPYのみ固定ダミー詳細、他ペアは情報なし |
+| `tradeinfo/` | Removed Legacy implementation | 旧ページ実装は削除済み。`tradeInfo`キーと旧v1バックアップ互換処理は、別途移行・廃止判断するまで維持する |
+| 政策金利予測 | Removed Experimental implementation / Under consideration | 固定サンプルによる旧実装は削除済み。将来必要になった場合は正式なデータ源と仕様を決めて作り直す |
+| 転換（反転）シグナル | Removed Experimental implementation / Under consideration | 固定ダミーによる旧実装は削除済み。将来必要になった場合は正式仕様を決めて作り直す |
 | Position Details内チャート | Experimental / Known issue | 固定ダミーデータを表示する |
 | OCR | Planned UI placeholder | 現在は無効ボタンのみ |
-| 押し／戻り | Under consideration | リンク先ファイルが存在せず、正式採否は未決定 |
-| 設定 | Planned | リンク先ファイルが存在しない |
+| 押し／戻り | Under consideration | 画面実装とナビゲーションはなく、正式採否は未決定 |
+| 設定 | Planned | 画面実装とナビゲーションは未作成 |
 
 ## 7. UI名称
 

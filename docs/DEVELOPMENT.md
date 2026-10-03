@@ -25,9 +25,6 @@ TradeScope/
   profit/                    Profit management
   history/                   History page JS/CSS
   assets/                    Shared logic, UI, images
-  analysis/                  Experimental rate forecast
-  tenkan/                    Experimental reversal signal
-  tradeinfo/                 Legacy trade information
   service-worker.js          PWA cache
   manifest.webmanifest       Active manifest
   docs/                      Product and development specifications

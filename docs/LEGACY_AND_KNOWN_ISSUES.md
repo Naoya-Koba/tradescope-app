@@ -47,7 +47,6 @@
 - **Current**：データが空の場合に2025年ダミー損益が自動投入される。
 - **Current**：トップSummary、Asset Allocation、Riskに固定フォールバック値がある。
 - **Current**：Position Detailsのチャート、累積スワップ、平均スワップ等に固定表示がある。
-- **Current**：政策金利予測と転換シグナルは固定サンプル値である。
 - **Known issue**：実値と誤認される可能性がある。
 - **Decided**：サンプル・フォールバックを実データのように表示しない。
 
@@ -58,10 +57,9 @@
 - **Known issue**：更新により画面間の挙動が変わる可能性がある。
 - **Planned / Development guidance**：画面間のバージョン差異を解消する。検証済みの同一固定バージョンを推奨するが、採用バージョンと更新方針は実装時に決定する。
 
-### 存在しないページへのリンク
+### 存在しないページへのリンク（解消済み）
 
-- **Current**：`settings.html`と`oshime.html`へのリンクがある。
-- **Known issue**：対象ファイルは存在しない。主要画面では準備中・操作不可だが、Legacy/Experimental画面には通常リンクが残る。
+- **Current**：`settings.html`と`oshime.html`へのリンクおよび準備中メニューは、主要画面を含む残存実装から削除済み。
 - **Planned / Under consideration**：設定画面はPlanned。押し／戻り機能の正式採否は未確定。
 
 ### データ削除処理の残存キー
@@ -73,8 +71,8 @@
 
 ### tradeInfoの利用状況
 
-- **Current**：`tradeinfo/`は独自`tradeInfo`キーを使い、損益を`価格差 × lot × 10000`で計算する。
-- **Current**：現在の主要ナビゲーションからはリンクされていない。
+- **Current**：`tradeinfo/`の旧ページ実装とナビゲーションは削除済み。
+- **Current / Compatibility**：`tradeInfo`のlocalStorageキーと、存在する場合に`legacy.tradeInfo`として保存・復元する完全バックアップv1互換処理は維持している。
 - **Current / Confirmed**：現在ユーザーは`tradeInfo`を利用していない。
 - **Unknown**：localStorage内に過去の`tradeInfo`データが残存しているかは、コードだけでは確認できない。
 - **Decided**：`tradeinfo/`は正式機能ではなくLegacyとして扱い、将来の正式機能として維持しない。残存データが確認された場合は、明示的な移行・削除判断まで一時的に保護し、その期間のバックアップから欠落させない。恒久的な完全バックアップ対象とは確定しない。
@@ -129,9 +127,9 @@
 
 | 対象 | 分類 | 方針 |
 |---|---|---|
-| `tradeinfo/` | Legacy | 現在は未使用で、正式機能として維持しない。残存時のみ移行・削除判断まで一時保護 |
-| `analysis/rates.*` | Experimental | 固定サンプル。正式データ源未決定 |
-| `tenkan/*` | Experimental | 固定ダミー。売買推奨機能として扱わない |
+| `tradeinfo/` | Removed Legacy implementation | 旧ページ実装は削除済み。`tradeInfo`キーとバックアップ互換処理は別途判断まで維持 |
+| `analysis/rates.*` | Removed Experimental implementation | 固定サンプルによる旧実装は削除済み。将来採用時は正式なデータ源から再設計 |
+| `tenkan/*` | Removed Experimental implementation | 固定ダミーによる旧実装は削除済み。将来採用時は正式仕様から再設計 |
 | Position Details固定チャート | Experimental / placeholder | 実データ化または未実装表示へ変更予定 |
 | OCR UI | Planned placeholder | CSV優先方針の後でPDF/OCRを検討 |
 | `tmp_sbi_diff.txt` | Legacy diagnostic artifact | 実行時未使用。削除可否は別途判断 |
