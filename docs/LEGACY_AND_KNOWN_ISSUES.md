@@ -31,7 +31,7 @@
 
 ### Top Summary Snapshotの陳腐化
 
-- **Current**：トップは`tradeScopeTopSummarySnapshotV1`が有効形状なら、元の`tradingData`より先に利用する。
+- **Current**：トップは対象年の正本データが存在し、`tradeScopeTopSummarySnapshotV1`が有効形状なら、元の`tradingData`からの再計算より先にSnapshotを利用する。正本データがない場合はSnapshotだけを根拠に表示しない。
 - **Current**：過去にTopと損益管理でAsset Trend等の差異が発生したため、同じ値を利用する手段としてSnapshotを使う経路が導入された。
 - **Known issue**：元データrevisionや有効期限がなく、インポート、削除、別画面更新後に古い値が残る可能性がある。
 - **Decided**：Snapshotやキャッシュの利用自体は禁止しない。同一指標は同一の正本データまたは同一の共通計算結果を利用し、Snapshotは非正本として、元データ更新後に古い値を表示しない。
@@ -44,10 +44,10 @@
 
 ### dummy / fallback値
 
-- **Current**：データが空の場合に2025年ダミー損益が自動投入される。
-- **Current**：トップSummary、Asset Allocation、Riskに固定フォールバック値がある。
-- **Current**：Position Detailsのチャート、累積スワップ、平均スワップ等に固定表示がある。
-- **Known issue**：実値と誤認される可能性がある。
+- **Current**：空データ時の2025年ダミー損益の自動投入は廃止済み。「ダミーデータ再投入」はユーザーが明示操作した場合だけ実行する。
+- **Current**：トップSummary、Asset Allocation、Riskの固定フォールバック値は削除済みで、正本データがない場合は空状態を表示する。
+- **Current**：Position Detailsの固定チャート、固定Swap、平均建値を現在価格として表示する代用は削除済みで、取得元がない項目は「未取得」または「データなし」を表示する。
+- **Current**：Portfolioは取引履歴や月次保有明細に存在しない統合ポジションを資産残高から捏造しない。換算レートを取得できないクロス通貨の必要証拠金は「未取得」とする。
 - **Decided**：サンプル・フォールバックを実データのように表示しない。
 
 ### Chart.jsバージョン差異
@@ -88,13 +88,13 @@
 
 ### Top Position Detailsが実ポジション詳細になっていない
 
-- **Current**：現在レートに平均建値を表示し、証拠金維持率は`---`、チャートは固定値である。
-- **Known issue**：見た目上は実データ詳細に見える。
+- **Current**：現在レート、Swap、証拠金維持率、損益推移チャートは正式な実データ源がないため、「未取得」または「データなし」を表示する。平均建値や固定値による代用はしない。
+- **Known issue**：これらの実データ取得・計算機能自体は未実装である。
 - **Decided**：実データで算出できない項目は未取得・未実装と明示する。
 
 ### FX必要証拠金が概算
 
-- **Current**：平均建値と履歴上の換算レートまたは固定換算値を使い、想定元本の4%で計算する。
+- **Current**：平均建値と履歴上の換算レートを使い、想定元本の4%で計算する。必要な換算レートが履歴から取得できない場合は計算しない。
 - **Known issue**：現在レート、口座固有ルール、実際の必要証拠金と一致しない可能性がある。
 - **Decided**：概算は概算と明示し、将来の口座別Riskとは分離する。
 
@@ -130,7 +130,7 @@
 | `tradeinfo/` | Removed Legacy implementation | 旧ページ実装は削除済み。`tradeInfo`キーとバックアップ互換処理は別途判断まで維持 |
 | `analysis/rates.*` | Removed Experimental implementation | 固定サンプルによる旧実装は削除済み。将来採用時は正式なデータ源から再設計 |
 | `tenkan/*` | Removed Experimental implementation | 固定ダミーによる旧実装は削除済み。将来採用時は正式仕様から再設計 |
-| Position Details固定チャート | Experimental / placeholder | 実データ化または未実装表示へ変更予定 |
+| Position Details固定チャート | Removed placeholder | 固定チャートは削除済み。正式なデータ源が実装されるまでは空状態を表示 |
 | OCR UI | Planned placeholder | CSV優先方針の後でPDF/OCRを検討 |
 | `tmp_sbi_diff.txt` | Legacy diagnostic artifact | 実行時未使用。削除可否は別途判断 |
 | `input/` | Empty / unknown | 現在空。将来用途は不明 |

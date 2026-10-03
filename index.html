@@ -130,14 +130,14 @@
     <div class="summary-row summary-primary">
       <span class="summary-label">純資産 <span class="sub-en">Total Equity</span></span>
       <div class="summary-right">
-        <span id="kpiTotal" class="summary-value">¥0</span>
+        <span id="kpiTotal" class="summary-value">—</span>
         <div class="summary-metric-row">
           <span class="growth-label">変動額</span>
-          <span id="deltaTotal" class="summary-delta neutral">0</span>
+          <span id="deltaTotal" class="summary-delta neutral">—</span>
         </div>
         <div class="growth-group">
           <span class="growth-label">年間成長率</span>
-          <span id="growthTotal" class="growth-pill neutral">+0.0%</span>
+          <span id="growthTotal" class="growth-pill neutral">—</span>
         </div>
       </div>
     </div>
@@ -145,14 +145,14 @@
     <div class="summary-row summary-primary">
       <span class="summary-label">確定資産 <span class="sub-en">Net Balance</span></span>
       <div class="summary-right">
-        <span id="kpiRealized" class="summary-value">¥0</span>
+        <span id="kpiRealized" class="summary-value">—</span>
         <div class="summary-metric-row">
           <span class="growth-label">変動額</span>
-          <span id="deltaNet" class="summary-delta neutral">0</span>
+          <span id="deltaNet" class="summary-delta neutral">—</span>
         </div>
         <div class="growth-group">
           <span class="growth-label">年間成長率</span>
-          <span id="growthNet" class="growth-pill neutral">+0.0%</span>
+          <span id="growthNet" class="growth-pill neutral">—</span>
         </div>
       </div>
     </div>
@@ -164,10 +164,10 @@
     <div class="summary-row summary-primary">
       <span class="summary-label">純損益 <span class="sub-en">Net P/L</span></span>
       <div class="summary-right">
-        <span id="annualNetPnL" class="summary-value">¥0</span>
+        <span id="annualNetPnL" class="summary-value">—</span>
         <div class="growth-group">
           <span class="growth-label">年間成長率</span>
-          <span id="annualNetPnLGrowth" class="growth-pill neutral">+0.0%</span>
+          <span id="annualNetPnLGrowth" class="growth-pill neutral">—</span>
         </div>
       </div>
     </div>
@@ -175,10 +175,10 @@
     <div class="summary-row summary-primary">
       <span class="summary-label">確定損益 <span class="sub-en">Realized Net P/L</span></span>
       <div class="summary-right">
-        <span id="annualConfirmedPnL" class="summary-value">¥0</span>
+        <span id="annualConfirmedPnL" class="summary-value">—</span>
         <div class="growth-group">
           <span class="growth-label">年間成長率</span>
-          <span id="annualConfirmedPnLGrowth" class="growth-pill neutral">+0.0%</span>
+          <span id="annualConfirmedPnLGrowth" class="growth-pill neutral">—</span>
         </div>
       </div>
     </div>
@@ -201,6 +201,7 @@
     </div>
   </div>
   <canvas id="perfChart" height="200"></canvas>
+  <p id="perfChartEmpty" class="data-empty-state" hidden>データなし</p>
 </section>
 
     <!-- ===== Asset Allocation Section ===== -->
@@ -255,25 +256,25 @@
         <div class="risk-header">
           <div class="risk-header-copy">
             <span class="risk-header-label">最大損失</span>
-            <p id="riskNote" class="risk-note">0円時想定 FX + 暗号資産</p>
+            <p id="riskNote" class="risk-note">対象データなし</p>
           </div>
-          <span id="riskMaxLoss" class="risk-total-value">¥0</span>
+          <span id="riskMaxLoss" class="risk-total-value neutral">—</span>
         </div>
       </div>
       <div class="risk-block risk-grid-two">
         <div class="risk-cell">
           <span class="risk-row-label">FX 1円時損失</span>
-          <span id="riskFxOne" class="risk-row-value">¥0</span>
+          <span id="riskFxOne" class="risk-row-value neutral">—</span>
         </div>
         <div class="risk-cell">
           <span class="risk-row-label">FX 0円時損失</span>
-          <span id="riskFxZero" class="risk-row-value">¥0</span>
+          <span id="riskFxZero" class="risk-row-value neutral">—</span>
         </div>
       </div>
       <div class="risk-block risk-block-last">
         <div class="risk-cell risk-cell-wide">
           <span class="risk-row-label">暗号資産 0円時損失</span>
-          <span id="riskCryptoZero" class="risk-row-value">¥0</span>
+          <span id="riskCryptoZero" class="risk-row-value neutral">—</span>
         </div>
       </div>
     </section>
@@ -282,13 +283,13 @@
 <aside id="pairDetailPanel" class="pair-detail" aria-hidden="true">
 <header class="detail-header enhanced">
   <div class="detail-header-main">
-    <h2 id="detailTitle">USD/JPY</h2>
+    <h2 id="detailTitle">Position Details</h2>
     <button id="detailClose" class="close-btn">×</button>
   </div>
 
   <div class="detail-stats">
-    <span class="profit positive" id="detailProfit">¥25,000</span>
-    <span class="rate-change" id="detailRate">(+2.3%)</span>
+    <span class="profit neutral" id="detailProfit">—</span>
+    <span class="rate-change neutral" id="detailRate">—</span>
   </div>
 </header>
 
@@ -296,23 +297,16 @@
   <div class="detail-section">
     <h4 class="detail-heading">ポジション情報</h4>
     <div class="detail-grid">
-      <div><span>ロット数</span><strong id="detailLots">300</strong></div>
-      <div><span>平均建値</span><strong id="detailAvg">3.250</strong></div>
-      <div><span>現在レート</span><strong id="detailNow">3.630</strong></div>
+      <div><span>ロット数</span><strong id="detailLots">—</strong></div>
+      <div><span>平均建値</span><strong id="detailAvg">—</strong></div>
+      <div><span>現在レート</span><strong id="detailNow">未取得</strong></div>
     </div>
   </div>
 
 <!-- チャートエリア -->
 <section class="detail-section">
   <h4>損益・スワップ推移</h4>
-  <div class="chart-tabs">
-    <button class="chart-tab active" data-type="total">累計損益</button>
-    <button class="chart-tab" data-type="unrealized">含み損益</button>
-    <button class="chart-tab" data-type="swap">スワップ</button>
-  </div>
-  <div class="detail-chart">
-    <canvas id="detailChart"></canvas>
-  </div>
+  <p class="data-empty-state">データなし</p>
 </section>
 
 
@@ -320,8 +314,8 @@
 <div class="detail-section">
   <h4>スワップ情報</h4>
   <div class="detail-grid">
-    <div><span>累計スワップ</span><strong>¥45,000</strong></div>
-    <div><span>1日平均スワップ</span><strong>¥1,500</strong></div>
+    <div><span>累計スワップ</span><strong>未取得</strong></div>
+    <div><span>1日平均スワップ</span><strong>未取得</strong></div>
   </div>
 </div>
 
@@ -329,16 +323,16 @@
   <div class="detail-section">
     <h4 class="detail-heading">損失リスク</h4>
     <div class="detail-grid">
-      <div><span>証拠金維持率</span><strong id="detailMMR">265%</strong></div>
-      <div><span>0円時損失</span><strong id="detailZero" class="negative">-¥3,280,000</strong></div>
-      <div><span>半額損失</span><strong id="detailHalf" class="negative">-¥1,640,000</strong></div>
+      <div><span>証拠金維持率</span><strong id="detailMMR">—</strong></div>
+      <div><span>0円時損失</span><strong id="detailZero">—</strong></div>
+      <div><span>半額損失</span><strong id="detailHalf">—</strong></div>
     </div>
   </div>
 
   <!-- コメント／戦略メモ -->
   <div class="detail-section">
     <h4 class="detail-heading">コメント</h4>
-    <p id="detailNote">高スワップ維持中。利確目標は3.8。</p>
+    <p id="detailNote">データなし</p>
   </div>
 </aside>
 
@@ -350,7 +344,7 @@
         <div class="swap-main">
           <div class="swap-main-row">
             <div class="kpi-label small">前月スワップ</div>
-            <div id="swapPrevMonth" class="kpi-value positive">¥0</div>
+            <div id="swapPrevMonth" class="kpi-value neutral">—</div>
           </div>
           <div id="swapPrevMonthAccounts" class="swap-mini"></div>
         </div>
@@ -358,11 +352,11 @@
         <div class="swap-sub">
           <div class="swap-sub-row">
             <div class="kpi-label small">年間累計スワップ</div>
-            <div id="swapCumulative" class="kpi-subvalue">¥0</div>
+            <div id="swapCumulative" class="kpi-subvalue neutral">—</div>
           </div>
           <div class="swap-sub-row">
             <div class="kpi-label small">年間スワップ想定</div>
-            <div id="swapYearEstimate" class="kpi-subvalue">¥0</div>
+            <div id="swapYearEstimate" class="kpi-subvalue neutral">—</div>
           </div>
         </div>
       </div>
@@ -441,128 +435,6 @@
   <script src="assets/profit-metrics.js"></script>
   <script src="assets/trade-history-core.js?v=20260516-5"></script>
 <script>
-function initializeDetailChart() {
-  if (window.__tradeScopeDetailChartInitialized) return;
-  const detailChartCanvas = document.getElementById("detailChart");
-  if (!detailChartCanvas || typeof Chart === 'undefined') return;
-  const ctx = detailChartCanvas.getContext("2d");
-  if (!ctx || typeof Chart === 'undefined') return;
-  window.__tradeScopeDetailChartInitialized = true;
-
-  // ▼ ダミーデータ例（月別）
-  const labels = ["7月","8月","9月","10月","11月","12月"];
-  const dataSets = {
-    total: [10000, 15000, 18000, 12000, 20000, 26000],
-    unrealized: [-8000, -4000, 3000, 12000, 8000, 15000],
-    swap: [2000, 5000, 9000, 13000, 17000, 21000],
-  };
-
-  // ▼ グラデーション作成関数
-  function createGradient(ctx, chartArea, data, type) {
-  const { top, bottom } = chartArea;
-  const gradient = ctx.createLinearGradient(0, bottom, 0, top);
-  const lastValue = data[data.length - 1];
-
-  // 種類別グラデーション設定
-  if (type === "total") {
-    if (lastValue >= 0) {
-      gradient.addColorStop(0, "rgba(62,224,143,0.05)");  // 緑・下
-      gradient.addColorStop(1, "rgba(62,224,143,0.45)");  // 緑・上
-    } else {
-      gradient.addColorStop(0, "rgba(255,107,107,0.05)");
-      gradient.addColorStop(1, "rgba(255,107,107,0.45)");
-    }
-  } else {
-    if (lastValue >= 0) {
-      gradient.addColorStop(0, "rgba(255,255,255,0)");
-      gradient.addColorStop(1, "rgba(255,255,255,0.45)");
-    } else {
-      gradient.addColorStop(0, "rgba(255,107,107,0.0)");
-      gradient.addColorStop(1, "rgba(255,107,107,0.4)");
-    }
-  }
-  return gradient;
-}
-
-
-  let chart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [{
-        data: dataSets.total,
-        fill: true,
-        borderColor: "#3EE08F",
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.35,
-backgroundColor: function(context) {
-  const chart = context.chart;
-  const { ctx, chartArea } = chart;
-  if (!chartArea) return null;
-  return createGradient(ctx, chartArea, dataSets.total, "total");
-},
-
-      }],
-    },
-    options: {
-      maintainAspectRatio: false,
-      animation: {
-        duration: 2000,
-        easing: 'easeInOutCubic',
-        delay: (ctx) => {
-          let delay = 0;
-          if (ctx.type === 'data') {
-            delay = ctx.dataIndex * 60;
-          }
-          return delay;
-        }
-      },
-      scales: {
-        x: {
-          ticks: { color: "rgba(255,255,255,0.7)" },
-          grid: { color: "rgba(255,255,255,0.1)" }
-        },
-        y: {
-          position: "right",
-          beginAtZero: true,
-          ticks: {
-            color: "rgba(255,255,255,0.7)",
-callback: (val) => val.toLocaleString(),
-          },
-          grid: { color: "rgba(255,255,255,0.1)" }
-        }
-      },
-      plugins: { legend: { display: false } },
-    }
-  });
-
-  // ▼ タブ切り替え制御
-  document.querySelectorAll(".chart-tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".chart-tab").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-
-      const type = tab.dataset.type;
-      const dataset = dataSets[type];
-      chart.data.datasets[0].data = dataset;
-
-      chart.data.datasets[0].borderColor =
-        type === "total" ? "#3EE08F" : "#FFFFFF";
-
-      chart.data.datasets[0].backgroundColor = (context) => {
-  const { ctx, chartArea } = context.chart;
-  if (!chartArea) return null;
-  return createGradient(ctx, chartArea, dataset, type);
-};
-
-
-      chart.update();
-    });
-  });
-}
-</script>
-<script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch(() => {
@@ -610,13 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const bootTopPage = () => {
-    loadTopScript()
-      .then(() => {
-        initializeDetailChart();
-      })
-      .catch(() => {
-        initializeDetailChart();
-      });
+    loadTopScript().catch(() => {});
   };
 
   const hasSeenSplashThisSession = (() => {

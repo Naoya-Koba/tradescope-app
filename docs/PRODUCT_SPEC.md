@@ -48,7 +48,9 @@
 
 **Current**：過去にTopと損益管理でAsset Trend等の差異が発生したため、同じ値を利用する手段としてTop Summary Snapshotを使う経路が導入されている。
 
-**Known issue**：Snapshot自体を廃止対象とはしないが、現在は元データのrevisionや有効期限がなく、古いSnapshotが元データより優先され続ける可能性がある。また、トップ独自の計算・フォールバックも残っている。
+**Current**：Summary、Asset Trend、Asset Allocation、Riskは、対象となる正本データがない場合に固定値を使わず空状態を表示する。
+
+**Known issue**：Snapshot自体を廃止対象とはしないが、現在は元データのrevisionや有効期限がなく、正本データが存在する年では古いSnapshotが元データより優先され続ける可能性がある。また、トップと損益管理には計算ロジックの重複が残っている。
 
 ### 損益管理
 
@@ -85,7 +87,7 @@
 | `tradeinfo/` | Removed Legacy implementation | 旧ページ実装は削除済み。`tradeInfo`キーと旧v1バックアップ互換処理は、別途移行・廃止判断するまで維持する |
 | 政策金利予測 | Removed Experimental implementation / Under consideration | 固定サンプルによる旧実装は削除済み。将来必要になった場合は正式なデータ源と仕様を決めて作り直す |
 | 転換（反転）シグナル | Removed Experimental implementation / Under consideration | 固定ダミーによる旧実装は削除済み。将来必要になった場合は正式仕様を決めて作り直す |
-| Position Details内チャート | Experimental / Known issue | 固定ダミーデータを表示する |
+| Position Details内チャート | Current / 未実装 | 固定ダミーデータは削除済み。実データ源がないため「データなし」を表示する |
 | OCR | Planned UI placeholder | 現在は無効ボタンのみ |
 | 押し／戻り | Under consideration | 画面実装とナビゲーションはなく、正式採否は未決定 |
 | 設定 | Planned | 画面実装とナビゲーションは未作成 |
@@ -97,6 +99,8 @@
 **Under consideration**：将来的な日本語化を検討する。現在の英語名を最終的な正式名称とは扱わない。
 
 名称変更時も、データキーや内部IDを表示名と連動して安易に変更しない。
+
+**Planned**：TradeScopeはモバイルアプリとしての完成度を重視する。Disney+等の高品質アプリを参考に、操作性、画面遷移、モーション、階層感、タップフィードバック、一貫性を高める。ただし完全コピーは行わず、金融情報の視認性とTradeScope独自UIを優先し、将来は共通のUI Design Systemを整備する。
 
 ## 8. 非機能要件
 

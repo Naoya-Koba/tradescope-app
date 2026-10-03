@@ -2913,3 +2913,14 @@ body.drawer-open {
   }
 }
 
+.data-empty-state {
+  margin: 0;
+  padding: 24px 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  text-align: center;
+}
+
+.portfolio-empty-row {
+  justify-content: center;
+}

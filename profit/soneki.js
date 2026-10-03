@@ -794,8 +794,27 @@ function hasMeaningfulMonthData(year, month) {
       || (Number(row.withdrawal) || 0) !== 0
       || (Number(row.maintenanceRate) || 0) !== 0
       || (Number(row.monthEndBalance) || 0) !== 0
+      || (Array.isArray(row.holdings) && row.holdings.length > 0)
       || (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0 && row.unrealizedLegs.some(v => Number(v) !== 0));
   });
+}
+
+function hasStoredAccountValues(yearRecord) {
+  if (!yearRecord || typeof yearRecord !== 'object' || Array.isArray(yearRecord)) return false;
+  return ACCOUNTS.some((account) => {
+    if (!Object.prototype.hasOwnProperty.call(yearRecord, account.key)) return false;
+    const value = yearRecord[account.key];
+    if (typeof value === 'number') return Number.isFinite(value);
+    return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value));
+  });
+}
+
+function hasStoredYearData(year) {
+  const hasMonthlyData = Array.from({ length: 12 }, (_, index) => index + 1)
+    .some((month) => hasMeaningfulMonthData(year, month));
+  return hasMonthlyData
+    || hasStoredAccountValues(yearInitialFunds?.[year])
+    || hasStoredAccountValues(yearInitialUnrealized?.[year]);
 }
 
 function getLatestSavedMonth(year) {
@@ -1500,7 +1519,41 @@ function renderPerformanceChart(options = {}) {
   const { renderAssets = true, renderPnl = true, accountFilter = null } = options;
   const assetsCanvas = document.getElementById('assetsTrendChart');
   const pnlCanvas = document.getElementById('pnlBarChart');
+  const assetsEmpty = document.getElementById('assetsTrendEmpty');
+  const pnlEmpty = document.getElementById('pnlBarEmpty');
   if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
+
+  if (!hasStoredYearData(currentYear)) {
+    if (renderAssets) {
+      if (assetsTrendChart) {
+        assetsTrendChart.destroy();
+        assetsTrendChart = null;
+      }
+      assetsCanvas.hidden = true;
+      if (assetsEmpty) assetsEmpty.hidden = false;
+    }
+    if (renderPnl) {
+      if (pnlBarChart) {
+        pnlBarChart.destroy();
+        pnlBarChart = null;
+      }
+      pnlCanvas.hidden = true;
+      if (pnlEmpty) pnlEmpty.hidden = false;
+    }
+    updateChartTitles(accountFilter);
+    updateAssetTrendViewSelectVisibility(accountFilter);
+    syncChartViewTabs();
+    return;
+  }
+
+  if (renderAssets) {
+    assetsCanvas.hidden = false;
+    if (assetsEmpty) assetsEmpty.hidden = true;
+  }
+  if (renderPnl) {
+    pnlCanvas.hidden = false;
+    if (pnlEmpty) pnlEmpty.hidden = true;
+  }
 
   const labels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
   const assetsLabels = ['年初', ...labels];
@@ -1943,6 +1996,33 @@ function bindChartViewControls() {
 
 // ===== UI Updates =====
 function renderAnnualSummary() {
+  if (!hasStoredYearData(currentYear)) {
+    [
+      'yearRealizedSum',
+      'yearSwapSum',
+      'yearInitialCapital',
+      'yearInitialUnrealizedTotal',
+      'yearDepositSum',
+      'yearWithdrawSum',
+      'yearNetCashFlow',
+      'totalAssets',
+      'confirmedAssets',
+      'totalAssetsDelta',
+      'confirmedAssetsDelta',
+      'yearGrowthRate',
+      'confirmedYearGrowthRate',
+      'yearNetPnL',
+      'yearConfirmedPnL',
+      'yearNetPnLGrowthRate',
+      'yearConfirmedPnLGrowthRate'
+    ].map((id) => document.getElementById(id)).filter(Boolean).forEach((el) => {
+      el.textContent = '—';
+      el.classList.remove('positive', 'negative');
+      el.classList.add('neutral');
+    });
+    return;
+  }
+
   const latestMonth = getLatestSavedMonth(currentYear);
   const yearly = calculateYearlyTotals(currentYear);
   const initialCapital = calculateInitialCapital(currentYear);
@@ -1965,8 +2045,8 @@ function renderAnnualSummary() {
   const yearStartConfirmed = initialCapital;
   const totalAssetsDelta = totalAssets - yearStartTotal;
   const confirmedAssetsDelta = confirmedAssets - yearStartConfirmed;
-  const growthRate = yearStartTotal > 0 ? (totalAssetsDelta / yearStartTotal * 100) : 0;
-  const confirmedGrowthRate = yearStartConfirmed > 0 ? (confirmedAssetsDelta / yearStartConfirmed * 100) : 0;
+  const growthRate = yearStartTotal > 0 ? (totalAssetsDelta / yearStartTotal * 100) : null;
+  const confirmedGrowthRate = yearStartConfirmed > 0 ? (confirmedAssetsDelta / yearStartConfirmed * 100) : null;
 
   // 純損益/確定損益は投資口座のみ（bankOnly除外）でトップページと定義を一致させる
   const growthStartInitial = calculateInitialCapital(currentYear, growthAccounts);
@@ -1995,8 +2075,8 @@ function renderAnnualSummary() {
 
   const yearNetPnL = growthCurrentTotal - growthYearStartTotal - growthDepositSum + growthWithdrawSum;
   const yearConfirmedPnL = growthCurrentConfirmed - growthYearStartConfirmed - growthDepositSum + growthWithdrawSum;
-  const yearNetPnLGrowthRate = growthYearStartTotal > 0 ? (yearNetPnL / growthYearStartTotal * 100) : 0;
-  const yearConfirmedPnLGrowthRate = growthYearStartConfirmed > 0 ? (yearConfirmedPnL / growthYearStartConfirmed * 100) : 0;
+  const yearNetPnLGrowthRate = growthYearStartTotal > 0 ? (yearNetPnL / growthYearStartTotal * 100) : null;
+  const yearConfirmedPnLGrowthRate = growthYearStartConfirmed > 0 ? (yearConfirmedPnL / growthYearStartConfirmed * 100) : null;
   const netCashFlowYear = yearly.depositSum - yearly.withdrawSum;
 
   // トップページ共有用: この年のSummary/Asset Trend算出結果を保存
@@ -2013,12 +2093,12 @@ function renderAnnualSummary() {
   document.getElementById('confirmedAssets').textContent = fmtJPY(confirmedAssets);
   document.getElementById('totalAssetsDelta').textContent = fmtDeltaNumber(totalAssetsDelta);
   document.getElementById('confirmedAssetsDelta').textContent = fmtDeltaNumber(confirmedAssetsDelta);
-  document.getElementById('yearGrowthRate').textContent = (growthRate >= 0 ? '+' : '') + growthRate.toFixed(1) + '%';
-  document.getElementById('confirmedYearGrowthRate').textContent = (confirmedGrowthRate >= 0 ? '+' : '') + confirmedGrowthRate.toFixed(1) + '%';
+  document.getElementById('yearGrowthRate').textContent = Number.isFinite(growthRate) ? `${growthRate >= 0 ? '+' : ''}${growthRate.toFixed(1)}%` : '—';
+  document.getElementById('confirmedYearGrowthRate').textContent = Number.isFinite(confirmedGrowthRate) ? `${confirmedGrowthRate >= 0 ? '+' : ''}${confirmedGrowthRate.toFixed(1)}%` : '—';
   document.getElementById('yearNetPnL').textContent = fmtJPY(yearNetPnL);
   document.getElementById('yearConfirmedPnL').textContent = fmtJPY(yearConfirmedPnL);
-  document.getElementById('yearNetPnLGrowthRate').textContent = (yearNetPnLGrowthRate >= 0 ? '+' : '') + yearNetPnLGrowthRate.toFixed(1) + '%';
-  document.getElementById('yearConfirmedPnLGrowthRate').textContent = (yearConfirmedPnLGrowthRate >= 0 ? '+' : '') + yearConfirmedPnLGrowthRate.toFixed(1) + '%';
+  document.getElementById('yearNetPnLGrowthRate').textContent = Number.isFinite(yearNetPnLGrowthRate) ? `${yearNetPnLGrowthRate >= 0 ? '+' : ''}${yearNetPnLGrowthRate.toFixed(1)}%` : '—';
+  document.getElementById('yearConfirmedPnLGrowthRate').textContent = Number.isFinite(yearConfirmedPnLGrowthRate) ? `${yearConfirmedPnLGrowthRate >= 0 ? '+' : ''}${yearConfirmedPnLGrowthRate.toFixed(1)}%` : '—';
 
   const elRealized = document.getElementById('yearRealizedSum');
   const elSwap = document.getElementById('yearSwapSum');
@@ -2082,6 +2162,11 @@ function renderMonthlyDisplay() {
     accountHeader.hidden = true;
     accountHeader.innerHTML = '';
   }
+
+  if (!hasStoredYearData(currentYear)) {
+    container.innerHTML = '<p class="data-empty-state">データなし</p>';
+    return;
+  }
   
   for (let m = 1; m <= 12; m++) {
     const monthly = calculateMonthlyTotals(currentYear, m);
@@ -2115,6 +2200,11 @@ function renderMonthlyByAccount(accountKey) {
   if (accountHeader) {
     accountHeader.hidden = false;
     accountHeader.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${account.name}</span>`;
+  }
+
+  if (!hasStoredYearData(currentYear)) {
+    container.innerHTML = '<p class="data-empty-state">データなし</p>';
+    return;
   }
 
   for (let m = 1; m <= 12; m++) {
@@ -3295,7 +3385,6 @@ function renderAll() {
 
 window.addEventListener('load', () => {
   loadFromStorage();
-  seedDemoDataIfEmpty();
   const sharedYear = getSharedSelectedYear();
   if (sharedYear) {
     currentYear = sharedYear;

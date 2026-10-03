@@ -14,6 +14,15 @@ const fmtQuantity = (n) => {
   if (!isFinite(n)) return '-';
   return Number(n).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
 };
+const fmtRate = (value, assetType) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  const fractionDigits = assetType === 'FX' ? 3 : 0;
+  return numeric.toLocaleString('ja-JP', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
+  });
+};
 const setSignClass = (el, val) => {
   if (!el) return;
   el.classList.remove('positive', 'negative', 'neutral');
@@ -769,11 +778,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) refreshAllTickers();
 });
 
-// ===== Demo Data =====
-const demoMonthly = {
-  realized: [500,520,540,560,580,600,610,620,640,660,680,700],
-  total: [510,535,555,575,590,615,625,640,665,690,705,730]
-};
+// ===== Profit data shared with the top dashboard =====
 const PROFIT_STORAGE_KEY_TRADING = 'tradingData';
 const PROFIT_STORAGE_KEY_INITIAL = 'yearInitialFunds';
 const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
@@ -894,33 +899,70 @@ function hasMeaningfulMonthData(yearData, month) {
       || (Number(row.withdrawal) || 0) !== 0
       || (Number(row.maintenanceRate) || 0) !== 0
       || (Number(row.monthEndBalance) || 0) !== 0
+      || (Array.isArray(row.holdings) && row.holdings.length > 0)
       || (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0 && row.unrealizedLegs.some(v => Number(v) !== 0));
   });
 }
 
+function hasStoredAccountValues(yearRecord) {
+  if (!yearRecord || typeof yearRecord !== 'object' || Array.isArray(yearRecord)) return false;
+  return LINKED_ACCOUNTS.some((account) => {
+    if (!Object.prototype.hasOwnProperty.call(yearRecord, account.key)) return false;
+    const value = yearRecord[account.key];
+    if (typeof value === 'number') return Number.isFinite(value);
+    return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value));
+  });
+}
+
+function hasTopSourceDataForYear(tradingData, initialFunds, initialUnrealized, year) {
+  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
+  const hasMonthlyData = Array.from({ length: 12 }, (_, index) => index + 1)
+    .some((month) => hasMeaningfulMonthData(yearData, month));
+  const yearInitial = initialFunds?.[year] || initialFunds?.[String(year)];
+  const yearInitialUnrealized = initialUnrealized?.[year] || initialUnrealized?.[String(year)];
+  return hasMonthlyData
+    || hasStoredAccountValues(yearInitial)
+    || hasStoredAccountValues(yearInitialUnrealized);
+}
+
+function createEmptyTopSeries(year = TOP_BASE_YEAR) {
+  return {
+    hasData: false,
+    realized: [],
+    total: [],
+    accountData: [],
+    year,
+    month: null
+  };
+}
+
 function buildTopLinkedData(selectedYear = null) {
+  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
+  const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
+  const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
+  const sourceYears = [...new Set([
+    ...getNumericYears(tradingData),
+    ...getNumericYears(initialFunds),
+    ...getNumericYears(initialUnrealized)
+  ])].sort((a, b) => a - b);
+  const targetYear = selectedYear || sourceYears[sourceYears.length - 1] || null;
+  if (!targetYear || !hasTopSourceDataForYear(tradingData, initialFunds, initialUnrealized, targetYear)) {
+    return null;
+  }
+
   const snapshotStore = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT);
-  const snapshotYears = getNumericYears(snapshotStore);
-  const snapshotTargetYear = selectedYear || (snapshotYears.length ? snapshotYears[snapshotYears.length - 1] : null);
-  if (snapshotTargetYear) {
-    const snapshot = snapshotStore?.[snapshotTargetYear] || snapshotStore?.[String(snapshotTargetYear)];
+  if (targetYear) {
+    const snapshot = snapshotStore?.[targetYear] || snapshotStore?.[String(targetYear)];
     if (snapshot && Array.isArray(snapshot.realized) && Array.isArray(snapshot.total) && snapshot.realized.length === 12 && snapshot.total.length === 12) {
       return {
         ...snapshot,
-        year: Number(snapshot.year) || snapshotTargetYear,
+        hasData: true,
+        year: Number(snapshot.year) || targetYear,
         month: Number(snapshot.month) || 1,
         accountData: Array.isArray(snapshot.accountData) ? snapshot.accountData : []
       };
     }
   }
-
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
-  const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
-  const years = getNumericYears(tradingData);
-  if (!years.length) return null;
-
-  const targetYear = selectedYear || years[years.length - 1];
   const growthAccounts = GROWTH_TARGET_ACCOUNTS;
   const latestMonth = (() => {
     const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
@@ -998,6 +1040,7 @@ function buildTopLinkedData(selectedYear = null) {
   }, 0);
 
   return {
+    hasData: true,
     realized,
     total,
     accountData: linkedAccountData,
@@ -1014,35 +1057,11 @@ function buildTopLinkedData(selectedYear = null) {
   };
 }
 
-const demoTotal = demoMonthly.total.map((v) => v * 10000);
-const fallbackTopData = {
-  realized: demoMonthly.realized.map((v) => v * 10000),
-  total: demoTotal,
-  accountData: null,
-  yearStartTotal: demoTotal[0],
-  yearStartConfirmed: demoMonthly.realized[0] * 10000,
-  growthCurrentTotal: demoTotal[demoTotal.length - 1],
-  growthCurrentConfirmed: demoMonthly.realized[demoMonthly.realized.length - 1] * 10000,
-  chartStartTotal: demoTotal[0],
-  chartStartTotalWithUnrealized: demoTotal[0],
-  cumulativeDeposits: 0,
-  cumulativeWithdrawals: 0
-};
 const linkedTopData = buildTopLinkedData();
-let topSeries = linkedTopData || fallbackTopData;
-const lotsByPair = { TRY:300, HUF:200, MXN:150, ZAR:80 };
-const risk = { zero:-3280000, half:-1640000, mmr:265 };
+let topSeries = linkedTopData || createEmptyTopSeries();
 
 // ===== Portfolio Data =====
 let accountData = topSeries.accountData?.length ? topSeries.accountData : [];
-
-const fallbackPortfolioData = [
-  { label: 'FX', amount: 4560000, color: '#3B6DFF' },
-  { label: '暗号資産', amount: 568000, color: '#EAF1FF' },
-  { label: '証券', amount: 1260000, color: '#D95757' },
-  { label: '現金', amount: 710000, color: '#2F7A46' },
-  { label: 'その他', amount: 202000, color: '#7E7A98' }
-];
 
 function buildPortfolioAllocationFromAccounts(accounts) {
   const byKey = accounts.reduce((acc, item) => {
@@ -1057,7 +1076,7 @@ function buildPortfolioAllocationFromAccounts(accounts) {
     { label: '現金', amount: byKey['三井住友銀行'] || 0, color: '#2F7A46' }
   ].filter((item) => item.amount > 0);
 
-  return data.length ? data : fallbackPortfolioData;
+  return data;
 }
 
 let portfolioData = buildPortfolioAllocationFromAccounts(accountData);
@@ -1070,28 +1089,32 @@ function updateRiskSection() {
   const noteEl = document.getElementById('riskNote');
   if (!maxEl || !fxOneEl || !fxZeroEl || !cryptoZeroEl) return;
 
+  const renderEmptyRisk = () => {
+    [maxEl, fxOneEl, fxZeroEl, cryptoZeroEl].forEach((el) => {
+      el.textContent = '—';
+      el.classList.remove('positive', 'negative');
+      el.classList.add('neutral');
+    });
+    if (noteEl) noteEl.textContent = '対象データなし';
+  };
+
   if (!historyCore?.calculateRiskSummary || !historyCore?.parseEntries) {
-    [maxEl, fxOneEl, fxZeroEl, cryptoZeroEl].forEach((el) => { el.textContent = '-'; });
+    renderEmptyRisk();
     return;
   }
 
   const entries = historyCore.parseEntries();
-  const cryptoValue = accountData.find((item) => item.label === 'SBI VC')?.amount || 0;
-  if (!entries.length) {
-    const fallbackFxZero = Math.abs(risk.zero || 0);
-    const fallbackFxOne = Math.abs(risk.half || 0);
-    const fallbackCrypto = Math.abs(cryptoValue || 0);
-    maxEl.textContent = fmtJPY(fallbackFxZero + fallbackCrypto);
-    fxOneEl.textContent = fmtJPY(fallbackFxOne);
-    fxZeroEl.textContent = fmtJPY(fallbackFxZero);
-    cryptoZeroEl.textContent = fmtJPY(fallbackCrypto);
-    if (noteEl) {
-      noteEl.textContent = 'FX＋暗号資産 0円時（フォールバック表示）';
-    }
+  const cryptoAccount = accountData.find((item) => item.label === 'SBI VC');
+  const hasCryptoRiskData = Number(cryptoAccount?.amount) > 0;
+  const cryptoValue = hasCryptoRiskData ? Number(cryptoAccount.amount) : 0;
+  const riskSummary = historyCore.calculateRiskSummary(entries, cryptoValue);
+  const hasFxRiskData = Array.isArray(riskSummary.activeCarrySymbols)
+    && riskSummary.activeCarrySymbols.length > 0;
+
+  if (!hasFxRiskData && !hasCryptoRiskData) {
+    renderEmptyRisk();
     return;
   }
-
-  const riskSummary = historyCore.calculateRiskSummary(entries, cryptoValue);
 
   const fxOneDisplayLoss = (riskSummary.fxOneYenLoss || 0) + (riskSummary.fxHufPointOneLoss || 0);
   const maxLoss = Math.abs(riskSummary.maxLoss || 0);
@@ -1100,9 +1123,9 @@ function updateRiskSection() {
   const cryptoZeroLoss = Math.abs(riskSummary.cryptoZeroYenLoss || 0);
 
   maxEl.textContent = fmtJPY(maxLoss);
-  fxOneEl.textContent = fmtJPY(fxOneLoss);
-  fxZeroEl.textContent = fmtJPY(fxZeroLoss);
-  cryptoZeroEl.textContent = fmtJPY(cryptoZeroLoss);
+  fxOneEl.textContent = hasFxRiskData ? fmtJPY(fxOneLoss) : '—';
+  fxZeroEl.textContent = hasFxRiskData ? fmtJPY(fxZeroLoss) : '—';
+  cryptoZeroEl.textContent = hasCryptoRiskData ? fmtJPY(cryptoZeroLoss) : '—';
 
   if (noteEl) {
     noteEl.textContent = 'FX＋暗号資産 0円時';
@@ -1111,6 +1134,28 @@ function updateRiskSection() {
 
 // ===== KPI =====
 function updateKPIs() {
+  const summaryElements = [
+    'kpiTotal',
+    'kpiRealized',
+    'deltaTotal',
+    'deltaNet',
+    'growthTotal',
+    'growthNet',
+    'annualNetPnL',
+    'annualConfirmedPnL',
+    'annualNetPnLGrowth',
+    'annualConfirmedPnLGrowth'
+  ].map((id) => document.getElementById(id)).filter(Boolean);
+
+  if (!topSeries?.hasData) {
+    summaryElements.forEach((el) => {
+      el.textContent = '—';
+      el.classList.remove('positive', 'negative');
+      el.classList.add('neutral');
+    });
+    return;
+  }
+
   const i = Math.max(0, (topSeries.month || topSeries.realized.length) - 1);
   const rLast = topSeries.realized[i];
   const tLast = topSeries.total[i];
@@ -1139,13 +1184,13 @@ function updateKPIs() {
 
   const totalAssetDelta = tLast - yearStartTotalActual;
   const confirmedAssetDelta = rLast - yearStartConfirmedActual;
-  const annualGrowthRate = yearStartTotalActual > 0 ? (totalAssetDelta / yearStartTotalActual) * 100 : 0;
-  const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : 0;
+  const annualGrowthRate = yearStartTotalActual > 0 ? (totalAssetDelta / yearStartTotalActual) * 100 : null;
+  const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : null;
 
   const annualNetPnL = growthCurrentTotal - yearStartTotalPerformance - cumulativeDeposits + cumulativeWithdrawals;
   const annualConfirmedPnL = growthCurrentConfirmed - yearStartConfirmedPerformance - cumulativeDeposits + cumulativeWithdrawals;
-  const annualNetPnLGrowth = yearStartTotalPerformance > 0 ? (annualNetPnL / yearStartTotalPerformance) * 100 : 0;
-  const annualConfirmedPnLGrowth = yearStartConfirmedPerformance > 0 ? (annualConfirmedPnL / yearStartConfirmedPerformance) * 100 : 0;
+  const annualNetPnLGrowth = yearStartTotalPerformance > 0 ? (annualNetPnL / yearStartTotalPerformance) * 100 : null;
+  const annualConfirmedPnLGrowth = yearStartConfirmedPerformance > 0 ? (annualConfirmedPnL / yearStartConfirmedPerformance) * 100 : null;
 
   const elTotalDelta = document.getElementById('deltaTotal');
   const elNetDelta = document.getElementById('deltaNet');
@@ -1158,11 +1203,15 @@ function updateKPIs() {
     setSignClass(elNetDelta, confirmedAssetDelta);
   }
 
-  elNet.textContent = (confirmedAnnualGrowthRate >= 0 ? '+' : '') + confirmedAnnualGrowthRate.toFixed(1) + '%';
+  elNet.textContent = Number.isFinite(confirmedAnnualGrowthRate)
+    ? `${confirmedAnnualGrowthRate >= 0 ? '+' : ''}${confirmedAnnualGrowthRate.toFixed(1)}%`
+    : '—';
   setSignClass(elNet, confirmedAnnualGrowthRate);
 
   const elTotalGrowth = document.getElementById('growthTotal');
-  elTotalGrowth.textContent = (annualGrowthRate >= 0 ? '+' : '') + annualGrowthRate.toFixed(1) + '%';
+  elTotalGrowth.textContent = Number.isFinite(annualGrowthRate)
+    ? `${annualGrowthRate >= 0 ? '+' : ''}${annualGrowthRate.toFixed(1)}%`
+    : '—';
   setSignClass(elTotalGrowth, annualGrowthRate);
 
   const elAnnualNetPnL = document.getElementById('annualNetPnL');
@@ -1179,11 +1228,15 @@ function updateKPIs() {
     setSignClass(elAnnualConfirmedPnL, annualConfirmedPnL);
   }
   if (elAnnualNetGrowth) {
-    elAnnualNetGrowth.textContent = (annualNetPnLGrowth >= 0 ? '+' : '') + annualNetPnLGrowth.toFixed(1) + '%';
+    elAnnualNetGrowth.textContent = Number.isFinite(annualNetPnLGrowth)
+      ? `${annualNetPnLGrowth >= 0 ? '+' : ''}${annualNetPnLGrowth.toFixed(1)}%`
+      : '—';
     setSignClass(elAnnualNetGrowth, annualNetPnLGrowth);
   }
   if (elAnnualConfirmedGrowth) {
-    elAnnualConfirmedGrowth.textContent = (annualConfirmedPnLGrowth >= 0 ? '+' : '') + annualConfirmedPnLGrowth.toFixed(1) + '%';
+    elAnnualConfirmedGrowth.textContent = Number.isFinite(annualConfirmedPnLGrowth)
+      ? `${annualConfirmedPnLGrowth >= 0 ? '+' : ''}${annualConfirmedPnLGrowth.toFixed(1)}%`
+      : '—';
     setSignClass(elAnnualConfirmedGrowth, annualConfirmedPnLGrowth);
   }
 }
@@ -1256,6 +1309,18 @@ function updateSwap() {
   const yearEstimateEl = document.getElementById('swapYearEstimate');
   const accountBreakdownEl = document.getElementById('swapPrevMonthAccounts');
 
+  if (!swapSummary.enteredMonthCount) {
+    [prevMonthEl, cumulativeEl, yearEstimateEl].filter(Boolean).forEach((el) => {
+      el.textContent = '—';
+      el.classList.remove('positive', 'negative');
+      el.classList.add('neutral');
+    });
+    if (accountBreakdownEl) {
+      accountBreakdownEl.innerHTML = '<span class="swap-mini-title">口座別内訳</span><span class="swap-breakdown-item">データなし</span>';
+    }
+    return;
+  }
+
   if (prevMonthEl) {
     prevMonthEl.textContent = fmtJPY(swapSummary.prevMonthSwap);
     setSignClass(prevMonthEl, swapSummary.prevMonthSwap);
@@ -1272,7 +1337,7 @@ function updateSwap() {
   }
 
   if (accountBreakdownEl) {
-    if (!swapSummary.enteredMonthCount || swapSummary.prevMonth == null) {
+    if (swapSummary.prevMonth == null) {
       accountBreakdownEl.innerHTML = '<span class="swap-mini-title">口座別内訳</span><span class="swap-breakdown-item">データなし</span>';
     } else {
       const nonZeroBreakdown = swapSummary.prevMonthBreakdown.filter((item) => item.value !== 0);
@@ -1336,6 +1401,7 @@ function applyRateClass(el, rawText) {
 }
 
 function formatLossJPY(value) {
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   const abs = Math.round(Math.abs(Number(value) || 0)).toLocaleString();
   return `-¥${abs}`;
 }
@@ -1348,14 +1414,14 @@ function buildDetailDataFromPosition(position) {
   const marketValue = estimateMarketValue(position);
   const requiredMargin = estimateRequiredMargin(position);
 
-  let zeroLoss = 0;
-  let halfLoss = 0;
+  let zeroLoss = null;
+  let halfLoss = null;
   if (position?.assetType === 'FX') {
     zeroLoss = Math.max(0, -((0 - avgRateValue) * signedUnits));
     halfLoss = Math.max(0, -(((avgRateValue * 0.5) - avgRateValue) * signedUnits));
   } else {
-    zeroLoss = marketValue;
-    halfLoss = marketValue * 0.5;
+    zeroLoss = Number.isFinite(marketValue) ? marketValue : null;
+    halfLoss = Number.isFinite(marketValue) ? marketValue * 0.5 : null;
   }
 
   const accountsText = Array.isArray(position?.accounts) && position.accounts.length
@@ -1366,12 +1432,12 @@ function buildDetailDataFromPosition(position) {
 
   return {
     title: `${position?.symbol || '-'} (${position?.assetType || '-'})`,
-    profit: fmtJPY(headlineValue),
-    rate: '0.0%',
-    lots: fmtQuantity(absQuantity),
-    avg: fmtRate(avgRateValue, position?.assetType, position?.symbol),
-    now: fmtRate(avgRateValue, position?.assetType, position?.symbol),
-    mmr: '---',
+    profit: Number.isFinite(headlineValue) ? fmtJPY(headlineValue) : '未取得',
+    rate: '—',
+    lots: absQuantity > 0 ? fmtQuantity(absQuantity) : '—',
+    avg: avgRateValue > 0 ? fmtRate(avgRateValue, position?.assetType, position?.symbol) : '—',
+    now: '未取得',
+    mmr: '—',
     zero: formatLossJPY(zeroLoss),
     half: formatLossJPY(halfLoss),
     note: noteText
@@ -1630,8 +1696,24 @@ function updateTopAssetLegend() {
 }
 
 function renderPerformanceChart() {
-  const ctx = document.getElementById('perfChart')?.getContext('2d');
+  const canvas = document.getElementById('perfChart');
+  const emptyEl = document.getElementById('perfChartEmpty');
+  const ctx = canvas?.getContext('2d');
   if (!ctx) return;
+
+  if (!topSeries?.hasData) {
+    if (perfChart) {
+      if (perfChart.$laserRevealRaf) cancelAnimationFrame(perfChart.$laserRevealRaf);
+      perfChart.destroy();
+      perfChart = null;
+    }
+    canvas.hidden = true;
+    if (emptyEl) emptyEl.hidden = false;
+    return;
+  }
+
+  canvas.hidden = false;
+  if (emptyEl) emptyEl.hidden = true;
 
   const gradBlue = ctx.createLinearGradient(0, 0, 0, 250);
   gradBlue.addColorStop(0, 'rgba(61,162,255,0.25)');
@@ -1864,30 +1946,34 @@ function bindSectionDonutReveal(section, chartResolver) {
 
 // ===== Portfolio Chart & List =====
 function renderPortfolio() {
-  // Calculate total
-  const total = portfolioData.reduce((sum, item) => sum + item.amount, 0);
-  
-  // Sort by amount (descending) - keep original data unchanged
-  const sortedData = portfolioData.slice().sort((a, b) => b.amount - a.amount);
-  
-  // Render list
-  const listContainer = document.getElementById('portfolioItems');
-  if (listContainer) {
-    listContainer.innerHTML = sortedData.map(item => {
-      const pct = total > 0 ? ((item.amount / total) * 100).toFixed(1) : '0.0';
-      return `
+  const renderAllocation = ({ data, listId, canvasId, currentChart, onChartCreated }) => {
+    const total = data.reduce((sum, item) => sum + item.amount, 0);
+    const sortedData = data.slice().sort((a, b) => b.amount - a.amount);
+    const listEl = document.getElementById(listId);
+    const canvas = document.getElementById(canvasId);
+
+    if (!sortedData.length || total <= 0) {
+      if (listEl) listEl.innerHTML = '<p class="data-empty-state">データなし</p>';
+      if (canvas) canvas.hidden = true;
+      if (currentChart) currentChart.destroy();
+      onChartCreated(null);
+      return null;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = sortedData.map((item) => `
         <div class="portfolio-item" style="--item-color: ${item.color}">
           <span class="portfolio-label">${item.label}</span>
           <span class="portfolio-amount">${fmtJPY(item.amount)}</span>
-          <span class="portfolio-percent">${pct}%</span>
+          <span class="portfolio-percent">${((item.amount / total) * 100).toFixed(1)}%</span>
         </div>
-      `;
-    }).join('');
-  }
+      `).join('');
+    }
 
-  // Render doughnut chart
-  const portfolioCtx = document.getElementById('portfolioChart')?.getContext('2d');
-  if (portfolioCtx) {
+    if (!canvas || typeof Chart === 'undefined') return null;
+    canvas.hidden = false;
+    if (currentChart) currentChart.destroy();
+
     const hexToRgba = (hex, alpha = 0.75) => {
       const r = parseInt(hex.slice(1, 3), 16);
       const g = parseInt(hex.slice(3, 5), 16);
@@ -1895,97 +1981,71 @@ function renderPortfolio() {
       return `rgba(${r},${g},${b},${alpha})`;
     };
 
-    const doughnutOpts = (dataTotal) => ({
-      maintainAspectRatio: false,
-      responsive: true,
-      cutout: '68%',
-      animation: false,
-      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
-      interaction: {
-        mode: 'nearest',
-        intersect: false
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(10,12,26,0.9)',
-          titleColor: 'rgba(255,255,255,0.9)',
-          bodyColor: 'rgba(255,255,255,0.85)',
-          borderColor: 'rgba(255,255,255,0.15)',
-          borderWidth: 1,
-          padding: 10,
-          displayColors: true,
-          boxPadding: 6,
-          callbacks: {
-            label: (ctx) => `${fmtJPY(ctx.parsed)} (${((ctx.parsed / dataTotal) * 100).toFixed(1)}%)`
-          }
-        }
-      }
-    });
-
-    if (portfolioChart) {
-      portfolioChart.destroy();
-    }
-
-    portfolioChart = new Chart(portfolioCtx, {
+    const chart = new Chart(canvas.getContext('2d'), {
       type: 'doughnut',
       data: {
-        labels: sortedData.map(d => d.label),
+        labels: sortedData.map((item) => item.label),
         datasets: [{
-          data: sortedData.map(d => d.amount),
-          backgroundColor: sortedData.map(d => hexToRgba(d.color)),
+          data: sortedData.map((item) => item.amount),
+          backgroundColor: sortedData.map((item) => hexToRgba(item.color)),
           borderColor: 'rgba(255,255,255,0.2)',
           borderWidth: 1
         }]
       },
-      options: doughnutOpts(total)
-    });
-    bindDoughnutTooltipInteractions(portfolioChart, () => accountChart);
-
-    // ==== 口座別配分チャート ====
-    const accountTotal = accountData.reduce((s, d) => s + d.amount, 0);
-    const sortedAccount = accountData.slice().sort((a, b) => b.amount - a.amount);
-
-    const accountListEl = document.getElementById('accountItems');
-    if (accountListEl) {
-      accountListEl.innerHTML = sortedAccount.map(item => {
-        const pct = accountTotal > 0 ? ((item.amount / accountTotal) * 100).toFixed(1) : '0.0';
-        return `
-          <div class="portfolio-item" style="--item-color: ${item.color}">
-            <span class="portfolio-label">${item.label}</span>
-            <span class="portfolio-amount">${fmtJPY(item.amount)}</span>
-            <span class="portfolio-percent">${pct}%</span>
-          </div>`;
-      }).join('');
-    }
-
-    const accountCtx = document.getElementById('accountChart')?.getContext('2d');
-    if (accountCtx) {
-      if (accountChart) {
-        accountChart.destroy();
+      options: {
+        maintainAspectRatio: false,
+        responsive: true,
+        cutout: '68%',
+        animation: false,
+        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(10,12,26,0.9)',
+            titleColor: 'rgba(255,255,255,0.9)',
+            bodyColor: 'rgba(255,255,255,0.85)',
+            borderColor: 'rgba(255,255,255,0.15)',
+            borderWidth: 1,
+            padding: 10,
+            displayColors: true,
+            boxPadding: 6,
+            callbacks: {
+              label: (ctx) => `${fmtJPY(ctx.parsed)} (${((ctx.parsed / total) * 100).toFixed(1)}%)`
+            }
+          }
+        }
       }
+    });
+    onChartCreated(chart);
+    return chart;
+  };
 
-      accountChart = new Chart(accountCtx, {
-        type: 'doughnut',
-        data: {
-          labels: sortedAccount.map(d => d.label),
-          datasets: [{
-            data: sortedAccount.map(d => d.amount),
-            backgroundColor: sortedAccount.map(d => hexToRgba(d.color)),
-            borderColor: 'rgba(255,255,255,0.2)',
-            borderWidth: 1
-          }]
-        },
-        options: doughnutOpts(accountTotal)
-      });
-      bindDoughnutTooltipInteractions(accountChart, () => portfolioChart);
-    }
+  portfolioChart = renderAllocation({
+    data: portfolioData,
+    listId: 'portfolioItems',
+    canvasId: 'portfolioChart',
+    currentChart: portfolioChart,
+    onChartCreated: (chart) => { portfolioChart = chart; }
+  });
 
-    const allocSection = portfolioChart?.canvas?.closest('.section') || accountChart?.canvas?.closest('.section');
-    bindSectionDonutReveal(allocSection, () => [portfolioChart, accountChart]);
-    if (allocSection?.classList.contains('reveal-anim') && isElementInViewport(allocSection)) {
-      [portfolioChart, accountChart].forEach(playDonutReveal);
-    }
+  accountChart = renderAllocation({
+    data: accountData,
+    listId: 'accountItems',
+    canvasId: 'accountChart',
+    currentChart: accountChart,
+    onChartCreated: (chart) => { accountChart = chart; }
+  });
+
+  if (portfolioChart && accountChart) {
+    bindDoughnutTooltipInteractions(portfolioChart, () => accountChart);
+    bindDoughnutTooltipInteractions(accountChart, () => portfolioChart);
+  }
+
+  const allocSection = portfolioChart?.canvas?.closest('.section') || accountChart?.canvas?.closest('.section');
+  bindSectionDonutReveal(allocSection, () => [portfolioChart, accountChart]);
+  if (allocSection?.classList.contains('reveal-anim') && isElementInViewport(allocSection)) {
+    [portfolioChart, accountChart].forEach(playDonutReveal);
   }
 }
 renderPortfolio();
@@ -2030,25 +2090,10 @@ function getLatestFxRate(entries, symbol) {
   return Number(hit?.rate) || 0;
 }
 
-const QUOTE_TO_JPY_FALLBACK_RATES = {
-  USD: 150,
-  EUR: 165,
-  GBP: 195,
-  AUD: 100,
-  NZD: 90,
-  CAD: 110,
-  CHF: 170,
-  TRY: 4,
-  MXN: 8,
-  ZAR: 8,
-  CZK: 7,
-  HUF: 0.4
-};
-
 function resolveQuoteToJpyRate(symbol, entries) {
   const normalized = String(symbol || '').trim().toUpperCase();
   const parts = normalized.split('/');
-  if (parts.length !== 2) return 1;
+  if (parts.length !== 2) return null;
   const quote = parts[1];
   if (!quote || quote === 'JPY') return 1;
 
@@ -2058,10 +2103,7 @@ function resolveQuoteToJpyRate(symbol, entries) {
   const inverse = getLatestFxRate(entries, `JPY/${quote}`);
   if (inverse > 0) return 1 / inverse;
 
-  const fallback = Number(QUOTE_TO_JPY_FALLBACK_RATES[quote]);
-  if (fallback > 0) return fallback;
-
-  return 1;
+  return null;
 }
 
 function resolveSecuritiesUnitDivider(position) {
@@ -2074,17 +2116,17 @@ function estimateRequiredMargin(position) {
   const avgRate = Number(position.avgRate) || 0;
   const contractSize = Number(position.contractSize)
     || resolveTopDefaultContractSize(position?.assetType, position?.symbol);
-  const quoteToJpyRate = Number(position.quoteToJpyRate) || 1;
+  const quoteToJpyRate = Number(position.quoteToJpyRate);
+  if (!Number.isFinite(quoteToJpyRate) || quoteToJpyRate <= 0) return null;
   const notionalJpy = qty * contractSize * Math.max(0, avgRate) * Math.max(0, quoteToJpyRate);
   return notionalJpy * 0.04;
 }
 
 function estimateMarketValue(position) {
-  const qty = Number(position.absQuantity) || 0;
-  const avgRate = Number(position.avgRate) || 0;
-  const contractSize = Number(position.contractSize) || 1;
-  const unitDivider = resolveSecuritiesUnitDivider(position);
-  return (qty * contractSize * Math.max(0, avgRate)) / unitDivider;
+  const explicitValue = Number(position?.metricValue);
+  return Number.isFinite(explicitValue) && position?.metricValue !== null
+    ? explicitValue
+    : null;
 }
 
 function getLatestMemoMap(entries) {
@@ -2200,72 +2242,6 @@ function aggregateOpenPositionsForTop(entries) {
     .sort((a, b) => (Number(b.metricValue) || 0) - (Number(a.metricValue) || 0));
 }
 
-function buildFallbackPortfolioRowsFromAccounts() {
-  const byKey = (accountData || []).reduce((acc, item) => {
-    acc[item.label] = Number(item.amount) || 0;
-    return acc;
-  }, {});
-
-  const fxAmount = (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0);
-  const securitiesAmount = byKey['SBI'] || 0;
-  const cryptoAmount = byKey['SBI VC'] || 0;
-
-  const rows = [];
-  if (fxAmount > 0) {
-    rows.push({
-      id: 'fallback::FX',
-      symbol: 'FX統合',
-      assetType: 'FX',
-      side: 'buy',
-      absQuantity: 1,
-      avgRate: 1,
-      contractSize: 1,
-      accounts: ['GMO', 'Light FX', 'みんなのFX'],
-      strategy: '-',
-      memo: 'Open Positions未登録のため資産配分から表示',
-      metricValue: fxAmount * 0.04
-    });
-  }
-  if (securitiesAmount > 0) {
-    rows.push({
-      id: 'fallback::証券',
-      symbol: '証券統合',
-      assetType: '証券',
-      side: 'buy',
-      absQuantity: 1,
-      avgRate: 1,
-      contractSize: 1,
-      accounts: ['SBI'],
-      strategy: '-',
-      memo: 'Open Positions未登録のため資産配分から表示',
-      metricValue: securitiesAmount
-    });
-  }
-  
-  // 暗号資産: 月次保有明細から詳細を取得
-  const cryptoRows = buildCryptoPortfolioFromMonthlyHoldings();
-  if (cryptoRows.length > 0) {
-    rows.push(...cryptoRows);
-  } else if (cryptoAmount > 0) {
-    // 保有明細がない場合のフォールバック
-    rows.push({
-      id: 'fallback::暗号資産',
-      symbol: '暗号資産統合',
-      assetType: '暗号資産',
-      side: 'buy',
-      absQuantity: 1,
-      avgRate: 1,
-      contractSize: 1,
-      accounts: ['SBI VC'],
-      strategy: '-',
-      memo: 'Open Positions未登録のため資産配分から表示',
-      metricValue: cryptoAmount
-    });
-  }
-
-  return rows;
-}
-
 function buildCryptoPortfolioFromMonthlyHoldings() {
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const year = topSeries?.year || TOP_BASE_YEAR;
@@ -2300,9 +2276,13 @@ function buildCryptoPortfolioFromMonthlyHoldings() {
     }
 
     const rate = Number(holding.rate) || 0;
-    const valueJPY = Number(holding.valueJPY) || 0;
+    const hasValueJPY = holding.valueFilled === true
+      || (holding.valueJPY != null && holding.valueJPY !== '' && Number(holding.valueJPY) > 0);
+    const valueJPY = hasValueJPY ? Number(holding.valueJPY) : null;
     // レートが入力されている場合は優先、なければ円換算額から計算
-    const avgRate = rate > 0 ? rate : (quantity > 0 ? valueJPY / quantity : 0);
+    const avgRate = rate > 0
+      ? rate
+      : (quantity > 0 && Number.isFinite(valueJPY) ? valueJPY / quantity : 0);
 
     return {
       id: `monthly::${symbol}`,
@@ -2315,7 +2295,7 @@ function buildCryptoPortfolioFromMonthlyHoldings() {
       accounts: ['SBI VC'],
       strategy: '-',
       memo: `月次報告書: ${quantity.toFixed(8)} ${symbol}`,
-      metricValue: valueJPY
+      metricValue: Number.isFinite(valueJPY) ? valueJPY : null
     };
   });
 }
@@ -2487,14 +2467,12 @@ function bindCurrentPortfolioRows(rows) {
 
 function renderCurrentPortfolioSection() {
   const list = document.getElementById('currentPortfolioList');
-  const chartCtx = document.getElementById('currentPortfolioChart')?.getContext('2d');
+  const chartCanvas = document.getElementById('currentPortfolioChart');
+  const chartCtx = chartCanvas?.getContext('2d');
   if (!list) return;
 
   const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
   let allRows = aggregateOpenPositionsForTop(entries);
-  if (!allRows.length) {
-    allRows = buildFallbackPortfolioRowsFromAccounts();
-  }
   allRows = applyMonthlyCryptoRows(allRows);
   allRows = applyMonthlySecuritiesValues(allRows);
   const hasTabData = (tabName) => allRows.some((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(tabName));
@@ -2507,7 +2485,8 @@ function renderCurrentPortfolioSection() {
   const rows = allRows.filter((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(activePortfolioAssetTab));
 
   if (!rows.length) {
-    list.innerHTML = '<li class="pair-card"><div class="pair-title">保有ポジションがありません</div><div class="pair-right"><div class="pair-profit neutral">-</div><div class="pair-growth neutral">0.0%</div></div></li>';
+    list.innerHTML = '<li class="pair-card portfolio-empty-row"><p class="data-empty-state">データなし</p></li>';
+    if (chartCanvas) chartCanvas.hidden = true;
     if (currentPortfolioChart) {
       currentPortfolioChart.destroy();
       currentPortfolioChart = null;
@@ -2515,10 +2494,12 @@ function renderCurrentPortfolioSection() {
     return;
   }
 
-  const total = rows.reduce((sum, row) => sum + (Number(row.metricValue) || 0), 0);
+  const chartRows = rows.filter((row) => Number.isFinite(row.metricValue) && row.metricValue > 0);
+  const total = chartRows.reduce((sum, row) => sum + row.metricValue, 0);
   const palette = ['#3B6DFF', '#3EE08F', '#3DA2FF', '#D95757', '#E9C85E', '#7E7A98', '#F18E4F', '#8BC7FF'];
   list.innerHTML = rows.map((row, idx) => {
-    const share = total > 0 ? ((row.metricValue / total) * 100) : 0;
+    const hasMetric = Number.isFinite(row.metricValue);
+    const share = hasMetric && total > 0 ? ((row.metricValue / total) * 100) : null;
     const metricLabel = activePortfolioAssetTab === 'FX' ? '必要証拠金' : '評価額';
     const color = palette[idx % palette.length];
     const unit = resolvePortfolioUnit(row);
@@ -2543,12 +2524,15 @@ function renderCurrentPortfolioSection() {
       `;
     }
 
-    const secondaryText = `${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%`;
+    const metricText = hasMetric ? fmtJPY(row.metricValue) : '未取得';
+    const secondaryText = share == null
+      ? `${fmtQuantity(row.absQuantity)} ${unit}`
+      : `${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%`;
     return `
       <li class="pair-card" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
         <div class="pair-title">${escapeHtml(row.symbol)}</div>
         <div class="pair-right">
-          <div class="pair-profit neutral">${metricLabel} ${fmtJPY(row.metricValue)}</div>
+          <div class="pair-profit neutral">${metricLabel} ${metricText}</div>
           <div class="pair-growth neutral">${secondaryText}</div>
         </div>
       </li>
@@ -2557,15 +2541,23 @@ function renderCurrentPortfolioSection() {
 
   bindCurrentPortfolioRows(rows);
 
-  if (!chartCtx || typeof Chart === 'undefined') return;
+  if (!chartCtx || typeof Chart === 'undefined' || !chartRows.length) {
+    if (chartCanvas) chartCanvas.hidden = true;
+    if (currentPortfolioChart) {
+      currentPortfolioChart.destroy();
+      currentPortfolioChart = null;
+    }
+    return;
+  }
+  chartCanvas.hidden = false;
   if (currentPortfolioChart) currentPortfolioChart.destroy();
   currentPortfolioChart = new Chart(chartCtx, {
     type: 'doughnut',
     data: {
-      labels: rows.map((row) => row.symbol),
+      labels: chartRows.map((row) => row.symbol),
       datasets: [{
-        data: rows.map((row) => row.metricValue),
-        backgroundColor: rows.map((_, idx) => palette[idx % palette.length]),
+        data: chartRows.map((row) => row.metricValue),
+        backgroundColor: chartRows.map((_, idx) => palette[idx % palette.length]),
         borderColor: 'rgba(255,255,255,0.2)',
         borderWidth: 1
       }]
@@ -2609,19 +2601,13 @@ function saveSelectedYear(year) {
 function resolveTopSeriesForYear(selectedYear) {
   const linkedData = buildTopLinkedData(selectedYear);
   if (linkedData) return linkedData;
-  return {
-    ...fallbackTopData,
-    year: selectedYear,
-    month: 12,
-    realized: Array(12).fill(0),
-    total: Array(12).fill(0),
-    accountData: []
-  };
+  return createEmptyTopSeries(selectedYear);
 }
 
 function initializeYearSelector() {
   const tradingDataMap = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const snapshotMap = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT);
+  const initialFundsMap = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
+  const initialUnrealizedMap = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
   const yearSelect = document.getElementById('topYearSelect');
 
   if (!yearSelect) return;
@@ -2632,7 +2618,10 @@ function initializeYearSelector() {
     getNumericYears(tradingDataMap)
       .filter((year) => year >= TOP_BASE_YEAR)
       .forEach((year) => set.add(year));
-    getNumericYears(snapshotMap)
+    getNumericYears(initialFundsMap)
+      .filter((year) => year >= TOP_BASE_YEAR)
+      .forEach((year) => set.add(year));
+    getNumericYears(initialUnrealizedMap)
       .filter((year) => year >= TOP_BASE_YEAR)
       .forEach((year) => set.add(year));
 
