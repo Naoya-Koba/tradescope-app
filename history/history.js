@@ -634,9 +634,12 @@ function readFormEntry() {
   const account = document.getElementById('entryAccount').value;
   const assetType = document.getElementById('entryAssetType').value;
   const selectEl = document.getElementById('entrySymbolSelect');
-  const symbol = (!selectEl || selectEl.hidden)
+  const rawSymbol = (!selectEl || selectEl.hidden)
     ? document.getElementById('entrySymbol').value.trim()
     : selectEl.value.trim();
+  const symbol = historyCore.normalizeInstrumentSymbol
+    ? historyCore.normalizeInstrumentSymbol(assetType, rawSymbol)
+    : rawSymbol;
   const side = document.getElementById('entrySide').value;
   const category = document.getElementById('entryCategory').value;
   const quantity = Number(document.getElementById('entryQuantity').value);
@@ -779,7 +782,10 @@ function bindEvents() {
     const date = document.getElementById('editEntryDate')?.value;
     const account = document.getElementById('editEntryAccount')?.value;
     const assetType = document.getElementById('editEntryAssetType')?.value;
-    const symbol = document.getElementById('editEntrySymbol')?.value.trim();
+    const rawSymbol = document.getElementById('editEntrySymbol')?.value.trim();
+    const symbol = historyCore.normalizeInstrumentSymbol
+      ? historyCore.normalizeInstrumentSymbol(assetType, rawSymbol)
+      : rawSymbol;
     const side = document.getElementById('editEntrySide')?.value;
     const category = document.getElementById('editEntryCategory')?.value;
     const quantity = Number(document.getElementById('editEntryQuantity')?.value);

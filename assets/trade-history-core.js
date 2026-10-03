@@ -1,5 +1,6 @@
 (function () {
   const STORAGE_KEY = 'tradeScopeTradeHistoryV1';
+  const SYMBOL_LIST_STORAGE_KEY = 'tradeScopeSymbolListV1';
   const FX_CONTRACT_SIZE_DEFAULT = 10000;
 
   const CARRY_PAIRS = ['TRY/JPY', 'HUF/JPY', 'MXN/JPY', 'ZAR/JPY', 'CZK/JPY'];
@@ -7,6 +8,62 @@
   const HUF_CONTRACT_SIZE = 100000;
   const HUF_RISK_RATE = 0.1;
   const LARGE_LOT_PAIRS = ['HUF/JPY', 'ZAR/JPY', 'MXN/JPY'];
+  const KNOWN_FX_SYMBOL_ALIASES = Object.freeze({
+    'EUD/USD': 'EUR/USD'
+  });
+
+  function normalizeFxSymbol(symbol) {
+    const trimmed = String(symbol || '').trim();
+    if (!/^[A-Za-z]{3}\/[A-Za-z]{3}$/.test(trimmed)) return trimmed;
+    const upper = trimmed.toUpperCase();
+    return KNOWN_FX_SYMBOL_ALIASES[upper] || upper;
+  }
+
+  function normalizeInstrumentSymbol(assetType, symbol) {
+    const trimmed = String(symbol || '').trim();
+    return String(assetType || '').trim().toUpperCase() === 'FX'
+      ? normalizeFxSymbol(trimmed)
+      : trimmed;
+  }
+
+  function normalizeKnownSymbolListAliases(list) {
+    if (!Array.isArray(list)) return list;
+    const seen = new Set();
+    const normalized = [];
+
+    list.forEach((item) => {
+      let next = item;
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        const upper = trimmed.toUpperCase();
+        if (upper === 'EUD/USD') next = 'EUR/USD';
+        if (upper === 'ZAR/JPY' && trimmed !== upper) next = 'ZAR/JPY';
+      }
+      if (seen.has(next)) return;
+      seen.add(next);
+      normalized.push(next);
+    });
+
+    return normalized;
+  }
+
+  function migrateStoredSymbolList(storage = window.localStorage) {
+    try {
+      const raw = storage.getItem(SYMBOL_LIST_STORAGE_KEY);
+      if (raw === null) return { changed: false, list: null };
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return { changed: false, list: parsed };
+      const normalized = normalizeKnownSymbolListAliases(parsed);
+      if (JSON.stringify(normalized) === JSON.stringify(parsed)) {
+        return { changed: false, list: parsed };
+      }
+      storage.setItem(SYMBOL_LIST_STORAGE_KEY, JSON.stringify(normalized));
+      return { changed: true, list: normalized };
+    } catch {
+      return { changed: false, list: null };
+    }
+  }
+
   function normalizeSymbolKey(symbol) {
     return String(symbol || '').trim().toUpperCase().replace(/\s+/g, '');
   }
@@ -102,6 +159,7 @@
     const entries = parseEntries();
     const normalized = normalizeEntry({
       ...entry,
+      symbol: normalizeInstrumentSymbol(entry?.assetType, entry?.symbol),
       id: entry?.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       createdAt: entry?.createdAt || Date.now()
     }, entries.length);
@@ -393,13 +451,20 @@
       }));
   }
 
+  migrateStoredSymbolList();
+
   window.TradeScopeHistory = {
     STORAGE_KEY,
+    SYMBOL_LIST_STORAGE_KEY,
     FX_CONTRACT_SIZE_DEFAULT,
     CARRY_PAIRS,
     HUF_PAIR,
     HUF_CONTRACT_SIZE,
     HUF_RISK_RATE,
+    normalizeFxSymbol,
+    normalizeInstrumentSymbol,
+    normalizeKnownSymbolListAliases,
+    migrateStoredSymbolList,
     normalizeSymbolKey,
     isCarryPair,
     parseEntries,

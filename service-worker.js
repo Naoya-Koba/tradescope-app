@@ -1,15 +1,15 @@
-const CACHE_NAME = 'tradescope-static-v245';
+const CACHE_NAME = 'tradescope-static-v246';
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./history.html",
   "./manifest.webmanifest",
   "./assets/app-gestures.js",
-  "./assets/trade-history-core.js",
+  "./assets/trade-history-core.js?v=20261003-1",
   "./top/style.css?v=20261003-2",
   "./top/script.js?v=20261003-2",
   "./history/history.css",
-  "./history/history.js",
+  "./history/history.js?v=20261003-1",
   "./profit/soneki.html",
   "./profit/soneki.css?v=20261003-2",
   "./profit/soneki.js?v=20261003-2",
