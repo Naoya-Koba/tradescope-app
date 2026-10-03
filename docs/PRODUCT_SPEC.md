@@ -66,7 +66,9 @@
 
 **Planned**：入力優先順位は `CSV → API → PDF → 手入力` とする。概念フローは次のとおり。
 
-`CSV / PDF → Raw Transactions → Position reconstruction → Completed Trades → Analytics`
+`CSV / API / PDF / 手入力 → ImportBatch → ImportRowDraft / Preview → ユーザー確認 → RawTransaction → Position reconstruction → Completed Trades → Analytics`
+
+**Decided**：RawTransactionは受理した取引事実の正本とし、照合状態・検証警告・戦略・Memo・Risk設定を混在させない。PositionおよびCompleted TradeはRawTransactionから再構築する派生データとして扱う。
 
 **Planned**：勝率、平均利益・平均損失、戦略別、通貨ペア・銘柄別、保有期間、キャリー／キャピタル別の分析に利用する。
 
@@ -78,7 +80,11 @@
 
 **Decided**：口座と資産クラスを分離する。SBI証券はAccount、株式・ETF・投資信託はAsset Classである。
 
+**Decided**：Instrumentと、その口座での`contractSize`、数量単位、業者固有symbol等を分離し、後者はAccountInstrumentSettingとして扱う。Risk設定もこれらとは別概念とする。
+
 **Planned**：設定画面からAccountを追加・編集・無効化できるようにする。
+
+**Planned**：将来の設定画面では、Account、Instrument、Accountごとの取引仕様、Risk設定を責務ごとに管理する。具体的なUIはデータモデル実装後に設計する。
 
 ## 6. Legacy / Experimental
 

@@ -66,7 +66,21 @@ TradeScope/
 - migration前後の件数、ID、金額合計等を照合できるようにする。
 - importは全検証成功後に適用する。
 
-## 6. 共通計算の実装方針
+## 6. データアクセスとインポート境界
+
+**Decided**：新しいAccount、Instrument、AccountInstrumentSetting、RawTransaction、TransactionAnnotationは、画面から`localStorage`へ直接アクセスせず、Repository / Storage Adapterを介して扱う。
+
+**Decided**：Entity IDは表示名、配列位置、providerCodeから独立したstable IDとする。保存形式には`schemaVersion`を持たせ、JSON export/importと将来の保存先変更を可能にする。
+
+**Decided**：インポートは`ImportBatch → ImportRowDraft / Preview → ユーザー確認 → RawTransaction`の境界を守る。未解決行、検証警告、重複候補はRawTransactionへ確定保存する前に扱う。
+
+**Decided**：CSV等に存在しない値を推測してRawTransactionへ埋めない。数値の欠落を`0`へ変換せず、原資料に存在するdecimal値の精度を早期のJavaScript変換で失わない。
+
+**Decided**：取引事実とTransactionAnnotation等のユーザーメタデータを別Repositoryで扱い、再インポートで後者を消去しない。
+
+**Planned**：localStorageを最初の保存先として使う場合も、RawTransaction増加時の容量を計測し、Repositoryを介してIndexedDB等へ移行可能にする。CSV MVPで全面移行は行わない。
+
+## 7. 共通計算の実装方針
 
 **Decided**：次の計算を画面ファイルから共有計算層へ集約する。
 
@@ -88,7 +102,7 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 
 画面固有コードは、データ読込、ユーザー操作、表示形式に限定する。
 
-## 7. 状態とキャッシュ
+## 8. 状態とキャッシュ
 
 - 正本データ更新時に派生キャッシュを無効化する。
 - Snapshotやキャッシュは、複数画面で同一の共通計算結果を利用する実装手段として使用できる。廃止を前提としない。
@@ -98,7 +112,7 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 
 **Known issue**：現在のTop Summary Snapshotは元データrevisionを持たず、古い値を優先する可能性がある。
 
-## 8. テスト方針
+## 9. テスト方針
 
 **Planned**：ビルドシステム導入とは独立して、まず共有計算の自動テストを用意する。
 
@@ -113,10 +127,14 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 7. 耐性基準時損失・最大損失・状態境界
 8. バックアップ旧形式の読込
 9. migrationの再実行安全性
+10. ImportRowDraftの検証完了前にRawTransactionが保存されないこと
+11. 同一CSV再取込、external transaction ID、row fingerprint、曖昧な重複候補
+12. decimal文字列、`null`と`0`、日付のみ、タイムゾーン不明の保持
+13. 再インポート後もTransactionAnnotationが維持されること
 
 fixtureは匿名の最小データを新規作成し、実ユーザーデータを使用しない。
 
-## 9. 外部依存
+## 10. 外部依存
 
 **Current**：Chart.js、Google Fonts、Google News RSS、AllOrigins、rss2json、MyMemory Translationに依存する。
 
@@ -126,7 +144,7 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 
 外部APIが失敗した場合、取得失敗を明示し、金融数値のダミー値へ置き換えない。
 
-## 10. PWA
+## 11. PWA
 
 - precache対象は存在確認する。
 - HTMLが実際に参照する資産とService Worker一覧を同期する。
@@ -135,11 +153,11 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 
 **Current**：`service-worker.js`のprecache対象は実在するファイルに限定し、トップ画面が読み込むCSS / JavaScriptと同じバージョン付きURLを使用する。PWA資産を変更した場合はCache versionも更新する。
 
-## 11. UI Design System
+## 12. UI Design System
 
 **Planned**：モバイルアプリとしての完成度を重視し、操作性、画面遷移、モーション、階層感、タップフィードバック、一貫性を共通のUI Design Systemとして整備する。Disney+等の高品質アプリは体験設計の参考とするが、完全コピーではなく、金融アプリとしての視認性とTradeScope独自UIを優先する。
 
-## 12. Git運用
+## 13. Git運用
 
 - 1変更1目的を基本とする。
 - 無関係なユーザー変更を上書きしない。
@@ -147,7 +165,7 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 - commit、push、deployは明示依頼時のみ行う。
 - 作業完了時は変更ファイル一覧と`git diff`要約を報告する。
 
-## 13. ドキュメント更新
+## 14. ドキュメント更新
 
 - 仕様変更時は該当docsを同じ変更で更新する。
 - Currentだけが変わる場合でも、Decidedとの差が変化するならKnown issueを更新する。

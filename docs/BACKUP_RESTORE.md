@@ -74,9 +74,11 @@ Memo、銘柄リスト、Legacy `tradeInfo`は含まれない。
 - 年初評価損益
 - 取引履歴
 - 将来のRaw Transactions
+- 将来のAccount、Instrument、AccountInstrumentSetting
+- 将来のImportBatch（出典追跡のため永続化する場合）
 - Risk設定
-- 戦略、タグ等のユーザーメタデータ
-- Memo
+- TransactionAnnotationを含む戦略、タグ、取引Memo等のユーザーメタデータ
+- トップMemo
 - 銘柄リスト
 - Account設定
 - インポート紐付け情報
@@ -105,7 +107,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 **Decided**：`backupVersion`を必須とする。
 
-概念例：
+現在のv1形式の概念例：
 
 ```json
 {
@@ -121,10 +123,6 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
     "initialFunds": {},
     "initialUnrealized": {},
     "transactions": [],
-    "rawTransactions": [],
-    "accounts": [],
-    "riskMetadata": [],
-    "userMetadata": {},
     "memos": [],
     "symbols": [],
     "legacy": {}
@@ -132,7 +130,13 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 }
 ```
 
-これは概念形であり、実装前に既存形式との変換仕様を決める。
+**Current**：上記v1は現在実装済みの保存対象を表す。未実装のAccount、Instrument、AccountInstrumentSetting、RawTransaction、TransactionAnnotationを空項目として追加してはいない。
+
+**Planned**：新データモデルへ実ユーザーデータを保存し始める前に、それらを完全バックアップ対象へ追加する。
+
+**Planned**：新モデルを追加するバックアップ形式は`backupVersion: 2`を候補とする。ただしv2の具体的なJSON構造、必須項目、移行規則は実装時に決定し、現時点の確定仕様とはしない。
+
+**Decided**：v1バックアップを復元するとき、v1に存在しない新モデルの現在値を空値で消去しない。将来の新形式復元では、新旧双方の対象を検証し、ジャーナルとロールバックの保護対象に含める。
 
 ## 5. 安全な復元フロー
 
@@ -200,6 +204,8 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 - 復元失敗時に現在データが維持されること
 - 復元後に派生値が再計算されること
 - Memo、Risk、Account、銘柄リストが失われないこと
+- Instrument、AccountInstrumentSetting、RawTransaction、TransactionAnnotationが失われないこと
+- v1復元で、v1に収録されない新モデルの現在値が消去されないこと
 - キャッシュを復元しなくても同じ正本結果になること
 
 実ユーザーデータそのものをテストfixtureに使用しない。
