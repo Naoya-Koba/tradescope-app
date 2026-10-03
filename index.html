@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="top/style.css" />
+  <link rel="stylesheet" href="top/style.css?v=20261003-1" />
   <link rel="stylesheet" href="assets/bottom-nav.css" />
   <link rel="stylesheet" href="assets/transitions.css" />
   <script src="assets/transitions.js"></script>
@@ -419,6 +419,28 @@
       </div>
     </section>
 
+    <!-- ===== Backup Restore Modal ===== -->
+    <div id="backupRestoreModal" class="backup-restore-modal" aria-hidden="true">
+      <div
+        id="backupRestoreDialog"
+        class="backup-restore-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="backupRestoreTitle"
+        aria-describedby="backupRestoreDate backupRestoreDescription backupRestoreLegacyNote"
+        tabindex="-1"
+      >
+        <h3 id="backupRestoreTitle" class="backup-restore-title">バックアップを復元</h3>
+        <p id="backupRestoreDate" class="backup-restore-date"></p>
+        <p id="backupRestoreDescription" class="backup-restore-description"></p>
+        <p id="backupRestoreLegacyNote" class="backup-restore-note" hidden></p>
+        <div class="backup-restore-actions">
+          <button type="button" id="cancelBackupRestoreBtn" class="backup-restore-btn backup-restore-btn-secondary">キャンセル</button>
+          <button type="button" id="confirmBackupRestoreBtn" class="backup-restore-btn backup-restore-btn-primary">復元</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== Memo ===== -->
     <h2 class="heading-muted">Memo</h2>
     <div class="memo-section">
@@ -586,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
   const splashBootLeadMs = 520;
-  const topScriptVersion = '20260926-2';
+  const topScriptVersion = '20261003-1';
   let topScriptPromise = null;
 
   const loadTopScript = () => {

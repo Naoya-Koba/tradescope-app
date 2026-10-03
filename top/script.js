@@ -3031,6 +3031,142 @@ function describeBackupRestore(inspection) {
   };
 }
 
+const backupRestoreModal = document.getElementById('backupRestoreModal');
+const backupRestoreDialog = document.getElementById('backupRestoreDialog');
+const backupRestoreTitle = document.getElementById('backupRestoreTitle');
+const backupRestoreDate = document.getElementById('backupRestoreDate');
+const backupRestoreDescription = document.getElementById('backupRestoreDescription');
+const backupRestoreLegacyNote = document.getElementById('backupRestoreLegacyNote');
+const cancelBackupRestoreBtn = document.getElementById('cancelBackupRestoreBtn');
+const confirmBackupRestoreBtn = document.getElementById('confirmBackupRestoreBtn');
+let backupRestoreDialogResolve = null;
+let backupRestoreReturnFocus = null;
+
+function formatBackupExportedAt(exportedAt) {
+  const date = new Date(exportedAt);
+  if (!Number.isFinite(date.getTime())) return '日時情報のないバックアップ';
+  const formatted = new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+  return `${formatted} のバックアップ`;
+}
+
+function closeBackupRestoreDialog(confirmed = false) {
+  if (!backupRestoreModal || backupRestoreModal.getAttribute('aria-hidden') !== 'false') return;
+
+  backupRestoreModal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('backup-restore-open');
+
+  const resolve = backupRestoreDialogResolve;
+  const returnFocus = backupRestoreReturnFocus;
+  backupRestoreDialogResolve = null;
+  backupRestoreReturnFocus = null;
+
+  if (returnFocus instanceof HTMLElement) {
+    requestAnimationFrame(() => returnFocus.focus());
+  }
+  resolve?.(confirmed);
+}
+
+function showBackupRestoreDialog({
+  title,
+  dateText = '',
+  description,
+  note = '',
+  confirmLabel,
+  showCancel = true
+}) {
+  if (!backupRestoreModal || !backupRestoreDialog || !backupRestoreTitle
+    || !backupRestoreDate || !backupRestoreDescription || !backupRestoreLegacyNote
+    || !cancelBackupRestoreBtn || !confirmBackupRestoreBtn) {
+    return Promise.resolve(false);
+  }
+
+  backupRestoreTitle.textContent = title;
+  backupRestoreDate.textContent = dateText;
+  backupRestoreDate.hidden = !dateText;
+  backupRestoreDescription.textContent = description;
+  backupRestoreLegacyNote.textContent = note;
+  backupRestoreLegacyNote.hidden = !note;
+  confirmBackupRestoreBtn.textContent = confirmLabel;
+  cancelBackupRestoreBtn.hidden = !showCancel;
+  backupRestoreReturnFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : document.getElementById('importAllDataBtn');
+
+  backupRestoreModal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('backup-restore-open');
+
+  return new Promise((resolve) => {
+    backupRestoreDialogResolve = resolve;
+    const initialFocusTarget = showCancel ? cancelBackupRestoreBtn : confirmBackupRestoreBtn;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (backupRestoreModal.getAttribute('aria-hidden') === 'false' && !initialFocusTarget.hidden) {
+          initialFocusTarget.focus();
+        }
+      }, 100);
+    });
+  });
+}
+
+function requestBackupRestoreConfirmation(inspection) {
+  const isLegacy = inspection.restorePlan.mode === 'legacy-partial';
+  return showBackupRestoreDialog({
+    title: 'バックアップを復元',
+    dateText: formatBackupExportedAt(inspection.normalized.exportedAt),
+    description: '現在のデータを、このバックアップの内容に置き換えます。',
+    note: isLegacy ? 'このバックアップに含まれるデータのみ復元します。' : '',
+    confirmLabel: '復元',
+    showCancel: true
+  });
+}
+
+function showBackupRestoreComplete() {
+  return showBackupRestoreDialog({
+    title: 'バックアップを復元しました',
+    description: 'バックアップの内容を反映しました。',
+    confirmLabel: '閉じる',
+    showCancel: false
+  });
+}
+
+cancelBackupRestoreBtn?.addEventListener('click', () => closeBackupRestoreDialog(false));
+confirmBackupRestoreBtn?.addEventListener('click', () => closeBackupRestoreDialog(true));
+backupRestoreModal?.addEventListener('click', (event) => {
+  if (event.target === backupRestoreModal) closeBackupRestoreDialog(false);
+});
+document.addEventListener('keydown', (event) => {
+  if (backupRestoreModal?.getAttribute('aria-hidden') !== 'false') return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeBackupRestoreDialog(false);
+    return;
+  }
+  if (event.key !== 'Tab') return;
+
+  const focusable = [cancelBackupRestoreBtn, confirmBackupRestoreBtn]
+    .filter((element) => element && !element.hidden && !element.disabled);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!focusable.includes(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+
 function buildRestoreConfirmationMessage(inspection) {
   const description = describeBackupRestore(inspection);
   const restoredLabels = description.restoredKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key);
@@ -3328,7 +3464,7 @@ function importAllData(file) {
   }
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const inspection = inspectBackupJson(String(e.target.result));
       if (!inspection.ok) {
@@ -3337,20 +3473,10 @@ function importAllData(file) {
         return;
       }
 
-      if (!confirm(buildRestoreConfirmationMessage(inspection))) return;
+      if (!await requestBackupRestoreConfirmation(inspection)) return;
 
-      const result = executeBackupRestore(inspection.restorePlan, localStorage);
-      const description = describeBackupRestore(inspection);
-      const resultLines = [
-        `${description.modeLabel}が完了しました。`,
-        `復元したデータ: ${description.restoredKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key).join('、')}`
-      ];
-      if (description.preservedKeys.length) {
-        resultLines.push(`維持したデータ: ${description.preservedKeys.map((key) => COMPLETE_BACKUP_STORAGE_LABELS[key] || key).join('、')}`);
-      }
-      if (description.warnings.length) resultLines.push(...description.warnings);
-      if (result.snapshotInvalidated) resultLines.push('古いSummary Snapshotを無効化しました。');
-      alert(resultLines.join('\n'));
+      executeBackupRestore(inspection.restorePlan, localStorage);
+      await showBackupRestoreComplete();
       window.location.reload();
     } catch (error) {
       console.error('Import error:', error);
