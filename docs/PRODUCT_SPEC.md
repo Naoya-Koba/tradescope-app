@@ -52,7 +52,9 @@
 
 **Current**：Summary、Asset Trend、Asset Allocation、Riskは、対象となる正本データがない場合に固定値を使わず空状態を表示する。
 
-**Known issue**：Snapshot自体を廃止対象とはしないが、現在は元データのrevisionや有効期限がなく、正本データが存在する年では古いSnapshotが元データより優先され続ける可能性がある。また、トップと損益管理には計算ロジックの重複が残っている。
+**Current**：Top Summary Snapshotは正本データのfingerprintと最新入力済み月が一致する場合だけ利用し、不一致または旧形式のSnapshotは正本データから再計算する。
+
+**Known issue**：トップと損益管理には計算ロジックの重複が残っている。
 
 ### 損益管理
 

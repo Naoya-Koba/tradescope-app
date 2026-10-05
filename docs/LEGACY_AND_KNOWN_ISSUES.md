@@ -29,11 +29,11 @@
 - **Known issue**：Portfolio必要証拠金、Open Positions、Riskで異なる契約数量を使う可能性がある。
 - **Decided**：商品・契約単位の正本を一箇所へ集約する。
 
-### Top Summary Snapshotの陳腐化
+### Top Summary Snapshotの整合性
 
-- **Current**：トップは対象年の正本データが存在し、`tradeScopeTopSummarySnapshotV1`が有効形状なら、元の`tradingData`からの再計算より先にSnapshotを利用する。正本データがない場合はSnapshotだけを根拠に表示しない。
+- **Current**：トップは対象年の正本データが存在し、`tradeScopeTopSummarySnapshotV1`のfingerprintと最新入力済み月が正本データに一致する場合だけSnapshotを利用する。正本データがない場合、または不一致の場合はSnapshotだけを根拠に表示しない。
 - **Current**：過去にTopと損益管理でAsset Trend等の差異が発生したため、同じ値を利用する手段としてSnapshotを使う経路が導入された。
-- **Known issue**：元データrevisionや有効期限がなく、インポート、削除、別画面更新後に古い値が残る可能性がある。
+- **Current**：fingerprintを持たない旧Snapshot、元データ変更後の古いSnapshot、無効な月を指すSnapshotは使用せず、正本データから再計算する。
 - **Decided**：Snapshotやキャッシュの利用自体は禁止しない。同一指標は同一の正本データまたは同一の共通計算結果を利用し、Snapshotは非正本として、元データ更新後に古い値を表示しない。
 
 ### 計算ロジックの重複

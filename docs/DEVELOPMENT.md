@@ -126,11 +126,11 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 
 - 正本データ更新時に派生キャッシュを無効化する。
 - Snapshotやキャッシュは、複数画面で同一の共通計算結果を利用する実装手段として使用できる。廃止を前提としない。
-- キャッシュには元データのrevisionまたはhashを関連付ける方式を検討する。
+- キャッシュには元データのrevisionまたはhashを関連付ける。
 - キャッシュが欠落・破損しても元データから再生成できるようにする。
 - キャッシュ値を正本へ逆流させない。
 
-**Known issue**：現在のTop Summary Snapshotは元データrevisionを持たず、古い値を優先する可能性がある。
+**Current**：Top Summary Snapshotは対象年の正本データfingerprintと最新入力済み月を保持し、トップ表示時に両方を照合する。不一致またはfingerprintを持たない旧Snapshotは利用しない。
 
 ## 10. テスト方針
 

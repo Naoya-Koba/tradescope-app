@@ -7,6 +7,8 @@
 - **Decided**：共通計算ロジックは一箇所に置き、各画面は同じ結果を表示する。
 - **Current**：過去にTopと損益管理でAsset Trend等の差異が発生したため、同じ値を利用する目的でSnapshotを使う経路が導入されている。
 - **Decided**：Snapshotやキャッシュを共通結果の共有・表示高速化に使用してよく、廃止を要件とはしない。ただし正本にはせず、入力変更時に無効化または即時再生成する。
+- **Current**：月次データは`__saved === true`、または旧形式で非ゼロ値・保有明細等の実データがある場合だけ入力済みと判定する。描画由来の全ゼロ月は未入力として扱い、未入力値と明示的な0を区別する。
+- **Current**：Top Summary Snapshotは対象年の正本データから生成したfingerprintと最新入力済み月を照合し、不一致または旧形式のSnapshotは使用せず正本データから再計算する。
 - **Known issue**：現在は`assets/profit-metrics.js`、`profit/soneki.js`、`top/script.js`等に同種の計算が重複している。
 
 ## 2. 確定資産
@@ -134,7 +136,7 @@ Monthly P/L = 当月決済損益 + 当月スワップ損益
 
 - **Decided**：純資産ベースと確定資産ベースの両系列を維持する。
 - **Decided**：Topと損益管理で同じ計算結果を使う。
-- **Known issue**：現在は両画面に別実装が残る。Top Summary Snapshot経由も存在し、Snapshotの利用自体ではなく、元データ変更後も古い値が優先され得る点が問題である。
+- **Known issue**：現在は両画面に別実装が残る。Top Summary Snapshotの鮮度検証は共通化されたが、計算ロジック自体の重複は残っている。
 
 ## 7. 月次集計
 
