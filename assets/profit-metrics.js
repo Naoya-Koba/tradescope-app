@@ -21,21 +21,45 @@
     return Number.isFinite(Number(value));
   }
 
+  const LEGACY_MONTHLY_INPUT_FIELDS = {
+    gmo: ['realizedPnL', 'swapPnL', 'unrealizedPnL', 'deposit', 'withdrawal'],
+    lightfx: ['realizedPnL', 'swapPnL', 'unrealizedPnL', 'deposit', 'withdrawal'],
+    minano: ['realizedPnL', 'swapPnL', 'unrealizedPnL', 'deposit', 'withdrawal'],
+    sbi: ['realizedPnL', 'deposit', 'withdrawal'],
+    sbivc: ['realizedPnL', 'deposit', 'withdrawal'],
+    smbc: ['monthEndBalance']
+  };
+  const LEGACY_UNREALIZED_LEG_ACCOUNTS = new Set(['lightfx', 'minano']);
+
+  function getLegacyMonthlyInputFields(accountKey) {
+    return LEGACY_MONTHLY_INPUT_FIELDS[accountKey]
+      || ['realizedPnL', 'swapPnL', 'unrealizedPnL', 'deposit', 'withdrawal'];
+  }
+
+  function hasFiniteUnrealizedLeg(row, allowZero) {
+    if (!Array.isArray(row?.unrealizedLegs)) return false;
+    return row.unrealizedLegs.some(function (value) {
+      if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return false;
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && (allowZero || numeric !== 0);
+    });
+  }
+
+  function hasLegacyMonthlyInput(row, accountKey, allowZero) {
+    const hasField = getLegacyMonthlyInputFields(accountKey).some(function (field) {
+      return hasStoredNumber(row, field) && (allowZero || Number(row[field]) !== 0);
+    });
+    if (hasField) return true;
+    return LEGACY_UNREALIZED_LEG_ACCOUNTS.has(accountKey)
+      && hasFiniteUnrealizedLeg(row, allowZero);
+  }
+
   function hasLegacyMonthData(yearData, month, accountKeys) {
     const monthData = yearData?.[month] || yearData?.[String(month)];
     if (!monthData || typeof monthData !== 'object' || Array.isArray(monthData)) return false;
 
     return (accountKeys || []).some(function (accountKey) {
-      const row = monthData?.[accountKey] || {};
-      return ['realizedPnL', 'swapPnL', 'unrealizedPnL', 'deposit', 'withdrawal', 'maintenanceRate', 'monthEndBalance', 'netAssets']
-        .some(function (field) { return hasStoredNumber(row, field) && Number(row[field]) !== 0; })
-        || (Array.isArray(row.holdings) && row.holdings.some(function (holding) {
-          return holding?.valueFilled === true
-            || holding?.quantityManual === true
-            || ['quantity', 'rate', 'acquisitionRate', 'valueJPY']
-              .some(function (field) { return hasStoredNumber(holding, field) && Number(holding[field]) !== 0; });
-        }))
-        || (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.some(function (value) { return Number(value) !== 0; }));
+      return hasLegacyMonthlyInput(monthData?.[accountKey] || {}, accountKey, false);
     });
   }
 
@@ -47,18 +71,10 @@
   }
 
   function isAccountMonthEntered(yearData, month, accountKey) {
-    if (!isMonthEntered(yearData, month, [accountKey])) return false;
+    const monthData = yearData?.[month] || yearData?.[String(month)];
+    if (!monthData || typeof monthData !== 'object' || Array.isArray(monthData)) return false;
     const row = getMonthRow(yearData, month, accountKey);
-    const hasNumericField = ['realizedPnL', 'swapPnL', 'unrealizedPnL', 'deposit', 'withdrawal', 'maintenanceRate', 'monthEndBalance', 'netAssets']
-      .some(function (field) { return hasStoredNumber(row, field); });
-    const hasHoldingField = Array.isArray(row.holdings) && row.holdings.some(function (holding) {
-      return holding?.valueFilled === true
-        || holding?.quantityManual === true
-        || ['quantity', 'rate', 'acquisitionRate', 'valueJPY'].some(function (field) { return hasStoredNumber(holding, field); });
-    });
-    const hasUnrealizedLeg = Array.isArray(row.unrealizedLegs)
-      && row.unrealizedLegs.some(function (value) { return value !== null && value !== '' && Number.isFinite(Number(value)); });
-    return hasNumericField || hasHoldingField || hasUnrealizedLeg;
+    return hasLegacyMonthlyInput(row, accountKey, monthData.__saved === true);
   }
 
   function getLatestEnteredMonth(yearData, accountKeys) {
