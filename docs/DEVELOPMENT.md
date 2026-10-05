@@ -80,7 +80,27 @@ TradeScope/
 
 **Planned**：localStorageを最初の保存先として使う場合も、RawTransaction増加時の容量を計測し、Repositoryを介してIndexedDB等へ移行可能にする。CSV MVPで全面移行は行わない。
 
-## 7. 共通計算の実装方針
+## 7. Importerのセキュリティとプライバシー
+
+- **Decided**：PDF / CSVは原則としてブラウザ内で解析し、原本を外部サービスへ送信しない。
+- **Decided**：PDF / CSV原本を`localStorage`、IndexedDB等へ永続保存しない。
+- **Decided**：PDF全文、CSV全文、解析前の全行を保存しない。
+- **Decided**：氏名、住所、口座番号、ユーザーID等、取引・資産管理に不要な個人情報を保存しない。
+- **Decided**：永続化する`rawFields`はallowlist方式とし、必要な取引・保有事実だけを選択して保存する。
+- **Decided**：ファイルの絶対パスを保存しない。出典追跡に必要なファイル情報は、個人情報を含まない名称、hash、サイズ、更新日時等のうち必要最小限へ限定する。
+- **Decided**：実データ、実PDF / CSV、解析結果をGitHubへcommitしない。
+- **Decided**：consoleへ実ユーザーデータ、PDF全文、CSV全文、raw rowを大量出力しない。
+- **Decided**：エラー表示、例外、診断ログへ不要な氏名、口座番号、残高、取引明細等を含めない。
+- **Decided**：Importer用の外部ライブラリまたはCDNを追加する場合、機能・容量だけでなく、配布元、固定バージョン、改ざん対策、オフライン動作、供給網リスクを確認する。
+- **Decided**：将来cloud syncを導入する場合は、ローカル保存の延長として扱わず、認証、認可、アクセス制御、通信・保存時暗号化、鍵管理、削除、監査を別途設計する。
+
+**Planned**：Parserは原本から必要なallowlist項目だけをImportRowDraftへ抽出し、ValidationとPreview完了前には正本Repositoryへ書き込まない。
+
+**Decided**：Parserはファイル内の正式な基準日・基準日時と、その取得根拠を優先して抽出する。日時がない場合、`File.lastModified`等を候補として提示してよいが、ユーザー確認なしに観測日時として確定しない。架空の時刻・タイムゾーンも補完しない。
+
+**Decided**：内部モデル名、`targetMonth`、`snapshotAsOf`、provenance、月末性判定等を通常UIの説明文へそのまま露出させない。画面側は対象月、主要な金融数値、必要時の短い基準日・警告だけを表示する。
+
+## 8. 共通計算の実装方針
 
 **Decided**：次の計算を画面ファイルから共有計算層へ集約する。
 
@@ -102,7 +122,7 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 
 画面固有コードは、データ読込、ユーザー操作、表示形式に限定する。
 
-## 8. 状態とキャッシュ
+## 9. 状態とキャッシュ
 
 - 正本データ更新時に派生キャッシュを無効化する。
 - Snapshotやキャッシュは、複数画面で同一の共通計算結果を利用する実装手段として使用できる。廃止を前提としない。
@@ -112,7 +132,7 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 
 **Known issue**：現在のTop Summary Snapshotは元データrevisionを持たず、古い値を優先する可能性がある。
 
-## 9. テスト方針
+## 10. テスト方針
 
 **Planned**：ビルドシステム導入とは独立して、まず共有計算の自動テストを用意する。
 
@@ -131,10 +151,17 @@ storage/import adapter -> normalized model -> shared calculations -> page render
 11. 同一CSV再取込、external transaction ID、row fingerprint、曖昧な重複候補
 12. decimal文字列、`null`と`0`、日付のみ、タイムゾーン不明の保持
 13. 再インポート後もTransactionAnnotationが維持されること
+14. `targetMonth`、`snapshotAsOf`、`importedAt`が混同されないこと
+15. Import値と手入力値が黙って二重計上されないこと
+16. PDF / CSV原本、個人情報、非allowlist列が永続化・console出力されないこと
+17. v1復元がHoldingSnapshot、AccountSnapshot等の新モデルを削除しないこと
+18. 一つのSnapshotへ異なる取得元が黙って合成されず、口座全体表示が派生Viewとして生成されること
+19. ファイル内基準日を優先し、日時欠落時の`File.lastModified`がユーザー確認なしに確定値にならないこと
+20. 正式月末Snapshotと対象月へ採用した近似Snapshotを区別し、近似値を無条件に月末確定値へ昇格させないこと
 
 fixtureは匿名の最小データを新規作成し、実ユーザーデータを使用しない。
 
-## 10. 外部依存
+## 11. 外部依存
 
 **Current**：Chart.js、Google Fonts、Google News RSS、AllOrigins、rss2json、MyMemory Translationに依存する。
 
@@ -144,7 +171,7 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 
 外部APIが失敗した場合、取得失敗を明示し、金融数値のダミー値へ置き換えない。
 
-## 11. PWA
+## 12. PWA
 
 - precache対象は存在確認する。
 - HTMLが実際に参照する資産とService Worker一覧を同期する。
@@ -153,11 +180,11 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 
 **Current**：`service-worker.js`のprecache対象は実在するファイルに限定し、トップ画面が読み込むCSS / JavaScriptと同じバージョン付きURLを使用する。PWA資産を変更した場合はCache versionも更新する。
 
-## 12. UI Design System
+## 13. UI Design System
 
 **Planned**：モバイルアプリとしての完成度を重視し、操作性、画面遷移、モーション、階層感、タップフィードバック、一貫性を共通のUI Design Systemとして整備する。Disney+等の高品質アプリは体験設計の参考とするが、完全コピーではなく、金融アプリとしての視認性とTradeScope独自UIを優先する。
 
-## 13. Git運用
+## 14. Git運用
 
 - 1変更1目的を基本とする。
 - 無関係なユーザー変更を上書きしない。
@@ -165,7 +192,7 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 - commit、push、deployは明示依頼時のみ行う。
 - 作業完了時は変更ファイル一覧と`git diff`要約を報告する。
 
-## 14. ドキュメント更新
+## 15. ドキュメント更新
 
 - 仕様変更時は該当docsを同じ変更で更新する。
 - Currentだけが変わる場合でも、Decidedとの差が変化するならKnown issueを更新する。

@@ -18,6 +18,10 @@ TradeScopeのデータは、概念上次の4層に分類する。
 - 保有数量、取得単価、評価額
 - 将来のCSV、API、PDFインポート結果
 - Raw Transactions
+- Holding Snapshots
+- Account Snapshots
+
+**Decided**：`HoldingSnapshot`と`AccountSnapshot`は、外部資料または手入力から得た「ある時点の観測事実」を保持する元データである。表示高速化用のSnapshotやキャッシュとは別物であり、名称が同じSnapshotでも削除可能な派生キャッシュとして扱わない。
 
 ### 2. ユーザー付与情報
 
@@ -148,6 +152,8 @@ Account {
 - **Decided**：過去データを持つAccountは原則物理削除せず、無効化する。
 - **Decided**：現行の`gmo`、`GMO`等との対応は`legacyRefs`等の移行情報として保持し、新しい安定IDそのものにはしない。
 - **Planned**：設定画面からAccountを追加・編集・無効化する。
+- **Planned**：Accountを起点に、資産評価額または純資産、評価損益、月間確定損益、保有銘柄・FX建玉・暗号資産、現金残高、必要証拠金等の口座固有情報、データ取得時点を閲覧できるようにする。
+- **Decided**：FX、証券、暗号資産を一つの固定項目集合へ無理に押し込まない。Account共通項目と、資産クラス・口座種別固有項目を分離する。
 - **Planned**：初期Account IDは`acc_gmo_fx`、`acc_lightfx_fx`、`acc_minna_fx`、`acc_sbi_sec`、`acc_sbivc_crypto`、`acc_smbc_bank`等を候補とする。
 - **Under consideration**：Account IDの最終命名、既存固定キーとの具体的な変換規則、ユーザーによる追加口座のID生成方式。
 
@@ -224,7 +230,120 @@ AccountInstrumentSetting {
 
 **Under consideration**：追跡フィールドは`accountInstrumentSettingId`や設定revision等を候補とする。有効期間を含む完全な版管理方式はCSV MVPの必須範囲としない。
 
-## 7. インポート処理の境界
+## 7. 時点別の保有・口座状態
+
+**Decided**：取引と時点状態の責務を次のように分ける。
+
+- `RawTransaction`：売買、新規、決済、入出金等の取引事実
+- `HoldingSnapshot`：ある観測時点の銘柄・建玉・暗号資産等の保有状態
+- `AccountSnapshot`：ある観測時点の口座全体の状態
+- Position / Completed Trade / 集計値：上記元データから生成する派生データ
+
+### HoldingSnapshot
+
+**Planned**：保有証券一覧、FX建玉、暗号資産残高等を、時点付きの保有状態として保存できるようにする。
+
+候補フィールド：
+
+```text
+HoldingSnapshot {
+  schemaVersion
+  id
+  accountSnapshotId
+  accountId
+  instrumentId
+  targetMonth
+  snapshotAsOf
+  importedAt
+  sourceMode          // imported | manual
+  sourceScope         // 国内保有、外国株、円現金等の取得範囲
+  importBatchId
+  quantity
+  acquisitionPrice
+  marketPrice
+  marketValue
+  unrealizedPnl
+  currency
+  rawFields
+}
+```
+
+**Decided**：原資料に存在しない取得単価、現在価格、評価額、評価損益等を推測してHoldingSnapshotへ埋めない。取得できない値は欠落または`null`として扱い、実際の`0`と区別する。
+
+**Decided**：一つのHoldingSnapshot集合は、原則として一つの取得元・一つの観測に基づく。SBI国内保有CSV、SBI外国株の手入力、円現金の手入力等を一つの観測Snapshotへ合成しない。
+
+### AccountSnapshot
+
+**Planned**：口座全体の状態を、観測時点と出所を伴う元データとして保存できるようにする。
+
+候補フィールド：
+
+```text
+AccountSnapshot {
+  schemaVersion
+  id
+  accountId
+  targetMonth
+  snapshotAsOf
+  importedAt
+  sourceMode          // imported | manual
+  sourceScope         // PDF口座全体、国内保有、現金等の取得範囲
+  importBatchId
+  valuationCurrency
+  assetValue
+  netAssetValue
+  cashBalance
+  unrealizedPnl
+  reportedMonthlyRealizedPnl
+  accountSpecific    // FX・証券・暗号資産等の型別allowlist項目
+}
+```
+
+- **Decided**：一つのAccountSnapshotは、原則として一つの取得元・一つの観測に基づく事実だけを保持する。取得元が口座全体を報告していない場合、そのSnapshotを口座全体の完全な状態とは扱わない。
+- **Decided**：共通項目には口座識別、対象月、観測時点、保存時点、出所、取得範囲、通貨、原資料が報告する口座合計等だけを置く。
+- **Decided**：必要証拠金、証拠金維持率、買付余力、預り金等は全Accountへ同じ意味で強制せず、口座種別ごとの明示的なallowlist項目として扱う。
+- **Decided**：原資料が報告する口座合計と、HoldingSnapshotから算出した合計を同じ正本値として混在させない。算出値は派生結果として出所を区別する。
+- **Decided**：SBI国内保有、SBI外国株、円現金・外貨現金等、複数取得元を合算した「SBI証券口座全体」等は、観測Snapshotとして保存せず、原則として派生計算または表示用Viewとして生成する。
+- **Decided**：自動取込値には`importBatchId`等、手入力値には手入力記録の識別子等を関連付ける。MVPでは一つのSnapshotへ複数取得元を混在させないことで、値単位provenanceを必須にしない。
+- **Under consideration**：将来、一つのSnapshot内へ複数取得元の値を混在させる要件が生じた場合は、値単位provenanceと競合解決履歴を必須にする可能性がある。
+
+### 対象月と観測時点
+
+**Decided**：`targetMonth`、`snapshotAsOf`、`importedAt`を別概念として扱う。
+
+- `targetMonth`：損益管理上どの月へ表示・関連付けるか
+- `snapshotAsOf`：原資料が表す実際の観測日時または基準日時
+- `importedAt`：TradeScopeへ保存した日時
+
+**Decided**：`snapshotAsOf`は推測で確定せず、次の優先順位で決める。
+
+1. ファイル内に正式な基準日・基準日時がある場合は、その値を使用する。
+2. ファイル内に日時がない場合は、Import Previewでユーザーが確認または指定する。
+3. `File.lastModified`等は初期候補に利用してよいが、正確な観測日時として黙って確定しない。
+
+**Decided**：日時が不明な場合は、架空の時刻やタイムゾーンを生成しない。日付だけが確認できる場合は日付精度のまま保持する。`importedAt`は観測日時の代用にせず、TradeScopeへ実際に保存した日時として記録する。
+
+SBI証券の保有証券CSVを2026年10月4日に取得し、2026年9月分として扱う例：
+
+```text
+targetMonth = 2026-09
+snapshotAsOf = 2026-10-04
+importedAt = TradeScopeへ実際に保存した日時
+```
+
+**Decided**：保有証券CSVの値を、対象月が9月であることだけを理由に9月30日の月末確定値とは扱わない。月末との乖離が大きい場合は取込前に警告し、観測日を保持したままユーザー確認後の取込を許可する。
+
+**Decided**：「対象月への採用」「実際の観測日時」「正式月末値か近似値か」を内部的に別概念として保持する。月末PDFに正式な基準日が明記されたSnapshotと、月初取得CSVを前月分へ採用した近似Snapshotを、同じ精度・同じ意味のデータとして扱わない。
+
+**Planned**：月末性を示す内部属性は、`officialMonthEnd`、`approximateForMonth`、`pointInTime`等を候補とする。最終名称と判定条件はImporter設計時に決定する。
+
+**Under consideration**：警告を出す日数閾値、休日・非営業日の扱い、対象月の初期提案方法。
+
+**Planned**：`MonthlyAccountSnapshot`は、まず`AccountSnapshot`に`targetMonth`と月次確定・確認状態を付けた月次版またはviewとして扱い、独立した永続エンティティを増やさない方向を優先する。近似Snapshotを正式月末値へ無条件に昇格させない。
+
+**Under consideration**：月末確定・ユーザー確認済み等の状態名と、実データ要件によって`MonthlyAccountSnapshot`を別概念として公開する必要があるか。
+
+## 8. インポート処理の境界
 
 **Planned**：インポート処理は次の層に分ける。
 
@@ -259,7 +378,25 @@ ImportBatch {
 
 **Decided**：ImportRowDraftはプレビュー中だけの一時データとしてよく、永続保存を必須としない。
 
-## 8. RawTransaction
+### 取得元の初期対応方針
+
+| Account / 資産 | Planned取得元 | 備考 |
+|---|---|---|
+| GMO FX | 月次PDF | Parser仕様は実ファイルと公式仕様を確認して決定 |
+| LIGHT FX | 月次PDF | 同上 |
+| みんなのFX | 月次PDF | 同上 |
+| SBI証券 国内株・投資信託 | 約定履歴CSV、保有証券一覧CSV | 取引事実と時点保有を別モデルへ保存 |
+| SBI証券 外国株 | 当面手入力 | 将来Importerを追加可能にする |
+| SBI VCトレード | 月次PDF | Parser仕様は実ファイル確認後に決定 |
+| 入出金・資料にない不足値 | 手入力を維持 | 推測補完しない |
+
+**Decided**：手入力機能を削除しない。自動取込値と手入力値は出所を保持し、算出値は派生データとして区別する。
+
+**Decided**：同一Account・Instrument・対象期間・データ責務について、Import値と手入力値を黙って加算しない。重複または競合の可能性をPreviewで示し、ユーザー確認前に正本へ反映しない。
+
+**Under consideration**：Import値と手入力値の上書き優先順位、部分的な手入力補正、競合解決、採用後の履歴保持方式。
+
+## 9. RawTransaction
 
 **Decided**：RawTransactionは、CSV / API / PDF / 手入力から受理した「取引事実」を保存する正本層とする。PositionおよびCompleted TradeはRawTransactionから生成される派生データである。
 
@@ -301,7 +438,7 @@ RawTransaction {
 - **Decided**：原資料の列は`rawFields`へ保持できる。受理後の標準フィールドと元の表現を区別する。
 - **Under consideration**：取引種別ごとの必須・nullable項目、decimal文字列表現、日時の標準化、手入力をImportBatch経由にするか直接保存するか。
 
-## 9. TransactionAnnotationとその他ユーザーメタデータ
+## 10. TransactionAnnotationとその他ユーザーメタデータ
 
 **Decided**：戦略、Risk対象、タグ、ユーザーMemoは、再インポート可能な取引行そのものから分離し、安定した取引・ポジション識別子へ関連付ける。再インポートしてもユーザー付与情報を失ってはならない。
 
@@ -327,7 +464,7 @@ TransactionAnnotation {
 
 **Under consideration**：これらのモデル名、関連先、必須フィールド、ユーザーによる上書き単位は各機能の実装前に決定する。
 
-## 10. Duplicate protection
+## 11. Duplicate protection
 
 **Decided**：同一ファイルや同一取引を再度取り込んでも、確定済みRawTransactionを無条件に重複作成しない。
 
@@ -340,14 +477,14 @@ TransactionAnnotation {
 - **Decided**：完全一致に見える正当な複数約定を自動削除しない。曖昧な一致は「重複候補」としてユーザー確認へ回す。
 - **Under consideration**：最初の実CSVを確認するまで、fingerprintの最終構成フィールド、時刻精度、取引IDの安定性、訂正・取消取引の扱いは確定しない。
 
-## 11. PositionとCompleted Trade
+## 12. PositionとCompleted Trade
 
 - **Decided**：Positionは取引列から再構築可能な派生データとする。
 - **Decided**：Completed Tradeも原則として取引と対応付けルールから生成する派生データとする。
 - **Current**：同方向追加は加重平均、反対売買は数量減算、反転時は新規側レートへ平均を切り替える。
 - **Under consideration**：FIFO、総平均、口座別約定単位、手数料、税、部分決済の正式対応ルール。
 
-## 12. 現行データとの並行運用と移行
+## 13. 現行データとの並行運用と移行
 
 **Current**：次の現行キーが正本またはユーザー付与情報として利用されている。
 
@@ -365,7 +502,7 @@ TransactionAnnotation {
 
 **Planned**：移行前後で件数、数量、金額、Position、Risk等を照合し、同等性が確認できるまで旧キーを削除しない。
 
-## 13. 保存境界とlocalStorageキー案
+## 14. 保存境界とlocalStorageキー案
 
 **Decided**：画面や計算処理が`localStorage`キーを直接前提にしないよう、Repository / Storage Adapterを介して読み書きする。これにより将来のIndexedDBまたはcloud syncへの移行余地を保つ。
 
@@ -375,6 +512,8 @@ TransactionAnnotation {
 - `tradeScopeInstrumentsV1`
 - `tradeScopeAccountInstrumentSettingsV1`
 - `tradeScopeRawTransactionsV1`
+- `tradeScopeHoldingSnapshotsV1`
+- `tradeScopeAccountSnapshotsV1`
 - `tradeScopeTransactionAnnotationsV1`
 - `tradeScopeRiskSettingsV1`
 - `tradeScopeDataModelMetaV1`
@@ -390,37 +529,38 @@ TransactionAnnotation {
 }
 ```
 
-**Known issue**：RawTransaction件数の増加によりlocalStorage容量上限へ達する可能性がある。
+**Known issue**：RawTransactionおよび時点別Snapshotの件数増加によりlocalStorage容量上限へ達する可能性がある。
 
 **Under consideration**：CSV MVPで直ちに全面IndexedDB化はしないが、実データ量を確認しながら保存先移行の時期を決める。Repository境界とstable IDを先に導入し、移行を妨げない。
 
-## 14. Riskとの分離
+## 15. Riskとの分離
 
 **Decided**：Risk設定はInstrumentおよびAccountInstrumentSettingと分離する。Instrumentの存在やlot sizeだけを理由にRisk対象へしない。
 
 **Planned**：Risk対象ON/OFF、耐性基準価格、個別ポジション上書き等は、`RISK_SPEC.md`に従う独立モデルとして管理する。
 
-## 15. 実装範囲と順序
+## 16. 実装範囲と順序
 
-**Planned**：CSV MVP前後の推奨実装順序は次のとおり。
+**Planned**：既存データの破壊と二重計上を防ぐため、次の順序を基本とする。
 
-1. Entity定義とvalidator
-2. 現行6口座のAccount seedと`legacyRefs`
-3. canonical Instrument seedとresolver
-4. AccountInstrumentSetting
-5. Repository / Storage Adapter
-6. 新モデルを含む完全バックアップ対応
-7. RawTransaction repository
-8. ImportBatchとImportRowDraft / preview
-9. duplicate detection
-10. 1業者・1形式に限定したCSV MVP
-11. TransactionAnnotation
-12. Position projection
-13. `tradeScopeTradeHistoryV1`の段階移行
+1. 正本文書更新
+2. 共通Parser / Validation / Preview基盤
+3. SBI証券国内CSV Parser
+4. Account、Instrument、RawTransaction、HoldingSnapshot、AccountSnapshot等の新モデルStorage
+5. 新モデルを含む完全バックアップ / Restore対応
+6. 新モデルへの永続保存解禁
+7. SBI証券国内の対象月データ取込
+8. Accountを中心とした口座情報表示
+9. FX月次PDF Importer
+10. SBI VCトレード月次PDF Importer
+
+**Decided**：ParserとPreviewは永続保存なしで先行実装してよいが、新モデルを実ユーザーデータとして永続保存する前に完全バックアップと復元を対応させる。
+
+**Planned**：Account seed、canonical Instrument resolver、AccountInstrumentSetting、Repository / Storage Adapter、duplicate detection、TransactionAnnotation等は、上記各段階で必要になる最小範囲を実装する。
 
 **Under consideration / 今回実装しない**：Position / Completed Tradeの正式対応アルゴリズム、FIFO税計算、cloud syncと認証、全面IndexedDB移行、API / PDF / OCR、実時間価格、高度な証拠金モデル、曖昧一致による銘柄自動補正、自動戦略・Risk分類、複雑な同期競合解決。
 
-## 16. 移行原則
+## 17. 移行原則
 
 - 旧キーを即時削除しない。
 - 新形式を導入する場合は旧形式読込→正規化→新形式利用を可能にする。

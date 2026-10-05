@@ -32,7 +32,7 @@
 - `tradeScopeSymbolListV1`
 - localStorageに実在する場合のみLegacy `tradeInfo`
 
-**Current**：Risk設定、Account設定、Raw Transactionsは現在存在しないため、v1エクスポートでは新設していない。
+**Current**：Risk設定、Account設定、Raw Transactions、Holding Snapshots、Account Snapshotsは現在存在しないため、v1エクスポートでは新設していない。
 
 **Current**：v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v1は正式対象データを完全復元し、旧形式は収録項目だけを復元して未収録項目を維持するLegacy部分復元として扱う。
 
@@ -74,6 +74,7 @@ Memo、銘柄リスト、Legacy `tradeInfo`は含まれない。
 - 年初評価損益
 - 取引履歴
 - 将来のRaw Transactions
+- 将来のHolding Snapshots、Account Snapshots
 - 将来のAccount、Instrument、AccountInstrumentSetting
 - 将来のImportBatch（出典追跡のため永続化する場合）
 - Risk設定
@@ -83,6 +84,8 @@ Memo、銘柄リスト、Legacy `tradeInfo`は含まれない。
 - Account設定
 - インポート紐付け情報
 - その他、再生成不能なユーザー編集設定
+
+**Decided**：PDF / CSV原本、PDF全文、CSV全文、個人情報を含む解析前データは永続保存しないため、完全バックアップ対象にも含めない。バックアップする`rawFields`はImporterで選別済みのallowlist項目に限定する。
 
 Legacy `tradeInfo`の扱い：
 
@@ -130,13 +133,13 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 }
 ```
 
-**Current**：上記v1は現在実装済みの保存対象を表す。未実装のAccount、Instrument、AccountInstrumentSetting、RawTransaction、TransactionAnnotationを空項目として追加してはいない。
+**Current**：上記v1は現在実装済みの保存対象を表す。未実装のAccount、Instrument、AccountInstrumentSetting、RawTransaction、HoldingSnapshot、AccountSnapshot、TransactionAnnotationを空項目として追加してはいない。
 
-**Planned**：新データモデルへ実ユーザーデータを保存し始める前に、それらを完全バックアップ対象へ追加する。
+**Decided**：新データモデルへ実ユーザーデータを永続保存できるようにする前に、それらの完全バックアップ、検証、復元、journal、rollbackを実装・検証する。ParserとPreviewは永続保存なしで先行してよい。
 
 **Planned**：新モデルを追加するバックアップ形式は`backupVersion: 2`を候補とする。ただしv2の具体的なJSON構造、必須項目、移行規則は実装時に決定し、現時点の確定仕様とはしない。
 
-**Decided**：v1バックアップを復元するとき、v1に存在しない新モデルの現在値を空値で消去しない。将来の新形式復元では、新旧双方の対象を検証し、ジャーナルとロールバックの保護対象に含める。
+**Decided**：v1バックアップを復元するとき、v1に存在しない新モデルの現在値を空値で消去しない。将来の新形式復元では、新旧双方の対象を検証し、HoldingSnapshotとAccountSnapshotを含めてjournalとrollbackの保護対象にする。
 
 ## 5. 安全な復元フロー
 
@@ -205,6 +208,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 - 復元後に派生値が再計算されること
 - Memo、Risk、Account、銘柄リストが失われないこと
 - Instrument、AccountInstrumentSetting、RawTransaction、TransactionAnnotationが失われないこと
+- HoldingSnapshot、AccountSnapshotおよびその出所・観測時点が失われないこと
 - v1復元で、v1に収録されない新モデルの現在値が消去されないこと
 - キャッシュを復元しなくても同じ正本結果になること
 
