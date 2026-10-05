@@ -378,6 +378,8 @@ ImportBatch {
 
 **Decided**：ImportRowDraftはプレビュー中だけの一時データとしてよく、永続保存を必須としない。
 
+**Current**：SBI国内CSVの`import.html`は、allowlistの`data` / `rawFields` / `sourceHeaders`、行番号、検証結果、正常・問題行、原資料の合計をメモリ内のPreview Rowとして扱う。Account / Instrument照合、RawTransaction / HoldingSnapshot / AccountSnapshotへの確定変換・保存は未実装。対象月と取得日は別の一時情報で、保有情報の存在を月次入力済み判定へ渡さない。既存`tradingData`、Top Snapshot、バックアップ形式に変更はない。
+
 ### 取得元の初期対応方針
 
 | Account / 資産 | Planned取得元 | 備考 |
