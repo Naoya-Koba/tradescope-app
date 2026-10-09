@@ -4,11 +4,11 @@
 
 ## 1. 重要な仕様差異・既知の問題
 
-### 完全バックアップv1とLegacy部分復元
+### 完全バックアップv2・v1互換とLegacy部分復元
 
-- **Current**：トップのエクスポートは`backupVersion: 1`の完全バックアップとなり、損益データ、年初資金、年初評価損益、取引履歴、Memo、銘柄リスト、存在する場合のLegacy `tradeInfo`を保存する。
-- **Current**：v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
-- **Current**：v1は完全復元し、旧統合・旧損益・旧履歴は収録項目だけを部分復元する。未収録項目は現在値を維持する。
+- **Current**：トップexportは`backupVersion: 2`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotを保存する。Previewの保存接続は未実装。
+- **Current**：v2、v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
+- **Current**：v2は新旧モデルを完全復元し、v1は従来対象を復元して新モデルを維持する。旧形式は部分復元で未収録項目を維持する。
 - **Current**：復元前ジャーナル、書き込み後検証、失敗時ロールバック、Summary Snapshot無効化、空データ復元時のダミー投入抑止を行う。
 - **Current**：未完了ジャーナルが残る場合は新しい復元を開始せず、ユーザー確認後に復元前状態へ戻す。
 - **Current / Confirmed**：2026年9月23日に現行統合形式の `tradescope-all-backup-2026-09-23.json` を出力済みである。
@@ -117,11 +117,11 @@
 - **Known issue / Data protection note**：iPhoneのホーム画面Web Appと通常のSafariでは、同じURLでもストレージが分離される可能性がある。データが見えない場合も初期化前に利用形態とバックアップを確認する。
 - **Planned**：Codex中心開発へ移行する前後で、起動・公開・ロールバック手順を文書化する。
 
-### 自動テストがない
+### 自動テストと未検証範囲
 
-- **Current**：計算、データ移行、バックアップ互換性の自動テストがない。
-- **Known issue**：重複計算やlocalStorage変更の回帰を検出しにくい。
-- **Planned**：共有計算とバックアップから優先的にテストする。
+- **Current**：CSV Preview、Storage、新旧バックアップ互換・rollbackの匿名自動テストを追加済み。
+- **Known issue**：計算全体、Migration、実ブラウザ／iPhoneでの新Storage・v2往復、容量上限、複数タブ排他は未確認。
+- **Planned**：共有計算と実環境の容量・中断復旧を追加検証する。保存基盤の追加だけで実CSV保存を解禁しない。
 
 ## 3. Legacy / Experimental一覧
 

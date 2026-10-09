@@ -128,7 +128,7 @@ tradingData[year][month][accountKey] = {
 
 **Decided**：Accountを正式な基本エンティティとして扱う。
 
-**Current**：GMO、Light FX、みんなのFX、SBI、SBI VC、三井住友銀行は、月次データや取引履歴のコード内で固定キーまたは表示名として扱われている。Accountマスターと設定画面はまだ存在しない。
+**Current**：既存の月次・履歴は固定キーまたは表示名を使用する。新しいAccount Repositoryと初期口座の純粋factoryは存在するが、設定画面、既存データのMigration、自動seed保存は未接続。
 
 将来の最小概念：
 
@@ -154,8 +154,8 @@ Account {
 - **Planned**：設定画面からAccountを追加・編集・無効化する。
 - **Planned**：Accountを起点に、資産評価額または純資産、評価損益、月間確定損益、保有銘柄・FX建玉・暗号資産、現金残高、必要証拠金等の口座固有情報、データ取得時点を閲覧できるようにする。
 - **Decided**：FX、証券、暗号資産を一つの固定項目集合へ無理に押し込まない。Account共通項目と、資産クラス・口座種別固有項目を分離する。
-- **Planned**：初期Account IDは`acc_gmo_fx`、`acc_lightfx_fx`、`acc_minna_fx`、`acc_sbi_sec`、`acc_sbivc_crypto`、`acc_smbc_bank`等を候補とする。
-- **Under consideration**：Account IDの最終命名、既存固定キーとの具体的な変換規則、ユーザーによる追加口座のID生成方式。
+- **Current**：初期口座factoryは`acc_gmo_fx`、`acc_lightfx_fx`、`acc_minna_fx`、`acc_sbi_sec`、`acc_sbivc_crypto`、`acc_smbc_bank`の固定IDを返す。表示名変更で変えない。旧キーは`legacyRefs`へ保持し、自動変換しない。追加IDの技術基盤にはブラウザ標準`crypto.randomUUID()`を用意する。
+- **Under consideration**：追加口座UI、provider変更の運用規則、具体的なMigration。
 
 ## 5. Asset ClassとInstrument
 
@@ -378,7 +378,7 @@ ImportBatch {
 
 **Decided**：ImportRowDraftはプレビュー中だけの一時データとしてよく、永続保存を必須としない。
 
-**Current**：SBI国内CSVの`import.html`は、allowlistの`data` / `rawFields` / `sourceHeaders`、行番号、検証結果、正常・問題行、原資料の合計をメモリ内のPreview Rowとして扱う。Account / Instrument照合、RawTransaction / HoldingSnapshot / AccountSnapshotへの確定変換・保存は未実装。対象月と取得日は別の一時情報で、保有情報の存在を月次入力済み判定へ渡さない。既存`tradingData`、Top Snapshot、バックアップ形式に変更はない。
+**Current**：SBI国内CSVの`import.html`はallowlist項目、行番号、検証結果、原資料の合計をメモリ内のPreview Rowとして扱う。新Storageはこの画面へ読み込まず、Account / Instrument照合や正本への確定変換・保存は未接続。対象月・取得日は一時情報であり、保有情報の存在を月次入力済み判定へ渡さない。Previewから既存`tradingData`やTop Snapshotを変更しない。完全バックアップの拡張は独立した経路で行う。
 
 ### 取得元の初期対応方針
 
@@ -522,6 +522,35 @@ TransactionAnnotation {
 - `tradeScopeImportBatchesV1`（ImportBatchを永続化する場合のみ）
 
 各保存値は、`schemaVersion`とrecordsを持つJSON envelopeを基本候補とする。
+
+### 実装済みStorage基盤（Preview未接続）
+
+**Current**：`assets/data-model-storage.js`のRepositoryはAdapterを注入して使用する。実装済みcollectionとキーは次の6つ。
+
+| collection | 保存キー | 責務 |
+|---|---|---|
+| `accounts` | `tradeScopeAccountsV1` | stable ID、口座、provider、有効状態 |
+| `instruments` | `tradeScopeInstrumentsV1` | 商品識別。銘柄候補リストとは別物 |
+| `importBatches` | `tradeScopeImportBatchesV1` | 取込単位、最小出所metadata |
+| `rawTransactions` | `tradeScopeRawTransactionsV1` | 取引事実。戦略・Risk・ユーザーMemoは受理しない |
+| `holdingSnapshots` | `tradeScopeHoldingSnapshotsV1` | 一取得元・一観測の保有状態 |
+| `accountSnapshots` | `tradeScopeAccountSnapshotsV1` | 一取得元・一観測が報告する口座状態／取得範囲 |
+
+**Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は省略可、存在時は`1`のみ。すべてのrecordにstable `id`を要求する。
+
+**Current**：`read` / `list`は非破壊。`commit`は複数envelopeを全検証後に保存し、`save`と同一IDへの`upsert`も同じ入口を使う。既存Account IDを落とす更新は拒否し、無効化を優先する。Migration、別IDへの暗黙統合はしない。Account / Instrument / Batch / 関連Snapshotの参照、重複IDを検証する。imported Snapshotは一つのBatchへ関連付け、口座・保存時点・観測時点・対象月を照合する。同じAccountSnapshotに属するHoldingの取得範囲・出所も一致させ、複数ソースを合成保存しない。
+
+**Current**：数値はdecimal文字列または`null`／欠落で、浮動小数Numberを拒否する。日付のみ、タイムゾーン不明、`snapshotAsOf: null`はその精度のまま保持する。混在列は`rawFields.settlementOrPnl`として保持できるが、実現損益に変換しない。`accountSpecific`は現段階でFXの`requiredMargin` / `maintenanceRate`、証券の`buyingPower` / `depositBalance`のみを受理する。
+
+**Current**：ImportBatchは`id`、`accountId`、`sourceType`、`sourceProvider`、`importedAt`を必須とする。任意の`targetMonth`、`snapshotAsOf`、`importerId` / `importerVersion`、`sourceFileMetadata: {hash, size}`のみを追加できる。原本、ファイル名、絶対パス、個人識別情報、全行原文は受理しない。架空のparser versionも補完しない。
+
+**Current**：未知field、非allowlistの`rawFields`、不正日付・型・schema version・prototype制御キーは拒否し、黙って捨てない。`sourceLocator`も絶対パス・URLを受理しない。rawFieldsの許可項目は保有・約定Parserの金融事実列に限定する。ただし銘柄名等の許可文字列に個人情報が混入していないかを自動判定する機能ではなく、将来Importerでも抽出元確認が必要。
+
+**Current**：Accountと外部取引IDの重複、同一Batch・行番号の再登録は拒否し、既存行を削除・統合しない。IDなしでは`dedupeCandidate`がブラウザ標準SHA-256でversion付き候補を作るだけ。正当な同一事実の複数約定は別ID・別行で維持できる。file hashを取引ID代わりにしない。
+
+**Under consideration**：fingerprintの最終構成、decimal表記差、日時精度、訂正・取消、locatorだけの重複解決、手入力競合は未確定。現在の候補は口座・商品・日時・売買・取引種別・数量・単位・価格・通貨を比較する技術基盤に限定する。月末性の正式名称・根拠確認フローも未確定で、候補属性`observationType`（`officialMonthEnd` / `approximateForMonth` / `pointInTime`）は指定時のみ保存し、自動付与・昇格しない。
+
+**Current**：Instrument照合、AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIは未実装。新モデルは既存の月次・履歴・Summary計算へ接続しない。
 
 ```text
 {

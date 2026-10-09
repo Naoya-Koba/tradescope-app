@@ -2715,7 +2715,9 @@ function updateDataByYear(inputYear = null) {
 
 // ===== Backup Format Core (pure functions; no storage writes) =====
 const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
-const COMPLETE_BACKUP_VERSION = 1;
+const COMPLETE_BACKUP_VERSION = 2;
+const backupDataStorage = window.TradeScopeDataStorage;
+const backupStorageTransaction = window.TradeScopeStorageTransaction;
 const COMPLETE_BACKUP_RESTORE_JOURNAL_KEY = 'tradeScopeRestoreJournalV1';
 const COMPLETE_BACKUP_SKIP_DEMO_KEY = 'profitSkipDemoSeed';
 const COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS = Object.freeze([
@@ -2725,7 +2727,8 @@ const COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS = Object.freeze([
   'tradeScopeTradeHistoryV1',
   'tradeScopeMemos',
   'tradeScopeSymbolListV1',
-  'tradeInfo'
+  'tradeInfo',
+  ...Object.values(backupDataStorage.keys)
 ]);
 const COMPLETE_BACKUP_STORAGE_LABELS = Object.freeze({
   tradingData: '月次データ',
@@ -2734,10 +2737,14 @@ const COMPLETE_BACKUP_STORAGE_LABELS = Object.freeze({
   tradeScopeTradeHistoryV1: '取引履歴',
   tradeScopeMemos: 'Memo',
   tradeScopeSymbolListV1: '銘柄リスト',
-  tradeInfo: 'Legacy tradeInfo'
+  tradeInfo: 'Legacy tradeInfo',
+  tradeScopeAccountsV1: '口座', tradeScopeInstrumentsV1: '商品',
+  tradeScopeImportBatchesV1: '取込履歴', tradeScopeRawTransactionsV1: '取引事実',
+  tradeScopeHoldingSnapshotsV1: '保有情報', tradeScopeAccountSnapshotsV1: '口座状態'
 });
 const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V1: 'v1-complete',
+  V2: 'v2-complete',
   LEGACY_ALL: 'legacy-all',
   LEGACY_PROFIT: 'legacy-profit',
   LEGACY_HISTORY: 'legacy-history',
@@ -2764,8 +2771,8 @@ function detectBackupFormat(value) {
 
   if (hasOwn(value, 'product') || hasOwn(value, 'backupVersion')) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) return COMPLETE_BACKUP_FORMATS.INVALID;
-    if (value.backupVersion !== COMPLETE_BACKUP_VERSION) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
-    return COMPLETE_BACKUP_FORMATS.V1;
+    if (![1, 2].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
+    return value.backupVersion === 1 ? COMPLETE_BACKUP_FORMATS.V1 : COMPLETE_BACKUP_FORMATS.V2;
   }
 
   if (value.tradescope === 'all-backup') return COMPLETE_BACKUP_FORMATS.LEGACY_ALL;
@@ -2782,6 +2789,8 @@ function detectBackupFormat(value) {
 
 function validateBackupValue(value, format = detectBackupFormat(value)) {
   const errors = [];
+  try { backupDataStorage.assertJson(value); }
+  catch (_) { return ['backup contains an unsafe JSON structure']; }
   const requireRecord = (target, path) => {
     if (!isPlainRecord(target)) errors.push(`${path} must be an object`);
   };
@@ -2811,12 +2820,12 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
     if (value?.product !== COMPLETE_BACKUP_PRODUCT) {
       return ['product must be TradeScope'];
     }
-    return [`unsupported backupVersion: ${String(value?.backupVersion)}`];
+    return ['unsupported backupVersion'];
   }
 
-  if (format === COMPLETE_BACKUP_FORMATS.V1) {
+  if (format === COMPLETE_BACKUP_FORMATS.V1 || format === COMPLETE_BACKUP_FORMATS.V2) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) errors.push('product must be TradeScope');
-    if (value.backupVersion !== COMPLETE_BACKUP_VERSION) errors.push(`backupVersion must be ${COMPLETE_BACKUP_VERSION}`);
+    if (value.backupVersion !== (format === COMPLETE_BACKUP_FORMATS.V1 ? 1 : 2)) errors.push('backupVersion does not match format');
     if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
     requireRecord(value.data, 'data');
 
@@ -2841,6 +2850,15 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
       if (isPlainRecord(value.source) && hasOwn(value.source, 'origin') && typeof value.source.origin !== 'string') {
         errors.push('source.origin must be a string');
       }
+    }
+    if (format === COMPLETE_BACKUP_FORMATS.V2) {
+      const onlyFields = (target, allowed) => isPlainRecord(target) && Object.keys(target).every(key => allowed.includes(key));
+      if (!onlyFields(value, ['product', 'backupVersion', 'exportedAt', 'source', 'data'])
+        || !onlyFields(value.data, ['monthly', 'initialFunds', 'initialUnrealized', 'transactions', 'memos', 'symbols', 'legacy', 'models'])
+        || (hasOwn(value, 'source') && !onlyFields(value.source, ['origin']))
+        || (hasOwn(value.data || {}, 'legacy') && !onlyFields(value.data.legacy, ['tradeInfo']))) errors.push('v2 contains unsupported fields');
+      try { backupDataStorage.validateModels(value.data?.models); }
+      catch (_) { errors.push('data.models has invalid schema, fields, IDs or references'); }
     }
   }
 
@@ -2888,13 +2906,13 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   const normalized = {
     format,
     exportedAt: typeof value?.exportedAt === 'string' ? value.exportedAt : '',
-    restoreMode: format === COMPLETE_BACKUP_FORMATS.V1 ? 'complete' : 'legacy-partial',
+    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2].includes(format) ? 'complete' : 'legacy-partial',
     coverage: { ...emptyCoverage },
     data: {},
     warnings: []
   };
 
-  if (format === COMPLETE_BACKUP_FORMATS.V1) {
+  if (format === COMPLETE_BACKUP_FORMATS.V1 || format === COMPLETE_BACKUP_FORMATS.V2) {
     const data = isPlainRecord(value.data) ? value.data : {};
     const legacy = isPlainRecord(data.legacy) ? data.legacy : {};
     normalized.coverage = {
@@ -2915,6 +2933,8 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
       symbols: data.symbols,
       legacy: normalized.coverage.legacyTradeInfo ? { tradeInfo: legacy.tradeInfo } : {}
     };
+    if (format === COMPLETE_BACKUP_FORMATS.V2) normalized.data.models = data.models;
+    else normalized.warnings.push('v1に含まれない新モデルの現在値を維持する');
     if (!normalized.coverage.legacyTradeInfo) {
       normalized.warnings.push('バックアップにLegacy tradeInfoがないため、現在値を維持する');
     }
@@ -2975,14 +2995,20 @@ function buildBackupRestorePlan(normalized) {
     ['legacyTradeInfo', 'tradeInfo', normalized.data.legacy?.tradeInfo]
   ];
 
+  const operations = mappings.filter(([coverageKey]) => normalized.coverage[coverageKey])
+    .map(([, storageKey, value]) => ({ type: 'set', storageKey, value }));
+  if (normalized.format === COMPLETE_BACKUP_FORMATS.V2) {
+    Object.entries(backupDataStorage.keys).forEach(([entity, storageKey]) => {
+      const value = normalized.data.models[entity];
+      operations.push(value === null ? { type: 'remove', storageKey } : { type: 'set', storageKey, value });
+    });
+  }
   return {
     format: normalized.format,
     exportedAt: normalized.exportedAt,
     mode: normalized.restoreMode,
     preserveUnspecified: normalized.restoreMode === 'legacy-partial',
-    operations: mappings
-      .filter(([coverageKey]) => normalized.coverage[coverageKey])
-      .map(([, storageKey, value]) => ({ type: 'set', storageKey, value })),
+    operations,
     warnings: [...normalized.warnings]
   };
 }
@@ -2993,9 +3019,9 @@ function inspectBackupValue(value) {
     return { ok: false, format, errors: validateBackupValue(value, format) };
   }
 
-  const normalized = normalizeBackupValue(value, format);
   const errors = validateBackupValue(value, format);
   if (errors.length) return { ok: false, format, errors };
+  const normalized = normalizeBackupValue(value, format);
 
   return {
     ok: true,
@@ -3032,6 +3058,7 @@ window.TradeScopeBackupFormat = Object.freeze({
 function getBackupFormatLabel(format) {
   const labels = {
     [COMPLETE_BACKUP_FORMATS.V1]: '完全バックアップv1',
+    [COMPLETE_BACKUP_FORMATS.V2]: '完全バックアップv2',
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: '旧統合バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: '旧損益バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: '旧履歴バックアップ'
@@ -3214,7 +3241,29 @@ function isEmptyPlainRecord(value) {
 }
 
 function prepareBackupRestoreActions(restorePlan, storage) {
+  if (!isPlainRecord(restorePlan) || !Array.isArray(restorePlan.operations)
+    || !Object.values(COMPLETE_BACKUP_FORMATS).filter(format => !['invalid', 'unsupported-version'].includes(format)).includes(restorePlan.format)) {
+    throw new Error('復元対象が不正です');
+  }
   const actions = restorePlan.operations.map((operation) => {
+    if (!isPlainRecord(operation) || !COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.includes(operation.storageKey)) throw new Error('復元キーが不正です');
+    const entity = Object.keys(backupDataStorage.keys).find(name => backupDataStorage.keys[name] === operation.storageKey);
+    if (operation.type === 'remove') {
+      if (!entity || restorePlan.format !== COMPLETE_BACKUP_FORMATS.V2) throw new Error('復元対象の削除が不正です');
+      return { type: 'remove', storageKey: operation.storageKey };
+    }
+    if (operation.type !== 'set') throw new Error('復元操作が不正です');
+    backupDataStorage.assertJson(operation.value);
+    if (entity) {
+      if (restorePlan.format !== COMPLETE_BACKUP_FORMATS.V2 || operation.value === null) throw new Error('復元モデルが不正です');
+      backupDataStorage.validateEnvelope(entity, operation.value);
+    } else {
+      const arrays = ['tradeScopeTradeHistoryV1', 'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeInfo'];
+      if (arrays.includes(operation.storageKey)) {
+        if (!Array.isArray(operation.value) || operation.value.some(item => operation.storageKey === 'tradeScopeSymbolListV1'
+          ? typeof item !== 'string' : !isPlainRecord(item))) throw new Error('復元データの型が不正です');
+      } else if (!isPlainRecord(operation.value)) throw new Error('復元データの型が不正です');
+    }
     const rawValue = JSON.stringify(operation.value);
     if (typeof rawValue !== 'string') {
       throw new Error(`${operation.storageKey} could not be serialized`);
@@ -3224,6 +3273,29 @@ function prepareBackupRestoreActions(restorePlan, storage) {
 
   const actionKeys = new Set(actions.map((action) => action.storageKey));
   if (actionKeys.size !== actions.length) throw new Error('restore plan contains duplicate storage keys');
+  const requiredByFormat = {
+    [COMPLETE_BACKUP_FORMATS.V1]: COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.slice(0, 6),
+    [COMPLETE_BACKUP_FORMATS.V2]: COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.filter(key => key !== 'tradeInfo'),
+    [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: ['tradingData', 'yearInitialFunds', 'tradeScopeTradeHistoryV1'],
+    [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: ['tradingData', 'yearInitialFunds'],
+    [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: ['tradeScopeTradeHistoryV1']
+  };
+  if (requiredByFormat[restorePlan.format].some(key => !actionKeys.has(key))) throw new Error('復元対象が不足しています');
+  if (restorePlan.format === COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY && actionKeys.size !== 1) throw new Error('復元対象が不正です');
+  if ([COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT, COMPLETE_BACKUP_FORMATS.LEGACY_ALL].includes(restorePlan.format)
+    && actions.some(action => !['tradingData', 'yearInitialFunds', 'yearInitialUnrealized',
+      ...(restorePlan.format === COMPLETE_BACKUP_FORMATS.LEGACY_ALL ? ['tradeScopeTradeHistoryV1'] : [])].includes(action.storageKey))) {
+    throw new Error('復元対象が不正です');
+  }
+  if (restorePlan.format === COMPLETE_BACKUP_FORMATS.V2) {
+    const models = {};
+    for (const [entity, key] of Object.entries(backupDataStorage.keys)) {
+      const operation = restorePlan.operations.find(item => item.storageKey === key);
+      if (!operation) throw new Error('復元モデルが不足しています');
+      models[entity] = operation.type === 'remove' ? null : operation.value;
+    }
+    backupDataStorage.validateModels(models);
+  }
 
   const profitKeys = [
     PROFIT_STORAGE_KEY_TRADING,
@@ -3252,141 +3324,13 @@ function prepareBackupRestoreActions(restorePlan, storage) {
   return actions;
 }
 
-function createBackupRestoreJournal(actions, storage) {
-  if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
-    throw new Error('未完了の復元ジャーナルが残っています');
-  }
-
-  const journal = {
-    product: COMPLETE_BACKUP_PRODUCT,
-    journalVersion: 1,
-    createdAt: new Date().toISOString(),
-    entries: actions.map((action) => {
-      const previousRawValue = storage.getItem(action.storageKey);
-      return {
-        storageKey: action.storageKey,
-        existed: previousRawValue !== null,
-        previousRawValue
-      };
-    })
-  };
-  const journalRaw = JSON.stringify(journal);
-
-  try {
-    storage.setItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY, journalRaw);
-    if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== journalRaw) {
-      throw new Error('復元ジャーナルを再読込できません');
-    }
-  } catch (error) {
-    try {
-      storage.removeItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
-    } catch {
-      // The restore has not started; retain the original storage error.
-    }
-    throw new Error(`復元ジャーナルを保存できません: ${error.message}`);
-  }
-
-  return journal;
-}
-
-function validateBackupRestoreJournal(journal) {
-  if (!isPlainRecord(journal)
-    || journal.product !== COMPLETE_BACKUP_PRODUCT
-    || journal.journalVersion !== 1
-    || !Array.isArray(journal.entries)) {
-    throw new Error('復元ジャーナルの形式が不正です');
-  }
-  journal.entries.forEach((entry, index) => {
-    if (!isPlainRecord(entry)
-      || typeof entry.storageKey !== 'string'
-      || typeof entry.existed !== 'boolean'
-      || (entry.existed && typeof entry.previousRawValue !== 'string')
-      || (!entry.existed && entry.previousRawValue !== null)) {
-      throw new Error(`復元ジャーナルのentries[${index}]が不正です`);
-    }
-  });
-}
-
-function rollbackBackupRestore(journal, storage) {
-  validateBackupRestoreJournal(journal);
-  const rollbackErrors = [];
-
-  [...journal.entries].reverse().forEach((entry) => {
-    try {
-      if (entry.existed) storage.setItem(entry.storageKey, entry.previousRawValue);
-      else storage.removeItem(entry.storageKey);
-    } catch (error) {
-      rollbackErrors.push(`${entry.storageKey}: ${error.message}`);
-    }
-  });
-
-  journal.entries.forEach((entry) => {
-    try {
-      const restoredRawValue = storage.getItem(entry.storageKey);
-      const matches = entry.existed
-        ? restoredRawValue === entry.previousRawValue
-        : restoredRawValue === null;
-      if (!matches) rollbackErrors.push(`${entry.storageKey}: rollback verification failed`);
-    } catch (error) {
-      rollbackErrors.push(`${entry.storageKey}: ${error.message}`);
-    }
-  });
-
-  if (rollbackErrors.length) {
-    throw new Error(rollbackErrors.join('; '));
-  }
-
-  storage.removeItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
-  if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
-    throw new Error('復元ジャーナルを削除できません');
-  }
-}
-
 function recoverPendingBackupRestore(storage) {
-  const journalRaw = storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
-  if (journalRaw === null) return false;
-
-  let journal;
-  try {
-    journal = JSON.parse(journalRaw);
-  } catch {
-    throw new Error('未完了の復元ジャーナルが壊れています');
-  }
-  rollbackBackupRestore(journal, storage);
-  return true;
+  return backupStorageTransaction.recover(storage);
 }
 
 function executeBackupRestore(restorePlan, storage) {
   const actions = prepareBackupRestoreActions(restorePlan, storage);
-  const journal = createBackupRestoreJournal(actions, storage);
-
-  try {
-    actions.forEach((action) => {
-      if (action.type === 'set') storage.setItem(action.storageKey, action.rawValue);
-      else storage.removeItem(action.storageKey);
-    });
-
-    actions.forEach((action) => {
-      const storedRawValue = storage.getItem(action.storageKey);
-      const matches = action.type === 'set'
-        ? storedRawValue === action.rawValue
-        : storedRawValue === null;
-      if (!matches) throw new Error(`${action.storageKey}の書き込み検証に失敗しました`);
-    });
-
-    storage.removeItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY);
-    if (storage.getItem(COMPLETE_BACKUP_RESTORE_JOURNAL_KEY) !== null) {
-      throw new Error('復元ジャーナルを削除できません');
-    }
-  } catch (restoreError) {
-    try {
-      rollbackBackupRestore(journal, storage);
-    } catch (rollbackError) {
-      throw new Error(`復元に失敗し、ロールバックにも失敗しました: ${restoreError.message}; ${rollbackError.message}`);
-    }
-    throw new Error(`復元に失敗したため元の状態へ戻しました: ${restoreError.message}`);
-  }
-
+  backupStorageTransaction.apply(actions, storage);
   return {
     restoredKeys: restorePlan.operations.map((operation) => operation.storageKey),
     snapshotInvalidated: true,
@@ -3403,9 +3347,9 @@ window.TradeScopeBackupRestore = Object.freeze({
   recoverPending: recoverPendingBackupRestore
 });
 
-// ===== Complete Backup v1 Export =====
-function readStoredBackupValue(storageKey, fallbackValue, expectedType) {
-  const raw = localStorage.getItem(storageKey);
+// ===== Complete Backup v2 Export =====
+function readStoredBackupValue(storageKey, fallbackValue, expectedType, storage = localStorage) {
+  const raw = storage.getItem(storageKey);
   if (raw === null) return fallbackValue;
 
   let parsed;
@@ -3420,30 +3364,33 @@ function readStoredBackupValue(storageKey, fallbackValue, expectedType) {
   return parsed;
 }
 
-function buildCompleteBackupPayload() {
+function buildCompleteBackupPayload(storage = localStorage, origin = window.location.origin, exportedAt = new Date().toISOString()) {
   const legacy = {};
-  if (localStorage.getItem('tradeInfo') !== null) {
-    legacy.tradeInfo = readStoredBackupValue('tradeInfo', [], 'array');
+  if (storage.getItem('tradeInfo') !== null) {
+    legacy.tradeInfo = readStoredBackupValue('tradeInfo', [], 'array', storage);
   }
 
   return {
     product: COMPLETE_BACKUP_PRODUCT,
     backupVersion: COMPLETE_BACKUP_VERSION,
-    exportedAt: new Date().toISOString(),
+    exportedAt,
     source: {
-      origin: window.location.origin
+      origin
     },
     data: {
-      monthly: readStoredBackupValue(PROFIT_STORAGE_KEY_TRADING, {}, 'object'),
-      initialFunds: readStoredBackupValue(PROFIT_STORAGE_KEY_INITIAL, {}, 'object'),
-      initialUnrealized: readStoredBackupValue(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, {}, 'object'),
-      transactions: readStoredBackupValue('tradeScopeTradeHistoryV1', [], 'array'),
-      memos: readStoredBackupValue('tradeScopeMemos', [], 'array'),
-      symbols: readStoredBackupValue('tradeScopeSymbolListV1', [], 'array'),
-      legacy
+      monthly: readStoredBackupValue(PROFIT_STORAGE_KEY_TRADING, {}, 'object', storage),
+      initialFunds: readStoredBackupValue(PROFIT_STORAGE_KEY_INITIAL, {}, 'object', storage),
+      initialUnrealized: readStoredBackupValue(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED, {}, 'object', storage),
+      transactions: readStoredBackupValue('tradeScopeTradeHistoryV1', [], 'array', storage),
+      memos: readStoredBackupValue('tradeScopeMemos', [], 'array', storage),
+      symbols: readStoredBackupValue('tradeScopeSymbolListV1', [], 'array', storage),
+      legacy,
+      models: backupDataStorage.readModels(storage)
     }
   };
 }
+
+window.TradeScopeBackupExport = Object.freeze({ buildPayload: buildCompleteBackupPayload });
 
 function exportAllData() {
   let payload;
@@ -3459,7 +3406,7 @@ function exportAllData() {
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const fileName = `tradescope-complete-backup-v1-${timestamp}.json`;
+  const fileName = `tradescope-complete-backup-v${COMPLETE_BACKUP_VERSION}-${timestamp}.json`;
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

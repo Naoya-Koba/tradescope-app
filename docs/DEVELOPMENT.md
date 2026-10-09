@@ -83,6 +83,14 @@ TradeScope/
 
 **Planned**：localStorageを最初の保存先として使う場合も、RawTransaction増加時の容量を計測し、Repositoryを介してIndexedDB等へ移行可能にする。CSV MVPで全面移行は行わない。
 
+**Current**：`assets/data-model-storage.js`がAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotのschema検証・Repository・注入式localStorage Adapterを提供する。module読込・Repository生成・readでseedやMigrationはしない。具体的なallowlist・参照制約はコードと`DATA_MODEL.md`のCurrentを参照する。
+
+**Current**：`assets/storage-transaction.js`は既存復元journal形式を引き継ぎ、複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあればRepositoryも保存を拒否し、既存の明示確認経路で復旧する。トップ完全バックアップはv2で6collectionを保護し、v1復元はその6キーを維持する。
+
+**Current**：SBI PreviewにStorageを読み込まず、正本保存は接続しない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
+
+**Known issue / Planned**：journalも含むlocalStorage容量を計測し、将来のIndexedDB移行と複数タブ排他を別途設計する。保存権限喪失等でrollbackまで失敗した場合、Web Storageだけで完全復旧は保証できないためjournalを保護して新規保存を止める。現在の同期Adapterを非同期DBへ移す際はRepository APIも調整する。
+
 ## 7. Importerのセキュリティとプライバシー
 
 - **Decided**：PDF / CSVは原則としてブラウザ内で解析し、原本を外部サービスへ送信しない。
@@ -121,6 +129,8 @@ TradeScope/
 - 描画は`textContent`、10MBまでのファイル、明細は100行ずつ表示。CSPは`connect-src 'none'`。新画面のアセットは同一originのみ。公式取得案内リンクはユーザーが開いた場合のみ別タブへ移動する。
 
 **Current / 検証**：`node --test tests/sbi-import.test.js`で架空の最小CSVとDOM harnessを使う。禁止storage・送信・console APIに接続したら失敗するテストを含む。実ブラウザでの実ファイル確認とは区別する。
+
+**Current / Storage・復元検証**：`node --test tests/data-storage-backup.test.js tests/sbi-import.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2完全復元、未知field/version、原本・個人識別情報フィールドの拒否を確認する。実localStorage・実CSV・本番PWAへ接続しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 

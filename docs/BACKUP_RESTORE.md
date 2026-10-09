@@ -22,7 +22,7 @@
 
 ### トップの完全バックアップ
 
-**Current**：`backupVersion: 1`を持つ完全バックアップとして、次を一つのJSONへ出力する。
+**Current**：`backupVersion: 2`を持つ完全バックアップとして、従来v1の次のデータと新Storageの6collectionを一つのJSONへ出力する。
 
 - `tradingData`
 - `yearInitialFunds`
@@ -32,13 +32,13 @@
 - `tradeScopeSymbolListV1`
 - localStorageに実在する場合のみLegacy `tradeInfo`
 
-**Current**：Risk設定、Account設定、Raw Transactions、Holding Snapshots、Account Snapshotsは現在存在しないため、v1エクスポートでは新設していない。
+**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBI Previewへの保存接続は存在しない。
 
-**Current**：v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v1は正式対象データを完全復元し、旧形式は収録項目だけを復元して未収録項目を維持するLegacy部分復元として扱う。
+**Current**：v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v2は新旧双方を復元し、v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
 
 **Current**：復元前に形式、バージョン、必須項目、型を検証し、復元内容、維持内容、警告を確認画面へ表示する。ユーザーがキャンセルした場合はlocalStorageを変更しない。
 
-**Current**：全書き込み値をメモリ上でJSON化した後、専用の`tradeScopeRestoreJournalV1`へ対象キーの存在有無と復元前の生文字列を保存する。ジャーナル保存に失敗した場合は復元を開始せず、途中失敗時は元の生文字列へロールバックする。復元成功後はジャーナルを削除する。ジャーナルは完全バックアップ対象外である。
+**Current**：全値をメモリ上でJSON化した後、`tradeScopeRestoreJournalV1`へ対象キーの存在有無と適用前の生文字列を保存する。`assets/storage-transaction.js`でRepositoryと復元が同じ安全処理を使う。journal保存失敗時は開始せず、途中失敗時は元の生文字列へrollbackし、元々不在のキーは削除する。成功・rollbackとも再読込一致を検証してjournalを削除する。journalはバックアップ対象外。
 
 **Current**：復元経路は取引履歴を再正規化せず、検証済み配列を直接保存して未知フィールドを保持する。復元成功時は`tradeScopeTopSummarySnapshotV1`を無効化し、完了表示後にページを再読み込みする。
 
@@ -110,7 +110,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 **Decided**：`backupVersion`を必須とする。
 
-現在のv1形式の概念例：
+互換対応を継続するv1形式の概念例：
 
 ```json
 {
@@ -118,7 +118,6 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
   "backupVersion": 1,
   "exportedAt": "ISO-8601 timestamp",
   "source": {
-    "appVersion": "unknown-or-version",
     "origin": "optional"
   },
   "data": {
@@ -133,11 +132,21 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 }
 ```
 
-**Current**：上記v1は現在実装済みの保存対象を表す。未実装のAccount、Instrument、AccountInstrumentSetting、RawTransaction、HoldingSnapshot、AccountSnapshot、TransactionAnnotationを空項目として追加してはいない。
+**Current**：上記v1は従来の保存対象を表し、新モデルを含まない。v1読込は継続するが、新しいトップexportは下記v2を使用する。
 
 **Decided**：新データモデルへ実ユーザーデータを永続保存できるようにする前に、それらの完全バックアップ、検証、復元、journal、rollbackを実装・検証する。ParserとPreviewは永続保存なしで先行してよい。
 
-**Planned**：新モデルを追加するバックアップ形式は`backupVersion: 2`を候補とする。ただしv2の具体的なJSON構造、必須項目、移行規則は実装時に決定し、現時点の確定仕様とはしない。
+### 実装済みv2拡張
+
+**Current**：新exportは`backupVersion: 2`。v1の`data`へ`models`を追加し、`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。未保存端末でも自動seedせずexportする。
+
+**Current**：v2復元はenvelopeをそのまま保存し、`null`のcollectionはキー不在へ戻す完全復元。この置換・削除は確認後のv2復元に限り、v1・旧形式では新モデルキーに触れない。Legacy `tradeInfo`はv2でも未収録なら維持する。
+
+**Current**：v2のroot、metadata、modelsの未知項目、新モデルの型・version・decimal・重複ID・参照を全検証し、`__proto__`等も拒否してからjournalを保存する。従来履歴の未知フィールドは安全なJSONとして維持し、再正規化しない。
+
+**Current**：ファイル名は`tradescope-complete-backup-v2-<日時>.json`。通常UIは変更せず、Blob + downloadとFile input / FileReader、Snapshot無効化、空データdemo抑止、完了後の再読み込みを維持する。
+
+**Known issue**：journal分の容量も確保できなければ、正本へ書き込まず失敗する。保存権限やディスク障害等でrollback自体も失敗した場合はエラーを返してjournalを保護し、次の保存を止める。複数タブの同時書き込みを完全排他する仕組みは未実装。実データ保存解禁前に容量・実ブラウザ／iPhoneでの往復と中断復旧を追加確認する。
 
 **Decided**：v1バックアップを復元するとき、v1に存在しない新モデルの現在値を空値で消去しない。将来の新形式復元では、新旧双方の対象を検証し、HoldingSnapshotとAccountSnapshotを含めてjournalとrollbackの保護対象にする。
 
