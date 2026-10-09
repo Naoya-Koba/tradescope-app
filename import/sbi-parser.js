@@ -53,6 +53,22 @@
     return { product, custody, mode, total: Boolean(match[3]), supported,
       key: JSON.stringify([product, custody, mode]) };
   }
+  function detectKind(text) {
+    // Use the same exact header vocabulary as parsing, never a file name or fuzzy guess.
+    let records;
+    try { records = csv.parseCSV(text); } catch (_) { return null; }
+    const kinds = new Set();
+    for (const { cells } of records) {
+      for (const kind of Object.keys(required)) {
+        const match = mapping(cells, kind);
+        if (!match.duplicate.length && required[kind].every(field => Object.hasOwn(match.fields, field))) {
+          kinds.add(kind);
+        }
+      }
+    }
+    // Mixed or unrecognised tables must not pass the file-type gate.
+    return kinds.size === 1 ? [...kinds][0] : null;
+  }
   function sourceDate(value) {
     const match = /^(\d{4})年(\d{1,2})月(\d{1,2})日$/.exec(value.trim());
     return csv.date(match ? `${match[1]}-${match[2]}-${match[3]}` : value);
@@ -251,7 +267,7 @@
     }
     return result;
   }
-  const api = { parse };
+  const api = { parse, detectKind };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TradeScopeSBI = Object.freeze(api);
 })(typeof globalThis !== 'undefined' ? globalThis : this);

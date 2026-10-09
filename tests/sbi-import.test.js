@@ -121,6 +121,16 @@ const sbiTrades = '約定履歴照会\n\n商品指定,約定開始年月日,約�
   '2030/01/05,架空投信F,,,売却,--,NISA(つ),--,20,200,0,0,2030/01/09,+200\n';
 const allIssues = result => [...result.issues, ...result.rows.flatMap(row => row.issues)];
 
+test('file type detection recognises exact SBI section and flat headers without file-name guessing', () => {
+  for (const text of [holdings, sbiHoldings, '\uFEFF' + sbiHoldings]) assert.equal(sbi.detectKind(text), 'holdings');
+  for (const text of [transactions, sbiTrades]) assert.equal(sbi.detectKind(text), 'transactions');
+  assert.equal(sbi.detectKind('保有証券一覧\n知らない列,値\n架空,1'), null);
+  assert.equal(sbi.detectKind(''), null);
+  assert.equal(sbi.detectKind('銘柄名,数量,評価額\n"閉じていない引用符'), null);
+  assert.equal(sbi.detectKind(sbiHoldings + '\n' + sbiTrades), null);
+  assert.equal(sbi.detectKind('銘柄名,数量,評価額,評価額\n架空,1,1,1'), null);
+});
+
 test('SBI section layouts: stock/fund headers, all NISA contexts, separate totals, no noise', () => {
   const result = sbi.parse(sbiHoldings, 'holdings');
   assert.equal(result.summary.validCount, 4); assert.equal(result.totals.length, 4);
@@ -243,6 +253,67 @@ test('SBI-format UTF-8 fixtures preview with no noise and display search/actual 
   const labels = h.elements.summary.children.map(child => child.textContent);
   assert.ok(labels.includes('検索期間')); assert.ok(labels.includes('約定期間'));
   await h.elements['close-preview'].fire('click'); assert.equal(h.elements['detail-body'].children.length, 0);
+});
+test('provider starts closed; open/close clears preview and remains reusable without persistence', async () => {
+  const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
+  assert.match(html, /<details id="sbi-provider" class="provider">/);
+  for (const provider of ['GMOクリック証券', 'LIGHT FX', 'みんなのFX', 'SBI VCトレード']) {
+    assert.ok(html.includes(`<button class="provider-pending" disabled><span>${provider}</span>`));
+  }
+  const h = harness();
+  h.elements['sbi-provider'].open = true; await h.elements['sbi-provider'].fire('toggle');
+  await h.upload('holdings', sbiHoldings); assert.equal(h.elements.preview.hidden, false);
+  h.elements['sbi-provider'].open = false; await h.elements['sbi-provider'].fire('toggle');
+  assert.equal(h.elements.preview.hidden, true); assert.equal(h.elements['detail-body'].children.length, 0);
+  assert.equal(h.elements['read-status'].textContent, '');
+  h.elements['sbi-provider'].open = true; await h.elements['sbi-provider'].fire('toggle');
+  await h.upload('transactions', sbiTrades); assert.equal(h.elements.preview.hidden, false);
+});
+test('both wrong file slots stop preview, show concise type errors, and allow correct reselection', async () => {
+  const h = harness();
+  await h.upload('holdings', sbiTrades);
+  assert.equal(h.elements.preview.hidden, true);
+  assert.equal(h.elements['read-status'].textContent, '約定履歴CSVです。約定履歴から選択してください。');
+  assert.equal(h.elements['detail-body'].children.length, 0);
+  await h.upload('holdings', sbiHoldings);
+  assert.equal(h.elements.preview.hidden, false); assert.equal(h.elements['detail-body'].children.length, 4);
+  await h.upload('transactions', sbiHoldings);
+  assert.equal(h.elements.preview.hidden, true);
+  assert.equal(h.elements['read-status'].textContent, '保有証券CSVです。保有証券から選択してください。');
+  assert.equal(h.elements.summary.children.length, 0);
+  await h.upload('transactions', sbiTrades);
+  assert.equal(h.elements.preview.hidden, false); assert.equal(h.elements['detail-body'].children.length, 2);
+});
+test('closing the provider during FileReader activity does not resurrect a preview', async () => {
+  const h = harness();
+  const input = h.elements['holdings-file']; input.files = [{ text: sbiHoldings, size: sbiHoldings.length }];
+  const reading = input.fire('change');
+  h.elements['sbi-provider'].open = false;
+  await h.elements['sbi-provider'].fire('toggle'); await reading;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.elements.preview.hidden, true); assert.equal(h.elements['detail-body'].children.length, 0);
+  assert.equal(h.elements['read-status'].textContent, '');
+});
+test('type detection also works after CP932 decoding without changing the existing decoder', () => {
+  const bytes = Buffer.from('96c195bf96bc2c909497ca2c955d89bf8a7a0a4142432c302c300a', 'hex');
+  assert.equal(sbi.detectKind(csv.decodeCSV(bytes).text), 'holdings');
+});
+test('unknown or mixed CSV never becomes normal preview and does not prevent the next selection', async () => {
+  const h = harness();
+  for (const text of ['未知の項目,値\n架空,0', sbiHoldings + '\n' + sbiTrades]) {
+    await h.upload('holdings', text);
+    assert.equal(h.elements.preview.hidden, true);
+    assert.equal(h.elements['read-status'].textContent, '対応するSBI証券CSVを確認できませんでした');
+    assert.equal(h.elements['detail-body'].children.length, 0);
+  }
+  await h.upload('holdings', sbiHoldings); assert.equal(h.elements.preview.hidden, false);
+});
+test('mobile detail labels are static and preserve the existing preview values', async () => {
+  const h = harness(); await h.upload('holdings', sbiHoldings);
+  const cells = h.elements['detail-body'].children[0].children;
+  assert.deepEqual(cells.slice(0, 3).map(cell => cell.dataset.label), ['行', '状態', '銘柄']);
+  assert.equal(cells[2].textContent, '架空株A');
+  assert.equal(cells[10].dataset.label, '評価額'); assert.equal(cells[10].textContent, '200');
 });
 test('repeated open/close, help, encoding reset and paging are transient', async () => {
   const h = harness();

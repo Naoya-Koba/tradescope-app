@@ -2,46 +2,56 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#121833">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>データを取り込む | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="import/preview.css?v=20261005-1">
+  <link rel="stylesheet" href="import/preview.css?v=20261009-1">
   <script defer src="import/csv-core.js?v=20261005-1"></script>
-  <script defer src="import/sbi-parser.js?v=20261005-1"></script>
-  <script defer src="import/preview.js?v=20261005-1"></script>
+  <script defer src="import/sbi-parser.js?v=20261009-1"></script>
+  <script defer src="import/preview.js?v=20261009-1"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
   <main>
     <h1>データを取り込む</h1>
     <p class="muted">内容の確認のみ。データは保存されません。</p>
-    <section aria-labelledby="sbi-title">
-      <h2 id="sbi-title">SBI証券</h2>
-      <div class="file-row">
-        <div><h3>保有証券CSV</h3><button class="help" data-help="holdings">取得方法を見る</button></div>
-        <label class="file-button">ファイルを選択<input id="holdings-file" type="file" accept=".csv,text/csv" data-kind="holdings"></label>
-      </div>
-      <div class="file-row">
-        <div><h3>約定履歴CSV</h3><button class="help" data-help="transactions">取得方法を見る</button></div>
-        <label class="file-button">ファイルを選択<input id="transactions-file" type="file" accept=".csv,text/csv" data-kind="transactions"></label>
-      </div>
-      <label class="encoding">文字コード<select id="encoding"><option value="auto">自動</option><option value="utf-8">UTF-8</option><option value="shift_jis">Shift_JIS / CP932</option></select></label>
-    </section>
-    <p id="read-status" class="muted" role="status" aria-live="polite"></p>
-    <section id="preview" aria-labelledby="preview-title" hidden>
-      <div class="preview-heading"><h2 id="preview-title">確認</h2><button id="close-preview" class="secondary">閉じる</button></div>
-      <div id="dates" class="date-fields" hidden>
-        <label>対象月<input id="target-month" type="month"></label>
-        <label>取得日<input id="observed-date" type="date"></label>
-        <span id="date-note" class="muted"></span>
-      </div>
-      <dl id="summary"></dl>
-      <div id="groups"></div>
-      <div id="issues" aria-live="polite"></div>
-      <details id="details"><summary>明細を見る</summary><div class="table-wrap"><table><thead id="detail-head"></thead><tbody id="detail-body"></tbody></table></div><button id="more-rows" class="secondary" hidden>続きを表示</button></details>
-    </section>
+    <div class="providers">
+      <details id="sbi-provider" class="provider">
+        <summary>SBI証券<span class="disclosure" aria-hidden="true">⌄</span></summary>
+        <div class="provider-content">
+          <div class="file-options">
+            <div class="file-row">
+              <div><h3>保有証券CSV</h3><button class="help" data-help="holdings">取得方法を見る</button></div>
+              <label class="file-button">ファイルを選択<input id="holdings-file" type="file" accept=".csv,text/csv" data-kind="holdings" aria-label="保有証券CSVを選択"></label>
+            </div>
+            <div class="file-row">
+              <div><h3>約定履歴CSV</h3><button class="help" data-help="transactions">取得方法を見る</button></div>
+              <label class="file-button">ファイルを選択<input id="transactions-file" type="file" accept=".csv,text/csv" data-kind="transactions" aria-label="約定履歴CSVを選択"></label>
+            </div>
+          </div>
+          <label class="encoding">文字コード<select id="encoding"><option value="auto">自動</option><option value="utf-8">UTF-8</option><option value="shift_jis">Shift_JIS / CP932</option></select></label>
+          <p id="read-status" class="muted" role="status" aria-live="polite"></p>
+          <section id="preview" aria-labelledby="preview-title" hidden>
+            <div class="preview-heading"><h2 id="preview-title">確認</h2><button id="close-preview" class="secondary">閉じる</button></div>
+            <div id="dates" class="date-fields" hidden>
+              <label>対象月<input id="target-month" type="month"></label>
+              <label>取得日<input id="observed-date" type="date"></label>
+              <span id="date-note" class="muted"></span>
+            </div>
+            <dl id="summary"></dl>
+            <div id="groups"></div>
+            <div id="issues" aria-live="polite"></div>
+            <details id="details"><summary>明細を見る</summary><div class="table-wrap"><table><thead id="detail-head"></thead><tbody id="detail-body"></tbody></table></div><button id="more-rows" class="secondary" hidden>続きを表示</button></details>
+          </section>
+        </div>
+      </details>
+      <button class="provider-pending" disabled><span>GMOクリック証券</span><span class="muted">準備中</span></button>
+      <button class="provider-pending" disabled><span>LIGHT FX</span><span class="muted">準備中</span></button>
+      <button class="provider-pending" disabled><span>みんなのFX</span><span class="muted">準備中</span></button>
+      <button class="provider-pending" disabled><span>SBI VCトレード</span><span class="muted">準備中</span></button>
+    </div>
   </main>
   <dialog id="help-dialog" aria-labelledby="help-title">
     <h2 id="help-title"></h2>

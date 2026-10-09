@@ -46,8 +46,10 @@
     if (!preview) return;
     const end = Math.min(visibleRows + 100, preview.rows.length);
     preview.rows.slice(visibleRows, end).forEach(row => {
-      const tr = node('tr'); tr.append(node('td', String(row.rowNumber)), node('td', row.status === 'invalid' ? '要確認' : row.issues.length ? '注意' : '正常'));
-      columns[preview.kind].forEach(([field]) => tr.append(node('td', row.data[field] ?? '—')));
+      const tr = node('tr');
+      const cell = (label, value) => { const td = node('td', value); td.dataset.label = label; return td; };
+      tr.append(cell('行', String(row.rowNumber)), cell('状態', row.status === 'invalid' ? '要確認' : row.issues.length ? '注意' : '正常'));
+      columns[preview.kind].forEach(([field, label]) => tr.append(cell(label, row.data[field] ?? '—')));
       $('detail-body').append(tr);
     });
     visibleRows = end; $('more-rows').hidden = visibleRows >= preview.rows.length;
@@ -97,6 +99,16 @@
       });
       if (token !== readToken) return;
       const decoded = TradeScopeCSV.decodeCSV(buffer, $('encoding').value);
+      const detectedKind = TradeScopeSBI.detectKind(decoded.text);
+      if (!detectedKind) {
+        $('read-status').textContent = '対応するSBI証券CSVを確認できませんでした'; return;
+      }
+      if (detectedKind !== input.dataset.kind) {
+        $('read-status').textContent = detectedKind === 'transactions'
+          ? '約定履歴CSVです。約定履歴から選択してください。'
+          : '保有証券CSVです。保有証券から選択してください。';
+        return;
+      }
       preview = TradeScopeSBI.parse(decoded.text, input.dataset.kind);
       $('read-status').textContent = 'プレビューのみ・保存されません'; render();
     } catch (_) {
@@ -104,6 +116,7 @@
     }
   }
   document.querySelectorAll('input[type=file]').forEach(input => input.addEventListener('change', () => readFile(input)));
+  $('sbi-provider').addEventListener('toggle', () => { if (!$('sbi-provider').open) reset(); });
   $('close-preview').addEventListener('click', reset);
   $('more-rows').addEventListener('click', renderRows);
   $('encoding').addEventListener('change', reset);
