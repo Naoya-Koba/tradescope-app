@@ -220,6 +220,7 @@
     calculateTotalNetAssets: calculateTotalNetAssets,
     getNumericYears: getNumericYears,
     hasStoredNumber: hasStoredNumber,
+    hasLegacyMonthlyInput: hasLegacyMonthlyInput,
     isMonthEntered: isMonthEntered,
     isAccountMonthEntered: isAccountMonthEntered,
     getLatestEnteredMonth: getLatestEnteredMonth,

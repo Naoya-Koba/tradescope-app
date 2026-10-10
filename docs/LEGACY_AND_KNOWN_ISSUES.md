@@ -4,6 +4,12 @@
 
 ## 1. 重要な仕様差異・既知の問題
 
+### SBI月次cutover
+
+- **Decided**：2026-08以前はlegacyを維持、2026-09以降は月次状態と明示採用先を用いる。意味のあるlegacy月次入力があればconflictで停止し、placeholderや他口座由来の`__saved`ではSBI確定にしない。欠損月を累積値へ0で補わない。
+- **Current（内部基盤）**：共有resolver・completeness・保存service・訂正・canonical依存fingerprintを匿名fixtureで検証する。UI／全画面接続は次段階。
+- **Known issue**：旧全ゼロ月の入力由来は保存形状だけでは確定できない。自動Migration・削除はせず、直接月次入力の有限な非ゼロ値をlegacy conflictの根拠とする。複数タブ完全排他・容量・実機iPhoneは引き続き別途確認する。
+
 ### 完全バックアップv3・v2／v1互換とLegacy部分復元
 
 - **Current**：トップexportは`backupVersion: 3`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、月次状態のInput UI・manual保存は未接続。

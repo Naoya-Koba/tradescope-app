@@ -154,6 +154,8 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 ### MonthlyAccountStateとv3の正式仕様
 
+**Current（内部基盤）**：SBI月次保存serviceは外国証券／現金のmanual AccountSnapshotとMonthlyAccountStateを既存schemaのまま同時保存する。訂正で残る旧Snapshotもv3の`accountSnapshots`で保護される。新しいBackup version・Restore規則は不要で、v1維持／v2 Stateクリア／v3完全復元の意味は変えない。UI接続と実保存service経由の匿名v3往復は次段階で検証する。
+
 **Decided**：最新完全バックアップをv3へ拡張し、従来dataと既存6モデルに`monthlyAccountStates`を加えた7モデルを完全保護する。未作成collectionは`null`（キー不在）とする。manual外国株／現金は既存`accountSnapshots`で保護する。ファイル名・exportedAtは変更しない。
 
 **Decided**：v2は既存6モデルの形式として固定し、7モデル形式へ意味を変更しない。過去versionの必須モデル一覧はversion別に明示し、将来のRepositoryキー一覧から自動生成しない。未知model／field／versionは拒否し、旧アプリがv3を拒否することを許容する。

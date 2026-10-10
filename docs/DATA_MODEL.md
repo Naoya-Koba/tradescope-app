@@ -345,6 +345,12 @@ importedAt = TradeScopeへ実際に保存した日時
 
 ### SBI manualと月次正本
 
+**Decided / SBI cutover**：`acc_sbi_sec`は2026-08以前のlegacy正本を維持し、2026-09以降はMonthlyAccountStateと明示採用先だけを月次正本とする。State不在は未確定で、legacy placeholderへfallbackしない。月全体の`__saved`だけではSBI入力の証拠にならない。SBIの直接月次入力（決済・スワップ・入出金）に有限な非ゼロ値があればlegacy conflictとして停止する。holdings、派生評価損益、netAssets、全ゼロplaceholderはこの証拠としない。旧全ゼロ値の入力由来を一意に復元するMigrationは行わない。
+
+**Decided**：今回のSBI保存UIでは、国内採用Batchと全保有の評価額・評価損益・取得日、外国証券評価額・評価損益・取得日、現金残高・取得日、実現損益・入金・出金がすべて必要。明示0は有効、blank／nullは不完全とする。`acc_sbi_sec`の新方式に限り`swapPnl: "0"`を固定し、他証券口座・旧月へ一般化しない。schemaのnull許容は変えない。
+
+**Current（内部基盤）**：`assets/sbi-monthly-save.js`は表示時の国内採用IDと最新モデルを再照合し、複数Batchを停止する。外国証券・現金のmanual AccountSnapshotとMonthlyAccountStateを一回の`repo.commit(..., {expectedModels})`で保存・再読込検証する。manualには`observationType: approximateForMonth`を付け、月末日でも正式月末へ昇格しない。訂正ではState IDを維持してconfirmedAtを更新し、変更したmanual値／日付は新Snapshot IDへ参照を切り替え、旧recordを保持する。未変更の採用先は再利用できる。UI・各集計画面への接続は次段階。
+
 **Decided**：外国株は既存AccountSnapshotの別recordとする。`sourceMode: manual`、`sourceScope: sbi-foreign-securities`、`accountId`、`targetMonth`、`snapshotAsOf`、`importedAt`、`valuationCurrency: JPY`、`assetValue`、`unrealizedPnl`を用いる。stable `id`を持ち、`importBatchId`、`netAssetValue`、`cashBalance`、`reportedMonthlyRealizedPnl`は混ぜない。銘柄別Instrument／HoldingSnapshotは現時点では作らず、ユーザーが確認した円換算値を保存する。為替レートや外貨金額から推測・再計算しない。
 
 **Decided**：現金は別のmanual AccountSnapshotとし、`sourceScope: sbi-cash`、stable `id`、`accountId`、`targetMonth`、`snapshotAsOf`、`importedAt`、`valuationCurrency: JPY`、`cashBalance`を用いる。`netAssetValue`を現金残高に流用しない。対象月はInputの選択を引き継ぎ、観測日不明は`null`のまま保持する。

@@ -13,6 +13,16 @@
 
 ## 2. 確定資産
 
+### SBI共有resolver・計算基盤
+
+**Current（内部基盤）**：`assets/monthly-account-resolver.js`はlegacy／canonical／missing／conflict、明示確定、月次・観測のcompleteness、採用ID、台帳入力と観測Viewを一箇所で解決する。`createCalculator`はDOM／Storage非依存で、既存`profit-metrics.js`のlegacy計算を保持し、SBI新方式だけを切り替える。画面接続は次段階。
+
+**Decided**：SBI cutoverは2026-09。State不在・legacy conflictを0として補わない。採用国内保有＋外国manualの評価損益が不完全なら口座評価損益はunknown。観測資産合計は国内評価額＋外国評価額＋現金、観測評価損益は国内＋外国。decimal合計は既存BigInt処理で行い、表示用の既存台帳計算へ渡す時点でのみNumberへ変換する。観測額を台帳へ加算せず、差額から損益・入出金を逆算しない。
+
+**Decided**：必要なcutover後の月次flowが一月でも欠ける場合、後続月の累積確定資産・純資産・年間Performanceはunknown。その月の月次損益自体は、Stateの月次入力が完全なら局所値として表示できる。例：9月missing／10月completeでは10月Monthly P/Lのみ既知、累積値はnull。欠損は0で飛ばさず、画面ごとに判定しない。
+
+**Current（内部基盤）**：fingerprintは計算version、legacy入力、対象年State、採用国内Batchと保有群、採用外国／現金recordに依存する。保存成功時のキャッシュ削除に失敗してもfingerprint不一致で旧Snapshotを拒否できる。hash用元データ複製の永続化・ログ・外部送信は行わない。
+
 **Decided**：確定資産は、評価損益を除いた確定ベースの現在資産である。
 
 ```text

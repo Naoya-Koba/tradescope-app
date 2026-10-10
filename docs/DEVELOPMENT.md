@@ -97,11 +97,15 @@ TradeScope/
 
 ### 月次正本の実装境界
 
+**Decided / SBI月次確定**：2026-08以前・他口座は従来計算を維持する。2026-09以降のSBIは共有resolverのmissing／conflictを含む判定だけを用い、legacy placeholderへ戻さない。必要入力が完全な場合だけUI保存を許可し、null許容schema自体は変更しない。
+
+**Current（内部基盤）**：`assets/monthly-account-resolver.js`と`assets/sbi-monthly-save.js`を追加。後者はAccountSnapshotとMonthlyAccountStateを一回の既存Repository transactionで保護し、採用国内データの再検証・expectedModels・訂正履歴保持を行う。Repository／Backup schema変更、Migration、seedはない。`tests/sbi-monthly.test.js`はcutover、legacy conflict、completeness、欠損伝播、訂正、atomic保存・失敗rollback、canonical fingerprintを匿名fixtureで確認する。Input／Summary／Top／Trendの公開接続は次段階で同時に行う。
+
 **Decided**：MonthlyAccountStateは観測Snapshotと分離した口座・月の明示確定記録とする。共通Repositoryへ統合し、7モデルを保護するBackup v3、version別Validation、journal／rollbackを先に検証する。v2は6モデル形式を固定し、v2 Restore時のStateクリアも同一transactionに含める。v1／Legacy RestoreではStateを維持する。
 
 **Current**：MonthlyAccountStateのStorage・検証・Backup v3への統合は完了。`assets/sbi-input-draft.js`はread-only Repository経由でSBI国内保有の候補を読み、既存CSV共通処理のdecimal加算を利用する。Inputの新方式SBIだけを月別の非永続Draftへ分離し、国内値を安全なtextContentで表示する。候補Batchを合算・latest自動採用しない。表示・月切替・Draft編集では金融Storageとlegacyメモリを変更せず、既存月次保存からもDraftを除外する。2026年1〜8月と新方式のない月はlegacyを維持する。外国株／現金manual保存、月次確定、旧月次・Summary等への反映は未接続。
 
-**Decided**：表示・read・初期化でseedしない。Input Draftはメモリ上に分離し、将来明示保存でのみmanual AccountSnapshotと月次状態を更新する。国内値のread-only表示を月次確定や台帳更新と混同せず、実manual保存、legacy monthly、共有計算には接続しない。既存台帳式を維持し、観測Viewから差額損益を逆算しない。schema・一意性・参照・null／0・version別復元・新キー途中失敗／再読込不一致／rollback不能を匿名fixtureで検証する。
+**Decided**：表示・read・初期化でseedしない。Input Draftはメモリ上に分離し、明示保存でのみmanual AccountSnapshotと月次状態を更新する。国内値のread-only表示だけを月次確定や台帳更新と混同せず、legacy monthlyへコピーしない。既存台帳式を維持し、観測Viewから差額損益を逆算しない。schema・一意性・参照・null／0・version別復元・新キー途中失敗／再読込不一致／rollback不能を匿名fixtureで検証する。
 
 ## 7. Importerのセキュリティとプライバシー
 
