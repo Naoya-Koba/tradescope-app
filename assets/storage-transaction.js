@@ -80,7 +80,8 @@
     try { journal = JSON.parse(raw); } catch (_) { fail('未完了の復元ジャーナルが壊れています'); }
     rollback(journal, storage); return true;
   }
-  function apply(actions, storage) {
+  function apply(actions, storage, verify) {
+    if (verify !== undefined && typeof verify !== 'function') fail('保存検証が不正です');
     const journal = createJournal(actions, storage);
     try {
       for (const action of actions) {
@@ -92,6 +93,8 @@
           fail('書き込み後の再読込検証に失敗しました');
         }
       }
+      // Semantic/reference verification must finish while rollback is still protected.
+      if (verify && verify() === false) fail('保存後の検証に失敗しました');
       storage.removeItem(JOURNAL_KEY);
       if (storage.getItem(JOURNAL_KEY) !== null) fail('復元ジャーナルを削除できません');
     } catch (_) {

@@ -179,10 +179,16 @@
   }
   function createRepository(adapter, options = {}) {
     const clock = options.clock || (() => new Date().toISOString());
-    function commit(changes) {
+    function commit(changes, guard = {}) {
       fields(changes, Object.keys(keys));
       if (!Object.keys(changes).length) fail();
       const models = readModels(adapter);
+      if (own(guard, 'expectedModels')) {
+        validateModels(guard.expectedModels);
+        if (JSON.stringify(models) !== JSON.stringify(guard.expectedModels)) {
+          throw new Error('保存データが変更されています。再確認してください');
+        }
+      }
       for (const [entity, value] of Object.entries(changes)) {
         // No physical-delete Repository API: retain historical entities and disable Accounts.
         if (value === null) fail();
@@ -192,8 +198,12 @@
       }
       validateModels(models);
       const actions = Object.entries(changes).map(([entity, value]) => ({ type: 'set', storageKey: keys[entity], rawValue: JSON.stringify(value) }));
-      transaction.apply(actions, adapter);
-      return clone(models);
+      let verified;
+      transaction.apply(actions, adapter, () => {
+        verified = readModels(adapter);
+        if (JSON.stringify(verified) !== JSON.stringify(models)) fail();
+      });
+      return clone(verified);
     }
     function save(entity, records) {
       if (!own(keys, entity)) fail();

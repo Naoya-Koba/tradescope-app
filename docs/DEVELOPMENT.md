@@ -89,6 +89,10 @@ TradeScope/
 
 **Current**：SBI Previewは新Storageの型・参照検証と6モデルの読み取り専用参照を利用する。Repository作成・commitや正本保存は接続しない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
+**Current**：独立した`import/sbi-save.js`の保存エンジンは1ファイルずつ処理し、既存Preview resolverとRepositoryを再利用する。Adapter・clock・cryptoを注入でき、module読込・構築・readではseedしない。保存時のみAccountを必要に応じて追加し、既存Account／Instrumentは上書きしない。重複・競合・不正／要確認があれば全ファイルを停止する。UIにはこのmoduleを読み込まず、保存ボタンも接続しない。
+
+**Current**：Repositoryの`commit(changes, {expectedModels})`は非同期判定中の変更を検知する。journal保護中にbyte一致確認に加え全モデル再読込・schema／参照・期待内容一致を検証し、失敗時は同じrollbackを行う。復元のschemaやv1互換仕様は変更しない。完全排他ではなく、タブ競合・Storage障害の既存限界を保持する。
+
 **Known issue / Planned**：journalも含むlocalStorage容量を計測し、将来のIndexedDB移行と複数タブ排他を別途設計する。保存権限喪失等でrollbackまで失敗した場合、Web Storageだけで完全復旧は保証できないためjournalを保護して新規保存を止める。現在の同期Adapterを非同期DBへ移す際はRepository APIも調整する。
 
 ## 7. Importerのセキュリティとプライバシー
@@ -133,6 +137,8 @@ TradeScope/
 **Current / 検証**：`node --test tests/sbi-import.test.js tests/sbi-model-preview.test.js`で架空の最小CSVとDOM harnessを使う。読み取り専用Storageを注入し、storage書き込み・送信・console APIに接続したら失敗するテストを含む。両CSV変換、null / 0、日付分離、銘柄照合・曖昧一致、重複候補、参照検証、PII項目除外、候補表示と破棄、既存月次状態不変を確認する。実ブラウザでの実ファイル確認とは区別する。
 
 **Current / Storage・復元検証**：`node --test tests/data-storage-backup.test.js tests/sbi-import.test.js tests/sbi-model-preview.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2完全復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。実localStorage・実CSV・本番PWAへ接続しない。
+
+**Current / 保存エンジン検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名注入AdapterでAccount／Instrumentの遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込不一致、rollback不能時の停止、v2 export／restore、v1互換、旧月次非変更を確認する。保存エンジンはHTMLに読み込まれず、UI／実ブラウザから実データ保存はまだできない。共有Storage moduleの変更に限りHTML／SWの版付きURLを更新する。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 

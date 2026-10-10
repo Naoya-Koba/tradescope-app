@@ -400,7 +400,21 @@ ImportBatch {
 
 **Current**：同一file hash、同じ対象月・観測日の既存保有Batch、既存取引の事実fingerprint一致は重複候補として示すだけで、自動除外・統合しない。Storageが不正・未対応schemaの場合は空マスターとみなさず変換を止め、元のCSV Previewは維持する。閉じる・会社パネルを閉じる・文字コード変更・離脱時に全候補を破棄する。
 
-**Under consideration**：未解決銘柄の照合・承認UI、国内コードの識別範囲、細分類の追加取得、正式な保存時点の確定処理は未実装。現行CSVには確認済みexternal transaction ID列がないため、取引ID照合は推測せず、既存の事実fingerprintで候補を比較する。商品区分のない約定CSVに、照合できないコードなし銘柄がある場合の分類確認フローも未実装である。
+**Under consideration**：未解決銘柄の照合・承認UI、国内コードの識別範囲、細分類の追加取得は未実装。現行CSVには確認済みexternal transaction ID列がないため、取引ID照合は推測せず、既存の事実fingerprintで候補を比較する。商品区分のない約定CSVに、照合できないコードなし銘柄がある場合の分類確認フローも未実装である。
+
+### SBI保存エンジン（UI未接続）
+
+**Decided**：1ファイル＝1 ImportBatch＝1保存トランザクション。保有CSVは必要なAccount・Instrument・Batch・HoldingSnapshot群、約定CSVは必要なAccount・Instrument・Batch・RawTransaction群を一括検証して保存する。一部行だけの保存、置換、訂正、取消は今回実装しない。
+
+**Current**：`import/sbi-save.js`は明示注入したAdapterを使う独立serviceで、どのHTML／Preview UIにも読み込まれない。1ファイルのParser結果とmetadataを受け、最新Repositoryの読み取り結果で既存の`model-preview.js`による照合を再実行する。古いPreview planをそのまま保存しない。実保存直前に`importedAt`を生成し、Batchと全recordで共有する。対象月・観測日はそのまま保持し、近似値を正式月末へ昇格しない。
+
+**Decided / Current**：`acc_sbi_sec`が存在しない場合のみ保存トランザクション内でcanonical Accountを追加する。存在時はdisplayName・legacyRefs等の編集内容を上書きせず再利用し、provider・種別の矛盾または無効口座では停止する。InstrumentはPreviewと同じコード完全一致／SBI投信正式名identityを使い、一意一致だけを再利用する。既存recordやenvelopeは更新せず、ユーザー情報を置換しない。曖昧一致、出所不明、無効銘柄、Parser／変換警告、未解決・不正行があるファイルは保存しない。
+
+**Decided / Current**：同じAccount・SBI CSV取得元のfile hash一致は`already-imported`として追加せず全キーを維持する。同Account・CSV・対象月・観測日の既存保有観測に別hashがある場合は`conflict`、既存取引のfingerprint候補一致は`review-required`でファイル全体を停止する。自動統合・削除・上書き・部分保存はしない。file hashは取引同一性の根拠とはしない。
+
+**Current**：Repositoryの全schema／参照検証、既存journal、複数キーwrite、生文字列検証とrollbackを使用する。非同期照合中に新モデルが変わった場合はcommit前の比較で停止する。journal削除前にRepositoryから全モデルを再読込し、schema・参照と期待内容の一致を確認する。容量不足／journal確保失敗では正本書き込みを始めず、途中失敗は以前の生文字列・キー不在状態へ戻す。rollback不能時はjournalを保持して後続保存を停止する。複数タブの完全排他やWeb Storage以上のatomic性は保証しない。
+
+**Decided / Current**：新モデル保存から旧月次・旧履歴・Summary Snapshot・月次入力判定へ反映しない。AccountSnapshotも生成しない。allowlistのcanonical dataだけを保存し、原CSV・ファイル名・パス・非allowlist PIIはコピーしない。保存ボタン・ユーザー操作の接続は別フェーズである。
 
 ### 取得元の初期対応方針
 
@@ -572,7 +586,7 @@ TransactionAnnotation {
 
 **Under consideration**：fingerprintの最終構成、decimal表記差、日時精度、訂正・取消、locatorだけの重複解決、手入力競合は未確定。現在の候補は口座・商品・日時・売買・取引種別・数量・単位・価格・通貨を比較する技術基盤に限定する。月末性の正式名称・根拠確認フローも未確定で、候補属性`observationType`（`officialMonthEnd` / `approximateForMonth` / `pointInTime`）は指定時のみ保存し、自動付与・昇格しない。
 
-**Current**：Instrument照合は上記の保存予定Preview候補生成までで、確定・保存UIは未実装。AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIも未実装。新モデルは既存の月次・履歴・Summary計算へ接続しない。
+**Current**：Instrument照合は上記の保存予定PreviewとUI未接続の保存エンジンで共有する。確定・保存UIは未実装。AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIも未実装。新モデルは既存の月次・履歴・Summary計算へ接続しない。
 
 ```text
 {
