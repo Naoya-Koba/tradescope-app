@@ -379,6 +379,8 @@ MonthlyAccountState {
 
 **Current**：新方式SBIの決済・入出金編集は月別のメモリ上Draftのみとし、legacy `tradingData`へのコピー・既存保存ボタンからの保存を行わない。外国株／現金manual保存、MonthlyAccountState確定保存、Summary／Top／Asset Trend接続は未実装。2026年9月は国内値の表示だけでは入力済み・確定にならない。2026年1〜8月と新方式データのない月は従来のlegacy Inputを維持し、自動migrationしない。
 
+**Current / Decided**：正常に解決した`acc_sbi_sec`・`imported`・`sbi-domestic-holdings`の国内保有Batch集合に限り、既存保存経路が省略していた`currency`の未設定／`null`をInput読込時に後方互換として許容する。明示的なJPY以外は表示を停止し、空文字はschema不正として拒否する。通貨をrecordへ補完せず、他口座・他取得範囲・AccountSnapshotへ一般化しない。金額の欠損を0にせず、表示によるmigration・月次確定は行わない。
+
 ## 8. インポート処理の境界
 
 **Planned**：インポート処理は次の層に分ける。

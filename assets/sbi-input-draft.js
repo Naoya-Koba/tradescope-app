@@ -31,7 +31,9 @@
       : batches.length === 1 ? batches[0] : null;
     if (!selected) return { ...base, status: batches.length > 1 ? 'multiple' : 'unavailable' };
     const group = holdings.filter(row => row.importBatchId === selected.id);
-    if (group.some(row => row.currency !== 'JPY')) return { ...base, status: 'unavailable' };
+    // Historical SBI domestic CSV records omit currency. This compatibility is
+    // limited to the source/account/scope-validated group above, never persisted.
+    if (group.some(row => row.currency != null && row.currency !== 'JPY')) return { ...base, status: 'unavailable' };
     return { ...base, status: 'ready', importBatchId: selected.id, snapshotAsOf: selected.snapshotAsOf,
       marketValue: csv.sum(group.map(row => row.marketValue ?? null)),
       unrealizedPnl: csv.sum(group.map(row => row.unrealizedPnl ?? null)) };
