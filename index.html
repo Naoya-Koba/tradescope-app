@@ -130,6 +130,7 @@
       </select>
     </div>
 <section class="section glass">
+  <p id="topMonthlyWarning" class="empty-state" hidden></p>
   <div class="summary-list">
     <div class="summary-row summary-primary">
       <span class="summary-label">純資産 <span class="sub-en">Total Equity</span></span>
@@ -440,6 +441,8 @@
   <script src="assets/profit-metrics.js?v=20261011-2"></script>
   <script src="assets/storage-transaction.js?v=20261010-3"></script>
   <script src="assets/data-model-storage.js?v=20261010-3"></script>
+  <script src="import/csv-core.js?v=20261005-1"></script>
+  <script src="assets/monthly-account-resolver.js?v=20261011-2"></script>
   <script src="assets/trade-history-core.js?v=20261003-1"></script>
 <script>
 if ("serviceWorker" in navigator) {
@@ -456,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
   const splashBootLeadMs = 520;
-  const topScriptVersion = '20261011-1';
+  const topScriptVersion = '20261011-2';
   let topScriptPromise = null;
 
   const loadTopScript = () => {

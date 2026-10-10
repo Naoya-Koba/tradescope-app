@@ -57,10 +57,12 @@ test('Currency compatibility never includes other scopes, brokers or accounts', 
   models.importBatches.records[0].sourceProvider = 'other'; assert.equal(input.selectDomestic(models, '2026-09').status, 'unavailable');
   models.importBatches.records[0].sourceProvider = 'sbi';
   models.holdingSnapshots.records.forEach(row => { row.sourceScope = 'sbi-foreign-securities'; });
-  assert.equal(input.selectDomestic(models, '2026-09').mode, 'legacy');
+  assert.equal(input.selectDomestic(models, '2026-09').mode, 'draft');
+  assert.equal(input.selectDomestic(models, '2026-09').status, 'unavailable');
   models.holdingSnapshots.records.forEach(row => { row.sourceScope = 'sbi-domestic-holdings'; }); models.accounts.records[0].id = 'acc_other';
   for (const entity of ['importBatches', 'holdingSnapshots', 'rawTransactions']) models[entity].records.forEach(row => { row.accountId = 'acc_other'; });
-  assert.equal(input.selectDomestic(models, '2026-09').mode, 'legacy');
+  assert.equal(input.selectDomestic(models, '2026-09').mode, 'draft');
+  assert.equal(input.selectDomestic(models, '2026-09').status, 'unavailable');
 });
 test('Missing financial values remain unknown with compatible omitted currency', async () => {
   for (const field of ['marketValue', 'unrealizedPnl']) for (const missing of ['null', 'absent']) {

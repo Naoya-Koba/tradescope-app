@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="soneki.css?v=20261011-1" />
+  <link rel="stylesheet" href="soneki.css?v=20261011-2" />
   <link rel="stylesheet" href="../assets/bottom-nav.css" />
   <link rel="stylesheet" href="../assets/transitions.css" />
   <script src="../assets/transitions.js"></script>
@@ -85,6 +85,7 @@
 
   <main class="container">
     <!-- 1. 年間損益表示セクション -->
+    <p id="annualMonthlyWarning" class="sbi-monthly-error" hidden></p>
     <div class="annual-summary-head">
       <h2 class="heading-muted annual-summary-heading">Annual Summary</h2>
       <div class="year-switch-row">
@@ -410,9 +411,12 @@
   <script src="../assets/storage-transaction.js?v=20261010-3"></script>
   <script src="../assets/data-model-storage.js?v=20261010-3"></script>
   <script src="../import/csv-core.js?v=20261005-1"></script>
-  <script src="../assets/sbi-input-draft.js?v=20261011-1"></script>
+  <script src="../assets/sbi-input-draft.js?v=20261011-2"></script>
+  <script src="../assets/monthly-account-resolver.js?v=20261011-2"></script>
+  <script src="../assets/sbi-monthly-save.js?v=20261011-1"></script>
+  <script src="../assets/sbi-monthly-ui.js?v=20261011-2"></script>
   <script src="../assets/account-ui.js?v=20261011-1"></script>
-  <script src="soneki.js?v=20261011-1"></script>
+  <script src="soneki.js?v=20261011-2"></script>
   <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

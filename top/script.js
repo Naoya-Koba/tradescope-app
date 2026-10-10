@@ -824,83 +824,22 @@ function getNumericYears(dataObj) {
     .sort((a, b) => a - b);
 }
 
+function linkedCalculator(tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING), initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL)) {
+  let models = null;
+  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) { /* Fail closed. */ }
+  return window.TradeScopeMonthlyResolver.createCalculator(profitMetrics, tradingData, initialFunds,
+    parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models);
+}
 function calculateLinkedMonthlyTotals(tradingData, year, month) {
-  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
-  const accountKeys = LINKED_ACCOUNTS.map((account) => account.key);
-  return {
-    realized: profitMetrics?.calculateMonthlyFieldTotal
-      ? profitMetrics.calculateMonthlyFieldTotal(yearData, month, accountKeys, 'realizedPnL')
-      : null,
-    swap: profitMetrics?.calculateMonthlyFieldTotal
-      ? profitMetrics.calculateMonthlyFieldTotal(yearData, month, accountKeys, 'swapPnL')
-      : null
-  };
+  const calculator = linkedCalculator(tradingData), keys = LINKED_ACCOUNTS.map(account => account.key);
+  return { realized: calculator.monthlyFieldTotal(year, month, keys, 'realizedPnL'),
+    swap: calculator.monthlyFieldTotal(year, month, keys, 'swapPnL') };
 }
-
-function calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, targetMonth, accountKey) {
-  if (profitMetrics?.calculateAccountConfirmedAssets) {
-    return profitMetrics.calculateAccountConfirmedAssets(tradingData, initialFunds, year, targetMonth, accountKey);
-  }
-
-  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
-  const yearInitial = initialFunds?.[year] || initialFunds?.[String(year)] || {};
-  const initial = Number(yearInitial?.[accountKey]) || 0;
-
-  let realized = 0;
-  let swap = 0;
-  let deposit = 0;
-  let withdrawal = 0;
-
-  for (let month = 1; month <= targetMonth; month += 1) {
-    const row = yearData?.[month]?.[accountKey] || yearData?.[String(month)]?.[accountKey] || {};
-    const realizedValue = readStoredNumber(row, 'realizedPnL');
-    const swapValue = readStoredNumber(row, 'swapPnL');
-    const depositValue = readStoredNumber(row, 'deposit');
-    const withdrawalValue = readStoredNumber(row, 'withdrawal');
-    if (Number.isFinite(realizedValue)) realized += realizedValue;
-    if (Number.isFinite(swapValue)) swap += swapValue;
-    if (Number.isFinite(depositValue)) deposit += depositValue;
-    if (Number.isFinite(withdrawalValue)) withdrawal += withdrawalValue;
-  }
-
-  return initial + realized + swap + deposit - withdrawal;
+function calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, month, key) {
+  return linkedCalculator(tradingData, initialFunds).confirmed(year, month, key);
 }
-
-function calculateLinkedAccountNetAssets(tradingData, initialFunds, year, targetMonth, accountKey) {
-  if (LINKED_ACCOUNTS.find((account) => account.key === accountKey)?.bankOnly) {
-    return calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, targetMonth, accountKey);
-  }
-  if (profitMetrics?.calculateAccountNetAssets) {
-    return profitMetrics.calculateAccountNetAssets(tradingData, initialFunds, year, targetMonth, accountKey);
-  }
-
-  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
-  const yearInitial = initialFunds?.[year] || initialFunds?.[String(year)] || {};
-  const initial = Number(yearInitial?.[accountKey]) || 0;
-
-  let realized = 0;
-  let swap = 0;
-  let deposit = 0;
-  let withdrawal = 0;
-
-  for (let month = 1; month <= targetMonth; month += 1) {
-    const row = yearData?.[month]?.[accountKey] || yearData?.[String(month)]?.[accountKey] || {};
-    const realizedValue = readStoredNumber(row, 'realizedPnL');
-    const swapValue = readStoredNumber(row, 'swapPnL');
-    const depositValue = readStoredNumber(row, 'deposit');
-    const withdrawalValue = readStoredNumber(row, 'withdrawal');
-    if (Number.isFinite(realizedValue)) realized += realizedValue;
-    if (Number.isFinite(swapValue)) swap += swapValue;
-    if (Number.isFinite(depositValue)) deposit += depositValue;
-    if (Number.isFinite(withdrawalValue)) withdrawal += withdrawalValue;
-  }
-
-  const currentRow = yearData?.[targetMonth]?.[accountKey] || yearData?.[String(targetMonth)]?.[accountKey] || {};
-  if (!Object.prototype.hasOwnProperty.call(currentRow, 'unrealizedPnL')) return null;
-  const unrealized = Number(currentRow.unrealizedPnL);
-  if (!Number.isFinite(unrealized)) return null;
-
-  return initial + realized + swap + deposit - withdrawal + unrealized;
+function calculateLinkedAccountNetAssets(tradingData, initialFunds, year, month, key) {
+  return linkedCalculator(tradingData, initialFunds).net(year, month, key);
 }
 
 function hasMeaningfulMonthData(yearData, month) {
@@ -946,139 +885,19 @@ function buildTopLinkedData(selectedYear = null) {
   const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
   const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
   const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
-  const sourceYears = [...new Set([
-    ...getNumericYears(tradingData),
-    ...getNumericYears(initialFunds),
-    ...getNumericYears(initialUnrealized)
-  ])].sort((a, b) => a - b);
-  const targetYear = selectedYear || sourceYears[sourceYears.length - 1] || null;
-  if (!targetYear || !hasTopSourceDataForYear(tradingData, initialFunds, initialUnrealized, targetYear)) {
-    return null;
-  }
-
-  const snapshotStore = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT);
-  const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
-  const latestMonth = profitMetrics?.getLatestEnteredMonth
-    ? profitMetrics.getLatestEnteredMonth(yearData, LINKED_ACCOUNTS.map((account) => account.key))
-    : null;
-  if (!latestMonth) return null;
-  const sourceFingerprint = profitMetrics?.createYearSourceFingerprint
-    ? profitMetrics.createYearSourceFingerprint(tradingData, initialFunds, initialUnrealized, targetYear)
-    : null;
-  if (targetYear) {
-    const snapshot = snapshotStore?.[targetYear] || snapshotStore?.[String(targetYear)];
-    const snapshotIsCurrent = profitMetrics?.isSummarySnapshotCurrent
-      ? profitMetrics.isSummarySnapshotCurrent(
-          snapshot,
-          sourceFingerprint,
-          latestMonth,
-          yearData,
-          LINKED_ACCOUNTS.map((account) => account.key)
-        )
-      : false;
-    if (snapshotIsCurrent && Array.isArray(snapshot.realized) && Array.isArray(snapshot.total) && snapshot.realized.length === 12 && snapshot.total.length === 12) {
-      return {
-        ...snapshot,
-        hasData: true,
-        year: Number(snapshot.year) || targetYear,
-        month: Number(snapshot.month) || 1,
-        accountData: Array.isArray(snapshot.accountData) ? snapshot.accountData : []
-      };
-    }
-  }
-  const growthAccounts = GROWTH_TARGET_ACCOUNTS;
-  const realized = [];
-  const total = [];
-  let cumulativeDeposits = 0;
-  let cumulativeWithdrawals = 0;
-
-  for (let month = 1; month <= 12; month += 1) {
-    const isEntered = hasMeaningfulMonthData(yearData, month);
-    const confirmedTotal = isEntered
-      ? LINKED_ACCOUNTS.reduce((sum, account) => sum + calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, targetYear, month, account.key), 0)
-      : null;
-    realized.push(confirmedTotal);
-
-    // 成長率向けの累計入出金は投資口座のみを対象にする
-    if (month <= latestMonth) {
-      growthAccounts.forEach((account) => {
-        const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
-        const monthData = yearData?.[month] || yearData?.[String(month)] || {};
-        const row = monthData?.[account.key] || {};
-        cumulativeDeposits += Number(row.deposit) || 0;
-        cumulativeWithdrawals += Number(row.withdrawal) || 0;
-      });
-    }
-
-    const monthNetValues = isEntered
-      ? LINKED_ACCOUNTS.map((account) => calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, month, account.key))
-      : [];
-    const monthTotal = isEntered && monthNetValues.every(Number.isFinite)
-      ? monthNetValues.reduce((sum, value) => sum + value, 0)
-      : null;
-    total.push(monthTotal);
-  }
-
-  const linkedAccountData = LINKED_ACCOUNTS.map((account) => {
-    const amount = calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, latestMonth, account.key);
-    return {
-      label: account.name,
-      amount: Number.isFinite(amount) ? Math.max(0, amount) : null,
-      color: account.color
-    };
-  }).filter((item) => Number.isFinite(item.amount) && item.amount > 0);
-
-  // 年初の総純資産: 月次データ開始前の初期残高のみを使用する
-  // （calculateLinkedAccountNetAssetsを使うと1月分の入出金が混入してしまうため）
-  const yearInitialData = initialFunds?.[targetYear] || initialFunds?.[String(targetYear)] || {};
-  const yearInitialUnrealData = initialUnrealized?.[targetYear] || initialUnrealized?.[String(targetYear)] || {};
-
-  // 年間成長率ベース: 年初資金 + 年初評価損益
-  const yearStartTotal = growthAccounts.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0)
-               + (Number(yearInitialUnrealData?.[account.key]) || 0);
-  }, 0);
-
-  const yearStartConfirmed = growthAccounts.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0);
-  }, 0);
-
-  const growthCurrentTotalValues = growthAccounts.map((account) => calculateLinkedAccountNetAssets(tradingData, initialFunds, targetYear, latestMonth, account.key));
-  const growthCurrentTotal = growthCurrentTotalValues.every(Number.isFinite)
-    ? growthCurrentTotalValues.reduce((sum, value) => sum + value, 0)
-    : null;
-
-  const growthCurrentConfirmed = growthAccounts.reduce((sum, account) => {
-    return sum + calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, targetYear, latestMonth, account.key);
-  }, 0);
-
-  // Realized Balance チャート年初点: 確定資産ベース（評価損益除く）
-  const chartStartTotal = LINKED_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0);
-  }, 0);
-
-  // Total Balance チャート年初点: 年初資金 + 年初評価損益
-  const chartStartTotalWithUnrealized = LINKED_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0)
-               + (Number(yearInitialUnrealData?.[account.key]) || 0);
-  }, 0);
-
-  return {
-    hasData: true,
-    realized,
-    total,
-    accountData: linkedAccountData,
-    year: targetYear,
-    month: latestMonth,
-    yearStartTotal,
-    yearStartConfirmed,
-    growthCurrentTotal,
-    growthCurrentConfirmed,
-    chartStartTotal,
-    chartStartTotalWithUnrealized,
-    cumulativeDeposits,
-    cumulativeWithdrawals
-  };
+  let models = null;
+  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
+  const sourceYears = [...new Set([...getNumericYears(tradingData), ...getNumericYears(initialFunds),
+    ...getNumericYears(initialUnrealized), ...(models?.monthlyAccountStates?.records || []).map(row => Number(row.targetMonth.slice(0, 4)))])].sort((a,b) => a-b);
+  const year = selectedYear || sourceYears[sourceYears.length - 1];
+  if (!year) return null;
+  const calculator = window.TradeScopeMonthlyResolver.createCalculator(profitMetrics, tradingData, initialFunds, initialUnrealized, models);
+  const fresh = calculator.snapshot(year, LINKED_ACCOUNTS);
+  if (!fresh) return null;
+  const cache = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT)?.[year];
+  const valid = calculator.snapshotCurrent(cache, year, LINKED_ACCOUNTS.map(account => account.key))
+    && Array.isArray(cache.realized) && cache.realized.length === 12 && Array.isArray(cache.total) && cache.total.length === 12;
+  return { ...(valid ? cache : fresh), hasData: true, warning: calculator.warning(year) };
 }
 
 const linkedTopData = buildTopLinkedData();
@@ -1158,6 +977,8 @@ function updateRiskSection() {
 
 // ===== KPI =====
 function updateKPIs() {
+  const warning = document.getElementById('topMonthlyWarning');
+  if (warning) { warning.textContent = linkedCalculator().warning(topSeries.year); warning.hidden = !warning.textContent; }
   const summaryElements = [
     'kpiTotal',
     'kpiRealized',
@@ -1194,7 +1015,7 @@ function updateKPIs() {
   elTotal.textContent = Number.isFinite(tLast) ? fmtJPY(tLast) : '—';
 
   const elReal = document.getElementById('kpiRealized');
-  elReal.textContent = fmtJPY(rLast);
+  elReal.textContent = Number.isFinite(rLast) ? fmtJPY(rLast) : '—';
 
   const elNet = document.getElementById('growthNet');
   const yearStartTotalActual = topSeries.chartStartTotalWithUnrealized || 0;
@@ -1203,22 +1024,23 @@ function updateKPIs() {
   const yearStartConfirmedPerformance = topSeries.yearStartConfirmed || 0;
   const growthCurrentTotal = Number.isFinite(topSeries.growthCurrentTotal) ? topSeries.growthCurrentTotal : tLast;
   const growthCurrentConfirmed = Number.isFinite(topSeries.growthCurrentConfirmed) ? topSeries.growthCurrentConfirmed : rLast;
-  const cumulativeDeposits = topSeries.cumulativeDeposits || 0;
-  const cumulativeWithdrawals = topSeries.cumulativeWithdrawals || 0;
+  const cumulativeDeposits = topSeries.cumulativeDeposits;
+  const cumulativeWithdrawals = topSeries.cumulativeWithdrawals;
 
   const totalAssetDelta = Number.isFinite(tLast) ? tLast - yearStartTotalActual : null;
-  const confirmedAssetDelta = rLast - yearStartConfirmedActual;
+  const confirmedAssetDelta = Number.isFinite(rLast) ? rLast - yearStartConfirmedActual : null;
   const annualGrowthRate = yearStartTotalActual > 0 && Number.isFinite(totalAssetDelta) ? (totalAssetDelta / yearStartTotalActual) * 100 : null;
-  const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : null;
+  const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 && Number.isFinite(confirmedAssetDelta) ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : null;
 
-  const annualNetPnL = Number.isFinite(growthCurrentTotal)
+  const annualNetPnL = Number.isFinite(growthCurrentTotal) && Number.isFinite(cumulativeDeposits) && Number.isFinite(cumulativeWithdrawals)
     ? growthCurrentTotal - yearStartTotalPerformance - cumulativeDeposits + cumulativeWithdrawals
     : null;
-  const annualConfirmedPnL = growthCurrentConfirmed - yearStartConfirmedPerformance - cumulativeDeposits + cumulativeWithdrawals;
+  const annualConfirmedPnL = Number.isFinite(growthCurrentConfirmed) && Number.isFinite(cumulativeDeposits) && Number.isFinite(cumulativeWithdrawals)
+    ? growthCurrentConfirmed - yearStartConfirmedPerformance - cumulativeDeposits + cumulativeWithdrawals : null;
   const annualNetPnLGrowth = yearStartTotalPerformance > 0 && Number.isFinite(annualNetPnL)
     ? (annualNetPnL / yearStartTotalPerformance) * 100
     : null;
-  const annualConfirmedPnLGrowth = yearStartConfirmedPerformance > 0 ? (annualConfirmedPnL / yearStartConfirmedPerformance) * 100 : null;
+  const annualConfirmedPnLGrowth = yearStartConfirmedPerformance > 0 && Number.isFinite(annualConfirmedPnL) ? (annualConfirmedPnL / yearStartConfirmedPerformance) * 100 : null;
 
   const elTotalDelta = document.getElementById('deltaTotal');
   const elNetDelta = document.getElementById('deltaNet');
@@ -1227,7 +1049,7 @@ function updateKPIs() {
     setSignClass(elTotalDelta, totalAssetDelta);
   }
   if (elNetDelta) {
-    elNetDelta.textContent = fmtDeltaNumber(confirmedAssetDelta);
+    elNetDelta.textContent = Number.isFinite(confirmedAssetDelta) ? fmtDeltaNumber(confirmedAssetDelta) : '—';
     setSignClass(elNetDelta, confirmedAssetDelta);
   }
 
@@ -1252,7 +1074,7 @@ function updateKPIs() {
     setSignClass(elAnnualNetPnL, annualNetPnL);
   }
   if (elAnnualConfirmedPnL) {
-    elAnnualConfirmedPnL.textContent = fmtJPY(annualConfirmedPnL);
+    elAnnualConfirmedPnL.textContent = Number.isFinite(annualConfirmedPnL) ? fmtJPY(annualConfirmedPnL) : '—';
     setSignClass(elAnnualConfirmedPnL, annualConfirmedPnL);
   }
   if (elAnnualNetGrowth) {
@@ -1276,7 +1098,7 @@ function buildMonthlySwapBreakdown(tradingData, year, month) {
   const monthData = yearData?.[month] || yearData?.[String(month)] || {};
 
   return LINKED_ACCOUNTS.map((account) => {
-    const row = monthData?.[account.key] || {};
+    const row = linkedCalculator(tradingData).row(year, month, account.key);
     return {
       name: account.name,
       value: readStoredNumber(row, 'swapPnL')
@@ -1292,7 +1114,7 @@ function buildSwapSummary(selectedYear = null) {
 
   const enteredMonths = [];
   for (let month = 1; month <= 12; month += 1) {
-    if (!hasMeaningfulMonthData(yearData, month)) continue;
+    if (!linkedCalculator(tradingData).monthEntered(targetYear, month, LINKED_ACCOUNTS.map(account => account.key))) continue;
     if (Number.isFinite(calculateLinkedMonthlyTotals(tradingData, targetYear, month).swap)) enteredMonths.push(month);
   }
 
@@ -1655,66 +1477,8 @@ setTimeout(adjustDetailHeight, 200);
 
 // ===== Chart =====
 function buildTopPerformanceSeries(year, latestMonth) {
-  if (Array.isArray(topSeries?.performanceConfirmedSeries) && Array.isArray(topSeries?.performanceTotalSeries)) {
-    return {
-      confirmedSeries: topSeries.performanceConfirmedSeries,
-      totalSeries: topSeries.performanceTotalSeries
-    };
-  }
-
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
-  const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
-  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
-  const yearInitialData = initialFunds?.[year] || initialFunds?.[String(year)] || {};
-  const yearInitialUnrealData = initialUnrealized?.[year] || initialUnrealized?.[String(year)] || {};
-
-  const yearStartConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0);
-  }, 0);
-  const yearStartTotal = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
-    return sum + (Number(yearInitialData?.[account.key]) || 0)
-      + (Number(yearInitialUnrealData?.[account.key]) || 0);
-  }, 0);
-
-  let cumulativeDeposits = 0;
-  let cumulativeWithdrawals = 0;
-
-  // Performanceモードは年初基準の差分表示とするため、基準点を必ず0に固定
-  const confirmedSeries = [0];
-  const totalSeries = [0];
-
-  for (let month = 1; month <= 12; month += 1) {
-    if (!hasMeaningfulMonthData(yearData, month)) {
-      confirmedSeries.push(null);
-      totalSeries.push(null);
-      continue;
-    }
-
-    const monthData = yearData?.[month] || yearData?.[String(month)] || {};
-    GROWTH_TARGET_ACCOUNTS.forEach((account) => {
-      const row = monthData?.[account.key] || {};
-      cumulativeDeposits += Number(row.deposit) || 0;
-      cumulativeWithdrawals += Number(row.withdrawal) || 0;
-    });
-
-    const growthConfirmed = GROWTH_TARGET_ACCOUNTS.reduce((sum, account) => {
-      return sum + calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, month, account.key);
-    }, 0);
-    const growthTotalValues = GROWTH_TARGET_ACCOUNTS.map((account) => (
-      calculateLinkedAccountNetAssets(tradingData, initialFunds, year, month, account.key)
-    ));
-    const growthTotal = growthTotalValues.every(Number.isFinite)
-      ? growthTotalValues.reduce((sum, value) => sum + value, 0)
-      : null;
-
-    confirmedSeries.push(growthConfirmed - yearStartConfirmed - cumulativeDeposits + cumulativeWithdrawals);
-    totalSeries.push(Number.isFinite(growthTotal)
-      ? growthTotal - yearStartTotal - cumulativeDeposits + cumulativeWithdrawals
-      : null);
-  }
-
-  return { confirmedSeries, totalSeries };
+  const value = linkedCalculator().snapshot(year, LINKED_ACCOUNTS);
+  return { confirmedSeries: value?.performanceConfirmedSeries || [], totalSeries: value?.performanceTotalSeries || [] };
 }
 
 function updateTopAssetLegend() {
@@ -2649,6 +2413,8 @@ function initializeYearSelector() {
   const persistedYear = getPersistedSelectedYear();
   const years = (() => {
     const set = new Set([TOP_BASE_YEAR]);
+    try { window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read().monthlyAccountStates?.records
+      .forEach(row => set.add(Number(row.targetMonth.slice(0, 4)))); } catch (_) {}
     getNumericYears(tradingDataMap)
       .filter((year) => year >= TOP_BASE_YEAR)
       .forEach((year) => set.add(year));
@@ -2664,7 +2430,7 @@ function initializeYearSelector() {
     let maxYear = Math.max(...set);
     while (true) {
       const yearData = tradingDataMap?.[maxYear] || tradingDataMap?.[String(maxYear)] || {};
-      if (!hasMeaningfulMonthData(yearData, 12)) break;
+      if (!linkedCalculator(tradingDataMap, initialFundsMap).monthEntered(maxYear, 12, LINKED_ACCOUNTS.map(account => account.key))) break;
       maxYear += 1;
       set.add(maxYear);
     }

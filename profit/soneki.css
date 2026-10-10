@@ -2207,3 +2207,15 @@ body.drawer-open {
   font-size: 13px;
   text-align: center;
 }
+
+/* SBI monthly Draft: keep numeric/date controls within the existing account card. */
+.sbi-manual-heading { margin: 18px 0 10px; font-size: 13px; color: var(--muted, #9aa6b2); }
+.account-body[data-account-body="sbi"].open { max-height: 1000px; }
+.account-body[data-account-body="sbi"] .form-group { min-width: 0; }
+.account-body[data-account-body="sbi"] .input-account { min-width: 0; max-width: 100%; }
+.sbi-monthly-actions { display: flex; align-items: center; margin-top: 18px; min-height: 44px; }
+.sbi-monthly-save { min-height: 44px; padding: 10px 24px; border: 1px solid #3da2ff; border-radius: 10px; background: #17354b; color: #e8f2fb; cursor: pointer; }
+.sbi-monthly-save:disabled { opacity: .45; cursor: default; }
+.sbi-monthly-save[hidden] { display: none; }
+.sbi-monthly-status { font-size: 13px; color: #9aa6b2; }
+.sbi-monthly-error { color: #dcba94; font-size: 13px; line-height: 1.5; margin: 10px 0; }

@@ -255,5 +255,6 @@ test('monthly State save never modifies legacy monthly, financial calculations o
   for (const key of ['tradingData', 'yearInitialFunds', 'yearInitialUnrealized', 'tradeScopeTradeHistoryV1',
     'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeScopeTopSummarySnapshotV1']) assert.equal(target.getItem(key), before[key]);
   const ui = fs.readFileSync(path.join(__dirname, '../profit/soneki.js'), 'utf8');
-  assert.ok(!ui.includes('monthlyAccountStates')); assert.ok(!ui.includes(stateKey));
+  assert.ok(ui.includes('monthlyCalculator()')); assert.ok(ui.includes('sbiMonthlyUI.renderCard'));
+  assert.ok(!ui.includes(stateKey)); // No independent State storage writes in screen code.
 });

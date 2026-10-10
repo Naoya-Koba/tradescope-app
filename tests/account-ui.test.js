@@ -28,9 +28,9 @@ test('Legacy/new Input renderers use the same mapping but old calculation names 
   const legacy = section(source, 'function renderAccountInputs(', 'function renderSbiDraftCard(');
   const draft = section(source, 'function renderSbiDraftCard(', 'function handleAccountInputBlur(');
   assert.ok(legacy.includes('${displayAccountName(account.key)}'));
-  assert.ok(draft.includes('${displayAccountName(account.key)}'));
+  assert.ok(draft.includes('displayAccountName(account.key)'));
   assert.match(source, /return ACCOUNTS.find\(\(account\) => account.key === accountKey\)\?\.name/);
-  assert.match(source, /label: account.name/); // Snapshot serialization retains old labels.
+  assert.match(read('assets/monthly-account-resolver.js'), /label: account.name/); // Snapshot serialization retains old labels.
 });
 test('History selects retain original values for create/edit/filter/close operations', () => {
   const source = read('history/history.js'), elements = {};
@@ -83,6 +83,6 @@ test('All major pages load the display module; precache and HTML versions are al
       assert.ok(urls.includes('./' + relative), relative);
     }
   }
-  assert.match(read('index.html'), /topScriptVersion = '20261011-1'/);
-  assert.ok(urls.includes('./top/script.js?v=20261011-1'));
+  assert.match(read('index.html'), /topScriptVersion = '20261011-2'/);
+  assert.ok(urls.includes('./top/script.js?v=20261011-2'));
 });

@@ -32,7 +32,7 @@
 - `tradeScopeSymbolListV1`
 - localStorageに実在する場合のみLegacy `tradeInfo`
 
-**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続しているが、MonthlyAccountStateのInput接続・manual保存UIは未実装。
+**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続し、MonthlyAccountStateのInput接続・manual保存UIも実装済み。
 
 **Current**：SBIの確認後保存内容は最新v3 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
 
@@ -154,7 +154,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 ### MonthlyAccountStateとv3の正式仕様
 
-**Current（内部基盤）**：SBI月次保存serviceは外国証券／現金のmanual AccountSnapshotとMonthlyAccountStateを既存schemaのまま同時保存する。訂正で残る旧Snapshotもv3の`accountSnapshots`で保護される。新しいBackup version・Restore規則は不要で、v1維持／v2 Stateクリア／v3完全復元の意味は変えない。UI接続と実保存service経由の匿名v3往復は次段階で検証する。
+**Current**：SBI月次保存serviceは外国証券／現金のmanual AccountSnapshotとMonthlyAccountStateを既存schemaのまま同時保存する。訂正で残る旧Snapshotもv3の`accountSnapshots`で保護される。新しいBackup version・Restore規則は不要で、v1維持／v2 Stateクリア／v3完全復元の意味は変えない。実保存service経由の匿名保存・訂正→v3 export→空の匿名Storageへrestore→共有計算一致を検証済み。実機Restoreは今回行わない。
 
 **Decided**：最新完全バックアップをv3へ拡張し、従来dataと既存6モデルに`monthlyAccountStates`を加えた7モデルを完全保護する。未作成collectionは`null`（キー不在）とする。manual外国株／現金は既存`accountSnapshots`で保護する。ファイル名・exportedAtは変更しない。
 
@@ -168,7 +168,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 **Decided**：v2復元で採用先が過去状態へ置換されるため、MonthlyAccountStateを残さない。このクリアも確認後の同じjournal／rollbackに含め、途中失敗時はStateを含めて元状態へ戻す。v3と将来の月次保存も新キーを同じtransactionで保護する。journal確保失敗では開始せず、再読込不一致はrollback、rollback不能時はjournalを保持して後続保存を止める。画面表示・Repository初期化から空モデルを自動保存しない。
 
-**Current**：v3 exportは`data.models`に既存6モデルと`monthlyAccountStates`を必須とし、各値はenvelopeまたは`null`。version別の固定一覧を使って全schema・参照を検証する。v2のState削除とv3の7モデル復元を共通journalで保護し、journal削除前に全モデルを再読込・一致確認する。Input UI・実manual保存は未接続。
+**Current**：v3 exportは`data.models`に既存6モデルと`monthlyAccountStates`を必須とし、各値はenvelopeまたは`null`。version別の固定一覧を使って全schema・参照を検証する。v2のState削除とv3の7モデル復元を共通journalで保護し、journal削除前に全モデルを再読込・一致確認する。Inputからのmanual／月次確定保存も接続済み。Backup version・schema・復元規則は変更しない。
 
 ## 5. 安全な復元フロー
 

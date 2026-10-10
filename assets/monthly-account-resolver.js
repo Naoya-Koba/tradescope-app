@@ -191,6 +191,9 @@
       totalConfirmed: (year, month, keys) => total(keys.map(key => confirmed(year, month, key))),
       totalNet: (year, month, keys) => total(keys.map(key => net(year, month, key))),
       initial, performance, yearlyTotals, fingerprint, snapshot,
+      warning: year => models === null ? '取込データを確認できません'
+        : Array.from({ length: 12 }, (_, index) => index + 1).some(month => read(year, month, 'sbi').source === 'conflict')
+        ? '従来方式のSBI入力がある月は集計できません' : '',
       snapshotCurrent: (value, year, keys) => Boolean(value && value.sourceFingerprint === fingerprint(year)
         && value.month === latestMonth(year, keys) && monthEntered(year, value.month, keys)) });
   }

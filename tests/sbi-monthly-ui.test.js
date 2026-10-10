@@ -1,0 +1,84 @@
+const test = require('node:test'), assert = require('node:assert/strict');
+const fs = require('node:fs'), vm = require('node:vm');
+const model = require('../assets/data-model-storage.js'), input = require('../assets/sbi-input-draft.js');
+const resolver = require('../assets/monthly-account-resolver.js'), service = require('../assets/sbi-monthly-save.js');
+const now = '2026-10-04T12:00:00Z', env = records => ({schemaVersion:1,records,updatedAt:now});
+const fields = {foreignAssetValue:'0',foreignUnrealizedPnl:'0',foreignDate:'2026-10-04',cashBalance:'0',cashDate:'2026-09-30',realizedPnL:'0',deposit:'0',withdrawal:'0'};
+class Element {
+ constructor(tag) { this.tag=tag;this.children=[];this.style={};this.dataset={};this.listeners={};this.hidden=false;this.textContent='';
+   this.classList={contains:name=>name==='open'};this.scrollHeight=1200; }
+ setAttribute() {}
+ append(...nodes) { this.children.push(...nodes); }
+ appendChild(node) { this.append(node); return node; }
+ addEventListener(name,fn) { this.listeners[name]=fn; }
+ set innerHTML(value) {
+   this.parts=Object.fromEntries(['.sbi-account-label','.account-color-dot','.sbi-domestic-value','.sbi-domestic-pnl','.sbi-import-status','.sbi-domestic-date','.account-body'].map(key=>[key,new Element('div')]));
+ }
+ querySelector(selector) { return this.parts[selector]; }
+}
+function harness(mutator = () => {}) {
+ const models=Object.fromEntries(Object.keys(model.keys).map(key=>[key,null]));
+ models.accounts=env(model.initialAccounts().filter(row=>row.id==='acc_sbi_sec'));
+ models.instruments=env([{id:'ins_fake',assetType:'Stock',symbol:'ZZ01',displayName:'架空証券',enabled:true}]);
+ models.importBatches=env([{id:'batch_fake',accountId:'acc_sbi_sec',targetMonth:'2026-09',snapshotAsOf:'2026-10-04',importedAt:now,sourceType:'csv',sourceProvider:'sbi'}]);
+ models.holdingSnapshots=env([{id:'hs_fake',accountId:'acc_sbi_sec',instrumentId:'ins_fake',importBatchId:'batch_fake',targetMonth:'2026-09',snapshotAsOf:'2026-10-04',importedAt:now,sourceMode:'imported',sourceScope:'sbi-domestic-holdings',marketValue:'0',unrealizedPnl:'0'}]);
+ mutator(models);
+ const values={tradingData:'{}',...Object.fromEntries(Object.entries(models).filter(([,v])=>v).map(([key,v])=>[model.keys[key],JSON.stringify(v)]))};
+ const adapter={getItem:key=>values[key]??null,setItem:(key,v)=>{values[key]=v;},removeItem:key=>{delete values[key];}};
+ const drafts=input.createDrafts(), document={createElement:tag=>new Element(tag)};
+ const context=vm.createContext({document,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service});
+ vm.runInContext(fs.readFileSync(require.resolve('../assets/sbi-monthly-ui.js'),'utf8'),context);
+ let card, saved=0;
+ const controller=context.TradeScopeSbiMonthlyUI.createController({adapter,drafts,legacyData:()=>JSON.parse(values.tradingData),onSaved:()=>{saved++;render();}});
+ function render() { card=controller.renderCard({key:'sbi',color:'red'},input.load(adapter,'2026-09'),'2026-09','SBI証券');return card; }
+ function children() { const walk=node=>[node,...node.children.flatMap(walk)];return walk(card.parts['.account-body']); }
+ const control=field=>children().find(el=>el.dataset.field===field);
+ const button=()=>children().find(el=>el.className==='sbi-monthly-save');
+ const status=()=>children().find(el=>el.className==='sbi-monthly-status').textContent;
+ const error=()=>children().find(el=>el.className==='sbi-monthly-error');
+ function fill(field,value) { const el=control(field);el.value=value;el.listeners.input(); }
+ render(); return {values,adapter,drafts,render,control,button,status,error,fill,fillAll:()=>Object.entries(fields).forEach(([k,v])=>fill(k,v)),saved:()=>saved,card:()=>card};
+}
+test('Input rendering and editing remain detached; blanks have no zero placeholder',()=>{
+ const h=harness(), before=JSON.stringify(h.values);h.fillAll();
+ assert.equal(JSON.stringify(h.values),before);assert.equal(h.saved(),0);
+ for(const key of Object.keys(fields))assert.equal(h.control(key).placeholder,undefined);
+ assert.equal(h.drafts.read('2026-09').realizedPnL,'0');
+});
+test('explicit-zero save verifies before saved status, hides action, and reload rehydrates',()=>{
+ const h=harness();h.fillAll();h.button().listeners.click();
+ assert.equal(h.saved(),1);assert.equal(h.status(),'保存済み');assert.equal(h.button().hidden,true);
+ h.drafts.clear();h.render();assert.equal(h.status(),'保存済み');assert.equal(h.control('cashBalance').value,'0');
+ assert.equal(JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].swapPnl,'0');
+});
+test('reediting returns action without changing canonical data; correction retains old snapshots',()=>{
+ const h=harness();h.fillAll();h.button().listeners.click();const before=JSON.stringify(h.values);
+ const id=JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].id;
+ h.fill('foreignAssetValue','12.25');assert.equal(h.button().hidden,false);assert.equal(h.status(),'');assert.equal(JSON.stringify(h.values),before);
+ h.button().listeners.click();assert.equal(JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].id,id);
+ assert.equal(JSON.parse(h.values[model.keys.accountSnapshots]).records.length,3);assert.equal(h.status(),'保存済み');
+});
+test('missing input returns specific error, keeps Draft, and expands body for visible message',()=>{
+ const h=harness(),before=JSON.stringify(h.values);h.button().listeners.click();
+ assert.equal(h.error().textContent,'外国証券の評価額を入力してください');assert.equal(h.error().hidden,false);
+ assert.equal(h.card().parts['.account-body'].style.maxHeight,'1200px');assert.equal(JSON.stringify(h.values),before);
+});
+test('canonical unavailability and multiple domestic candidates disable save without writes',()=>{
+ for(const multiple of [false,true]) {
+ const h=harness(m=>{if(!multiple)m.holdingSnapshots=null;else {m.importBatches.records.push({...m.importBatches.records[0],id:'batch_second'});
+ m.holdingSnapshots.records.push({...m.holdingSnapshots.records[0],id:'hs_second',importBatchId:'batch_second'});}});
+ const before=JSON.stringify(h.values);h.button().listeners.click();assert.equal(h.button().disabled,true);assert.equal(JSON.stringify(h.values),before);
+ assert.match(h.error().textContent,multiple?/複数/:/取り込んで/);
+ }
+});
+test('meaningful legacy conflict prevents save, without hiding the conflict',()=>{
+ const h=harness();h.values.tradingData='{"2026":{"9":{"sbi":{"deposit":1}}}}';h.render();
+ const before=JSON.stringify(h.values);h.button().listeners.click();assert.equal(h.button().disabled,true);
+ assert.match(h.error().textContent,/従来方式/);assert.equal(JSON.stringify(h.values),before);
+});
+test('failed transaction never shows saved status or clears edited values',()=>{
+ const h=harness(),before=JSON.stringify(h.values);h.fillAll();const set=h.adapter.setItem;
+ let failed=false;h.adapter.setItem=(key,value)=>{if(key===model.keys.monthlyAccountStates&&!failed){failed=true;throw Error('Anonymous write failure');}set(key,value);};
+ h.button().listeners.click();assert.equal(h.saved(),0);assert.equal(h.status(),'');assert.equal(h.error().hidden,false);
+ assert.equal(h.drafts.read('2026-09').cashBalance,'0');assert.equal(JSON.stringify(h.values),before);
+});

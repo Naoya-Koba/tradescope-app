@@ -349,7 +349,7 @@ importedAt = TradeScopeへ実際に保存した日時
 
 **Decided**：今回のSBI保存UIでは、国内採用Batchと全保有の評価額・評価損益・取得日、外国証券評価額・評価損益・取得日、現金残高・取得日、実現損益・入金・出金がすべて必要。明示0は有効、blank／nullは不完全とする。`acc_sbi_sec`の新方式に限り`swapPnl: "0"`を固定し、他証券口座・旧月へ一般化しない。schemaのnull許容は変えない。
 
-**Current（内部基盤）**：`assets/sbi-monthly-save.js`は表示時の国内採用IDと最新モデルを再照合し、複数Batchを停止する。外国証券・現金のmanual AccountSnapshotとMonthlyAccountStateを一回の`repo.commit(..., {expectedModels})`で保存・再読込検証する。manualには`observationType: approximateForMonth`を付け、月末日でも正式月末へ昇格しない。訂正ではState IDを維持してconfirmedAtを更新し、変更したmanual値／日付は新Snapshot IDへ参照を切り替え、旧recordを保持する。未変更の採用先は再利用できる。UI・各集計画面への接続は次段階。
+**Current**：`assets/sbi-monthly-save.js`は表示時の国内採用IDと最新モデルを再照合し、複数Batchを停止する。外国証券・現金のmanual AccountSnapshotとMonthlyAccountStateを一回の`repo.commit(..., {expectedModels})`で保存・再読込検証する。manualには`observationType: approximateForMonth`を付け、月末日でも正式月末へ昇格しない。訂正ではState IDを維持してconfirmedAtを更新し、変更したmanual値／日付は新Snapshot IDへ参照を切り替え、旧recordを保持する。未変更の採用先は再利用できる。Inputの口座内保存UIとMonthly Summary／Top／Asset Trendは同じ共有resolver／計算へ接続済み。
 
 **Decided**：外国株は既存AccountSnapshotの別recordとする。`sourceMode: manual`、`sourceScope: sbi-foreign-securities`、`accountId`、`targetMonth`、`snapshotAsOf`、`importedAt`、`valuationCurrency: JPY`、`assetValue`、`unrealizedPnl`を用いる。stable `id`を持ち、`importBatchId`、`netAssetValue`、`cashBalance`、`reportedMonthlyRealizedPnl`は混ぜない。銘柄別Instrument／HoldingSnapshotは現時点では作らず、ユーザーが確認した円換算値を保存する。為替レートや外貨金額から推測・再計算しない。
 
@@ -381,9 +381,9 @@ MonthlyAccountState {
 
 **Decided**：同じ月の全保有Batchを加算せず、`domesticImportBatchId`の集合だけを採用する。latest importedAtを自動採用しない。Input編集中Draftはメモリ上で分離し、明示保存成功時だけ正本を更新する。CSV保存だけでは月次確定にしない。2026年1〜8月を自動migrationせず、新方式とlegacyの同じ範囲を二重加算しない。
 
-**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。Inputでは2026年9月以降、対応する国内保有データがあるSBI口座だけを新方式に分離する。月次状態が未保存なら対象月・口座・国内保有scopeが一致するBatchが1件のときのみread-only表示し、複数なら選択せず表示を停止する。月次状態の明示採用先がある場合はその参照だけを読む。金額は既存の共通decimal加算で集計し、必要値のnull／欠損・JPY以外は不明とする。AccountSnapshotや月次状態を表示のために作成しない。
+**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。Inputでは2026年9月以降のSBI口座を新方式に分離し、国内保有不在でもlegacyへ戻さない。月次状態が未保存なら対象月・口座・国内保有scopeが一致するBatchが1件のときのみread-only表示し、複数なら選択せず表示を停止する。月次状態の明示採用先がある場合はその参照だけを読む。金額は既存の共通decimal加算で集計し、必要値のnull／欠損・JPY以外は不明とする。AccountSnapshotや月次状態を表示のために作成しない。
 
-**Current**：新方式SBIの決済・入出金編集は月別のメモリ上Draftのみとし、legacy `tradingData`へのコピー・既存保存ボタンからの保存を行わない。外国株／現金manual保存、MonthlyAccountState確定保存、Summary／Top／Asset Trend接続は未実装。2026年9月は国内値の表示だけでは入力済み・確定にならない。2026年1〜8月と新方式データのない月は従来のlegacy Inputを維持し、自動migrationしない。
+**Current**：新方式SBIの決済・入出金編集は月別のメモリ上Draftのみとし、legacy `tradingData`へのコピー・既存保存ボタンからの保存を行わない。外国証券・現金・月次必須入力を口座内の「保存」で同時確定し、Summary／Top／Asset Trendへ接続する。2026年9月は国内値の表示だけでは入力済み・確定にならない。2026年1〜8月は従来のlegacy Inputを維持する。9月以降の未確定月をplaceholderへ戻さず、自動migrationしない。
 
 **Current / Decided**：正常に解決した`acc_sbi_sec`・`imported`・`sbi-domestic-holdings`の国内保有Batch集合に限り、既存保存経路が省略していた`currency`の未設定／`null`をInput読込時に後方互換として許容する。明示的なJPY以外は表示を停止し、空文字はschema不正として拒否する。通貨をrecordへ補完せず、他口座・他取得範囲・AccountSnapshotへ一般化しない。金額の欠損を0にせず、表示によるmigration・月次確定は行わない。
 
@@ -629,7 +629,7 @@ TransactionAnnotation {
 
 **Under consideration**：fingerprintの最終構成、decimal表記差、日時精度、訂正・取消、locatorだけの重複解決、手入力競合は未確定。現在の候補は口座・商品・日時・売買・取引種別・数量・単位・価格・通貨を比較する技術基盤に限定する。月末性の正式名称・根拠確認フローも未確定で、候補属性`observationType`（`officialMonthEnd` / `approximateForMonth` / `pointInTime`）は指定時のみ保存し、自動付与・昇格しない。
 
-**Current**：Instrument照合は保存予定Previewと確認後保存エンジンで共有する。AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIは未実装。新モデルは既存の月次・履歴・Summary計算へ接続しない。
+**Current**：Instrument照合は保存予定Previewと確認後保存エンジンで共有する。AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIは未実装。RawTransactionは既存履歴へ自動反映しない。SBIの月次確定・明示採用データのみ共有月次計算へ接続する。
 
 ```text
 {
@@ -678,3 +678,5 @@ TransactionAnnotation {
 - 移行済みバージョンを記録し、二重変換を防ぐ。
 - 欠落項目には安全な初期値または`unknown`を使う。
 - 既存データの意味が不明な場合は変換せず、確認対象として残す。
+
+**Current / SBI Input**：外国証券の評価額・評価損益・取得日、現金残高・取得日、実現損益・入金・出金を非永続Draftとして編集する。0 placeholderは使わず明示0を受理する。検証済み保存後は操作を隠して「保存済み」、再編集は保存操作へ戻す。編集中の集計は直前の正本から計算する。

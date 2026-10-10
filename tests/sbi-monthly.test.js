@@ -50,6 +50,55 @@ test('cutover preserves August legacy; absent State and other-account saved zero
   assert.equal(resolver.resolve(models, data, '2026-09', 'gmo').source, 'legacy');
   assert.deepEqual(data, before);
 });
+function backupHarness(target) {
+  const source = fs.readFileSync(require.resolve('../top/script.js'), 'utf8');
+  const context = vm.createContext({ window: { TradeScopeDataStorage: model, TradeScopeStorageTransaction: tx, location: { origin: 'http://127.0.0.1:anonymous' } },
+    document: { getElementById: () => null, addEventListener() {} }, localStorage: target,
+    isEmptyPlainRecord: value => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0,
+    PROFIT_STORAGE_KEY_TRADING: 'tradingData', PROFIT_STORAGE_KEY_INITIAL: 'yearInitialFunds',
+    PROFIT_STORAGE_KEY_INITIAL_UNREALIZED: 'yearInitialUnrealized', PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT: 'tradeScopeTopSummarySnapshotV1' });
+  vm.runInContext(source.slice(source.indexOf('// ===== Backup Format Core'), source.indexOf('function exportAllData()')), context);
+  return context.window;
+}
+test('real monthly service save and correction survive unchanged v3 export/empty restore calculations', () => {
+  const original = seed();
+  for (const correction of [false, true]) {
+    save(original, { ...draft(), foreignUnrealizedPnl: correction ? '5.25' : '-1.20' });
+    const before = model.readModels(original), expected = calc(original).snapshot(2026, [{ key: 'sbi', name: 'SBI' }]);
+    const api = backupHarness(original), backup = api.TradeScopeBackupExport.buildPayload(original);
+    assert.equal(backup.backupVersion, 3);
+    const empty = new Storage(), parsed = api.TradeScopeBackupFormat.inspectValue(backup);
+    assert.equal(parsed.ok, true); api.TradeScopeBackupRestore.execute(parsed.restorePlan, empty);
+    assert.deepEqual(model.readModels(empty), before);
+    assert.deepEqual(calc(empty).snapshot(2026, [{ key: 'sbi', name: 'SBI' }]), expected);
+  }
+});
+test('UI routing uses shared calculation and service, preserves backup core, and never writes Draft fields', () => {
+  const profit = fs.readFileSync(require.resolve('../profit/soneki.js'), 'utf8');
+  const top = fs.readFileSync(require.resolve('../top/script.js'), 'utf8');
+  const ui = fs.readFileSync(require.resolve('../assets/sbi-monthly-ui.js'), 'utf8');
+  assert.match(profit, /monthlyCalculator\(\)\.snapshot/); assert.match(top, /calculator\.snapshotCurrent/);
+  assert.match(ui, /service\.save/); assert.doesNotMatch(ui, /\.setItem\(|\.commit\(/);
+  assert.doesNotMatch(ui, /placeholder\s*=\s*['"]0/); assert.match(ui, /dataset.draft = 'sbi'/);
+  assert.match(profit, /if \(input.dataset.draft === 'sbi'\) return/);
+});
+test('all eight legacy months and other accounts retain asset/performance/flow results', () => {
+  const old = legacyMetrics(), data = { 2026: {} }, funds = { 2026: { sbi: 100, gmo: 200, smbc: 50 } };
+  for (let month = 1; month <= 8; month++) data[2026][month] = { __saved: true,
+    sbi: { realizedPnL: month % 2 ? -1 : 0, swapPnL: 2, deposit: 3, withdrawal: 1, unrealizedPnL: -month },
+    gmo: { realizedPnL: 2, swapPnL: 1, deposit: 0, withdrawal: 0, unrealizedPnL: month } };
+  const before = copy(data), c = resolver.createCalculator(old, data, funds, {}, fixture());
+  for (let month = 1; month <= 8; month++) for (const key of ['sbi', 'gmo']) {
+    assert.equal(c.confirmed(2026, month, key), old.calculateAccountConfirmedAssets(data, funds, 2026, month, key));
+    assert.equal(c.net(2026, month, key), old.calculateAccountNetAssets(data, funds, 2026, month, key));
+  }
+  assert.equal(c.net(2026, 9, 'smbc'), 50); assert.deepEqual(data, before);
+});
+test('canonical yearly independence retains missing January rather than using prior-year observations', () => {
+  const target = seed(fixture('2027-02')); save(target, draft('2027-02'));
+  assert.equal(calc(target).confirmed(2027, 2, 'sbi'), null);
+  assert.equal(calc(target).monthlyFieldTotal(2027, 2, ['sbi'], 'swapPnL'), 0);
+});
 for (const field of ['realizedPnL', 'swapPnL', 'deposit', 'withdrawal']) test(`meaningful legacy ${field} stops cutover save`, () => {
   const target = seed(fixture(), { 2026: { 9: { sbi: { [field]: 1 } } } }), before = target.snapshot();
   assert.equal(resolver.resolve(model.readModels(target), JSON.parse(target.getItem('tradingData')), '2026-09').source, 'conflict');

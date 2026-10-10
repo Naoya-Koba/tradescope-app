@@ -57,7 +57,8 @@ test('Execution Batch and RawTransactions cannot become a domestic candidate', (
   models.rawTransactions = envelope([{ id: 'tx_fake', accountId: 'acc_sbi_sec', instrumentId: 'ins_fake',
     importBatchId: 'batch_exec', sourceType: 'csv', sourceProvider: 'sbi', importedAt: now, transactionType: '架空買付' }]);
   assert.equal(select(models).importBatchId, 'batch_hold');
-  models.holdingSnapshots = null; assert.equal(select(models).mode, 'legacy');
+  models.holdingSnapshots = null; assert.equal(select(models).mode, 'draft');
+  assert.equal(select(models).status, 'unavailable');
 });
 test('Another account holdings are not included', () => {
   const models = fixture(); models.accounts.records.push({ ...models.accounts.records[0], id: 'acc_fake' });
@@ -110,10 +111,10 @@ test('Malformed canonical data fails closed without writes', () => {
   const before = JSON.stringify(adapter.values); assert.equal(input.load(adapter, '2026-09').status, 'unavailable');
   assert.equal(JSON.stringify(adapter.values), before);
 });
-test('January-August and months without new data remain legacy', () => {
+test('January-August remain legacy; cutover missing months remain unsaved Draft', () => {
   for (let month = 1; month <= 8; month++) assert.equal(input.selectDomestic(fixture(`2026-${String(month).padStart(2, '0')}`),
     `2026-${String(month).padStart(2, '0')}`).mode, 'legacy');
-  assert.equal(input.selectDomestic(fixture(), '2026-10').mode, 'legacy');
+  assert.equal(input.selectDomestic(fixture(), '2026-10').mode, 'draft');
 });
 test('Draft is month-scoped, detached from returned objects, and not persisted', () => {
   const drafts = input.createDrafts(); drafts.set('2026-09', 'realizedPnL', '0'); drafts.set('2026-10', 'deposit', '12');

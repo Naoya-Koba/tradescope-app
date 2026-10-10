@@ -12,7 +12,7 @@
 
 ### 完全バックアップv3・v2／v1互換とLegacy部分復元
 
-- **Current**：トップexportは`backupVersion: 3`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、月次状態のInput UI・manual保存は未接続。
+- **Current**：トップexportは`backupVersion: 3`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、SBIの2026年9月以降のInput UI・manual月次保存・共有集計も接続済み。
 - **Current**：v3、v2、v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
 - **Current**：v3は7モデルを完全復元し、v2は従来6モデルを復元して月次状態を同一journalでクリアする。v1は従来対象を復元して7モデルを維持する。旧形式は部分復元で未収録項目を維持する。
 - **Current**：復元前ジャーナル、書き込み後検証、失敗時ロールバック、Summary Snapshot無効化、空データ復元時のダミー投入抑止を行う。
@@ -155,3 +155,5 @@
 - 政策金利予測、転換シグナル、押し／戻りの正式採否とデータ源
 
 不明点は推測で埋めず、実装開始前に確認する。
+
+**Current / SBI月次接続**：2026-09以降は未確定をlegacy placeholderで補わない。Top／Summary／Trendは共有resolverを参照し、Stateと採用元を含むfingerprintで古いキャッシュを拒否する。保存済みの旧全ゼロ値が実入力かplaceholderかは既存recordだけでは区別不能であり、Migrationせず非ゼロ直接入力を競合の証拠とする。複数国内候補の解決UI、同時タブの完全排他、実機iPhoneの保存／容量／中断検証は今回追加しない。

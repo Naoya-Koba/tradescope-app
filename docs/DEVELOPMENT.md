@@ -99,11 +99,11 @@ TradeScope/
 
 **Decided / SBI月次確定**：2026-08以前・他口座は従来計算を維持する。2026-09以降のSBIは共有resolverのmissing／conflictを含む判定だけを用い、legacy placeholderへ戻さない。必要入力が完全な場合だけUI保存を許可し、null許容schema自体は変更しない。
 
-**Current（内部基盤）**：`assets/monthly-account-resolver.js`と`assets/sbi-monthly-save.js`を追加。後者はAccountSnapshotとMonthlyAccountStateを一回の既存Repository transactionで保護し、採用国内データの再検証・expectedModels・訂正履歴保持を行う。Repository／Backup schema変更、Migration、seedはない。`tests/sbi-monthly.test.js`はcutover、legacy conflict、completeness、欠損伝播、訂正、atomic保存・失敗rollback、canonical fingerprintを匿名fixtureで確認する。Input／Summary／Top／Trendの公開接続は次段階で同時に行う。
+**Current**：`assets/monthly-account-resolver.js`と`assets/sbi-monthly-save.js`を追加。後者はAccountSnapshotとMonthlyAccountStateを一回の既存Repository transactionで保護し、採用国内データの再検証・expectedModels・訂正履歴保持を行う。Repository／Backup schema変更、Migration、seedはない。`tests/sbi-monthly.test.js`はcutover、legacy conflict、completeness、欠損伝播、訂正、atomic保存・失敗rollback、canonical fingerprintを匿名fixtureで確認する。`assets/sbi-monthly-ui.js`は保存serviceを通して確定し、Input／Summary／Top／Trendを同じ共有計算へ同時接続する。匿名テストで保存・訂正後のv3往復とUI状態遷移も確認する。
 
 **Decided**：MonthlyAccountStateは観測Snapshotと分離した口座・月の明示確定記録とする。共通Repositoryへ統合し、7モデルを保護するBackup v3、version別Validation、journal／rollbackを先に検証する。v2は6モデル形式を固定し、v2 Restore時のStateクリアも同一transactionに含める。v1／Legacy RestoreではStateを維持する。
 
-**Current**：MonthlyAccountStateのStorage・検証・Backup v3への統合は完了。`assets/sbi-input-draft.js`はread-only Repository経由でSBI国内保有の候補を読み、既存CSV共通処理のdecimal加算を利用する。Inputの新方式SBIだけを月別の非永続Draftへ分離し、国内値を安全なtextContentで表示する。候補Batchを合算・latest自動採用しない。表示・月切替・Draft編集では金融Storageとlegacyメモリを変更せず、既存月次保存からもDraftを除外する。2026年1〜8月と新方式のない月はlegacyを維持する。外国株／現金manual保存、月次確定、旧月次・Summary等への反映は未接続。
+**Current**：MonthlyAccountStateのStorage・検証・Backup v3への統合は完了。`assets/sbi-input-draft.js`はread-only Repository経由でSBI国内保有の候補を読み、既存CSV共通処理のdecimal加算を利用する。Inputの新方式SBIだけを月別の非永続Draftへ分離し、国内値を安全なtextContentで表示する。候補Batchを合算・latest自動採用しない。表示・月切替・Draft編集では金融Storageとlegacyメモリを変更せず、既存月次保存からもDraftを除外する。2026年1〜8月はlegacyを維持し、9月以降のSBIは未取込でも新方式Draftとする。外国証券・現金manualと月次状態は口座内明示保存で同時更新する。集計は共有計算へ接続し、旧月次へのコピーは行わない。
 
 **Decided**：表示・read・初期化でseedしない。Input Draftはメモリ上に分離し、明示保存でのみmanual AccountSnapshotと月次状態を更新する。国内値のread-only表示だけを月次確定や台帳更新と混同せず、legacy monthlyへコピーしない。既存台帳式を維持し、観測Viewから差額損益を逆算しない。schema・一意性・参照・null／0・version別復元・新キー途中失敗／再読込不一致／rollback不能を匿名fixtureで検証する。
 
@@ -262,3 +262,5 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 - Currentだけが変わる場合でも、Decidedとの差が変化するならKnown issueを更新する。
 - docsとコードの矛盾を発見したら報告し、判断なしにどちらかを正しいと決めない。
 - UI表示名変更と内部データ名変更を分離する。
+
+**Current / UI検証**：`tests/sbi-monthly-ui.test.js`は匿名DOMで空欄拒否、明示0、保存済み、再編集、訂正履歴、再読込、競合・不足・rollback失敗表示を検証する。PC 1280／mobile 390で数字・date input・エラー・保存済み・Summary・Top・円グラフ・Trendを確認し、開閉パネルの高さを表示内容の変更後も更新する。PWAはv263で変更資産のqueryとprecacheを同期する。

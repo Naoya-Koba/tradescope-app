@@ -22,7 +22,6 @@
       && batch.sourceProvider === 'sbi' && batch.sourceType === 'csv');
     const state = records(models, 'monthlyAccountStates').find(row =>
       row.accountId === accountId && row.targetMonth === targetMonth);
-    if (!holdings.length && !state) return { mode: 'legacy' };
     const base = { mode: 'draft', targetMonth, marketValue: null, unrealizedPnl: null, snapshotAsOf: null };
     const account = records(models, 'accounts').find(row => row.id === accountId);
     if (account?.providerCode !== 'sbi' || account.accountType !== 'securities') return { ...base, status: 'unavailable' };
@@ -51,9 +50,11 @@
 
   function createDrafts() {
     const months = new Map();
-    const fields = ['realizedPnL', 'deposit', 'withdrawal'];
+    const fields = ['realizedPnL', 'deposit', 'withdrawal', 'foreignAssetValue', 'foreignUnrealizedPnl', 'foreignDate', 'cashBalance', 'cashDate'];
     return Object.freeze({
       read: month => ({ ...(months.get(month) || {}) }),
+      initialize: (month, values) => { if (!months.has(month)) months.set(month, { ...values }); },
+      clearMonth: month => months.delete(month),
       set: (month, field, value) => {
         if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !fields.includes(field)) throw new Error('Draft項目が不正です');
         months.set(month, { ...(months.get(month) || {}), [field]: String(value ?? '') });
