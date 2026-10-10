@@ -129,6 +129,60 @@ test('two files commit separately; exact SBI fund identity reused across Holding
   assert.equal(saved.rawTransactions.records[0].transactionType, '投信金額買付');
   assert.equal(storage.actions.filter(([type, key]) => type === 'set' && key === transaction.journalKey).length, 2);
 });
+test('Preview and save-time resolution share whitespace identity and preserve original labels', async () => {
+  const storage = new Storage(), save = service(storage);
+  const holding = source('holdings', fund.replace('架空投信', '架空　投信'));
+  assert.equal((await save.save(holding)).status, 'saved');
+  const existing = save.read(), id = existing.instruments.records[0].id;
+  const instrumentBytes = storage.getItem(model.keys.instruments);
+  const input = source('transactions', fundTrade.replace('架空投信', '架空  投信'), 'b'.repeat(64));
+  const draft = await preview.convert([input], existing, preview.createSession(cryptoApi));
+  assert.equal(draft.files[0].transactions[0].instrumentId, id);
+  assert.equal((await save.inspect(input)).status, 'ready');
+  assert.equal((await save.save(input)).status, 'saved');
+  const saved = save.read();
+  assert.equal(saved.instruments.records.length, 1);
+  assert.equal(saved.rawTransactions.records[0].instrumentId, id);
+  assert.equal(storage.getItem(model.keys.instruments), instrumentBytes);
+  assert.equal(saved.instruments.records[0].symbol, '架空　投信');
+  assert.equal(saved.instruments.records[0].displayName, '架空　投信');
+  assert.equal(saved.holdingSnapshots.records[0].rawFields.name, '架空　投信');
+  assert.equal(saved.rawTransactions.records[0].rawFields.name, '架空  投信');
+});
+
+test('whitespace identity preserves already-imported and transaction fingerprint protection', async () => {
+  const storage = new Storage(), save = service(storage);
+  const input = source('transactions', fundTrade.replace('架空投信', '架空　投信'));
+  assert.equal((await save.save(input)).status, 'saved');
+  const before = storage.snapshot(), actions = storage.actions.length;
+  assert.equal((await save.save(input)).status, 'already-imported');
+  const other = source('transactions', fundTrade, 'b'.repeat(64));
+  const outcome = await save.save(other);
+  assert.equal(outcome.status, 'review-required');
+  assert.equal(outcome.reason, 'duplicate-transaction');
+  assert.deepEqual(storage.snapshot(), before);
+  assert.equal(storage.actions.length, actions);
+});
+
+test('save-time normalized fund ambiguity never chooses, merges or deletes existing IDs', async () => {
+  const storage = new Storage(), save = service(storage);
+  assert.equal((await save.save(source('holdings', fund))).status, 'saved');
+  const saved = save.read();
+  seed(storage, {
+    instruments: envelope([...saved.instruments.records,
+      { ...saved.instruments.records[0], id: 'ins_other', symbol: '架空 投信', displayName: '架空 投信' }]),
+    holdingSnapshots: envelope([...saved.holdingSnapshots.records,
+      { ...saved.holdingSnapshots.records[0], id: 'holding_other', instrumentId: 'ins_other',
+        rawFields: { ...saved.holdingSnapshots.records[0].rawFields, name: '架空 投信' } }])
+  });
+  const before = storage.snapshot(), actions = storage.actions.length;
+  const input = source('transactions', fundTrade, 'b'.repeat(64));
+  assert.equal((await save.inspect(input)).status, 'review-required');
+  assert.equal((await save.save(input)).status, 'review-required');
+  assert.deepEqual(storage.snapshot(), before);
+  assert.equal(storage.actions.length, actions);
+});
+
 test('code-free fund saves independently of current holdings; similar name is not merged', async () => {
   const storage = new Storage(), save = service(storage);
   await save.save(source('transactions', fundTrade));

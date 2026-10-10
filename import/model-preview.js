@@ -45,6 +45,11 @@
     const product = typeof data.product === 'string' ? data.product.trim() : null;
     return product || (own(transactionProducts, data.transactionType) ? transactionProducts[data.transactionType] : null);
   }
+  function sbiFundIdentityKey(name) {
+    // Comparison only for source-qualified SBI funds: JS whitespace, no NFKC/fuzzy/zero-width cleanup.
+    // Never use this key as the persisted displayName, symbol or raw source label.
+    return JSON.stringify(['sbi', 'MutualFund', name.replace(/\s+/gu, '')]);
+  }
   function createSession(cryptoApi = root.crypto) {
     const ids = new Map();
     return Object.freeze({ cryptoApi, id(key, prefix) {
@@ -71,9 +76,8 @@
     const existingInstruments = records(existing, 'instruments');
     const byCode = new Map();
     const fundsByName = new Map();
-    const fundKey = name => JSON.stringify(['sbi', 'MutualFund', name.trim()]);
     const addFund = (name, record) => {
-      const key = fundKey(name);
+      const key = sbiFundIdentityKey(name);
       if (!fundsByName.has(key)) fundsByName.set(key, new Map());
       fundsByName.get(key).set(record.id, record);
     };
@@ -140,7 +144,7 @@
         return reuse(unique[0]);
       }
       const fundMatches = !code && (type === 'MutualFund' || !type)
-        ? [...(fundsByName.get(fundKey(data.name))?.values() || [])] : [];
+        ? [...(fundsByName.get(sbiFundIdentityKey(data.name))?.values() || [])] : [];
       if (fundMatches.length > 1) {
         issues.push(issue('error', 'instrument-ambiguous', '正式名の一致先を確認してください。', row.rowNumber));
         return null;
@@ -158,7 +162,7 @@
       const nameMatches = !code ? existingInstruments.filter(item => item.assetType === type
         && (item.displayName === data.name || item.symbol === data.name || item.aliases?.includes(data.name))) : [];
       const idKey = code ? JSON.stringify(['code', code, type]) : type === 'MutualFund'
-        ? fundKey(data.name) : JSON.stringify(['row', fileKey, row.rowNumber]);
+        ? sbiFundIdentityKey(data.name) : JSON.stringify(['row', fileKey, row.rowNumber]);
       const record = { id: session.id(idKey, 'ins'), assetType: type, symbol: code || data.name,
         displayName: data.name, enabled: true };
       validDraft('instruments', record);

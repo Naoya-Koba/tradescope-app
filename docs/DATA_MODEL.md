@@ -198,7 +198,7 @@ Instrument {
 - **Decided**：FXの`TRY/JPY`、`HUF/JPY`、`USD/JPY`等はcanonicalなInstrumentとして識別可能にする。
 - **Decided**：既存のFX文字列正規化はInstrument照合前の前処理として再利用する。前後空白、ASCII英字の大文字小文字、明示確認済みaliasだけを扱い、未知のタイプミスを推測修正しない。
 - **Decided**：証券、投資信託、暗号資産等へFX専用の正規化を誤適用しない。
-- **Decided**：SBIのコードなし投資信託はprovider、商品区分、CSV上の正式名の完全一致で再利用可能とする。外周空白のtrim以外の名称補正、部分一致、類似名照合はしない。特定／NISA等の預り区分はHolding属性であり、Instrument identityへ含めない。
+- **Decided**：SBI由来のコードなし投資信託に限り、provider・商品区分・CSV上の正式名からidentityを照合する。比較時だけJavaScriptの通常のUnicode whitespace（`\s`：半角／全角スペース、連続空白等）を除いて完全一致とする。displayName・symbol・rawFieldsの原表記は変更しない。空白以外の文字差、部分一致、類似名、fuzzy match、NFKC等の広いUnicode正規化では同一視せず、ゼロ幅文字を無制限に除去しない。Stock・コードあり照合・SBI以外へこのルールを適用しない。複数の既存IDが一致した場合は曖昧として停止し、自動統合・削除しない。特定／NISA等の預り区分はHolding属性であり、Instrument identityへ含めない。
 - **Decided**：原資料が確定しないETF／個別株等の細分類を推測しない。上位分類が確定できれば、細分類が不明でも候補生成を妨げない。
 - **Under consideration**：Instrument IDの最終形式、初期マスターの範囲、ユーザー追加Instrumentの重複判定と承認フロー。
 
@@ -386,7 +386,7 @@ ImportBatch {
 
 **Current**：SBI証券のstable ID `acc_sbi_sec`を参照し、既存Accountの有無と将来作成が必要かを内部判定する。保有CSVと約定CSVには別のImportBatch候補を生成する。ファイル情報はブラウザ標準SHA-256とbyte sizeのみで、原文・ファイル名・絶対パス・個人識別項目はコピーしない。Parserの一箇所に定義した`version`（現在`sbi-domestic-v1`）を解析結果の`parserVersion`、Batchの既存フィールド`importerVersion`へ引き継ぎ、別versionによる再解析を追跡できる。
 
-**Current**：銘柄コードの一意な一致を優先し、商品区分と矛盾せず有効な既存Instrumentを再利用候補にする。SBIコードなし投信はprovider・投資信託区分・正式名の完全一致（外周trimのみ）で共有し、特定／NISA間、両CSV間、次月の候補で同一Instrumentを再利用できる。現行Instrumentにはprovider属性がないため、既存のSBI Account / ImportBatchに関連するHoldingSnapshot / RawTransactionの`rawFields.product`または確認済み取引区分mappingと、`rawFields.name`を出所の根拠とする。任意のdisplayNameやaliasだけでは再利用しない。SBI由来を確認できない同名マスターは要確認、複数IDへの一致や無効銘柄は未解決とする。
+**Current**：銘柄コードの一意な一致を優先し、商品区分と矛盾せず有効な既存Instrumentを再利用候補にする。SBIコードなし投信はprovider・投資信託区分・正式名の空白差だけを除いた完全一致で共有し、特定／NISA間、両CSV間、次月の候補で同一Instrumentを再利用できる。比較用の空白除去は一箇所に定義し、候補生成・既存照合・曖昧判定と保存直前の再照合で同じresolverを使う。名称・rawFieldsの原表記、transaction fingerprintの構成は変更しない。現行Instrumentにはprovider属性がないため、既存のSBI Account / ImportBatchに関連するHoldingSnapshot / RawTransactionの`rawFields.product`または確認済み取引区分mappingと、`rawFields.name`を出所の根拠とする。任意のdisplayNameやaliasだけでは再利用しない。SBI由来を確認できない同名マスターは要確認、正規化後の複数IDへの一致や無効銘柄は未解決とする。既存重複のmigration・自動統合・削除は行わない。
 
 **Current**：CSVの株式区分を現行schemaの上位`Stock`として扱い、細分類は候補側の`subtype: null`で保持する。明示的なETF区分だけでETFを確定し、名称・コード体系から分類しない。SBIの取引区分が`投信金額買付`と完全一致する場合のみ、CSVが明示した事実として`投資信託`へ分類する。一箇所のmappingを用い、原文の取引区分を保持する。この場合、コードなし投信の候補生成・再利用に現在の保有CSVとの一致は必要ない。それ以外の商品区分がない約定行は一意なコード照合、またはSBI投信の正式名identityとの一致を根拠にする。後者は参照した商品区分の確認を促すWarningとし、部分一致・類似名やコード・市場空欄だけで投信と判定しない。
 

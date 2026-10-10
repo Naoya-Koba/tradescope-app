@@ -78,11 +78,11 @@ test('code-free SBI fund reuses exact official identity from prior transactions 
   assert.equal(JSON.stringify(stored), before);
 });
 
-test('transaction-classified funds use exact outer-trim name, never similar or partial names', async () => {
+test('transaction-classified funds never merge similar or partial non-whitespace names', async () => {
   const stored = await storedFund();
   const exact = source('transactions', fundTrade); exact.preview.rows[0].data.name = '  匿名投信  ';
   assert.equal((await convert([exact], stored)).instruments[0].status, 'existing');
-  for (const name of ['匿名投信A', '匿名 投信', '匿名投信（別型）']) {
+  for (const name of ['匿名投信A', '匿名投信（別型）']) {
     const result = await convert([source('transactions', fundTrade.replace('匿名投信', name), 'b'.repeat(64))], stored);
     assert.equal(result.instruments[0].status, 'new'); assert.equal(result.files[0].transactions.length, 1);
     assert.notEqual(result.files[0].transactions[0].instrumentId, stored.instruments.records[0].id);
@@ -198,16 +198,87 @@ test('similar fund names and different provider/product evidence never automatic
     assert.equal(result.instruments[0].status, 'new'); assert.equal(result.instruments[0].requiresConfirmation, true);
   }
 });
-test('fund identity trims outer whitespace only, not inner whitespace, aliases or similar spelling', async () => {
+test('fund identity ignores whitespace only, never aliases or other spelling changes', async () => {
   const stored = await storedFund();
   const exact = source('holdings', fund); exact.preview.rows[0].data.name = '  匿名投信  ';
   assert.equal((await convert([exact], stored)).instruments[0].status, 'existing');
-  for (const name of ['匿名 投信', '匿名投信A', '匿名投信（別型）']) {
+  for (const name of ['匿名投信A', '匿名投信（別型）', '匿名投資', '匿名\u200b投信', '匿名\u2060投信', '匿名ﾄｳｼﾝ']) {
     const input = source('holdings', fund.replace('匿名投信', name));
     assert.equal((await convert([input], stored)).instruments[0].status, 'new');
   }
   stored.instruments.records[0].aliases = ['参考別名'];
   assert.equal((await convert([source('holdings', fund.replace('匿名投信', '参考別名'))], stored)).instruments[0].status, 'new');
+});
+
+for (const [label, name] of [
+  ['ASCII space', '匿名 投信'], ['full-width space', '匿名　投信'],
+  ['repeated mixed spaces', '匿名 　\u00a0 投信'], ['Unicode whitespace', '匿名\u2009\u202f投信'],
+  ['tab', '匿名\t投信']
+]) {
+  test(`code-free SBI fund ${label} shares identity across both previews and existing source facts`, async () => {
+    const holdingInput = source('holdings', fund.replace('匿名投信', name));
+    const tradeInput = source('transactions', fundTrade, 'b'.repeat(64));
+    const inputsBefore = JSON.stringify([holdingInput, tradeInput]);
+    const planned = await convert([tradeInput, holdingInput]);
+    assert.equal(planned.instruments.length, 1);
+    assert.equal(planned.files[0].holdings[0].instrumentId, planned.files[1].transactions[0].instrumentId);
+    assert.equal(planned.instruments[0].record.displayName, name);
+    assert.equal(planned.instruments[0].record.symbol, name);
+    assert.equal(planned.files[0].holdings[0].rawFields.name, name);
+    assert.equal(planned.files[1].transactions[0].rawFields.name, '匿名投信');
+    assert.equal(JSON.stringify([holdingInput, tradeInput]), inputsBefore);
+    const stored = { ...existing(planned.instruments.map(item => copy(item.record))),
+      importBatches: envelope([{ ...planned.files[0].batch, importedAt: now }]),
+      holdingSnapshots: envelope(planned.files[0].holdings.map(item => ({ ...item, importedAt: now }))) };
+    const before = JSON.stringify(stored);
+    const reused = await convert([tradeInput], stored);
+    assert.equal(reused.instruments[0].status, 'existing');
+    assert.equal(reused.files[0].transactions[0].instrumentId, stored.instruments.records[0].id);
+    assert.equal(JSON.stringify(stored), before);
+  });
+}
+
+test('whitespace comparison does not merge code-free Stock or replace code-based identity', async () => {
+  const codeFreeStock = source('holdings', stock); codeFreeStock.preview.rows[0].data.code = null;
+  const otherStock = copy(codeFreeStock); otherStock.metadata.hash = 'b'.repeat(64);
+  otherStock.preview.rows[0].data.name = '匿名 株';
+  const session = preview.createSession(crypto);
+  const first = await convert([codeFreeStock], preview.emptyModels(), session);
+  const second = await convert([otherStock], preview.emptyModels(), session);
+  assert.notEqual(first.instruments[0].record.id, second.instruments[0].record.id);
+  const stored = existing([instrument('ins_code', '元表示')]);
+  const coded = source('holdings', stock.replace('匿名株', '匿名 株'));
+  assert.equal((await convert([coded], stored)).files[0].holdings[0].instrumentId, 'ins_code');
+  coded.preview.rows[0].data.code = 'ZZ02';
+  assert.equal((await convert([coded], stored)).instruments[0].status, 'new');
+});
+
+test('non-SBI Account or Batch provenance cannot gain whitespace-based fund reuse', async () => {
+  for (const scope of ['account', 'batch']) {
+    const stored = await storedFund();
+    if (scope === 'account') stored.accounts.records.find(item => item.id === preview.accountId).providerCode = 'other';
+    else stored.importBatches.records[0].sourceProvider = 'other';
+    const before = JSON.stringify(stored);
+    const planned = await convert([source('transactions', fundTrade.replace('匿名投信', '匿名 投信'))], stored);
+    assert.ok(!planned.instruments.some(item => item.status === 'existing'));
+    assert.equal(JSON.stringify(stored), before);
+  }
+});
+
+test('normalized fund identity collision across existing IDs remains ambiguous without mutation', async () => {
+  const stored = await storedFund();
+  stored.instruments.records.push({ ...stored.instruments.records[0], id: 'ins_whitespace_duplicate',
+    displayName: '匿名　投信', symbol: '匿名　投信' });
+  stored.holdingSnapshots.records.push({ ...stored.holdingSnapshots.records[0], id: 'hs_whitespace_duplicate',
+    instrumentId: 'ins_whitespace_duplicate', rawFields: { ...stored.holdingSnapshots.records[0].rawFields, name: '匿名　投信' } });
+  const before = JSON.stringify(stored);
+  for (const input of [source('holdings', fund), source('transactions', fundTrade)]) {
+    const file = (await convert([input], stored)).files[0];
+    assert.equal(file.rows[0].instrumentStatus, 'unresolved');
+    assert.equal(file.rows[0].saveEligible, false);
+    assert.ok(file.rows[0].issues.some(item => item.code === 'instrument-ambiguous'));
+  }
+  assert.equal(JSON.stringify(stored), before);
 });
 test('custody is a Holding attribute, not fund identity; same exact name across both CSVs shares ID', async () => {
   const holdings = source('holdings', fund + '\n' + fund.replace('NISA預り（成長投資枠）', '特定預り'));
