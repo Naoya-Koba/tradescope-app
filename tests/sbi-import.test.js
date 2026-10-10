@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const csv = require('../import/csv-core.js');
 const sbi = require('../import/sbi-parser.js');
+const modelPreview = require('../import/model-preview.js');
 const root = path.resolve(__dirname, '..');
 const holdings = '商品区分,銘柄名,銘柄コード,預り区分,保有数量,取得単価,現在値,取得金額,評価額,評価損益\r\n' +
   '国内株式,"架空,株式会社",0001,特定預り,2,500,550,1000,1100,100\r\n' +
@@ -188,7 +189,7 @@ test('SBI unsupported sections, truncated totals and broken rows cannot silently
 });
 
 // Lightweight DOM harness: no browser or package dependency. The app is executed
-// with storage/network APIs that throw, so any accidental connection fails tests.
+// with read-only injected storage and forbidden write/network APIs.
 class Element {
   constructor(tag = 'div') { this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.value = ''; this.files = []; this.textContent = ''; this.hidden = false; }
   append(...elements) { this.children.push(...elements); }
@@ -198,7 +199,7 @@ class Element {
   showModal() { this.open = true; }
   close() { this.open = false; }
 }
-function harness() {
+function harness(stored = {}) {
   const ids = [...fs.readFileSync(path.join(root, 'import.html'), 'utf8').matchAll(/id="([^"]+)"/g)].map(match => match[1]);
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
   const files = ['holdings', 'transactions'].map(kind => { const element = elements[kind + '-file']; element.dataset.kind = kind; return element; });
@@ -206,13 +207,15 @@ function harness() {
   elements.encoding.value = 'auto';
   const deny = () => { throw new Error('Forbidden persistence/network API'); };
   const storage = new Proxy({}, { get: deny });
-  const win = { addEventListener: (type, handler) => { win[type] = handler; } };
+  const saved = { ...stored };
+  const win = { localStorage: { getItem: key => saved[key] ?? null, setItem: deny, removeItem: deny, clear: deny },
+    addEventListener: (type, handler) => { win[type] = handler; } };
   class Reader {
     readAsArrayBuffer(file) { this.result = new TextEncoder().encode(file.text).buffer; queueMicrotask(() => this.onload()); }
   }
   const context = vm.createContext({ document: { getElementById: id => elements[id], createElement: tag => new Element(tag),
     querySelectorAll: query => query === 'input[type=file]' ? files : helps },
-    window: win, FileReader: Reader, TradeScopeCSV: csv, TradeScopeSBI: sbi,
+    window: win, FileReader: Reader, TradeScopeCSV: csv, TradeScopeSBI: sbi, TradeScopeSBIModelPreview: modelPreview,
     localStorage: storage, sessionStorage: storage, indexedDB: storage, caches: storage,
     fetch: deny, XMLHttpRequest: deny, WebSocket: deny, console: { log: deny, error: deny } });
   vm.runInContext(fs.readFileSync(path.join(root, 'import/preview.js'), 'utf8'), context);
@@ -220,9 +223,9 @@ function harness() {
     const input = elements[kind + '-file']; input.files = [{ text, size: text.length }];
     await input.fire('change'); await new Promise(resolve => setImmediate(resolve));
   }
-  return { elements, helps, win, upload };
+  return { elements, helps, win, upload, saved };
 }
-test('J/K/L: file input preview, safe text rendering, close clears data; no storage/network/log access', async () => {
+test('J/K/L: file input preview, safe text rendering, close clears data; no storage writes/network/logging', async () => {
   const h = harness();
   const source = '銘柄名,数量,評価額\n<img src=x onerror=alert(1)>,1,10';
   await h.upload('holdings', source);
@@ -235,6 +238,101 @@ test('J/K/L: file input preview, safe text rendering, close clears data; no stor
   assert.equal(h.elements['holdings-file'].value, '');
   await h.upload('transactions', transactions); assert.equal(h.elements.preview.hidden, false);
   h.win.pagehide(); assert.equal(h.elements['detail-body'].children.length, 0);
+});
+test('planned UI responds to month/date, shows one observation and clears drafts without writes', async () => {
+  const h = harness({ tradingData: '{"unchanged":true}', tradeScopeTopSummarySnapshotV1: '{"unchanged":true}' });
+  const before = JSON.stringify(h.saved);
+  await h.upload('holdings', holdings);
+  assert.equal(h.elements.planned.hidden, false);
+  assert.ok(h.elements['planned-issues'].children.some(item => item.textContent.includes('対象月')));
+  h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
+  h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
+  assert.deepEqual(h.elements['planned-summary'].children.map(item => item.textContent), [
+    '保有記録', '2件', '新規銘柄候補', '2件', '既存銘柄再利用', '0件', '対象月', '2030年09月分', '取得日', '2030-10-04', '保有の観測', '1件']);
+  assert.equal(h.elements['planned-rows'].children.length, 2);
+  await h.elements['close-preview'].fire('click');
+  assert.equal(h.elements.planned.hidden, true); assert.equal(h.elements['planned-rows'].children.length, 0);
+  assert.equal(JSON.stringify(h.saved), before);
+});
+test('two CSVs share code evidence in memory; closing resets it, no internal IDs in UI', async () => {
+  const h = harness(); await h.upload('holdings', holdings);
+  h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
+  h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
+  const noProduct = transactions.replace(',商品区分', '').replace(',国内株式', '');
+  await h.upload('transactions', noProduct);
+  assert.equal(h.elements['planned-summary'].children[1].textContent, '1件');
+  const text = JSON.stringify(h.elements['planned-summary'].children.map(item => item.textContent));
+  assert.ok(!/acc_|ins_|batch_|RawTransaction|HoldingSnapshot/.test(text));
+  await h.elements['close-preview'].fire('click');
+  await h.upload('transactions', noProduct);
+  assert.deepEqual(h.elements['planned-summary'].children.slice(0, 6).map(item => item.textContent), [
+    '取引候補', '1件', '保存可能', '0件', '要確認', '1件']);
+  assert.ok(h.elements['planned-issues'].children.some(item => item.textContent.includes('商品区分')));
+});
+test('explicit SBI fund trade type shows compact ready count with no holdings evidence or storage writes', async () => {
+  const h = harness(), before = JSON.stringify(h.saved);
+  const text = '約定日,銘柄,銘柄コード,市場,取引,預り,約定数量,約定単価,受渡日,受渡金額/決済損益\n' +
+    '2030/09/01,匿名投信,,,投信金額買付,NISA(成),0,0,2030/09/04,0\n';
+  await h.upload('transactions', text);
+  assert.equal(h.elements.planned.hidden, false);
+  const summary = h.elements['planned-summary'].children.map(item => item.textContent);
+  assert.deepEqual(summary.slice(0, 2), ['取引候補', '1件']);
+  assert.ok(!summary.includes('要確認')); assert.equal(h.elements['planned-issues'].children.length, 0);
+  assert.equal(h.elements['planned-rows'].children.length, 1);
+  assert.equal(JSON.stringify(h.saved), before);
+});
+
+test('invalid stored model blocks planned conversion without hiding CSV Preview or writing', async () => {
+  const h = harness({ tradeScopeAccountsV1: '{broken' }), before = JSON.stringify(h.saved);
+  await h.upload('transactions', transactions);
+  assert.equal(h.elements.preview.hidden, false); assert.equal(h.elements.planned.hidden, false);
+  assert.match(h.elements['planned-issues'].children[0].textContent, /保存予定内容を確認できません/);
+  assert.equal(h.elements['planned-summary'].children.length, 0); assert.equal(JSON.stringify(h.saved), before);
+});
+
+test('both CSV counts remain visible, switching preserves dates and clears correctly without storage writes', async () => {
+  const h = harness(), before = JSON.stringify(h.saved);
+  await h.upload('holdings', holdings);
+  h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
+  h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
+  await h.upload('transactions', transactions);
+  assert.equal(h.elements['loaded-previews'].hidden, false);
+  assert.deepEqual(h.elements['loaded-previews'].children.map(item => item.textContent), ['保有証券 2件', '約定履歴 1件']);
+  await h.elements['loaded-previews'].children[0].fire('click');
+  assert.equal(h.elements['target-month'].value, '2030-09'); assert.equal(h.elements['observed-date'].value, '2030-10-04');
+  assert.equal(h.elements['planned-summary'].children[1].textContent, '2件');
+  assert.equal(h.elements['planned-issues'].children.length, 0);
+  await h.elements['loaded-previews'].children[1].fire('click');
+  assert.equal(h.elements['planned-summary'].children[1].textContent, '1件');
+  await h.elements['close-preview'].fire('click');
+  assert.equal(h.elements['loaded-previews'].hidden, true); assert.equal(h.elements['loaded-previews'].children.length, 0);
+  assert.equal(JSON.stringify(h.saved), before);
+});
+
+test('reselecting same holdings file retains chosen dates, different file does not inherit them', async () => {
+  const h = harness(); await h.upload('holdings', holdings);
+  h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
+  h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
+  await h.upload('transactions', transactions);
+  await h.upload('holdings', holdings);
+  assert.equal(h.elements['target-month'].value, '2030-09'); assert.equal(h.elements['observed-date'].value, '2030-10-04');
+  assert.equal(h.elements['planned-issues'].children.length, 0);
+  await h.upload('holdings', holdings.replace('架空ファンド', '別の架空ファンド'));
+  assert.equal(h.elements['target-month'].value, ''); assert.equal(h.elements['observed-date'].value, '');
+  assert.ok(h.elements['planned-issues'].children.length > 0);
+  await h.elements['loaded-previews'].children[1].fire('click');
+  assert.equal(h.elements['planned-summary'].children[1].textContent, '1件');
+});
+test('planned rows use text only; exact SBI fund identities need no name-only warning', async () => {
+  const h = harness(), text = '投資信託（金額/NISA預り（成長投資枠））\nファンド名,保有口数,評価額\n' +
+    '<img src=x onerror=alert(1)>,1口,0\n匿名投信,1口,0';
+  await h.upload('holdings', text);
+  h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
+  h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
+  assert.equal(h.elements['planned-rows'].children.length, 2);
+  const name = h.elements['planned-rows'].children[0].children[0];
+  assert.equal(name.textContent, '<img src=x onerror=alert(1)>'); assert.equal(name.children.length, 0);
+  assert.equal(h.elements['planned-issues'].children.length, 0);
 });
 test('preview date is user-specified or file-derived, not lastModified', async () => {
   const h = harness(); await h.upload('holdings', holdings);
@@ -339,14 +437,14 @@ test('latest monthly logic remains independent and non-destructive', () => {
   assert.equal(metrics.getLatestEnteredMonth(months, ['gmo', 'sbi']), 8);
   assert.equal(JSON.stringify(months), before);
 });
-test('standalone page has no app/storage modules, uses local assets and CSP', () => {
+test('standalone page uses read-only model preview without legacy app modules, local assets and CSP', () => {
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
   assert.ok(html.includes("connect-src 'none'"));
   assert.ok(!/top\/script|soneki.js|profit-metrics|trade-history-core/.test(html));
   assert.ok(!/src="https?:/.test(html));
-  for (const file of ['csv-core.js', 'sbi-parser.js', 'preview.js']) {
+  for (const file of ['csv-core.js', 'sbi-parser.js', 'preview.js', 'model-preview.js']) {
     const code = fs.readFileSync(path.join(root, 'import', file), 'utf8');
-    assert.ok(!/localStorage|sessionStorage|indexedDB|\.setItem\(|fetch\(|XMLHttpRequest|sendBeacon|console\./.test(code));
+    assert.ok(!/sessionStorage|indexedDB|\.setItem\(|\.removeItem\(|\.commit\(|createRepository|fetch\(|XMLHttpRequest|sendBeacon|console\./.test(code));
   }
 });
 test('Service Worker precache exists, has no duplicate URLs and matches preview HTML', () => {
@@ -356,12 +454,13 @@ test('Service Worker precache exists, has no duplicate URLs and matches preview 
   assert.equal(new Set(urls).size, urls.length);
   urls.forEach(url => assert.ok(fs.existsSync(path.join(root, url.split('?')[0])), 'Missing static asset'));
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
-  [...html.matchAll(/(?:src|href)="(import\/[^" ]+)"/g)].forEach(match => assert.ok(urls.includes('./' + match[1])));
+  [...html.matchAll(/(?:src|href)="((?:import|assets)\/[^" ]+)"/g)].forEach(match => assert.ok(urls.includes('./' + match[1])));
 });
 
 test('localhost HTTP smoke: preview document and all local resources are served', async () => {
   const http = require('node:http');
-  const allowed = new Set(['import.html', 'assets/icon-192.png', 'import/csv-core.js', 'import/sbi-parser.js', 'import/preview.js', 'import/preview.css']);
+  const allowed = new Set(['import.html', 'assets/icon-192.png', 'assets/storage-transaction.js', 'assets/data-model-storage.js',
+    'import/csv-core.js', 'import/sbi-parser.js', 'import/model-preview.js', 'import/preview.js', 'import/preview.css']);
   const server = http.createServer((request, response) => {
     const file = new URL(request.url, 'http://localhost').pathname.slice(1);
     if (!allowed.has(file)) { response.writeHead(404).end(); return; }

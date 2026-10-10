@@ -1,13 +1,14 @@
-const CACHE_NAME = 'tradescope-static-v251';
+const CACHE_NAME = 'tradescope-static-v252';
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./history.html",
   "./import.html",
   "./import/csv-core.js?v=20261005-1",
-  "./import/sbi-parser.js?v=20261009-1",
-  "./import/preview.js?v=20261009-1",
-  "./import/preview.css?v=20261009-1",
+  "./import/sbi-parser.js?v=20261009-2",
+  "./import/model-preview.js?v=20261009-1",
+  "./import/preview.js?v=20261009-2",
+  "./import/preview.css?v=20261009-2",
   "./manifest.webmanifest",
   "./assets/app-gestures.js",
   "./assets/storage-transaction.js?v=20261009-1",

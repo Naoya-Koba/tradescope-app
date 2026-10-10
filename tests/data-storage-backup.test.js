@@ -293,9 +293,9 @@ test('L: Repository storage is independent of all existing monthly/top/history/b
   for (const key of ['tradingData', 'yearInitialFunds', 'yearInitialUnrealized', 'tradeScopeTradeHistoryV1',
     'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeScopeTopSummarySnapshotV1']) assert.equal(storage.getItem(key), before[key]);
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
-  assert.ok(!/data-model-storage|storage-transaction/.test(html));
+  assert.ok(html.includes('import/model-preview.js'));
   const preview = fs.readFileSync(path.join(root, 'import/preview.js'), 'utf8');
-  assert.ok(!/TradeScopeDataStorage|createRepository|\.save\(|\.commit\(|localStorage|sessionStorage|indexedDB/.test(preview));
+  assert.ok(!/TradeScopeDataStorage|createRepository|\.save\(|\.commit\(|\.setItem\(|\.removeItem\(|sessionStorage|indexedDB/.test(preview));
 });
 test('every v2 write/removal position, including Snapshot and journal cleanup, rolls back exactly', () => {
   const h = backupHarness(), payload = h.build(seeded(), 'http://localhost', now);

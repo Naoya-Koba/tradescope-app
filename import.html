@@ -7,10 +7,13 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>データを取り込む | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="import/preview.css?v=20261009-1">
+  <link rel="stylesheet" href="import/preview.css?v=20261009-2">
   <script defer src="import/csv-core.js?v=20261005-1"></script>
-  <script defer src="import/sbi-parser.js?v=20261009-1"></script>
-  <script defer src="import/preview.js?v=20261009-1"></script>
+  <script defer src="import/sbi-parser.js?v=20261009-2"></script>
+  <script defer src="assets/storage-transaction.js?v=20261009-1"></script>
+  <script defer src="assets/data-model-storage.js?v=20261009-1"></script>
+  <script defer src="import/model-preview.js?v=20261009-1"></script>
+  <script defer src="import/preview.js?v=20261009-2"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
@@ -33,6 +36,7 @@
           </div>
           <label class="encoding">文字コード<select id="encoding"><option value="auto">自動</option><option value="utf-8">UTF-8</option><option value="shift_jis">Shift_JIS / CP932</option></select></label>
           <p id="read-status" class="muted" role="status" aria-live="polite"></p>
+          <div id="loaded-previews" class="loaded-previews" aria-label="読み込んだCSV" hidden></div>
           <section id="preview" aria-labelledby="preview-title" hidden>
             <div class="preview-heading"><h2 id="preview-title">確認</h2><button id="close-preview" class="secondary">閉じる</button></div>
             <div id="dates" class="date-fields" hidden>
@@ -44,6 +48,12 @@
             <div id="groups"></div>
             <div id="issues" aria-live="polite"></div>
             <details id="details"><summary>明細を見る</summary><div class="table-wrap"><table><thead id="detail-head"></thead><tbody id="detail-body"></tbody></table></div><button id="more-rows" class="secondary" hidden>続きを表示</button></details>
+            <div id="planned" class="planned" hidden>
+              <h3>保存予定内容</h3>
+              <dl id="planned-summary"></dl>
+              <div id="planned-issues" aria-live="polite"></div>
+              <details id="planned-details"><summary>候補を見る</summary><div id="planned-rows"></div><button id="more-planned" class="secondary" hidden>続きを表示</button></details>
+            </div>
           </section>
         </div>
       </details>

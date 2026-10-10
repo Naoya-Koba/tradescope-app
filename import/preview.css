@@ -45,6 +45,14 @@ dl { display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; } dt { colo
 details { margin-top: 20px; } summary { cursor: pointer; padding: 8px 0; }
 .table-wrap { overflow: auto; margin-top: 12px; } table { width: 100%; border-collapse: collapse; font-size: 13px; } th, td { padding: 12px 10px; border-bottom: 1px solid #ffffff15; text-align: left; white-space: nowrap; } th { color: var(--muted); font-weight: 500; }
 #more-rows { margin-top: 12px; }
+.planned { border-top: 1px solid #ffffff15; margin-top: 24px; padding-top: 20px; }
+.loaded-previews { display: flex; flex-wrap: wrap; gap: 8px; }
+.loaded-previews button { flex: 1 1 140px; font-size: 14px; }
+.loaded-previews button[aria-pressed=true] { border-color: var(--accent); }
+.planned-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid #ffffff12; font-size: 13px; }
+.planned-row > span { min-width: 0; overflow-wrap: anywhere; }
+.planned-row > .muted { flex-shrink: 0; }
+#more-planned { margin-top: 12px; }
 dialog { width: min(420px, calc(100% - 32px)); padding: 24px; background: #18213b; color: var(--text); border: 1px solid #ffffff20; border-radius: 18px; }
 dialog::backdrop { background: #0008; } dialog ol { padding-left: 22px; font-size: 14px; } dialog a { font-size: 14px; } dialog button { display: block; width: 100%; margin-top: 24px; }
 [hidden] { display: none !important; }

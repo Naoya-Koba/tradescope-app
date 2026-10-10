@@ -198,6 +198,8 @@ Instrument {
 - **Decided**：FXの`TRY/JPY`、`HUF/JPY`、`USD/JPY`等はcanonicalなInstrumentとして識別可能にする。
 - **Decided**：既存のFX文字列正規化はInstrument照合前の前処理として再利用する。前後空白、ASCII英字の大文字小文字、明示確認済みaliasだけを扱い、未知のタイプミスを推測修正しない。
 - **Decided**：証券、投資信託、暗号資産等へFX専用の正規化を誤適用しない。
+- **Decided**：SBIのコードなし投資信託はprovider、商品区分、CSV上の正式名の完全一致で再利用可能とする。外周空白のtrim以外の名称補正、部分一致、類似名照合はしない。特定／NISA等の預り区分はHolding属性であり、Instrument identityへ含めない。
+- **Decided**：原資料が確定しないETF／個別株等の細分類を推測しない。上位分類が確定できれば、細分類が不明でも候補生成を妨げない。
 - **Under consideration**：Instrument IDの最終形式、初期マスターの範囲、ユーザー追加Instrumentの重複判定と承認フロー。
 
 ## 6. AccountInstrumentSetting
@@ -378,7 +380,27 @@ ImportBatch {
 
 **Decided**：ImportRowDraftはプレビュー中だけの一時データとしてよく、永続保存を必須としない。
 
-**Current**：SBI国内CSVの`import.html`はallowlist項目、行番号、検証結果、原資料の合計をメモリ内のPreview Rowとして扱う。新Storageはこの画面へ読み込まず、Account / Instrument照合や正本への確定変換・保存は未接続。対象月・取得日は一時情報であり、保有情報の存在を月次入力済み判定へ渡さない。Previewから既存`tradingData`やTop Snapshotを変更しない。完全バックアップの拡張は独立した経路で行う。
+**Current**：SBI国内CSVの`import.html`はallowlist項目、行番号、検証結果、原資料の合計をメモリ内のPreview Rowとして扱う。`import/model-preview.js`が新Storageの6モデルを読み取り専用Adapterで参照し、保存予定候補へ変換する。Repositoryの作成・commit、Account seed、正本保存は接続しない。対象月・取得日は一時情報であり、保有情報の存在を月次入力済み判定へ渡さない。Previewから既存`tradingData`やTop Snapshotを変更しない。完全バックアップの拡張は独立した経路で行う。
+
+### 保存予定への変換Preview
+
+**Current**：SBI証券のstable ID `acc_sbi_sec`を参照し、既存Accountの有無と将来作成が必要かを内部判定する。保有CSVと約定CSVには別のImportBatch候補を生成する。ファイル情報はブラウザ標準SHA-256とbyte sizeのみで、原文・ファイル名・絶対パス・個人識別項目はコピーしない。Parserの一箇所に定義した`version`（現在`sbi-domestic-v1`）を解析結果の`parserVersion`、Batchの既存フィールド`importerVersion`へ引き継ぎ、別versionによる再解析を追跡できる。
+
+**Current**：銘柄コードの一意な一致を優先し、商品区分と矛盾せず有効な既存Instrumentを再利用候補にする。SBIコードなし投信はprovider・投資信託区分・正式名の完全一致（外周trimのみ）で共有し、特定／NISA間、両CSV間、次月の候補で同一Instrumentを再利用できる。現行Instrumentにはprovider属性がないため、既存のSBI Account / ImportBatchに関連するHoldingSnapshot / RawTransactionの`rawFields.product`または確認済み取引区分mappingと、`rawFields.name`を出所の根拠とする。任意のdisplayNameやaliasだけでは再利用しない。SBI由来を確認できない同名マスターは要確認、複数IDへの一致や無効銘柄は未解決とする。
+
+**Current**：CSVの株式区分を現行schemaの上位`Stock`として扱い、細分類は候補側の`subtype: null`で保持する。明示的なETF区分だけでETFを確定し、名称・コード体系から分類しない。SBIの取引区分が`投信金額買付`と完全一致する場合のみ、CSVが明示した事実として`投資信託`へ分類する。一箇所のmappingを用い、原文の取引区分を保持する。この場合、コードなし投信の候補生成・再利用に現在の保有CSVとの一致は必要ない。それ以外の商品区分がない約定行は一意なコード照合、またはSBI投信の正式名identityとの一致を根拠にする。後者は参照した商品区分の確認を促すWarningとし、部分一致・類似名やコード・市場空欄だけで投信と判定しない。
+
+**Current**：現行StorageのHoldingSnapshotは銘柄ごとのflat recordである。一取得元・一観測とはこのrecord集合の責務であり、銘柄数だけ別観測があるという意味ではない。同じCSVの全recordは同じ`importBatchId`、`accountId`、`targetMonth`、`snapshotAsOf`、`sourceScope`を共有する。`sourceType: csv`は共通ImportBatchを参照して取得し、一時グループにも明示する。recordには既存の`sourceMode: imported`を保持し、新しい永続フィールドや集約schemaは追加しない。CSVの取得範囲以外の現金・外国株等は補完せず、SBI口座全体の状態やAccountSnapshotを生成しない。投信の数量単位は保持し、価格当たり口数は推測換算しない。
+
+**Current**：約定行はRawTransaction候補へ変換する。受渡日、取引、預り、市場、税額、`settlementOrPnl`等は金融事実のallowlistに限って`rawFields`へ保持する。混在列を`realizedPnl`へ変換しない。数値はdecimal文字列、空欄は`null`で、売買方向・通貨等を推測しない。`targetMonth`と`snapshotAsOf`を分離し、近似値を正式月末値へ昇格しない。
+
+**Current**：取引事実の型検証とInstrument解決を分離する。Instrument未解決でも`transactionCandidates`内の`facts`を保持し、`instrumentStatus: unresolved`、`saveEligible: false`、Warning／要確認とする。未解決IDは`null`で、Storageへ書けるrecordではない。事実自体が不正な行も問題行として残し、正常な値を捏造しない。`transactions`は検証済みの保存可能候補のみで、要確認・不正行は含めない。Parser件数、取引候補件数、保存可能件数、要確認件数を別集計する。全件解決時はUIを簡潔にし、要確認時のみ保存可能／要確認件数を併記する。
+
+**Current**：候補IDはメモリ内sessionに限定し、日付変更の再表示では維持する。保存時点を表す`importedAt`は候補に含めない。必須保存日時を要求する現行Storageとの型・参照検証では、メモリ内検証用の日時だけを補い、結果へコピーしない。保存可能なenvelopeではなく、将来の確定処理前のDraftである。
+
+**Current**：同一file hash、同じ対象月・観測日の既存保有Batch、既存取引の事実fingerprint一致は重複候補として示すだけで、自動除外・統合しない。Storageが不正・未対応schemaの場合は空マスターとみなさず変換を止め、元のCSV Previewは維持する。閉じる・会社パネルを閉じる・文字コード変更・離脱時に全候補を破棄する。
+
+**Under consideration**：未解決銘柄の照合・承認UI、国内コードの識別範囲、細分類の追加取得、正式な保存時点の確定処理は未実装。現行CSVには確認済みexternal transaction ID列がないため、取引ID照合は推測せず、既存の事実fingerprintで候補を比較する。商品区分のない約定CSVに、照合できないコードなし銘柄がある場合の分類確認フローも未実装である。
 
 ### 取得元の初期対応方針
 
@@ -523,7 +545,7 @@ TransactionAnnotation {
 
 各保存値は、`schemaVersion`とrecordsを持つJSON envelopeを基本候補とする。
 
-### 実装済みStorage基盤（Preview未接続）
+### 実装済みStorage基盤（Previewは読み取りのみ）
 
 **Current**：`assets/data-model-storage.js`のRepositoryはAdapterを注入して使用する。実装済みcollectionとキーは次の6つ。
 
@@ -550,7 +572,7 @@ TransactionAnnotation {
 
 **Under consideration**：fingerprintの最終構成、decimal表記差、日時精度、訂正・取消、locatorだけの重複解決、手入力競合は未確定。現在の候補は口座・商品・日時・売買・取引種別・数量・単位・価格・通貨を比較する技術基盤に限定する。月末性の正式名称・根拠確認フローも未確定で、候補属性`observationType`（`officialMonthEnd` / `approximateForMonth` / `pointInTime`）は指定時のみ保存し、自動付与・昇格しない。
 
-**Current**：Instrument照合、AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIは未実装。新モデルは既存の月次・履歴・Summary計算へ接続しない。
+**Current**：Instrument照合は上記の保存予定Preview候補生成までで、確定・保存UIは未実装。AccountInstrumentSetting、TransactionAnnotation、Risk設定のRepository／UIも未実装。新モデルは既存の月次・履歴・Summary計算へ接続しない。
 
 ```text
 {

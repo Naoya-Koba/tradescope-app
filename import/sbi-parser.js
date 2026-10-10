@@ -1,6 +1,7 @@
 (function (root) {
   'use strict';
   const csv = typeof module !== 'undefined' && module.exports ? require('./csv-core.js') : root.TradeScopeCSV;
+  const VERSION = 'sbi-domestic-v1';
   // Explicit header vocabulary, not fuzzy matching. Real download variants still require verification.
   const common = {
     product: ['商品区分'], name: ['銘柄名', '銘柄名称', '銘柄', 'ファンド名', '銘柄（コード）'],
@@ -75,7 +76,7 @@
   }
   function parse(text, kind) {
     if (!Object.hasOwn(headers, kind)) throw new Error('ファイル種別が不正です。');
-    const result = { kind, sourceProvider: 'SBI証券', rows: [], totals: [], issues: [], snapshotAsOf: null,
+    const result = { kind, parserVersion: VERSION, sourceProvider: 'SBI証券', rows: [], totals: [], issues: [], snapshotAsOf: null,
       snapshotAsOfSource: null, sourceMetadata: {}, summary: null };
     let records;
     try { records = csv.parseCSV(text); }
@@ -267,7 +268,7 @@
     }
     return result;
   }
-  const api = { parse, detectKind };
+  const api = { parse, detectKind, version: VERSION };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TradeScopeSBI = Object.freeze(api);
 })(typeof globalThis !== 'undefined' ? globalThis : this);

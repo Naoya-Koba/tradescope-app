@@ -87,7 +87,7 @@ TradeScope/
 
 **Current**：`assets/storage-transaction.js`は既存復元journal形式を引き継ぎ、複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあればRepositoryも保存を拒否し、既存の明示確認経路で復旧する。トップ完全バックアップはv2で6collectionを保護し、v1復元はその6キーを維持する。
 
-**Current**：SBI PreviewにStorageを読み込まず、正本保存は接続しない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
+**Current**：SBI Previewは新Storageの型・参照検証と6モデルの読み取り専用参照を利用する。Repository作成・commitや正本保存は接続しない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
 **Known issue / Planned**：journalも含むlocalStorage容量を計測し、将来のIndexedDB移行と複数タブ排他を別途設計する。保存権限喪失等でrollbackまで失敗した場合、Web Storageだけで完全復旧は保証できないためjournalを保護して新規保存を止める。現在の同期Adapterを非同期DBへ移す際はRepository APIも調整する。
 
@@ -113,10 +113,12 @@ TradeScope/
 
 ### SBI国内CSV Preview基盤
 
-**Current**：トップの「データを取り込む」から`import.html`を開く。既存の損益・履歴・バックアップモジュールはこの画面に読み込まない。保存ボタン、Repository接続、storageアクセス、ネットワーク送信処理は存在しない。閉じる・ページ離脱時にメモリ上のPreviewと明細DOMを破棄する。
+**Current**：トップの「データを取り込む」から`import.html`を開く。既存の損益・履歴・バックアップモジュールはこの画面に読み込まない。新モデルStorageはgetItemのみのAdapterで参照し、保存ボタン、Repository作成・commit、storage書き込み、ネットワーク送信処理は存在しない。閉じる・ページ離脱時にメモリ上のPreview・保存予定候補と明細DOMを破棄する。
 
 - `import/csv-core.js`：引用符、escaped quote、値中カンマ・改行、CRLF / LF、BOMを扱うCSV解析。ブラウザ標準`TextDecoder`でUTF-8を検証後、失敗時にShift_JIS（ブラウザのCP932系対応）を試す。手動指定も可能。UTF-16には未対応。
-- `import/sbi-parser.js`：明示した日本語ヘッダーだけを照合し、allowlist項目の一時Preview Rowを生成する。未知列・前書き・ファイル名・個人識別情報を中間データへコピーしない。ヘッダーを曖昧補正しない。
+- `import/sbi-parser.js`：明示した日本語ヘッダーだけを照合し、allowlist項目の一時Preview Rowを生成する。未知列・前書き・ファイル名・個人識別情報を中間データへコピーしない。ヘッダーを曖昧補正しない。Parser versionは一箇所に定義し、解析結果からBatchの`importerVersion`へ引き継ぐ。仕様変更時はこのversionとPWA資産URLを更新する。
+- `import/model-preview.js`：Parser結果と明示した対象月・観測日をImportBatch / Instrument / HoldingSnapshot / RawTransactionの一時候補へ変換する。SBI Accountは未保存でもseedしない。コード一致を優先し、コードなしSBI投信は出所・商品区分・正式名の完全一致で共有／再利用する。`投信金額買付`の完全一致だけを一箇所のmappingで投資信託へ分類し、保有CSVを必須にせず、原文の取引区分を保持する。未知の区分や類似名を推測分類しない。Instrument未解決の約定も取引事実DraftとしてPreviewに残し、解決状態・保存可能性を分離する。未確認の出所、曖昧一致・重複候補は自動統合せず、未解決・不正行は保存可能候補からのみ除外する。Storageのrecord・参照検証を再利用し、保存日時はDraftに含めない。既存のflat HoldingSnapshot集合は共通Batch・口座・月・日時・取得範囲とBatchのsourceTypeで一観測として扱い、保存schemaを変えない。株式系の細分類不明は候補の`subtype: null`とし、上位分類が分かる行まで除外しない。
+- 「保存予定内容」は件数・対象月・取得日・必要な注意だけを表示し、候補明細は任意展開とする。Parser取引件数と、要確認も含む取引候補件数・保存可能件数・要確認件数を区別し、要確認がある場合だけ追加件数を表示する。同じ種類の注意はまとめ、内部ID・JSON全文を表示しない。2種類のCSVを同じsessionで確認でき、両方の件数を同時表示し、詳細は切り替える。指定した日付は切り替え時と同一hashファイルの再選択時だけ維持し、別ファイルへ引き継がない。閉じる・会社を閉じる・文字コード変更・離脱で両方破棄する。非同期処理の完了が閉じたPreviewを再表示しないようtokenを確認する。
 - `detectKind()`は同じヘッダー定義を使い、保有証券／約定履歴の必須明細ヘッダーが揃うかを確認する純粋関数。種別不一致・不明・両形式の混在はPreview前に止める。ファイル名やタイトルだけで推測しない。将来の保存経路でもこの判定の成功を前提にするが、現段階では保存処理は接続しない。
 - 会社選択はネイティブの`details`による同画面内展開。SBIを閉じると一時Previewを破棄し、読み込み途中の結果も採用しない。未対応会社は無効な「準備中」表示のみ。PCはCSV選択を2列、スマホは縦積み・明細の項目別表示とし、safe-areaとreduced-motionを考慮する。
 - 数値はdecimal文字列、空欄は`null`。合計はdecimalの桁合わせとBigInt加算で検算する。CSV合計行と明細の値を勝手に補正しない。問題行を除く集計には注意を表示する。
@@ -128,9 +130,9 @@ TradeScope/
 - `基準日` / `基準日時`の明示行は4桁年の日付・日時を取得する。時刻・タイムゾーンがなければ追加しない。日時がない場合は取得日をユーザーが指定する（`File.lastModified`を確定値に使わない）。対象月は別の一時選択値で、既存月次へ反映しない。
 - 描画は`textContent`、10MBまでのファイル、明細は100行ずつ表示。CSPは`connect-src 'none'`。新画面のアセットは同一originのみ。公式取得案内リンクはユーザーが開いた場合のみ別タブへ移動する。
 
-**Current / 検証**：`node --test tests/sbi-import.test.js`で架空の最小CSVとDOM harnessを使う。禁止storage・送信・console APIに接続したら失敗するテストを含む。実ブラウザでの実ファイル確認とは区別する。
+**Current / 検証**：`node --test tests/sbi-import.test.js tests/sbi-model-preview.test.js`で架空の最小CSVとDOM harnessを使う。読み取り専用Storageを注入し、storage書き込み・送信・console APIに接続したら失敗するテストを含む。両CSV変換、null / 0、日付分離、銘柄照合・曖昧一致、重複候補、参照検証、PII項目除外、候補表示と破棄、既存月次状態不変を確認する。実ブラウザでの実ファイル確認とは区別する。
 
-**Current / Storage・復元検証**：`node --test tests/data-storage-backup.test.js tests/sbi-import.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2完全復元、未知field/version、原本・個人識別情報フィールドの拒否を確認する。実localStorage・実CSV・本番PWAへ接続しない。
+**Current / Storage・復元検証**：`node --test tests/data-storage-backup.test.js tests/sbi-import.test.js tests/sbi-model-preview.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2完全復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。実localStorage・実CSV・本番PWAへ接続しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 
