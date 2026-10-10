@@ -99,9 +99,9 @@ TradeScope/
 
 **Decided**：MonthlyAccountStateは観測Snapshotと分離した口座・月の明示確定記録とする。共通Repositoryへ統合し、7モデルを保護するBackup v3、version別Validation、journal／rollbackを先に検証する。v2は6モデル形式を固定し、v2 Restore時のStateクリアも同一transactionに含める。v1／Legacy RestoreではStateを維持する。
 
-**Current**：MonthlyAccountStateのStorage・検証・Backup v3への統合は完了。画面表示・Repository初期化で新キーを生成しない。Input UI、外国株／現金manual保存、旧月次・Summary等への反映は未接続。
+**Current**：MonthlyAccountStateのStorage・検証・Backup v3への統合は完了。`assets/sbi-input-draft.js`はread-only Repository経由でSBI国内保有の候補を読み、既存CSV共通処理のdecimal加算を利用する。Inputの新方式SBIだけを月別の非永続Draftへ分離し、国内値を安全なtextContentで表示する。候補Batchを合算・latest自動採用しない。表示・月切替・Draft編集では金融Storageとlegacyメモリを変更せず、既存月次保存からもDraftを除外する。2026年1〜8月と新方式のない月はlegacyを維持する。外国株／現金manual保存、月次確定、旧月次・Summary等への反映は未接続。
 
-**Decided**：表示・read・初期化でseedしない。Input Draftはメモリ上に分離し、将来明示保存でのみmanual AccountSnapshotと月次状態を更新する。今回Input UI、実manual保存、legacy monthly、共有計算には接続しない。既存台帳式を維持し、観測Viewから差額損益を逆算しない。schema・一意性・参照・null／0・version別復元・新キー途中失敗／再読込不一致／rollback不能を匿名fixtureで検証する。
+**Decided**：表示・read・初期化でseedしない。Input Draftはメモリ上に分離し、将来明示保存でのみmanual AccountSnapshotと月次状態を更新する。国内値のread-only表示を月次確定や台帳更新と混同せず、実manual保存、legacy monthly、共有計算には接続しない。既存台帳式を維持し、観測Viewから差額損益を逆算しない。schema・一意性・参照・null／0・version別復元・新キー途中失敗／再読込不一致／rollback不能を匿名fixtureで検証する。
 
 ## 7. Importerのセキュリティとプライバシー
 

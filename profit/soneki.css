@@ -1335,6 +1335,14 @@ body.drawer-open {
 }
 
 /* ===== Account Input Grid ===== */
+.sbi-domestic-input { margin-bottom: 18px; min-width: 0; }
+.sbi-domestic-heading { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.sbi-import-status { margin-left: 8px; font-size: 11px; font-weight: 400; color: var(--muted, #8d96a5); }
+.sbi-domestic-input dl { margin: 0; }
+.sbi-domestic-input dl > div { display: flex; justify-content: space-between; gap: 16px; margin: 8px 0; font-size: 13px; }
+.sbi-domestic-input dt { flex-shrink: 0; color: var(--muted, #8d96a5); }
+.sbi-domestic-input dd { margin: 0; min-width: 0; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sbi-domestic-date, .sbi-domestic-message { margin: 10px 0 0; font-size: 11px; line-height: 1.6; color: var(--muted, #8d96a5); }
 .input-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .input-import-link { color: var(--accent, #3da2ff); font-size: 13px; padding: 10px 0 10px 12px; text-decoration: none; }
 .input-import-link:focus-visible { outline: 2px solid #3da2ff; outline-offset: 3px; }

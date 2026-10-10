@@ -375,7 +375,9 @@ MonthlyAccountState {
 
 **Decided**：同じ月の全保有Batchを加算せず、`domesticImportBatchId`の集合だけを採用する。latest importedAtを自動採用しない。Input編集中Draftはメモリ上で分離し、明示保存成功時だけ正本を更新する。CSV保存だけでは月次確定にしない。2026年1〜8月を自動migrationせず、新方式とlegacyの同じ範囲を二重加算しない。
 
-**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。この仕様を使用するInput UI・manual保存・月次計算への接続は未実装。2026年9月を今回確定しない。
+**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。Inputでは2026年9月以降、対応する国内保有データがあるSBI口座だけを新方式に分離する。月次状態が未保存なら対象月・口座・国内保有scopeが一致するBatchが1件のときのみread-only表示し、複数なら選択せず表示を停止する。月次状態の明示採用先がある場合はその参照だけを読む。金額は既存の共通decimal加算で集計し、必要値のnull／欠損・JPY以外は不明とする。AccountSnapshotや月次状態を表示のために作成しない。
+
+**Current**：新方式SBIの決済・入出金編集は月別のメモリ上Draftのみとし、legacy `tradingData`へのコピー・既存保存ボタンからの保存を行わない。外国株／現金manual保存、MonthlyAccountState確定保存、Summary／Top／Asset Trend接続は未実装。2026年9月は国内値の表示だけでは入力済み・確定にならない。2026年1〜8月と新方式データのない月は従来のlegacy Inputを維持し、自動migrationしない。
 
 ## 8. インポート処理の境界
 

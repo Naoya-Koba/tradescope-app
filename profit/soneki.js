@@ -435,6 +435,11 @@ let currentMonth = new Date().getMonth() + 1; // 1-12
 let tradingData = {}; // { year: { month: { account: { realizedPnL, swapPnL, unrealizedPnL, maintenanceRate, deposit, withdrawal } } } }
 let yearInitialFunds = {}; // { year: { account: amount } }
 let yearInitialUnrealized = {}; // { year: { account: amount } }
+const sbiInput = window.TradeScopeSbiInput;
+const sbiInputDrafts = sbiInput.createDrafts();
+let sbiInputView = { mode: 'legacy' };
+const inputTargetMonth = () => `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+const usesSbiDraft = () => sbiInputView.mode === 'draft';
 
 // ===== Storage =====
 const STORAGE_KEY_TRADING = 'tradingData';
@@ -557,6 +562,7 @@ function saveToStorage() {
 }
 
 function loadFromStorage() {
+  sbiInputDrafts.clear();
   tradingData = JSON.parse(localStorage.getItem(STORAGE_KEY_TRADING) || '{}');
   yearInitialFunds = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL) || '{}');
   yearInitialUnrealized = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL_UNREALIZED) || '{}');
@@ -634,6 +640,7 @@ function ensureYearMonth(year, month) {
   if (!tradingData[year]) tradingData[year] = {};
   if (!tradingData[year][month]) tradingData[year][month] = {};
   ACCOUNTS.forEach(a => {
+    if (a.key === 'sbi' && year === currentYear && month === currentMonth && usesSbiDraft()) return;
     if (!tradingData[year][month][a.key]) {
       tradingData[year][month][a.key] = {};
     }
@@ -2523,8 +2530,13 @@ function selectMonth(month) {
 function renderAccountInputs() {
   const container = document.getElementById('accountInputGrid');
   container.innerHTML = '';
+  sbiInputView = sbiInput.load(localStorage, inputTargetMonth());
   
   ACCOUNTS.forEach(account => {
+    if (account.key === 'sbi' && usesSbiDraft()) {
+      container.appendChild(renderSbiDraftCard(account));
+      return;
+    }
     const data = tradingData?.[currentYear]?.[currentMonth]?.[account.key] || {};
     const unrealizedLegs = getUnrealizedLegs(currentYear, currentMonth, account.key);
     const unrealizedHelper = UNREALIZED_HELPER_ACCOUNTS.has(account.key)
@@ -2701,6 +2713,58 @@ function handleAccountInputFocus(event) {
   if (shouldSelectZeroForOverwrite(input)) input.select();
 }
 
+function renderSbiDraftCard(account) {
+  const card = document.createElement('div');
+  card.className = 'account-card';
+  // Dynamic values are rendered as text/value, not interpolated HTML.
+  card.innerHTML = `
+    <button type="button" class="account-toggle" data-account-toggle="sbi" aria-expanded="false">
+      <div class="account-title"><div class="account-color-dot" style="background-color: ${account.color}"></div>SBI証券</div>
+      <span class="account-toggle-icon">▼</span>
+    </button>
+    <div class="account-body" data-account-body="sbi">
+      <div class="sbi-domestic-input"><div class="sbi-domestic-heading">国内証券 <span class="sbi-import-status"></span></div>
+        <dl><div><dt>評価額</dt><dd class="sbi-domestic-value"></dd></div>
+        <div><dt>評価損益</dt><dd class="sbi-domestic-pnl"></dd></div></dl>
+        <p class="sbi-domestic-date"></p><p class="sbi-domestic-message"></p>
+      </div>
+    </div>`;
+  card.querySelector('.sbi-domestic-value').textContent = sbiInput.formatYen(sbiInputView.marketValue);
+  card.querySelector('.sbi-domestic-pnl').textContent = sbiInput.formatYen(sbiInputView.unrealizedPnl, true);
+  card.querySelector('.sbi-import-status').textContent = sbiInputView.status === 'ready' ? '取込済み' : '';
+  const date = card.querySelector('.sbi-domestic-date');
+  date.textContent = sbiInputView.snapshotAsOf ? `取得日：${sbiInputView.snapshotAsOf.slice(0, 10).replace(/-/g, '/')}` : '';
+  date.hidden = !date.textContent;
+  const message = card.querySelector('.sbi-domestic-message');
+  message.textContent = sbiInputView.status === 'multiple' ? '複数の取込データがあります。使用するデータの確認が必要です。'
+    : sbiInputView.status === 'unavailable' ? '取込データを確認できません。'
+    : sbiInputView.marketValue === null || sbiInputView.unrealizedPnl === null ? '一部の値が未取得です。' : '';
+  message.hidden = !message.textContent;
+  const draft = sbiInputDrafts.read(inputTargetMonth());
+  for (const [field, label] of [['realizedPnL', '決済損益'], ['deposit', '入金'], ['withdrawal', '出金']]) {
+    const group = document.createElement('div');
+    group.className = 'form-group';
+    const labelElement = document.createElement('label');
+    const input = document.createElement('input');
+    input.id = `sbi-draft-${field}`;
+    input.type = 'number';
+    input.className = 'input-account';
+    input.dataset.account = 'sbi';
+    input.dataset.field = field;
+    input.dataset.draft = 'sbi';
+    input.value = draft[field] ?? '';
+    input.placeholder = '0';
+    labelElement.htmlFor = input.id;
+    labelElement.textContent = label;
+    const suffix = document.createElement('span');
+    suffix.className = 'suffix';
+    suffix.textContent = '¥';
+    group.append(labelElement, input, suffix);
+    card.querySelector('.account-body').appendChild(group);
+  }
+  return card;
+}
+
 function handleAccountInputBlur(event) {
   const input = event.target;
   if ((input.dataset.field === 'deposit' || input.dataset.field === 'withdrawal') && input.value.trim() !== '') {
@@ -2832,6 +2896,7 @@ function updateCryptoUnrealizedPnL(accountKey) {
 }
 
 function updateSecuritiesUnrealizedPnL(accountKey) {
+  if (accountKey === 'sbi' && usesSbiDraft()) return;
   ensureYearMonth(currentYear, currentMonth);
   const holdings = tradingData[currentYear][currentMonth][accountKey]?.holdings || [];
 
@@ -2858,12 +2923,21 @@ function updateSecuritiesUnrealizedPnL(accountKey) {
   if (unrealizedInput) unrealizedInput.value = String(unrealizedPnL);
 }
 
-function updateInputs({ render = true } = {}) {
+function updateInputs({ render = true, target } = {}) {
+  // SBI editing never enters the legacy mutation/calculation path.
+  if (target?.dataset.draft === 'sbi') {
+    sbiInputDrafts.set(inputTargetMonth(), target.dataset.field, target.value);
+    return;
+  }
   ensureYearMonth(currentYear, currentMonth);
   // 入力値をtradingDataに保存
   document.querySelectorAll('.input-account').forEach(el => {
     const account = el.dataset.account;
     const field = el.dataset.field;
+    if (account === 'sbi' && usesSbiDraft()) {
+      sbiInputDrafts.set(inputTargetMonth(), field, el.value);
+      return;
+    }
     const rawValue = String(el.value ?? '').trim();
     const row = tradingData[currentYear][currentMonth][account];
     if (rawValue === '') {
@@ -2912,6 +2986,7 @@ function updateHoldingsInputs() {
   
   document.querySelectorAll('.input-holdings').forEach(el => {
     const accountKey = el.dataset.account;
+    if (accountKey === 'sbi' && usesSbiDraft()) return;
     const symbol = el.dataset.symbol;
     const field = el.dataset.field; // 'quantity', 'rate', or 'valueJPY'
     const rawValue = String(el.value ?? '').trim();
@@ -3199,7 +3274,7 @@ document.getElementById('saveMonthData').addEventListener('click', () => {
   if (!confirmed) return;
 
   const hasExplicitInput = Array.from(document.querySelectorAll('.input-account:not([readonly]), .input-holdings'))
-    .some((input) => String(input.value ?? '').trim() !== '');
+    .some((input) => input.dataset.draft !== 'sbi' && String(input.value ?? '').trim() !== '');
   if (!hasExplicitInput) {
     window.alert('入力されたデータがありません。');
     return;
