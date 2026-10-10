@@ -62,14 +62,14 @@ function backupHarness(storage) {
     format: context.window.TradeScopeBackupFormat, restore: context.window.TradeScopeBackupRestore };
 }
 
-test('construction/read/Preview never seed Accounts or persist a key; no UI save path', async () => {
+test('construction/read/Preview never seed Accounts or persist a key; UI delegates to service', async () => {
   const storage = new Storage(), save = service(storage), before = storage.snapshot();
   assert.deepEqual(save.read(), preview.emptyModels());
   await preview.convert([source()], preview.readExisting(storage), preview.createSession(cryptoApi));
   assert.deepEqual(storage.snapshot(), before); assert.equal(storage.actions.length, 0);
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
   const ui = fs.readFileSync(path.join(root, 'import/preview.js'), 'utf8');
-  assert.ok(!/sbi-save|TradeScopeSBISave|createService|\.commit\(/.test(html + ui));
+  assert.ok(html.includes('import/sbi-save.js')); assert.ok(!/\.commit\(/.test(ui));
 });
 test('Holdings new file creates only required four collections, one Batch and one transaction', async () => {
   const storage = new Storage(), input = source(), before = JSON.stringify(input);
@@ -276,10 +276,10 @@ test('legacy monthly, history, Summary Snapshot and UI keys never change; holdin
   for (const [key, value] of Object.entries(legacy)) assert.equal(storage.getItem(key), value);
   assert.equal(metrics.getLatestEnteredMonth(JSON.parse(storage.getItem('tradingData'))['2026'], ['gmo', 'sbi']), 8);
 });
-test('engine has no direct storage writes, external communication, logging or application UI connection', () => {
+test('engine has no direct storage writes/communication/logging; only import page connects it', () => {
   const source = fs.readFileSync(path.join(root, 'import/sbi-save.js'), 'utf8');
   assert.ok(!/localStorage|sessionStorage|indexedDB|\.setItem\(|\.removeItem\(|fetch\(|XMLHttpRequest|WebSocket|sendBeacon|console\./.test(source));
-  for (const file of ['index.html', 'history.html', 'profit/soneki.html', 'import.html', 'import/preview.js']) {
+  for (const file of ['index.html', 'history.html', 'profit/soneki.html']) {
     assert.ok(!/sbi-save|TradeScopeSBISave/.test(fs.readFileSync(path.join(root, file), 'utf8')));
   }
 });

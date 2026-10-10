@@ -5,21 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#121833">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>データを取り込む | TradeScope</title>
+  <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="import/preview.css?v=20261009-2">
+  <link rel="stylesheet" href="assets/transitions.css">
+  <link rel="stylesheet" href="import/preview.css?v=20261010-1">
   <script defer src="import/csv-core.js?v=20261005-1"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
   <script defer src="assets/storage-transaction.js?v=20261010-1"></script>
   <script defer src="assets/data-model-storage.js?v=20261010-1"></script>
   <script defer src="import/model-preview.js?v=20261009-1"></script>
-  <script defer src="import/preview.js?v=20261009-2"></script>
+  <script defer src="import/sbi-save.js?v=20261010-1"></script>
+  <script defer src="import/preview.js?v=20261010-1"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
   <main>
-    <h1>データを取り込む</h1>
-    <p class="muted">内容の確認のみ。データは保存されません。</p>
+    <h1>データ取込</h1>
     <div class="providers">
       <details id="sbi-provider" class="provider">
         <summary>SBI証券<span class="disclosure" aria-hidden="true">⌄</span></summary>
@@ -41,7 +42,7 @@
             <div class="preview-heading"><h2 id="preview-title">確認</h2><button id="close-preview" class="secondary">閉じる</button></div>
             <div id="dates" class="date-fields" hidden>
               <label>対象月<input id="target-month" type="month"></label>
-              <label>取得日<input id="observed-date" type="date"></label>
+              <label><span id="observed-label">取得日</span><input id="observed-date" type="date"></label>
               <span id="date-note" class="muted"></span>
             </div>
             <dl id="summary"></dl>
@@ -53,6 +54,10 @@
               <dl id="planned-summary"></dl>
               <div id="planned-issues" aria-live="polite"></div>
               <details id="planned-details"><summary>候補を見る</summary><div id="planned-rows"></div><button id="more-planned" class="secondary" hidden>続きを表示</button></details>
+            </div>
+            <div id="save-actions" class="save-actions" aria-live="polite" hidden>
+              <p id="save-status" class="muted" role="status"></p>
+              <button id="save-preview" type="button" class="primary" hidden>保存</button>
             </div>
           </section>
         </div>
@@ -68,6 +73,14 @@
     <ol id="help-steps"></ol>
     <a id="official-help" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">SBI証券の案内を開く</a>
     <button id="close-help" class="secondary">閉じる</button>
+  </dialog>
+  <dialog id="save-dialog" aria-labelledby="save-title">
+    <h2 id="save-title">SBI証券</h2>
+    <dl id="save-summary"></dl>
+    <div class="dialog-actions">
+      <button id="cancel-save" type="button" class="secondary" autofocus>キャンセル</button>
+      <button id="confirm-save" type="button" class="primary">保存</button>
+    </div>
   </dialog>
 </body>
 </html>

@@ -12,13 +12,13 @@
   const records = (models, entity) => models[entity]?.records || [];
   const result = (status, reason) => ({ status, reason });
 
-  // Explicit injected storage only. This module is not loaded by any application page.
+  // Explicit injected storage only. Reading/inspection never seeds application data.
   // Accept one Parser source, not a possibly stale/mutated save plan or a pair of files.
   function createService(adapter, options = {}) {
     const repository = model.createRepository(adapter);
     const clock = options.clock || (() => new Date().toISOString());
     const cryptoApi = options.cryptoApi || root.crypto;
-    async function save(input) {
+    async function prepare(input) {
       if (adapter.getItem(transaction.journalKey) !== null) {
         throw new Error('未完了の復元ジャーナルが残っています。保存を停止しました');
       }
@@ -46,7 +46,11 @@
       const file = planned.files[0];
       if (!file?.batch || file.batch.importerVersion !== parser.version) return result('invalid', 'batch');
       // A same-file no-op does not change dates, Parser metadata, IDs or any existing record.
-      if (file.duplicateBatches.length) return result('already-imported', 'exact-file');
+      if (file.duplicateBatches.length) {
+        const saved = records(before, 'importBatches').find(item => item.id === file.duplicateBatches[0]);
+        return { ...result('already-imported', 'exact-file'), targetMonth: saved?.targetMonth ?? null,
+          snapshotAsOf: saved?.snapshotAsOf ?? null };
+      }
       if (source.preview.kind === 'holdings') {
         const batchById = new Map(records(before, 'importBatches').map(item => [item.id, item]));
         const observationExists = records(before, 'holdingSnapshots').some(item =>
@@ -61,6 +65,17 @@
       const entity = file.kind === 'holdings' ? 'holdingSnapshots' : 'rawTransactions';
       const drafts = file.kind === 'holdings' ? file.holdings : file.transactions;
       if (drafts.length !== source.preview.rows.length) return result('invalid', 'incomplete-file');
+
+      return { status: 'ready', before, planned, account, file, entity, drafts };
+    }
+    async function inspect(input) {
+      const prepared = await prepare(input);
+      return prepared.status === 'ready' ? result('ready', null) : prepared;
+    }
+    async function save(input) {
+      const prepared = await prepare(input);
+      if (prepared.status !== 'ready') return prepared;
+      const { before, planned, account, file, entity, drafts } = prepared;
 
       // Generate the actual save timestamp only now, not at Preview time.
       const importedAt = clock();
@@ -80,7 +95,7 @@
       repository.commit(changes, { expectedModels: before });
       return { status: 'saved', importBatchId: file.batch.id, recordCount: drafts.length };
     }
-    return Object.freeze({ read: () => repository.read(), save });
+    return Object.freeze({ read: () => repository.read(), inspect, save });
   }
   const api = Object.freeze({ createService });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

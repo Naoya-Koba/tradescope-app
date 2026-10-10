@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="soneki.css?v=20261003-2" />
+  <link rel="stylesheet" href="soneki.css?v=20261010-1" />
   <link rel="stylesheet" href="../assets/bottom-nav.css" />
   <link rel="stylesheet" href="../assets/transitions.css" />
   <script src="../assets/transitions.js"></script>
@@ -73,6 +73,10 @@
           <span class="menu-title">取引履歴</span>
           <span class="menu-sub">History / Open Positions</span>
         </span>
+      </a>
+      <a href="../import.html" class="menu-item" data-order="3">
+        <span class="menu-mark">●</span>
+        <span class="menu-copy"><span class="menu-title">データ取込</span></span>
       </a>
     </nav>
 
@@ -243,7 +247,10 @@
     </div>
 
     <!-- 3. 月別入力セクション -->
-    <h2 class="heading-muted">Input</h2>
+    <div class="input-heading-row summary-header">
+      <h2 class="heading-muted">Input</h2>
+      <a class="input-import-link" href="../import.html">データ取込</a>
+    </div>
     <section class="section glass margin-bottom monthly-input-section">
       <!-- 3-2. 月選択UI -->
       <div class="month-selector">

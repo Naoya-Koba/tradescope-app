@@ -1335,6 +1335,9 @@ body.drawer-open {
 }
 
 /* ===== Account Input Grid ===== */
+.input-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.input-import-link { color: var(--accent, #3da2ff); font-size: 13px; padding: 10px 0 10px 12px; text-decoration: none; }
+.input-import-link:focus-visible { outline: 2px solid #3da2ff; outline-offset: 3px; }
 .account-input-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

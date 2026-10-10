@@ -21,7 +21,7 @@ npm、bundler、フレームワークは現在導入されていない。CSV基�
 TradeScope/
   index.html                 Top dashboard
   history.html               Transaction History
-  import.html                SBI domestic CSV preview (no persistence)
+  import.html                SBI domestic CSV preview and confirmed save
   import/                    CSV grammar, SBI adapter, preview UI
   tests/                     Anonymous dependency-free CSV tests
   top/                       Top JS/CSS
@@ -87,9 +87,9 @@ TradeScope/
 
 **Current**：`assets/storage-transaction.js`は既存復元journal形式を引き継ぎ、複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあればRepositoryも保存を拒否し、既存の明示確認経路で復旧する。トップ完全バックアップはv2で6collectionを保護し、v1復元はその6キーを維持する。
 
-**Current**：SBI Previewは新Storageの型・参照検証と6モデルの読み取り専用参照を利用する。Repository作成・commitや正本保存は接続しない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
+**Current**：SBI Previewと保存可否判定は新Storageを読み取り専用で参照する。確認後保存だけを既存保存serviceへ接続する。UI独自のRepository commitやStorage writeは設けない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
-**Current**：独立した`import/sbi-save.js`の保存エンジンは1ファイルずつ処理し、既存Preview resolverとRepositoryを再利用する。Adapter・clock・cryptoを注入でき、module読込・構築・readではseedしない。保存時のみAccountを必要に応じて追加し、既存Account／Instrumentは上書きしない。重複・競合・不正／要確認があれば全ファイルを停止する。UIにはこのmoduleを読み込まず、保存ボタンも接続しない。
+**Current**：`import/sbi-save.js`の保存エンジンは1ファイルずつ処理し、既存Preview resolverとRepositoryを再利用する。Adapter・clock・cryptoを注入でき、module読込・構築・read・inspectではseedしない。保存時のみAccountを必要に応じて追加し、既存Account／Instrumentは上書きしない。重複・競合・不正／要確認があれば全ファイルを停止する。取込UIは同じ検証の`inspect`で事前判定し、確認モーダル後に`save`を呼ぶ。
 
 **Current**：Repositoryの`commit(changes, {expectedModels})`は非同期判定中の変更を検知する。journal保護中にbyte一致確認に加え全モデル再読込・schema／参照・期待内容一致を検証し、失敗時は同じrollbackを行う。復元のschemaやv1互換仕様は変更しない。完全排他ではなく、タブ競合・Storage障害の既存限界を保持する。
 
@@ -117,13 +117,13 @@ TradeScope/
 
 ### SBI国内CSV Preview基盤
 
-**Current**：トップの「データを取り込む」から`import.html`を開く。既存の損益・履歴・バックアップモジュールはこの画面に読み込まない。新モデルStorageはgetItemのみのAdapterで参照し、保存ボタン、Repository作成・commit、storage書き込み、ネットワーク送信処理は存在しない。閉じる・ページ離脱時にメモリ上のPreview・保存予定候補と明細DOMを破棄する。
+**Current**：主要3画面のハンバーガー「データ取込」と損益管理Inputの共通ショートカットから`import.html`を開く。ボトムナビは変更しない。既存の損益・履歴・バックアップモジュールはこの画面に読み込まない。確認前のPreviewは非破壊で、保存は既存serviceに限定する。閉じる・ページ離脱時にメモリ上の候補と明細DOMを破棄する。
 
 - `import/csv-core.js`：引用符、escaped quote、値中カンマ・改行、CRLF / LF、BOMを扱うCSV解析。ブラウザ標準`TextDecoder`でUTF-8を検証後、失敗時にShift_JIS（ブラウザのCP932系対応）を試す。手動指定も可能。UTF-16には未対応。
 - `import/sbi-parser.js`：明示した日本語ヘッダーだけを照合し、allowlist項目の一時Preview Rowを生成する。未知列・前書き・ファイル名・個人識別情報を中間データへコピーしない。ヘッダーを曖昧補正しない。Parser versionは一箇所に定義し、解析結果からBatchの`importerVersion`へ引き継ぐ。仕様変更時はこのversionとPWA資産URLを更新する。
 - `import/model-preview.js`：Parser結果と明示した対象月・観測日をImportBatch / Instrument / HoldingSnapshot / RawTransactionの一時候補へ変換する。SBI Accountは未保存でもseedしない。コード一致を優先し、コードなしSBI投信は出所・商品区分・正式名の完全一致で共有／再利用する。`投信金額買付`の完全一致だけを一箇所のmappingで投資信託へ分類し、保有CSVを必須にせず、原文の取引区分を保持する。未知の区分や類似名を推測分類しない。Instrument未解決の約定も取引事実DraftとしてPreviewに残し、解決状態・保存可能性を分離する。未確認の出所、曖昧一致・重複候補は自動統合せず、未解決・不正行は保存可能候補からのみ除外する。Storageのrecord・参照検証を再利用し、保存日時はDraftに含めない。既存のflat HoldingSnapshot集合は共通Batch・口座・月・日時・取得範囲とBatchのsourceTypeで一観測として扱い、保存schemaを変えない。株式系の細分類不明は候補の`subtype: null`とし、上位分類が分かる行まで除外しない。
 - 「保存予定内容」は件数・対象月・取得日・必要な注意だけを表示し、候補明細は任意展開とする。Parser取引件数と、要確認も含む取引候補件数・保存可能件数・要確認件数を区別し、要確認がある場合だけ追加件数を表示する。同じ種類の注意はまとめ、内部ID・JSON全文を表示しない。2種類のCSVを同じsessionで確認でき、両方の件数を同時表示し、詳細は切り替える。指定した日付は切り替え時と同一hashファイルの再選択時だけ維持し、別ファイルへ引き継がない。閉じる・会社を閉じる・文字コード変更・離脱で両方破棄する。非同期処理の完了が閉じたPreviewを再表示しないようtokenを確認する。
-- `detectKind()`は同じヘッダー定義を使い、保有証券／約定履歴の必須明細ヘッダーが揃うかを確認する純粋関数。種別不一致・不明・両形式の混在はPreview前に止める。ファイル名やタイトルだけで推測しない。将来の保存経路でもこの判定の成功を前提にするが、現段階では保存処理は接続しない。
+- `detectKind()`は同じヘッダー定義を使い、保有証券／約定履歴の必須明細ヘッダーが揃うかを確認する純粋関数。種別不一致・不明・両形式の混在はPreview前に止め、保存へ進めない。ファイル名やタイトルだけで推測しない。
 - 会社選択はネイティブの`details`による同画面内展開。SBIを閉じると一時Previewを破棄し、読み込み途中の結果も採用しない。未対応会社は無効な「準備中」表示のみ。PCはCSV選択を2列、スマホは縦積み・明細の項目別表示とし、safe-areaとreduced-motionを考慮する。
 - 数値はdecimal文字列、空欄は`null`。合計はdecimalの桁合わせとBigInt加算で検算する。CSV合計行と明細の値を勝手に補正しない。問題行を除く集計には注意を表示する。
 - 保有証券の必須ヘッダーは銘柄、数量、評価額。約定履歴は約定日、銘柄、取引、数量、単価（内部モデル名は`transactionType`）。欠落・重複ヘッダーはError、不正値・必須値欠落は行Error、未知列・合計不一致はWarning。正常な任意項目の空欄・`--`は`null`とし、不要なWarningを出さない。正常行と問題行を明細で分けて確認できる。
@@ -138,13 +138,15 @@ TradeScope/
 
 **Current / Storage・復元検証**：`node --test tests/data-storage-backup.test.js tests/sbi-import.test.js tests/sbi-model-preview.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2完全復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。実localStorage・実CSV・本番PWAへ接続しない。
 
-**Current / 保存エンジン検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名注入AdapterでAccount／Instrumentの遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込不一致、rollback不能時の停止、v2 export／restore、v1互換、旧月次非変更を確認する。保存エンジンはHTMLに読み込まれず、UI／実ブラウザから実データ保存はまだできない。共有Storage moduleの変更に限りHTML／SWの版付きURLを更新する。
+**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、v2 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 
-**Under consideration / Known issue**：確認済み2ファイル以外のSBIダウンロード形式・文字コード・区分の全網羅は未確認。年2桁の日付の根拠は未確定であり、世紀を推測しない。銘柄とコードが一つのセルに併記される場合はその文字列を保持し、コードを推測分割しない。未知商品・区分行は黙って国内合計へ混ぜない。実ブラウザ / iPhone PWAでのファイル選択、表示、consoleエラーの確認は未完了。
+**Under consideration / Known issue**：確認済み2ファイル以外のSBIダウンロード形式・文字コード・区分の全網羅は未確認。年2桁の日付の根拠は未確定であり、世紀を推測しない。銘柄とコードが一つのセルに併記される場合はその文字列を保持し、コードを推測分割しない。未知商品・区分行は黙って国内合計へ混ぜない。匿名localhostの実ブラウザで保存・再読込・競合停止とPC／スマホ幅を確認した。OSのファイル選択画面および実機iPhone PWAでの操作は別途確認する。
 
-**Planned**：追加形式と実機での対応範囲をプライバシー保護下で検証する。正式なモデル照合・重複検知・Storage・完全バックアップ対応後にのみ永続保存を解禁する。対象月末と取得日の乖離警告の閾値は未決定であり、この段階では保存や月末値への昇格をしない。
+**Known issue**：内蔵ブラウザの画面遷移で`ViewTransition opt-in disabled`が断続的に記録された。取込画面にも既存の共通遷移CSSを読み込むが、発生条件の全解消は未確認。遷移・保存操作は完了し、保存処理中のJavaScriptエラーとは区別する。
+
+**Planned**：追加形式と実機での対応範囲をプライバシー保護下で検証する。対象月末と取得日の乖離警告の閾値は未決定であり、近似値を正式月末値へ昇格しない。実データ初回保存前のバックアップ取得は運用手順で扱い、通常のCSV保存ごとに案内を増やさない。
 
 ## 8. 共通計算の実装方針
 

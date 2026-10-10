@@ -32,9 +32,9 @@
 - `tradeScopeSymbolListV1`
 - localStorageに実在する場合のみLegacy `tradeInfo`
 
-**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBI Previewへの保存接続は存在しない。
+**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続している。
 
-**Current**：SBIの独立保存エンジンによる匿名Storage保存後も、既存v2 export／restoreでAccount・Instrument・ImportBatch・RawTransaction・HoldingSnapshotをそのまま保護できることを検証する。AccountSnapshotを不要に生成せず、Backup schemaとv1復元の新モデル維持仕様は変更しない。エンジンはUIに未接続で、実CSVの正本保存はまだ実行しない。
+**Current**：SBIの確認後保存による匿名Storage保存後も、既存v2 export／restoreでAccount・Instrument・ImportBatch・RawTransaction・HoldingSnapshotを保護する。AccountSnapshotを不要に生成せず、Backup schemaとv1復元の新モデル維持仕様は変更しない。UI接続の検証は匿名CSVだけで行い、実CSVの正本保存はまだ実行しない。通常のCSV保存ごとにバックアップ案内を追加しない。
 
 **Current**：v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v2は新旧双方を復元し、v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
 

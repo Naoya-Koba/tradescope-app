@@ -7,6 +7,9 @@ const vm = require('node:vm');
 const csv = require('../import/csv-core.js');
 const sbi = require('../import/sbi-parser.js');
 const modelPreview = require('../import/model-preview.js');
+const dataStorage = require('../assets/data-model-storage.js');
+const transaction = require('../assets/storage-transaction.js');
+const saveEngine = require('../import/sbi-save.js');
 const root = path.resolve(__dirname, '..');
 const holdings = '商品区分,銘柄名,銘柄コード,預り区分,保有数量,取得単価,現在値,取得金額,評価額,評価損益\r\n' +
   '国内株式,"架空,株式会社",0001,特定預り,2,500,550,1000,1100,100\r\n' +
@@ -197,9 +200,10 @@ class Element {
   addEventListener(type, handler) { this.listeners[type] = handler; }
   async fire(type) { await this.listeners[type]?.({ target: this }); }
   showModal() { this.open = true; }
-  close() { this.open = false; }
+  close() { this.open = false; this.listeners.close?.(); }
+  focus() { this.focused = true; }
 }
-function harness(stored = {}) {
+function harness(stored = {}, writable = false, saveOverride = null) {
   const ids = [...fs.readFileSync(path.join(root, 'import.html'), 'utf8').matchAll(/id="([^"]+)"/g)].map(match => match[1]);
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
   const files = ['holdings', 'transactions'].map(kind => { const element = elements[kind + '-file']; element.dataset.kind = kind; return element; });
@@ -208,7 +212,10 @@ function harness(stored = {}) {
   const deny = () => { throw new Error('Forbidden persistence/network API'); };
   const storage = new Proxy({}, { get: deny });
   const saved = { ...stored };
-  const win = { localStorage: { getItem: key => saved[key] ?? null, setItem: deny, removeItem: deny, clear: deny },
+  const writes = [];
+  const win = { localStorage: { getItem: key => saved[key] ?? null,
+    setItem: writable ? (key, value) => { writes.push(key); saved[key] = value; } : deny,
+    removeItem: writable ? key => { writes.push(key); delete saved[key]; } : deny, clear: deny },
     addEventListener: (type, handler) => { win[type] = handler; } };
   class Reader {
     readAsArrayBuffer(file) { this.result = new TextEncoder().encode(file.text).buffer; queueMicrotask(() => this.onload()); }
@@ -216,6 +223,7 @@ function harness(stored = {}) {
   const context = vm.createContext({ document: { getElementById: id => elements[id], createElement: tag => new Element(tag),
     querySelectorAll: query => query === 'input[type=file]' ? files : helps },
     window: win, FileReader: Reader, TradeScopeCSV: csv, TradeScopeSBI: sbi, TradeScopeSBIModelPreview: modelPreview,
+    TradeScopeDataStorage: dataStorage, TradeScopeStorageTransaction: transaction, TradeScopeSBISave: saveOverride || saveEngine,
     localStorage: storage, sessionStorage: storage, indexedDB: storage, caches: storage,
     fetch: deny, XMLHttpRequest: deny, WebSocket: deny, console: { log: deny, error: deny } });
   vm.runInContext(fs.readFileSync(path.join(root, 'import/preview.js'), 'utf8'), context);
@@ -223,8 +231,130 @@ function harness(stored = {}) {
     const input = elements[kind + '-file']; input.files = [{ text, size: text.length }];
     await input.fire('change'); await new Promise(resolve => setImmediate(resolve));
   }
-  return { elements, helps, win, upload, saved };
+  return { elements, helps, win, upload, saved, writes };
 }
+async function readyHoldings(h, text = holdings) {
+  await h.upload('holdings', text);
+  h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
+  h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
+}
+async function saveVisible(h) {
+  await h.elements['save-preview'].fire('click');
+  assert.equal(h.elements['save-dialog'].open, true);
+  await h.elements['confirm-save'].fire('click');
+}
+test('save UI appears only for all-valid, resolved, dated files; inspection never writes', async () => {
+  const h = harness({}, true); await h.upload('holdings', holdings);
+  assert.equal(h.elements['save-preview'].hidden, true); assert.equal(h.writes.length, 0);
+  await readyHoldings(h);
+  assert.equal(h.elements['save-preview'].hidden, false); assert.equal(h.elements['save-preview'].disabled, false);
+  assert.equal(h.writes.length, 0);
+  await h.upload('transactions', transactions.replace('500,2026', 'broken,2026'));
+  assert.equal(h.elements['save-preview'].hidden, true); assert.equal(h.writes.length, 0);
+});
+test('confirmation is concise, date concepts distinct, cancellation does not write', async () => {
+  const h = harness({}, true); await readyHoldings(h); const before = JSON.stringify(h.saved);
+  await h.elements['save-preview'].fire('click');
+  assert.deepEqual(h.elements['save-summary'].children.map(item => item.textContent), ['保有証券', '2件', '対象月', '2030年9月', '取得日', '2030年10月4日']);
+  assert.equal(h.elements['cancel-save'].focused, true);
+  await h.elements['cancel-save'].fire('click');
+  assert.equal(h.elements['save-dialog'].open, false); assert.equal(h.elements['save-preview'].disabled, false);
+  assert.equal(JSON.stringify(h.saved), before); assert.equal(h.writes.length, 0);
+});
+test('holdings verified success hides action and shows saved; storage references and legacy keys unchanged', async () => {
+  const legacy = { tradingData: '{"2026":{"8":{"gmo":{"realizedPnL":1}},"9":{"sbi":{"holdings":[{"quantity":1}]}}}}',
+    yearInitialFunds: '{}', yearInitialUnrealized: '{}', tradeScopeTradeHistoryV1: '[]',
+    tradeScopeTopSummarySnapshotV1: '{"unchanged":true}' };
+  const h = harness(legacy, true); await readyHoldings(h); await saveVisible(h);
+  assert.equal(h.elements['save-status'].textContent, '保存済み'); assert.equal(h.elements['save-preview'].hidden, true);
+  const models = dataStorage.readModels(h.win.localStorage);
+  assert.equal(models.accounts.records.length, 1); assert.equal(models.holdingSnapshots.records.length, 2);
+  assert.equal(models.importBatches.records.length, 1); assert.equal(models.accountSnapshots, null);
+  assert.equal(h.saved[transaction.journalKey], undefined);
+  for (const [key, value] of Object.entries(legacy)) assert.equal(h.saved[key], value);
+  const ctx = vm.createContext({ window: {} }); vm.runInContext(fs.readFileSync(path.join(root, 'assets/profit-metrics.js'), 'utf8'), ctx);
+  assert.equal(ctx.window.TradeScopeProfitMetrics.getLatestEnteredMonth(JSON.parse(h.saved.tradingData)['2026'], ['gmo','sbi']), 8);
+});
+test('exact reselect and reload find saved state in canonical batches without saving twice', async () => {
+  const h = harness({}, true); await readyHoldings(h); await saveVisible(h); const before = JSON.stringify(h.saved);
+  await h.upload('holdings', holdings);
+  assert.equal(h.elements['save-status'].textContent, '保存済み'); assert.equal(JSON.stringify(h.saved), before);
+  const reload = harness(h.saved, true); await reload.upload('holdings', holdings);
+  assert.equal(reload.elements['save-status'].textContent, '保存済み'); assert.equal(reload.elements['save-preview'].hidden, true);
+  assert.equal(reload.elements['target-month'].value, '2030-09'); assert.equal(reload.elements['observed-date'].value, '2030-10-04');
+  assert.equal(reload.elements['planned-issues'].children.length, 0);
+  assert.equal(reload.writes.length, 0); assert.equal(JSON.stringify(reload.saved), before);
+});
+test('execution saves independently, reuses Account and persists mixed settlement facts, reload saved', async () => {
+  const h = harness({}, true); await readyHoldings(h); await saveVisible(h);
+  await h.upload('transactions', transactions); assert.equal(h.elements['save-preview'].hidden, false);
+  await saveVisible(h);
+  const models = dataStorage.readModels(h.win.localStorage);
+  assert.equal(models.accounts.records.length, 1); assert.equal(models.importBatches.records.length, 2);
+  assert.equal(models.rawTransactions.records.length, 1); assert.equal(models.rawTransactions.records[0].realizedPnl, null);
+  assert.equal(models.rawTransactions.records[0].rawFields.settlementOrPnl, '-1000');
+  const reload = harness(h.saved, true); await reload.upload('transactions', transactions);
+  assert.equal(reload.elements['save-status'].textContent, '保存済み'); assert.equal(reload.writes.length, 0);
+});
+test('holding conflict names reason directly, no button/no write/no replacement', async () => {
+  const h = harness({}, true); await readyHoldings(h); await saveVisible(h); const before = JSON.stringify(h.saved);
+  await readyHoldings(h, holdings.replace('架空ファンド', '別の架空ファンド'));
+  assert.equal(h.elements['save-status'].textContent, '同じ月・同じ取得日のデータが保存されています');
+  assert.equal(h.elements['save-preview'].hidden, true); assert.equal(JSON.stringify(h.saved), before);
+});
+test('duplicate transaction names reason directly and blocks whole file, no writes', async () => {
+  const h = harness({}, true); await h.upload('transactions', transactions); await saveVisible(h);
+  const before = JSON.stringify(h.saved); await h.upload('transactions', transactions + '\n');
+  assert.equal(h.elements['save-status'].textContent, '既存の取引と重複する可能性があります');
+  assert.equal(h.elements['save-preview'].hidden, true); assert.equal(JSON.stringify(h.saved), before);
+});
+test('double request/confirm suppressed; saved shown only after verification completes', async () => {
+  let release, calls = 0;
+  const wrapped = { createService(adapter) {
+    const real = saveEngine.createService(adapter);
+    return { inspect: real.inspect, save: async input => { calls++; await new Promise(resolve => { release = resolve; }); return real.save(input); } };
+  } };
+  const h = harness({}, true, wrapped); await readyHoldings(h);
+  await Promise.all([h.elements['save-preview'].fire('click'), h.elements['save-preview'].fire('click')]);
+  const first = h.elements['confirm-save'].fire('click'); await h.elements['confirm-save'].fire('click');
+  assert.equal(calls, 1); assert.equal(h.elements['confirm-save'].disabled, true);
+  assert.equal(h.elements['save-status'].textContent, '保存中…'); assert.equal(h.saved[dataStorage.keys.accounts], undefined);
+  release(); await first;
+  assert.equal(dataStorage.readModels(h.win.localStorage).importBatches.records.length, 1);
+  assert.equal(h.elements['save-status'].textContent, '保存済み');
+});
+test('save failure preserves legacy/new values and unlocks file selection with concrete failure text', async () => {
+  const h = harness({ tradingData: '{"unchanged":true}' }, true); await readyHoldings(h);
+  const before = JSON.stringify(h.saved); h.win.localStorage.setItem = () => { throw new Error('quota'); };
+  await saveVisible(h);
+  assert.equal(JSON.stringify(h.saved), before); assert.equal(h.elements['save-dialog'].open, false);
+  assert.equal(h.elements['holdings-file'].disabled, false); assert.match(h.elements['save-status'].textContent, /容量・保存権限/);
+  assert.notEqual(h.elements['save-status'].textContent, '保存済み');
+});
+test('date label uses acquired date, formal file date uses basis label, no internal terms in confirmation', async () => {
+  const h = harness({}, true); await readyHoldings(h, '基準日,2030/10/04\n' + holdings);
+  assert.equal(h.elements['observed-label'].textContent, '基準日');
+  await h.elements['save-preview'].fire('click');
+  const text = h.elements['save-summary'].children.map(item => item.textContent).join(' ');
+  assert.ok(!/Account|Instrument|Snapshot|ImportBatch|Storage|観測日/.test(text)); assert.ok(text.includes('基準日'));
+});
+test('navigation: all hamburger entrances and one Input shortcut; bottom navigation identical to base', () => {
+  const child = require('node:child_process');
+  for (const file of ['index.html','history.html','profit/soneki.html']) {
+    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    const drawer = text.match(/<nav class="drawer-nav"[\s\S]*?<\/nav>/)[0];
+    assert.match(drawer, /href="(?:\.\/|\.\.\/)?import\.html"/); assert.ok(drawer.includes('データ取込'));
+    const old = child.execFileSync('git', ['show', `a3385f386cabe57431b47eb3330d5c1b82e687b6:${file}`], {cwd:root, encoding:'utf8'});
+    const bottom = html => html.match(/<nav class="bottom-nav"[\s\S]*?<\/nav>/)[0].replace(/\r\n/g, '\n');
+    assert.equal(bottom(text), bottom(old));
+  }
+  const profit = fs.readFileSync(path.join(root, 'profit/soneki.html'), 'utf8');
+  assert.equal((profit.match(/class="input-import-link"/g) || []).length, 1);
+  // Existing gestures use summary-header both as a boundary and to find the target section.
+  assert.match(profit, /class="input-heading-row summary-header"/);
+  assert.match(profit, /Input<\/h2>\s*<a class="input-import-link" href="\.\.\/import.html">データ取込<\/a>/);
+  assert.match(fs.readFileSync(path.join(root, 'import.html'), 'utf8'), /href="assets\/transitions\.css"/);
+});
 test('J/K/L: file input preview, safe text rendering, close clears data; no storage writes/network/logging', async () => {
   const h = harness();
   const source = '銘柄名,数量,評価額\n<img src=x onerror=alert(1)>,1,10';
@@ -248,7 +378,7 @@ test('planned UI responds to month/date, shows one observation and clears drafts
   h.elements['target-month'].value = '2030-09'; await h.elements['target-month'].fire('change');
   h.elements['observed-date'].value = '2030-10-04'; await h.elements['observed-date'].fire('change');
   assert.deepEqual(h.elements['planned-summary'].children.map(item => item.textContent), [
-    '保有記録', '2件', '新規銘柄候補', '2件', '既存銘柄再利用', '0件', '対象月', '2030年09月分', '取得日', '2030-10-04', '保有の観測', '1件']);
+    '保有記録', '2件', '新規銘柄候補', '2件', '既存銘柄再利用', '0件', '対象月', '2030年9月', '取得日', '2030年10月4日']);
   assert.equal(h.elements['planned-rows'].children.length, 2);
   await h.elements['close-preview'].fire('click');
   assert.equal(h.elements.planned.hidden, true); assert.equal(h.elements['planned-rows'].children.length, 0);
@@ -344,10 +474,10 @@ test('preview date is user-specified or file-derived, not lastModified', async (
 test('SBI-format UTF-8 fixtures preview with no noise and display search/actual periods separately', async () => {
   const h = harness(); await h.upload('holdings', sbiHoldings);
   assert.equal(h.elements['detail-body'].children.length, 4);
-  assert.equal(h.elements.issues.children[0].textContent, 'エラー 0 / 注意 0');
+  assert.equal(h.elements.issues.children.length, 0);
   await h.upload('transactions', sbiTrades);
   assert.equal(h.elements['detail-body'].children.length, 2);
-  assert.equal(h.elements.issues.children[0].textContent, 'エラー 0 / 注意 0');
+  assert.equal(h.elements.issues.children.length, 0);
   const labels = h.elements.summary.children.map(child => child.textContent);
   assert.ok(labels.includes('検索期間')); assert.ok(labels.includes('約定期間'));
   await h.elements['close-preview'].fire('click'); assert.equal(h.elements['detail-body'].children.length, 0);
