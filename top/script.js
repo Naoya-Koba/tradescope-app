@@ -3390,6 +3390,13 @@ function buildCompleteBackupPayload(storage = localStorage, origin = window.loca
   };
 }
 
+function formatCompleteBackupFileName(date = new Date()) {
+  const pad = value => String(value).padStart(2, '0');
+  const day = `${String(date.getFullYear()).padStart(4, '0')}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+  const time = `${pad(date.getHours())}${pad(date.getMinutes())}`;
+  return `TradeScope_${day}_${time}_Backup.json`;
+}
+
 window.TradeScopeBackupExport = Object.freeze({ buildPayload: buildCompleteBackupPayload });
 
 function exportAllData() {
@@ -3405,8 +3412,7 @@ function exportAllData() {
   }
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const fileName = `tradescope-complete-backup-v${COMPLETE_BACKUP_VERSION}-${timestamp}.json`;
+  const fileName = formatCompleteBackupFileName();
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

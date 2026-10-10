@@ -71,13 +71,72 @@ function backupHarness(storage = new MemoryStorage()) {
     console: { log() { throw new Error('No data logging'); }, error() { throw new Error('No data logging'); } } });
   vm.runInContext(part, context);
   return { format: context.window.TradeScopeBackupFormat, restore: context.window.TradeScopeBackupRestore,
-    build: context.window.TradeScopeBackupExport.buildPayload };
+    build: context.window.TradeScopeBackupExport.buildPayload,
+    fileName: context.formatCompleteBackupFileName, context };
 }
 function v1() {
   return { product: 'TradeScope', backupVersion: 1, exportedAt: now,
     data: { monthly: {}, initialFunds: {}, initialUnrealized: {}, transactions: [{ id: 'old', unknownFact: 'preserved' }],
       memos: [], symbols: [] } };
 }
+test('backup filename uses local calendar fields, zero padding and 24-hour time only', () => {
+  const h = backupHarness();
+  assert.equal(h.fileName(new Date(2026, 9, 10, 17, 17)), 'TradeScope_20261010_1717_Backup.json');
+  assert.equal(h.fileName(new Date(2030, 0, 2, 3, 4)), 'TradeScope_20300102_0304_Backup.json');
+  const localOnly = { getFullYear: () => 2030, getMonth: () => 11, getDate: () => 31,
+    getHours: () => 23, getMinutes: () => 59,
+    toISOString() { throw new Error('UTC must not supply filename'); } };
+  assert.equal(h.fileName(localOnly), 'TradeScope_20301231_2359_Backup.json');
+  assert.match(h.fileName(new Date()), /^TradeScope_\d{8}_\d{4}_Backup\.json$/);
+});
+
+test('download filename change preserves v2 JSON, ISO exportedAt and all storage bytes', async () => {
+  const storage = seeded(), before = storage.snapshot(), writes = storage.writes;
+  const h = backupHarness(storage), context = h.context;
+  const source = fs.readFileSync(path.join(root, 'top/script.js'), 'utf8');
+  vm.runInContext(source.slice(source.indexOf('function exportAllData()'), source.indexOf('function importAllData(file)')), context);
+  const date = new Date(2030, 0, 2, 3, 4);
+  context.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [date.getTime()])); } };
+  let blob, link, clicks = 0, revoked;
+  context.Blob = Blob;
+  context.URL = { createObjectURL(value) { blob = value; return 'blob:anonymous'; }, revokeObjectURL(value) { revoked = value; } };
+  context.document.createElement = tag => { assert.equal(tag, 'a'); link = { click() { clicks++; } }; return link; };
+  context.alert = () => assert.fail('Export must succeed');
+  context.exportAllData();
+  assert.equal(link.download, 'TradeScope_20300102_0304_Backup.json');
+  assert.equal(link.href, 'blob:anonymous'); assert.equal(clicks, 1); assert.equal(revoked, link.href);
+  assert.equal(blob.type, 'application/json');
+  const value = JSON.parse(await blob.text());
+  assert.deepEqual(value, copy(h.build(storage, 'http://127.0.0.1:54321', date.toISOString())));
+  assert.equal(value.backupVersion, 2); assert.equal(value.exportedAt, date.toISOString());
+  assert.deepEqual(storage.snapshot(), before); assert.equal(storage.writes, writes);
+});
+
+test('v1/v2 file restore uses JSON content, including old names and browser duplicate suffixes', async () => {
+  const source = fs.readFileSync(path.join(root, 'top/script.js'), 'utf8');
+  const importer = source.slice(source.indexOf('function importAllData(file)'), source.indexOf("window.addEventListener('storage'", source.indexOf('function importAllData(file)')));
+  assert.ok(!/file\.(?:name|filename)|\.endsWith\(/.test(importer));
+  const values = [v1(), copy(backupHarness(seeded()).build(seeded(), 'http://localhost', now))];
+  for (const value of values) {
+    for (const name of ['tradescope-complete-backup-v2-2030-01-20T12-00-00-000Z.json',
+      'TradeScope_20300120_1200_Backup (1).json', 'unrelated-name.json']) {
+      const storage = new MemoryStorage(), h = backupHarness(storage), context = h.context;
+      let completed, confirmations = 0, notifications = 0, reloads = 0;
+      context.FileReader = class { readAsText(file) { completed = this.onload({ target: { result: file.content } }); } };
+      context.requestBackupRestoreConfirmation = async () => { confirmations++; return true; };
+      context.showBackupRestoreComplete = async () => { notifications++; };
+      context.window.location.reload = () => { reloads++; };
+      context.alert = () => assert.fail('Valid content must restore regardless of filename');
+      vm.runInContext(importer, context);
+      context.importAllData({ name, content: JSON.stringify(value) }); await completed;
+      assert.equal(confirmations, 1); assert.equal(notifications, 1); assert.equal(reloads, 1);
+      assert.equal(storage.getItem('tradeScopeRestoreJournalV1'), null);
+      assert.equal(storage.getItem('tradeScopeMemos'), JSON.stringify(value.data.memos));
+      if (value.backupVersion === 2) assert.deepEqual(model.readModels(storage), value.data.models);
+    }
+  }
+});
+
 test('A: new model write/read via adapter preserves all six versioned envelopes', () => {
   const storage = new MemoryStorage(); const repo = model.createRepository(model.localStorageAdapter(storage), { clock: () => now });
   const values = fixture(); repo.commit(values);
@@ -372,5 +431,6 @@ test('module load has no storage/network/log effects and PWA HTML/SW share versi
     const url = `assets/${file}?v=20261010-1`; assert.ok(html.includes(url)); assert.ok(sw.includes('./' + url));
   }
   assert.ok(html.indexOf('storage-transaction.js') < html.indexOf('data-model-storage.js'));
-  assert.match(html, /topScriptVersion = '20261009-1'/); assert.ok(sw.includes('./top/script.js?v=20261009-1'));
+  const topVersion = html.match(/topScriptVersion = '([^']+)'/)[1];
+  assert.ok(sw.includes(`./top/script.js?v=${topVersion}`));
 });

@@ -146,7 +146,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 **Current**：v2のroot、metadata、modelsの未知項目、新モデルの型・version・decimal・重複ID・参照を全検証し、`__proto__`等も拒否してからjournalを保存する。従来履歴の未知フィールドは安全なJSONとして維持し、再正規化しない。
 
-**Current**：ファイル名は`tradescope-complete-backup-v2-<日時>.json`。通常UIは変更せず、Blob + downloadとFile input / FileReader、Snapshot無効化、空データdemo抑止、完了後の再読み込みを維持する。
+**Current / Decided**：ダウンロード名は端末のローカル時刻で`TradeScope_YYYYMMDD_HHmm_Backup.json`とする。年4桁、月・日・24時間表記の時・分は2桁ゼロ埋めし、versionや独自連番は付けない。同名ファイルの扱いはOS／ブラウザに任せる。JSON内の`exportedAt`は従来のISO-8601仕様を維持する。復元判定はファイル名ではなくJSON内容によるため、旧名や`(1)`等の付いた名前も受理できる。Blob + downloadとFile input / FileReader、Snapshot無効化、空データdemo抑止、完了後の再読み込みは変更しない。
 
 **Known issue**：journal分の容量も確保できなければ、正本へ書き込まず失敗する。保存権限やディスク障害等でrollback自体も失敗した場合はエラーを返してjournalを保護し、次の保存を止める。複数タブの同時書き込みを完全排他する仕組みは未実装。実データ保存解禁前に容量・実ブラウザ／iPhoneでの往復と中断復旧を追加確認する。
 
