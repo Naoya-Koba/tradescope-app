@@ -83,21 +83,23 @@ TradeScope/
 
 **Planned**：localStorageを最初の保存先として使う場合も、RawTransaction増加時の容量を計測し、Repositoryを介してIndexedDB等へ移行可能にする。CSV MVPで全面移行は行わない。
 
-**Current**：`assets/data-model-storage.js`がAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotのschema検証・Repository・注入式localStorage Adapterを提供する。module読込・Repository生成・readでseedやMigrationはしない。具体的なallowlist・参照制約はコードと`DATA_MODEL.md`のCurrentを参照する。
+**Current**：`assets/data-model-storage.js`がAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateのschema検証・Repository・注入式localStorage Adapterを提供する。module読込・Repository生成・readでseedやMigrationはしない。具体的なallowlist・参照制約はコードと`DATA_MODEL.md`のCurrentを参照する。
 
-**Current**：`assets/storage-transaction.js`は既存復元journal形式を引き継ぎ、複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあればRepositoryも保存を拒否し、既存の明示確認経路で復旧する。トップ完全バックアップはv2で6collectionを保護し、v1復元はその6キーを維持する。
+**Current**：`assets/storage-transaction.js`は既存復元journal形式を引き継ぎ、複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあればRepositoryも保存を拒否し、既存の明示確認経路で復旧する。トップ完全バックアップはv3で7collectionを保護する。v1復元は7キーを維持し、v2は既存6collectionを復元してMonthlyAccountStateを同一transactionでクリアする。
 
 **Current**：SBI Previewと保存可否判定は新Storageを読み取り専用で参照する。確認後保存だけを既存保存serviceへ接続する。UI独自のRepository commitやStorage writeは設けない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
 **Current**：`import/sbi-save.js`の保存エンジンは1ファイルずつ処理し、既存Preview resolverとRepositoryを再利用する。Adapter・clock・cryptoを注入でき、module読込・構築・read・inspectではseedしない。保存時のみAccountを必要に応じて追加し、既存Account／Instrumentは上書きしない。重複・競合・不正／要確認があれば全ファイルを停止する。取込UIは同じ検証の`inspect`で事前判定し、確認モーダル後に`save`を呼ぶ。
 
-**Current**：Repositoryの`commit(changes, {expectedModels})`は非同期判定中の変更を検知する。journal保護中にbyte一致確認に加え全モデル再読込・schema／参照・期待内容一致を検証し、失敗時は同じrollbackを行う。復元のschemaやv1互換仕様は変更しない。完全排他ではなく、タブ競合・Storage障害の既存限界を保持する。
+**Current**：Repositoryの`commit(changes, {expectedModels})`は非同期判定中の変更を検知する。journal保護中にbyte一致確認に加え全モデル再読込・schema／参照・期待内容一致を検証し、失敗時は同じrollbackを行う。v1復元の既存維持仕様は変更しない。完全排他ではなく、タブ競合・Storage障害の既存限界を保持する。
 
 **Known issue / Planned**：journalも含むlocalStorage容量を計測し、将来のIndexedDB移行と複数タブ排他を別途設計する。保存権限喪失等でrollbackまで失敗した場合、Web Storageだけで完全復旧は保証できないためjournalを保護して新規保存を止める。現在の同期Adapterを非同期DBへ移す際はRepository APIも調整する。
 
 ### 月次正本の実装境界
 
 **Decided**：MonthlyAccountStateは観測Snapshotと分離した口座・月の明示確定記録とする。共通Repositoryへ統合し、7モデルを保護するBackup v3、version別Validation、journal／rollbackを先に検証する。v2は6モデル形式を固定し、v2 Restore時のStateクリアも同一transactionに含める。v1／Legacy RestoreではStateを維持する。
+
+**Current**：MonthlyAccountStateのStorage・検証・Backup v3への統合は完了。画面表示・Repository初期化で新キーを生成しない。Input UI、外国株／現金manual保存、旧月次・Summary等への反映は未接続。
 
 **Decided**：表示・read・初期化でseedしない。Input Draftはメモリ上に分離し、将来明示保存でのみmanual AccountSnapshotと月次状態を更新する。今回Input UI、実manual保存、legacy monthly、共有計算には接続しない。既存台帳式を維持し、観測Viewから差額損益を逆算しない。schema・一意性・参照・null／0・version別復元・新キー途中失敗／再読込不一致／rollback不能を匿名fixtureで検証する。
 
@@ -144,9 +146,9 @@ TradeScope/
 
 **Current / 検証**：`node --test tests/sbi-import.test.js tests/sbi-model-preview.test.js`で架空の最小CSVとDOM harnessを使う。読み取り専用Storageを注入し、storage書き込み・送信・console APIに接続したら失敗するテストを含む。両CSV変換、null / 0、日付分離、銘柄照合・曖昧一致、重複候補、参照検証、PII項目除外、候補表示と破棄、既存月次状態不変を確認する。実ブラウザでの実ファイル確認とは区別する。
 
-**Current / Storage・復元検証**：`node --test tests/data-storage-backup.test.js tests/sbi-import.test.js tests/sbi-model-preview.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2完全復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。実localStorage・実CSV・本番PWAへ接続しない。
+**Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2／v3復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。`tests/monthly-state-backup.test.js`は月次状態のnull／明示0、一意性、採用先参照、v2クリア、7モデル往復、新キーの書込・再読込・rollback失敗、expectedModelsと自動保存なしを確認する。実localStorage・実CSV・本番PWAへ接続しない。
 
-**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、v2 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
+**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v3 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 

@@ -4,11 +4,11 @@
 
 ## 1. 重要な仕様差異・既知の問題
 
-### 完全バックアップv2・v1互換とLegacy部分復元
+### 完全バックアップv3・v2／v1互換とLegacy部分復元
 
-- **Current**：トップexportは`backupVersion: 2`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotを保存する。Previewの保存接続は未実装。
-- **Current**：v2、v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
-- **Current**：v2は新旧モデルを完全復元し、v1は従来対象を復元して新モデルを維持する。旧形式は部分復元で未収録項目を維持する。
+- **Current**：トップexportは`backupVersion: 3`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、月次状態のInput UI・manual保存は未接続。
+- **Current**：v3、v2、v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
+- **Current**：v3は7モデルを完全復元し、v2は従来6モデルを復元して月次状態を同一journalでクリアする。v1は従来対象を復元して7モデルを維持する。旧形式は部分復元で未収録項目を維持する。
 - **Current**：復元前ジャーナル、書き込み後検証、失敗時ロールバック、Summary Snapshot無効化、空データ復元時のダミー投入抑止を行う。
 - **Current**：未完了ジャーナルが残る場合は新しい復元を開始せず、ユーザー確認後に復元前状態へ戻す。
 - **Current / Confirmed**：2026年9月23日に現行統合形式の `tradescope-all-backup-2026-09-23.json` を出力済みである。
@@ -120,7 +120,7 @@
 ### 自動テストと未検証範囲
 
 - **Current**：CSV Preview、Storage、新旧バックアップ互換・rollbackの匿名自動テストを追加済み。
-- **Known issue**：計算全体、Migration、実ブラウザ／iPhoneでの新Storage・v2往復、容量上限、複数タブ排他は未確認。
+- **Known issue**：計算全体、Migration、実ブラウザ／iPhoneでの月次状態・v3往復、容量上限、複数タブ排他は未確認。今回の月次状態は匿名MemoryStorageで検証し、実データ・本番Storageへは接続していない。
 - **Planned**：共有計算と実環境の容量・中断復旧を追加検証する。保存基盤の追加だけで実CSV保存を解禁しない。
 
 ## 3. Legacy / Experimental一覧

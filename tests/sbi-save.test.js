@@ -308,11 +308,11 @@ test('prototype controls are rejected before writes and never leak into records'
   const storage = new Storage(); assert.equal((await service(storage).save(input)).status, 'invalid');
   assert.equal(storage.actions.length, 0); assert.equal({}.polluted, undefined);
 });
-test('Backup v2 exports saved models exactly and round-trips; v1 keeps new data', async () => {
+test('Backup v3 exports saved models exactly and round-trips; v1 keeps new data', async () => {
   const storage = new Storage(), save = service(storage);
   await save.save(source()); await save.save(source('transactions', trades, 'b'.repeat(64)));
   const h = backupHarness(storage), payload = h.build(storage, 'http://localhost', now);
-  assert.equal(payload.backupVersion, 2); assert.deepEqual(copy(payload.data.models), save.read());
+  assert.equal(payload.backupVersion, 3); assert.deepEqual(copy(payload.data.models), save.read());
   assert.equal(payload.data.models.accountSnapshots, null);
   const target = new Storage(), other = backupHarness(target); other.restore.execute(other.format.inspectValue(payload).restorePlan, target);
   assert.deepEqual(model.readModels(target), save.read());

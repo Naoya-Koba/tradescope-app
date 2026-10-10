@@ -375,7 +375,7 @@ MonthlyAccountState {
 
 **Decided**：同じ月の全保有Batchを加算せず、`domesticImportBatchId`の集合だけを採用する。latest importedAtを自動採用しない。Input編集中Draftはメモリ上で分離し、明示保存成功時だけ正本を更新する。CSV保存だけでは月次確定にしない。2026年1〜8月を自動migrationせず、新方式とlegacyの同じ範囲を二重加算しない。
 
-**Current**：この仕様を使用するInput UI・manual保存・月次計算への接続は未実装。2026年9月を今回確定しない。
+**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。この仕様を使用するInput UI・manual保存・月次計算への接続は未実装。2026年9月を今回確定しない。
 
 ## 8. インポート処理の境界
 
@@ -593,7 +593,7 @@ TransactionAnnotation {
 
 ### 実装済みStorage基盤（Previewは読み取りのみ）
 
-**Current**：`assets/data-model-storage.js`のRepositoryはAdapterを注入して使用する。実装済みcollectionとキーは次の6つ。
+**Current**：`assets/data-model-storage.js`のRepositoryはAdapterを注入して使用する。実装済みcollectionとキーは次の7つ。
 
 | collection | 保存キー | 責務 |
 |---|---|---|
@@ -603,6 +603,7 @@ TransactionAnnotation {
 | `rawTransactions` | `tradeScopeRawTransactionsV1` | 取引事実。戦略・Risk・ユーザーMemoは受理しない |
 | `holdingSnapshots` | `tradeScopeHoldingSnapshotsV1` | 一取得元・一観測の保有状態 |
 | `accountSnapshots` | `tradeScopeAccountSnapshotsV1` | 一取得元・一観測が報告する口座状態／取得範囲 |
+| `monthlyAccountStates` | `tradeScopeMonthlyAccountStatesV1` | 口座・月の明示確定、採用先参照、月次台帳入力。合計値は保存しない |
 
 **Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は省略可、存在時は`1`のみ。すべてのrecordにstable `id`を要求する。
 

@@ -22,7 +22,7 @@
 
 ### トップの完全バックアップ
 
-**Current**：`backupVersion: 2`を持つ完全バックアップとして、従来v1の次のデータと新Storageの6collectionを一つのJSONへ出力する。
+**Current**：`backupVersion: 3`を持つ完全バックアップとして、従来v1の次のデータと新Storageの7collectionを一つのJSONへ出力する。
 
 - `tradingData`
 - `yearInitialFunds`
@@ -32,11 +32,11 @@
 - `tradeScopeSymbolListV1`
 - localStorageに実在する場合のみLegacy `tradeInfo`
 
-**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshotも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続している。
+**Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続しているが、MonthlyAccountStateのInput接続・manual保存UIは未実装。
 
-**Current**：SBIの確認後保存による匿名Storage保存後も、既存v2 export／restoreでAccount・Instrument・ImportBatch・RawTransaction・HoldingSnapshotを保護する。AccountSnapshotを不要に生成せず、Backup schemaとv1復元の新モデル維持仕様は変更しない。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
+**Current**：SBIの確認後保存内容は最新v3 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
 
-**Current**：v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v2は新旧双方を復元し、v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
+**Current**：v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v3は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
 
 **Current**：復元前に形式、バージョン、必須項目、型を検証し、復元内容、維持内容、警告を確認画面へ表示する。ユーザーがキャンセルした場合はlocalStorageを変更しない。
 
@@ -134,15 +134,15 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 }
 ```
 
-**Current**：上記v1は従来の保存対象を表し、新モデルを含まない。v1読込は継続するが、新しいトップexportは下記v2を使用する。
+**Current**：上記v1は従来の保存対象を表し、新モデルを含まない。v1読込は継続するが、新しいトップexportは下記v3を使用する。
 
 **Decided**：新データモデルへ実ユーザーデータを永続保存できるようにする前に、それらの完全バックアップ、検証、復元、journal、rollbackを実装・検証する。ParserとPreviewは永続保存なしで先行してよい。
 
 ### 実装済みv2拡張
 
-**Current**：新exportは`backupVersion: 2`。v1の`data`へ`models`を追加し、`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。未保存端末でも自動seedせずexportする。
+**Current**：既存`backupVersion: 2`はv1の`data`へ`models`を追加した6モデル形式。`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。読込互換を維持し、最新exportはv3とする。
 
-**Current**：v2復元はenvelopeをそのまま保存し、`null`のcollectionはキー不在へ戻す完全復元。この置換・削除は確認後のv2復元に限り、v1・旧形式では新モデルキーに触れない。Legacy `tradeInfo`はv2でも未収録なら維持する。
+**Current**：v2復元は6モデルのenvelopeをそのまま保存し、`null`のcollectionはキー不在へ戻す完全復元。MonthlyAccountStateも同一transactionでクリアする。v1・旧形式では新モデルキーに触れない。Legacy `tradeInfo`はv2でも未収録なら維持する。
 
 **Current**：v2のroot、metadata、modelsの未知項目、新モデルの型・version・decimal・重複ID・参照を全検証し、`__proto__`等も拒否してからjournalを保存する。従来履歴の未知フィールドは安全なJSONとして維持し、再正規化しない。
 
@@ -166,7 +166,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 **Decided**：v2復元で採用先が過去状態へ置換されるため、MonthlyAccountStateを残さない。このクリアも確認後の同じjournal／rollbackに含め、途中失敗時はStateを含めて元状態へ戻す。v3と将来の月次保存も新キーを同じtransactionで保護する。journal確保失敗では開始せず、再読込不一致はrollback、rollback不能時はjournalを保持して後続保存を止める。画面表示・Repository初期化から空モデルを自動保存しない。
 
-**Current**：この節のv3は正式仕様であり、Storage／Restoreへの実装は次段階で行う。Input UI・実manual保存は未接続。
+**Current**：v3 exportは`data.models`に既存6モデルと`monthlyAccountStates`を必須とし、各値はenvelopeまたは`null`。version別の固定一覧を使って全schema・参照を検証する。v2のState削除とv3の7モデル復元を共通journalで保護し、journal削除前に全モデルを再読込・一致確認する。Input UI・実manual保存は未接続。
 
 ## 5. 安全な復元フロー
 

@@ -3,6 +3,11 @@
   const transaction = typeof module !== 'undefined' && module.exports
     ? require('./storage-transaction.js') : root.TradeScopeStorageTransaction;
   const keys = transaction.modelKeys;
+  // Released Backup schemas are fixed lists, not derived from current Repository keys.
+  const backupModelEntities = Object.freeze({
+    2: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']),
+    3: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates'])
+  });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
     && (Object.getPrototypeOf(value) === null || Object.getPrototypeOf(Object.getPrototypeOf(value)) === null);
@@ -97,14 +102,24 @@
         acquisitionPrice: decimal, marketPrice: decimal, marketValue: decimal, unrealizedPnl: decimal, currency, rawFields } },
     accountSnapshots: { required: ['id', 'accountId', 'sourceMode', 'sourceScope', 'importedAt', 'snapshotAsOf'],
       types: { ...common, ...provenance, valuationCurrency: currency, assetValue: decimal, netAssetValue: decimal,
-        cashBalance: decimal, unrealizedPnl: decimal, reportedMonthlyRealizedPnl: decimal, accountSpecific: specific } }
+        cashBalance: decimal, unrealizedPnl: decimal, reportedMonthlyRealizedPnl: decimal, accountSpecific: specific } },
+    monthlyAccountStates: {
+      required: ['id', 'accountId', 'targetMonth', 'confirmedAt', 'domesticImportBatchId',
+        'foreignAccountSnapshotId', 'cashAccountSnapshotId', 'realizedPnl', 'swapPnl', 'deposit', 'withdrawal'],
+      nullable: ['domesticImportBatchId', 'foreignAccountSnapshotId', 'cashAccountSnapshotId',
+        'realizedPnl', 'swapPnl', 'deposit', 'withdrawal'],
+      types: { ...common, accountId: id, targetMonth: month, confirmedAt: timestamp,
+        domesticImportBatchId: id, foreignAccountSnapshotId: id, cashAccountSnapshotId: id,
+        realizedPnl: decimal, swapPnl: decimal, deposit: decimal, withdrawal: decimal }
+    }
   };
   function validateRecord(entity, record) {
     const definition = definitions[entity]; if (!definition) fail();
     assertJson(record); fields(record, Object.keys(definition.types), definition.required);
     for (const [field, value] of Object.entries(record)) {
       // Required identity/source fields cannot be null; unknown financial/date observations can.
-      const nullable = field !== 'schemaVersion' && (!definition.required.includes(field) || field === 'snapshotAsOf');
+      const nullable = field !== 'schemaVersion' && (!definition.required.includes(field) || field === 'snapshotAsOf'
+        || definition.nullable?.includes(field));
       if (value === null && nullable) continue;
       if (!definition.types[field](value)) fail();
     }
@@ -119,9 +134,9 @@
       if (ids.has(record.id)) fail(); ids.add(record.id);
     }
   }
-  function validateModels(models) {
-    fields(models, Object.keys(keys), Object.keys(keys)); assertJson(models);
-    for (const entity of Object.keys(keys)) validateEnvelope(entity, models[entity]);
+  function validateModelSet(models, entities) {
+    fields(models, entities, entities); assertJson(models);
+    for (const entity of entities) validateEnvelope(entity, models[entity]);
     const records = entity => models[entity]?.records || [];
     const accounts = new Map(records('accounts').map(item => [item.id, item]));
     const instruments = new Set(records('instruments').map(item => item.id));
@@ -161,7 +176,37 @@
         }
       }
     }
+    const accountMonths = new Set();
+    for (const state of records('monthlyAccountStates')) {
+      const account = accounts.get(state.accountId);
+      const pair = JSON.stringify([state.accountId, state.targetMonth]);
+      if (!account || accountMonths.has(pair)) fail();
+      accountMonths.add(pair);
+      const sameMonth = record => record && record.accountId === state.accountId && record.targetMonth === state.targetMonth;
+      const hasSbiReferences = ['domesticImportBatchId', 'foreignAccountSnapshotId', 'cashAccountSnapshotId']
+        .some(field => state[field] !== null);
+      if (hasSbiReferences && (account.providerCode !== 'sbi' || account.accountType !== 'securities')) fail();
+      if (state.domesticImportBatchId !== null) {
+        const batch = batches.get(state.domesticImportBatchId);
+        const holdings = records('holdingSnapshots').filter(item => item.importBatchId === state.domesticImportBatchId);
+        if (!sameMonth(batch) || batch.sourceType !== 'csv' || batch.sourceProvider !== 'sbi'
+          || !holdings.length || holdings.some(item => !sameMonth(item) || item.sourceMode !== 'imported'
+            || item.sourceScope !== 'sbi-domestic-holdings')) fail();
+      }
+      for (const [field, scope] of [['foreignAccountSnapshotId', 'sbi-foreign-securities'], ['cashAccountSnapshotId', 'sbi-cash']]) {
+        if (state[field] === null) continue;
+        const snapshot = snapshots.get(state[field]);
+        if (!sameMonth(snapshot) || snapshot.sourceMode !== 'manual' || snapshot.sourceScope !== scope
+          || snapshot.valuationCurrency !== 'JPY' || snapshot.importBatchId) fail();
+      }
+    }
     return true;
+  }
+  function validateModels(models) { return validateModelSet(models, Object.keys(keys)); }
+  function validateBackupModels(version, models) {
+    const entities = backupModelEntities[version];
+    if (!entities) fail();
+    return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function localStorageAdapter(storage) {
@@ -194,6 +239,9 @@
         if (value === null) fail();
         validateEnvelope(entity, value);
         if (entity === 'accounts' && (models.accounts?.records || []).some(record => !value.records.some(item => item.id === record.id))) fail();
+        if (entity === 'monthlyAccountStates' && (models[entity]?.records || []).some(record => value.records.some(item =>
+          (item.accountId === record.accountId && item.targetMonth === record.targetMonth && item.id !== record.id)
+          || (item.id === record.id && (item.accountId !== record.accountId || item.targetMonth !== record.targetMonth))))) fail();
         models[entity] = value;
       }
       validateModels(models);
@@ -248,7 +296,7 @@
     return { version: 1, kind: 'facts-candidate', key: await hashBytes(new TextEncoder().encode(JSON.stringify(facts)), cryptoApi),
       automaticMerge: false };
   }
-  const api = Object.freeze({ keys, assertJson, validateRecord, validateEnvelope, validateModels,
+  const api = Object.freeze({ keys, backupModelEntities, assertJson, validateRecord, validateEnvelope, validateModels, validateBackupModels,
     readModels, createRepository, localStorageAdapter, initialAccounts, newId, hashBytes, dedupeCandidate });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TradeScopeDataStorage = api;

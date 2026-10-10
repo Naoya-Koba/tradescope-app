@@ -47,7 +47,8 @@ function fixture() {
     accountSnapshots: envelope([{ id: 'as_fixture', ...source, valuationCurrency: 'JPY', assetValue: '0',
       cashBalance: null, unrealizedPnl: '0' }]),
     holdingSnapshots: envelope([{ id: 'hs_fixture', ...source, accountSnapshotId: 'as_fixture', instrumentId,
-      quantity: '0', acquisitionPrice: null, marketPrice: '123.123456789', marketValue: '0', unrealizedPnl: null, currency: 'JPY' }])
+      quantity: '0', acquisitionPrice: null, marketPrice: '123.123456789', marketValue: '0', unrealizedPnl: null, currency: 'JPY' }]),
+    monthlyAccountStates: envelope([])
   };
 }
 function seeded() {
@@ -90,7 +91,7 @@ test('backup filename uses local calendar fields, zero padding and 24-hour time 
   assert.match(h.fileName(new Date()), /^TradeScope_\d{8}_\d{4}_Backup\.json$/);
 });
 
-test('download filename change preserves v2 JSON, ISO exportedAt and all storage bytes', async () => {
+test('download filename change preserves latest v3 JSON, ISO exportedAt and all storage bytes', async () => {
   const storage = seeded(), before = storage.snapshot(), writes = storage.writes;
   const h = backupHarness(storage), context = h.context;
   const source = fs.readFileSync(path.join(root, 'top/script.js'), 'utf8');
@@ -108,15 +109,17 @@ test('download filename change preserves v2 JSON, ISO exportedAt and all storage
   assert.equal(blob.type, 'application/json');
   const value = JSON.parse(await blob.text());
   assert.deepEqual(value, copy(h.build(storage, 'http://127.0.0.1:54321', date.toISOString())));
-  assert.equal(value.backupVersion, 2); assert.equal(value.exportedAt, date.toISOString());
+  assert.equal(value.backupVersion, 3); assert.equal(value.exportedAt, date.toISOString());
   assert.deepEqual(storage.snapshot(), before); assert.equal(storage.writes, writes);
 });
 
-test('v1/v2 file restore uses JSON content, including old names and browser duplicate suffixes', async () => {
+test('v1/v2/v3 file restore uses JSON content, including old names and browser duplicate suffixes', async () => {
   const source = fs.readFileSync(path.join(root, 'top/script.js'), 'utf8');
   const importer = source.slice(source.indexOf('function importAllData(file)'), source.indexOf("window.addEventListener('storage'", source.indexOf('function importAllData(file)')));
   assert.ok(!/file\.(?:name|filename)|\.endsWith\(/.test(importer));
-  const values = [v1(), copy(backupHarness(seeded()).build(seeded(), 'http://localhost', now))];
+  const latest = copy(backupHarness(seeded()).build(seeded(), 'http://localhost', now));
+  const v2 = copy(latest); v2.backupVersion = 2; delete v2.data.models.monthlyAccountStates;
+  const values = [v1(), v2, latest];
   for (const value of values) {
     for (const name of ['tradescope-complete-backup-v2-2030-01-20T12-00-00-000Z.json',
       'TradeScope_20300120_1200_Backup (1).json', 'unrelated-name.json']) {
@@ -132,12 +135,13 @@ test('v1/v2 file restore uses JSON content, including old names and browser dupl
       assert.equal(confirmations, 1); assert.equal(notifications, 1); assert.equal(reloads, 1);
       assert.equal(storage.getItem('tradeScopeRestoreJournalV1'), null);
       assert.equal(storage.getItem('tradeScopeMemos'), JSON.stringify(value.data.memos));
-      if (value.backupVersion === 2) assert.deepEqual(model.readModels(storage), value.data.models);
+      if (value.backupVersion >= 2) assert.deepEqual(model.readModels(storage), { ...value.data.models,
+        monthlyAccountStates: value.data.models.monthlyAccountStates ?? null });
     }
   }
 });
 
-test('A: new model write/read via adapter preserves all six versioned envelopes', () => {
+test('A: new model write/read via adapter preserves all seven versioned envelopes', () => {
   const storage = new MemoryStorage(); const repo = model.createRepository(model.localStorageAdapter(storage), { clock: () => now });
   const values = fixture(); repo.commit(values);
   assert.deepEqual(repo.read(), values); assert.equal(storage.getItem(transaction.journalKey), null);
@@ -255,10 +259,10 @@ test('v1 restore does not parse, reset or migrate even an unreadable/future new-
   h.restore.execute(h.format.inspectValue(v1()).restorePlan, target);
   for (const key of Object.values(model.keys)) assert.equal(target.getItem(key), before[key]);
 });
-test('F: v2 export -> cleared anonymous fixture -> restore -> re-export exact data equality', () => {
+test('F: v3 export -> cleared anonymous fixture -> restore -> re-export exact data equality', () => {
   const source = seeded(), h = backupHarness(source), before = source.snapshot();
   const payload = h.build(source, 'http://127.0.0.1:54321', now);
-  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 2);
+  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 3);
   assert.equal(payload.source.origin, 'http://127.0.0.1:54321');
   const target = new MemoryStorage(), targetHarness = backupHarness(target);
   const inspection = targetHarness.format.inspectJson(JSON.stringify(payload)); assert.equal(inspection.ok, true);
@@ -266,7 +270,7 @@ test('F: v2 export -> cleared anonymous fixture -> restore -> re-export exact da
   const reexport = targetHarness.build(target, payload.source.origin, now);
   assert.deepEqual(copy(reexport), copy(payload)); assert.equal(target.getItem(transaction.journalKey), null);
 });
-test('F: v2 missing model keys use null, not invented timestamps/seeds; restore reproduces absence', () => {
+test('F: v3 missing model keys use null, not invented timestamps/seeds; restore reproduces absence', () => {
   const empty = new MemoryStorage(), h = backupHarness(empty), payload = h.build(empty, 'http://localhost', now);
   assert.deepEqual(copy(payload.data.models), emptyModels()); assert.equal(empty.writes, 0);
   const target = seeded(); h.restore.execute(h.format.inspectValue(payload).restorePlan, target);
@@ -274,7 +278,7 @@ test('F: v2 missing model keys use null, not invented timestamps/seeds; restore 
   assert.equal(target.getItem('tradeInfo'), '[{"legacy":"anonymous"}]');
   assert.equal(target.getItem('profitSkipDemoSeed'), '1');
 });
-test('G: v2 halfway failure rolls back legacy + new models + cache to byte-for-byte prior state', () => {
+test('G: v3 halfway failure rolls back legacy + new models + cache to byte-for-byte prior state', () => {
   const source = seeded(), h = backupHarness(source), payload = h.build(source, 'http://localhost', now);
   const target = new MemoryStorage({ tradingData: ' {"preserveWhitespace":true} ',
     tradeScopeMemos: '[{"old":true}]', tradeScopeTopSummarySnapshotV1: '{"old":true}' });
@@ -357,7 +361,7 @@ test('L: Repository storage is independent of all existing monthly/top/history/b
   assert.ok(!/createRepository|\.commit\(|\.setItem\(|\.removeItem\(|sessionStorage|indexedDB/.test(preview));
   assert.match(preview, /service\(\)\.save\(pending\.input\)/);
 });
-test('every v2 write/removal position, including Snapshot and journal cleanup, rolls back exactly', () => {
+test('every v3 write/removal position, including Snapshot and journal cleanup, rolls back exactly', () => {
   const h = backupHarness(), payload = h.build(seeded(), 'http://localhost', now);
   const plan = h.format.inspectValue(payload).restorePlan;
   for (const failureKey of [...plan.operations.map(item => item.storageKey), 'tradeScopeTopSummarySnapshotV1', transaction.journalKey]) {
@@ -428,7 +432,7 @@ test('module load has no storage/network/log effects and PWA HTML/SW share versi
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
   for (const file of ['storage-transaction.js', 'data-model-storage.js']) {
-    const url = `assets/${file}?v=20261010-1`; assert.ok(html.includes(url)); assert.ok(sw.includes('./' + url));
+    const url = `assets/${file}?v=20261010-3`; assert.ok(html.includes(url)); assert.ok(sw.includes('./' + url));
   }
   assert.ok(html.indexOf('storage-transaction.js') < html.indexOf('data-model-storage.js'));
   const topVersion = html.match(/topScriptVersion = '([^']+)'/)[1];

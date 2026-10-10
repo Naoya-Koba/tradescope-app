@@ -2715,7 +2715,7 @@ function updateDataByYear(inputYear = null) {
 
 // ===== Backup Format Core (pure functions; no storage writes) =====
 const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
-const COMPLETE_BACKUP_VERSION = 2;
+const COMPLETE_BACKUP_VERSION = 3;
 const backupDataStorage = window.TradeScopeDataStorage;
 const backupStorageTransaction = window.TradeScopeStorageTransaction;
 const COMPLETE_BACKUP_RESTORE_JOURNAL_KEY = 'tradeScopeRestoreJournalV1';
@@ -2740,17 +2740,24 @@ const COMPLETE_BACKUP_STORAGE_LABELS = Object.freeze({
   tradeInfo: 'Legacy tradeInfo',
   tradeScopeAccountsV1: '口座', tradeScopeInstrumentsV1: '商品',
   tradeScopeImportBatchesV1: '取込履歴', tradeScopeRawTransactionsV1: '取引事実',
-  tradeScopeHoldingSnapshotsV1: '保有情報', tradeScopeAccountSnapshotsV1: '口座状態'
+  tradeScopeHoldingSnapshotsV1: '保有情報', tradeScopeAccountSnapshotsV1: '口座状態',
+  tradeScopeMonthlyAccountStatesV1: '月次確定状態'
 });
 const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V1: 'v1-complete',
   V2: 'v2-complete',
+  V3: 'v3-complete',
   LEGACY_ALL: 'legacy-all',
   LEGACY_PROFIT: 'legacy-profit',
   LEGACY_HISTORY: 'legacy-history',
   UNSUPPORTED_VERSION: 'unsupported-version',
   INVALID: 'invalid'
 });
+
+function backupModelEntitiesForFormat(format) {
+  const version = format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : 0;
+  return backupDataStorage.backupModelEntities[version] || [];
+}
 
 function isPlainRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -2771,8 +2778,8 @@ function detectBackupFormat(value) {
 
   if (hasOwn(value, 'product') || hasOwn(value, 'backupVersion')) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) return COMPLETE_BACKUP_FORMATS.INVALID;
-    if (![1, 2].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
-    return value.backupVersion === 1 ? COMPLETE_BACKUP_FORMATS.V1 : COMPLETE_BACKUP_FORMATS.V2;
+    if (![1, 2, 3].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
+    return { 1: COMPLETE_BACKUP_FORMATS.V1, 2: COMPLETE_BACKUP_FORMATS.V2, 3: COMPLETE_BACKUP_FORMATS.V3 }[value.backupVersion];
   }
 
   if (value.tradescope === 'all-backup') return COMPLETE_BACKUP_FORMATS.LEGACY_ALL;
@@ -2823,9 +2830,10 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
     return ['unsupported backupVersion'];
   }
 
-  if (format === COMPLETE_BACKUP_FORMATS.V1 || format === COMPLETE_BACKUP_FORMATS.V2) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3].includes(format)) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) errors.push('product must be TradeScope');
-    if (value.backupVersion !== (format === COMPLETE_BACKUP_FORMATS.V1 ? 1 : 2)) errors.push('backupVersion does not match format');
+    const version = format === COMPLETE_BACKUP_FORMATS.V1 ? 1 : format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : 3;
+    if (value.backupVersion !== version) errors.push('backupVersion does not match format');
     if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
     requireRecord(value.data, 'data');
 
@@ -2851,13 +2859,13 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
         errors.push('source.origin must be a string');
       }
     }
-    if (format === COMPLETE_BACKUP_FORMATS.V2) {
+    if (backupModelEntitiesForFormat(format).length) {
       const onlyFields = (target, allowed) => isPlainRecord(target) && Object.keys(target).every(key => allowed.includes(key));
       if (!onlyFields(value, ['product', 'backupVersion', 'exportedAt', 'source', 'data'])
         || !onlyFields(value.data, ['monthly', 'initialFunds', 'initialUnrealized', 'transactions', 'memos', 'symbols', 'legacy', 'models'])
         || (hasOwn(value, 'source') && !onlyFields(value.source, ['origin']))
-        || (hasOwn(value.data || {}, 'legacy') && !onlyFields(value.data.legacy, ['tradeInfo']))) errors.push('v2 contains unsupported fields');
-      try { backupDataStorage.validateModels(value.data?.models); }
+        || (hasOwn(value.data || {}, 'legacy') && !onlyFields(value.data.legacy, ['tradeInfo']))) errors.push(`v${version} contains unsupported fields`);
+      try { backupDataStorage.validateBackupModels(version, value.data?.models); }
       catch (_) { errors.push('data.models has invalid schema, fields, IDs or references'); }
     }
   }
@@ -2906,13 +2914,13 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   const normalized = {
     format,
     exportedAt: typeof value?.exportedAt === 'string' ? value.exportedAt : '',
-    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2].includes(format) ? 'complete' : 'legacy-partial',
+    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3].includes(format) ? 'complete' : 'legacy-partial',
     coverage: { ...emptyCoverage },
     data: {},
     warnings: []
   };
 
-  if (format === COMPLETE_BACKUP_FORMATS.V1 || format === COMPLETE_BACKUP_FORMATS.V2) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3].includes(format)) {
     const data = isPlainRecord(value.data) ? value.data : {};
     const legacy = isPlainRecord(data.legacy) ? data.legacy : {};
     normalized.coverage = {
@@ -2933,8 +2941,9 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
       symbols: data.symbols,
       legacy: normalized.coverage.legacyTradeInfo ? { tradeInfo: legacy.tradeInfo } : {}
     };
-    if (format === COMPLETE_BACKUP_FORMATS.V2) normalized.data.models = data.models;
+    if (backupModelEntitiesForFormat(format).length) normalized.data.models = data.models;
     else normalized.warnings.push('v1に含まれない新モデルの現在値を維持する');
+    if (format === COMPLETE_BACKUP_FORMATS.V2) normalized.warnings.push('v2復元では月次確定状態をクリアする');
     if (!normalized.coverage.legacyTradeInfo) {
       normalized.warnings.push('バックアップにLegacy tradeInfoがないため、現在値を維持する');
     }
@@ -2997,11 +3006,15 @@ function buildBackupRestorePlan(normalized) {
 
   const operations = mappings.filter(([coverageKey]) => normalized.coverage[coverageKey])
     .map(([, storageKey, value]) => ({ type: 'set', storageKey, value }));
-  if (normalized.format === COMPLETE_BACKUP_FORMATS.V2) {
-    Object.entries(backupDataStorage.keys).forEach(([entity, storageKey]) => {
+  if (backupModelEntitiesForFormat(normalized.format).length) {
+    backupModelEntitiesForFormat(normalized.format).forEach(entity => {
+      const storageKey = backupDataStorage.keys[entity];
       const value = normalized.data.models[entity];
       operations.push(value === null ? { type: 'remove', storageKey } : { type: 'set', storageKey, value });
     });
+    if (normalized.format === COMPLETE_BACKUP_FORMATS.V2) {
+      operations.push({ type: 'remove', storageKey: backupDataStorage.keys.monthlyAccountStates });
+    }
   }
   return {
     format: normalized.format,
@@ -3059,6 +3072,7 @@ function getBackupFormatLabel(format) {
   const labels = {
     [COMPLETE_BACKUP_FORMATS.V1]: '完全バックアップv1',
     [COMPLETE_BACKUP_FORMATS.V2]: '完全バックアップv2',
+    [COMPLETE_BACKUP_FORMATS.V3]: '完全バックアップv3',
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: '旧統合バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: '旧損益バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: '旧履歴バックアップ'
@@ -3249,13 +3263,14 @@ function prepareBackupRestoreActions(restorePlan, storage) {
     if (!isPlainRecord(operation) || !COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.includes(operation.storageKey)) throw new Error('復元キーが不正です');
     const entity = Object.keys(backupDataStorage.keys).find(name => backupDataStorage.keys[name] === operation.storageKey);
     if (operation.type === 'remove') {
-      if (!entity || restorePlan.format !== COMPLETE_BACKUP_FORMATS.V2) throw new Error('復元対象の削除が不正です');
+      const clearsState = restorePlan.format === COMPLETE_BACKUP_FORMATS.V2 && entity === 'monthlyAccountStates';
+      if (!entity || (!clearsState && !backupModelEntitiesForFormat(restorePlan.format).includes(entity))) throw new Error('復元対象の削除が不正です');
       return { type: 'remove', storageKey: operation.storageKey };
     }
     if (operation.type !== 'set') throw new Error('復元操作が不正です');
     backupDataStorage.assertJson(operation.value);
     if (entity) {
-      if (restorePlan.format !== COMPLETE_BACKUP_FORMATS.V2 || operation.value === null) throw new Error('復元モデルが不正です');
+      if (!backupModelEntitiesForFormat(restorePlan.format).includes(entity) || operation.value === null) throw new Error('復元モデルが不正です');
       backupDataStorage.validateEnvelope(entity, operation.value);
     } else {
       const arrays = ['tradeScopeTradeHistoryV1', 'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeInfo'];
@@ -3273,9 +3288,13 @@ function prepareBackupRestoreActions(restorePlan, storage) {
 
   const actionKeys = new Set(actions.map((action) => action.storageKey));
   if (actionKeys.size !== actions.length) throw new Error('restore plan contains duplicate storage keys');
+  const legacyCompleteKeys = ['tradingData', 'yearInitialFunds', 'yearInitialUnrealized',
+    'tradeScopeTradeHistoryV1', 'tradeScopeMemos', 'tradeScopeSymbolListV1'];
+  const versionModelKeys = backupModelEntitiesForFormat(restorePlan.format).map(entity => backupDataStorage.keys[entity]);
   const requiredByFormat = {
-    [COMPLETE_BACKUP_FORMATS.V1]: COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.slice(0, 6),
-    [COMPLETE_BACKUP_FORMATS.V2]: COMPLETE_BACKUP_PRIMARY_STORAGE_KEYS.filter(key => key !== 'tradeInfo'),
+    [COMPLETE_BACKUP_FORMATS.V1]: legacyCompleteKeys,
+    [COMPLETE_BACKUP_FORMATS.V2]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountStates],
+    [COMPLETE_BACKUP_FORMATS.V3]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: ['tradingData', 'yearInitialFunds', 'tradeScopeTradeHistoryV1'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: ['tradingData', 'yearInitialFunds'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: ['tradeScopeTradeHistoryV1']
@@ -3287,14 +3306,20 @@ function prepareBackupRestoreActions(restorePlan, storage) {
       ...(restorePlan.format === COMPLETE_BACKUP_FORMATS.LEGACY_ALL ? ['tradeScopeTradeHistoryV1'] : [])].includes(action.storageKey))) {
     throw new Error('復元対象が不正です');
   }
-  if (restorePlan.format === COMPLETE_BACKUP_FORMATS.V2) {
+  if (backupModelEntitiesForFormat(restorePlan.format).length) {
     const models = {};
-    for (const [entity, key] of Object.entries(backupDataStorage.keys)) {
+    for (const entity of backupModelEntitiesForFormat(restorePlan.format)) {
+      const key = backupDataStorage.keys[entity];
       const operation = restorePlan.operations.find(item => item.storageKey === key);
       if (!operation) throw new Error('復元モデルが不足しています');
       models[entity] = operation.type === 'remove' ? null : operation.value;
     }
-    backupDataStorage.validateModels(models);
+    const version = restorePlan.format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : 3;
+    backupDataStorage.validateBackupModels(version, models);
+    if (version === 2) {
+      const stateAction = actions.find(action => action.storageKey === backupDataStorage.keys.monthlyAccountStates);
+      if (stateAction?.type !== 'remove') throw new Error('v2復元の月次状態クリアが不足しています');
+    }
   }
 
   const profitKeys = [
@@ -3330,7 +3355,17 @@ function recoverPendingBackupRestore(storage) {
 
 function executeBackupRestore(restorePlan, storage) {
   const actions = prepareBackupRestoreActions(restorePlan, storage);
-  backupStorageTransaction.apply(actions, storage);
+  backupStorageTransaction.apply(actions, storage, () => {
+    if (!backupModelEntitiesForFormat(restorePlan.format).length) return;
+    const restored = backupDataStorage.readModels(storage);
+    const expected = Object.fromEntries(Object.entries(backupDataStorage.keys).map(([entity, key]) => {
+      const action = actions.find(item => item.storageKey === key);
+      return [entity, action.type === 'remove' ? null : JSON.parse(action.rawValue)];
+    }));
+    if (JSON.stringify(restored) !== JSON.stringify(expected)) {
+      throw new Error('復元モデルの再読込検証に失敗しました');
+    }
+  });
   return {
     restoredKeys: restorePlan.operations.map((operation) => operation.storageKey),
     snapshotInvalidated: true,
@@ -3347,7 +3382,7 @@ window.TradeScopeBackupRestore = Object.freeze({
   recoverPending: recoverPendingBackupRestore
 });
 
-// ===== Complete Backup v2 Export =====
+// ===== Complete Backup v3 Export =====
 function readStoredBackupValue(storageKey, fallbackValue, expectedType, storage = localStorage) {
   const raw = storage.getItem(storageKey);
   if (raw === null) return fallbackValue;

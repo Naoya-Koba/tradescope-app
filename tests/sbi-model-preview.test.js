@@ -464,6 +464,6 @@ test('browser-style modules load without storage effects and convert through rea
   const result = await vm.runInContext(`TradeScopeSBIModelPreview.convert([{preview: TradeScopeSBI.parse(anonymous, 'holdings'),
     metadata: {hash: 'a'.repeat(64), size: 1}, targetMonth: '2030-09', snapshotAsOf: '2030-10-04'}],
     TradeScopeSBIModelPreview.readExisting(localStorage))`, context);
-  assert.equal(result.files[0].holdings.length, 1); assert.equal(reads.length, 6);
+  assert.equal(result.files[0].holdings.length, 1); assert.equal(reads.length, Object.keys(model.keys).length);
   assert.equal(JSON.stringify(values), before);
 });
