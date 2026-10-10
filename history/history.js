@@ -1,4 +1,5 @@
 const historyCore = window.TradeScopeHistory;
+const displayAccountName = window.TradeScopeAccountUI.displayAccountName;
 
 const ACCOUNTS = ['GMO', 'Light FX', 'みんなのFX', 'SBI', 'SBI VC', '三井住友銀行'];
 const ASSET_TYPES = ['FX', '証券', '暗号資産', 'その他'];
@@ -239,7 +240,7 @@ function buildBaseSelectOptions() {
   const categorySelect = document.getElementById('entryCategory');
   const strategySelect = document.getElementById('entryStrategy');
 
-  accountSelect.innerHTML = ACCOUNTS.map((v, idx) => toOptionHtml(v, v, idx === 0)).join('');
+  accountSelect.innerHTML = ACCOUNTS.map((v, idx) => toOptionHtml(v, displayAccountName(v), idx === 0)).join('');
   assetTypeSelect.innerHTML = ASSET_TYPES.map((v, idx) => toOptionHtml(v, v, idx === 0)).join('');
   categorySelect.innerHTML = ['new', 'add'].map((v, idx) => toOptionHtml(v, CATEGORY_LABELS[v], idx === 0)).join('');
   strategySelect.innerHTML = STRATEGIES.map((v) => toOptionHtml(v, STRATEGY_LABELS[v] || v, v === '')).join('');
@@ -262,7 +263,7 @@ function buildFilters(entries) {
   const symbols = uniqueSortedValues(entries, 'symbol');
   const strategies = uniqueSortedValues(entries, 'strategy');
 
-  filterAccount.innerHTML = [toOptionHtml('', 'すべて', current.account === ''), ...accounts.map((v) => toOptionHtml(v, v, current.account === v))].join('');
+  filterAccount.innerHTML = [toOptionHtml('', 'すべて', current.account === ''), ...accounts.map((v) => toOptionHtml(v, displayAccountName(v), current.account === v))].join('');
   filterSymbol.innerHTML = [toOptionHtml('', 'すべて', current.symbol === ''), ...symbols.map((v) => toOptionHtml(v, v, current.symbol === v))].join('');
   filterStrategy.innerHTML = [toOptionHtml('', 'すべて', current.strategy === ''), ...strategies.map((v) => toOptionHtml(v, v, current.strategy === v))].join('');
   filterCategory.innerHTML = [toOptionHtml('', 'すべて', current.category === ''), ...CATEGORIES.map((v) => toOptionHtml(v, CATEGORY_LABELS[v], current.category === v))].join('');
@@ -404,7 +405,7 @@ function openClosePositionModal(position) {
     ? (position.accountList || [])
     : [position.accountLabel];
 
-  if (accountSel) accountSel.innerHTML = accountList.map((a) => toOptionHtml(a, a)).join('');
+  if (accountSel) accountSel.innerHTML = accountList.map((a) => toOptionHtml(a, displayAccountName(a))).join('');
 
   if (accountRow) {
     accountRow.style.display = accountList.length <= 1 ? 'none' : '';
@@ -446,11 +447,11 @@ function renderOpenPositionDetail(position) {
 
   const sideLabel = position.side === 'buy' ? '買い' : '売り';
   const accountsLabel = position.viewMode === 'merged'
-    ? (position.accountList?.join(' / ') || '-')
-    : (position.accountLabel || '-');
+    ? (position.accountList?.map(displayAccountName).join(' / ') || '-')
+    : displayAccountName(position.accountLabel || '-');
   const breakdown = (position.details || []).map((row) => {
     const rowSide = row.side === 'buy' ? '買い' : '売り';
-    return `<li>${escapeHtml(row.account)}: ${rowSide} ${fmtQuantity(row.quantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')} @ ${fmtRate(row.avgRate, position.assetType, position.symbol)}</li>`;
+    return `<li>${escapeHtml(displayAccountName(row.account))}: ${rowSide} ${fmtQuantity(row.quantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')} @ ${fmtRate(row.avgRate, position.assetType, position.symbol)}</li>`;
   }).join('');
 
   detail.innerHTML = `
@@ -515,7 +516,7 @@ function renderOpenPositions(entries) {
     const sideClass = position.side === 'buy' ? 'tag-buy' : 'tag-sell';
     return `
       <tr class="open-position-row" data-open-position-index="${idx}">
-        <td>${escapeHtml(position.accountLabel)}</td>
+        <td>${escapeHtml(displayAccountName(position.accountLabel))}</td>
         <td>${escapeHtml(position.symbol)}</td>
         <td><span class="${sideClass}">${sideLabel}</span></td>
         <td>${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')}</td>
@@ -559,7 +560,7 @@ function renderHistoryTable(entries) {
   tbody.innerHTML = sorted.map((entry) => `
     <tr>
       <td>${escapeHtml(entry.date)}</td>
-      <td>${escapeHtml(entry.account)}</td>
+      <td>${escapeHtml(displayAccountName(entry.account))}</td>
       <td>${escapeHtml(entry.assetType)}</td>
       <td>${escapeHtml(entry.symbol)}</td>
       <td><span class="${entry.side === 'buy' ? 'tag-buy' : 'tag-sell'}">${entry.side === 'buy' ? '買い' : '売り'}</span></td>
@@ -580,7 +581,7 @@ function populateEditSelects() {
   const categorySel = document.getElementById('editEntryCategory');
   const strategySel = document.getElementById('editEntryStrategy');
   if (accountSel && !accountSel.options.length) {
-    accountSel.innerHTML = ACCOUNTS.map((v) => toOptionHtml(v, v)).join('');
+    accountSel.innerHTML = ACCOUNTS.map((v) => toOptionHtml(v, displayAccountName(v))).join('');
   }
   if (assetSel && !assetSel.options.length) {
     assetSel.innerHTML = ASSET_TYPES.map((v) => toOptionHtml(v, v)).join('');

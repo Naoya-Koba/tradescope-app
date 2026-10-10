@@ -240,6 +240,8 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 
 ## 13. UI Design System
 
+**Current / Decided**：`assets/account-ui.js`の`displayAccountName`はUI表示専用とする。計算・照合・集約・保存には従来の識別子を使い、履歴selectはvalueと表示テキストを分離する。口座名を含む派生キャッシュも表示時だけ変換し、正本やキャッシュの更新を表示名変更の条件にしない。
+
 **Planned**：モバイルアプリとしての完成度を重視し、操作性、画面遷移、モーション、階層感、タップフィードバック、一貫性を共通のUI Design Systemとして整備する。Disney+等の高品質アプリは体験設計の参考とするが、完全コピーではなく、金融アプリとしての視認性とTradeScope独自UIを優先する。
 
 ## 14. Git運用

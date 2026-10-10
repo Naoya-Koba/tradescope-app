@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+[data-account-label] {
+  text-transform: none;
+}
+
 html, body {
   margin: 0;
   width: 100%;

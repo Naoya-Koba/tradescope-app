@@ -785,6 +785,7 @@ const PROFIT_STORAGE_KEY_INITIAL_UNREALIZED = 'yearInitialUnrealized';
 const PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT = 'tradeScopeTopSummarySnapshotV1';
 const SHARED_SELECTED_YEAR_KEY = 'tradeScopeSelectedYear';
 const historyCore = window.TradeScopeHistory;
+const displayAccountName = window.TradeScopeAccountUI.displayAccountName;
 const LINKED_ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
   { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
@@ -1370,7 +1371,7 @@ function updateSwap() {
     } else {
       const nonZeroBreakdown = swapSummary.prevMonthBreakdown.filter((item) => item.value !== 0);
       const breakdownItems = (nonZeroBreakdown.length ? nonZeroBreakdown : swapSummary.prevMonthBreakdown)
-        .map((item) => `<span class="swap-breakdown-item">${item.name}: ${fmtJPY(item.value)}</span>`)
+        .map((item) => `<span class="swap-breakdown-item">${displayAccountName(item.name)}: ${fmtJPY(item.value)}</span>`)
         .join('');
       accountBreakdownEl.innerHTML = `<span class="swap-mini-title">口座別内訳</span>${breakdownItems}`;
     }
@@ -1453,7 +1454,7 @@ function buildDetailDataFromPosition(position) {
   }
 
   const accountsText = Array.isArray(position?.accounts) && position.accounts.length
-    ? position.accounts.join(' / ')
+    ? position.accounts.map(displayAccountName).join(' / ')
     : '情報なし';
   const noteText = `${position?.memo || 'メモなし'}\n口座: ${accountsText}`;
   const headlineValue = position?.assetType === 'FX' ? requiredMargin : marketValue;
@@ -1996,7 +1997,7 @@ function renderPortfolio() {
     if (listEl) {
       listEl.innerHTML = sortedData.map((item) => `
         <div class="portfolio-item" style="--item-color: ${item.color}">
-          <span class="portfolio-label">${item.label}</span>
+          <span class="portfolio-label">${displayAccountName(item.label)}</span>
           <span class="portfolio-amount">${fmtJPY(item.amount)}</span>
           <span class="portfolio-percent">${((item.amount / total) * 100).toFixed(1)}%</span>
         </div>
@@ -2017,7 +2018,7 @@ function renderPortfolio() {
     const chart = new Chart(canvas.getContext('2d'), {
       type: 'doughnut',
       data: {
-        labels: sortedData.map((item) => item.label),
+        labels: sortedData.map((item) => displayAccountName(item.label)),
         datasets: [{
           data: sortedData.map((item) => item.amount),
           backgroundColor: sortedData.map((item) => hexToRgba(item.color)),

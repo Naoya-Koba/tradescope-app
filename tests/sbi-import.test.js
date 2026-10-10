@@ -485,8 +485,8 @@ test('SBI-format UTF-8 fixtures preview with no noise and display search/actual 
 test('provider starts closed; open/close clears preview and remains reusable without persistence', async () => {
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
   assert.match(html, /<details id="sbi-provider" class="provider">/);
-  for (const provider of ['GMOクリック証券', 'LIGHT FX', 'みんなのFX', 'SBI VCトレード']) {
-    assert.ok(html.includes(`<button class="provider-pending" disabled><span>${provider}</span>`));
+  for (const provider of ['GMO FXneo', 'LIGHT FX', 'みんなのFX', 'SBI VC']) {
+    assert.match(html, new RegExp(`<button class="provider-pending" disabled><span(?: data-account-label="[a-z]+")?>${provider}</span>`));
   }
   const h = harness();
   h.elements['sbi-provider'].open = true; await h.elements['sbi-provider'].fire('toggle');

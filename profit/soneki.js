@@ -126,6 +126,7 @@ function bindAssetsTrendRevealToSection(section) {
   });
 }
 
+const displayAccountName = window.TradeScopeAccountUI.displayAccountName;
 const ACCOUNTS = [
   { name: 'GMO', key: 'gmo', color: '#3B6DFF' },
   { name: 'Light FX', key: 'lightfx', color: '#74D2F5' },
@@ -1514,7 +1515,7 @@ function updateChartTitles(accountKey) {
   if (accountKey && accountKey !== 'total') {
     const account = ACCOUNTS.find(a => a.key === accountKey);
     if (account) {
-      const accountSuffix = ` <span style="color: ${account.color}; font-weight: 700;">●</span> <span style="color: rgba(255,255,255,0.85);">(${account.name})</span>`;
+      const accountSuffix = ` <span style="color: ${account.color}; font-weight: 700;">●</span> <span style="color: rgba(255,255,255,0.85);">(${displayAccountName(account.key)})</span>`;
       if (assetLabel) assetLabel.innerHTML = `Asset Trend${accountSuffix}`;
       if (pnlLabel) pnlLabel.innerHTML = `Monthly P/L${accountSuffix}`;
     }
@@ -2247,7 +2248,7 @@ function renderMonthlyByAccount(accountKey) {
   container.innerHTML = '';
   if (accountHeader) {
     accountHeader.hidden = false;
-    accountHeader.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${account.name}</span>`;
+    accountHeader.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${displayAccountName(account.key)}</span>`;
   }
 
   if (!hasStoredYearData(currentYear)) {
@@ -2313,7 +2314,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
       return `
         <div class="detail-account-card detail-account-card-bank">
           <div class="detail-account-head">
-            <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${account.name}</span>
+            <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}</span>
           </div>
           <div class="detail-account-summary">
             <div class="detail-account-summary-label">月末残高</div>
@@ -2339,7 +2340,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
     return `
       <div class="detail-account-card">
         <div class="detail-account-head">
-          <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${account.name}</span>
+          <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}</span>
         </div>
         <div class="detail-account-summary">
           <div class="detail-account-summary-label">損益合計</div>
@@ -2618,7 +2619,7 @@ function renderAccountInputs() {
       <button type="button" class="account-toggle" data-account-toggle="${account.key}" aria-expanded="false">
         <div class="account-title">
           <div class="account-color-dot" style="background-color: ${account.color}"></div>
-          ${account.name}
+          ${displayAccountName(account.key)}
         </div>
         <span class="account-toggle-icon">▼</span>
       </button>
@@ -2719,7 +2720,7 @@ function renderSbiDraftCard(account) {
   // Dynamic values are rendered as text/value, not interpolated HTML.
   card.innerHTML = `
     <button type="button" class="account-toggle" data-account-toggle="sbi" aria-expanded="false">
-      <div class="account-title"><div class="account-color-dot" style="background-color: ${account.color}"></div>SBI証券</div>
+      <div class="account-title"><div class="account-color-dot" style="background-color: ${account.color}"></div>${displayAccountName(account.key)}</div>
       <span class="account-toggle-icon">▼</span>
     </button>
     <div class="account-body" data-account-body="sbi">
@@ -3463,7 +3464,7 @@ let selectedMonthlyAccount = 'total'; // 'total' | account key
 function getMonthlyViewOptions() {
   const accountOptions = ACCOUNTS
     .filter((account) => !account.bankOnly)
-    .map((account) => ({ key: account.key, label: account.name }));
+    .map((account) => ({ key: account.key, label: displayAccountName(account.key) }));
   return [{ key: 'total', label: '全体' }, ...accountOptions];
 }
 

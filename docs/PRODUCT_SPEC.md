@@ -146,6 +146,8 @@
 
 ## 7. UI名称
 
+**Decided / Current**：口座の通常UI表示名はGMO FXneo、SBI証券、LIGHT FX、みんなのFX、SBI VC、三井住友銀行に統一する。Inputの新旧方式、口座円グラフ・凡例・tooltip、履歴・取込の表示で共通のUI専用mappingを用いる。内部キー、旧口座文字列、履歴optionのvalue、Accountの保存済みdisplayName・legacyRefs、計算・Backup識別子は変更しない。旧Summary Snapshotのlabelも表示時のみ変換し、Snapshotを書き換えない。short labelは今回は導入しない。
+
 **Current**：Summary、Asset Trend、Monthly P/L等、英語見出しが多い。
 
 **Under consideration**：将来的な日本語化を検討する。現在の英語名を最終的な正式名称とは扱わない。
