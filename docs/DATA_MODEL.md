@@ -341,9 +341,41 @@ importedAt = TradeScopeへ実際に保存した日時
 
 **Under consideration**：警告を出す日数閾値、休日・非営業日の扱い、対象月の初期提案方法。
 
-**Planned**：`MonthlyAccountSnapshot`は、まず`AccountSnapshot`に`targetMonth`と月次確定・確認状態を付けた月次版またはviewとして扱い、独立した永続エンティティを増やさない方向を優先する。近似Snapshotを正式月末値へ無条件に昇格させない。
+**Decided**：観測事実と月次への採用・明示確定を分離し、後者は独立した`MonthlyAccountState`に保持する。合成値を保存する`MonthlyAccountSnapshot`は新設しない。月次確定は観測日を変更せず、近似Snapshotを正式月末値へ昇格させない。
 
-**Under consideration**：月末確定・ユーザー確認済み等の状態名と、実データ要件によって`MonthlyAccountSnapshot`を別概念として公開する必要があるか。
+### SBI manualと月次正本
+
+**Decided**：外国株は既存AccountSnapshotの別recordとする。`sourceMode: manual`、`sourceScope: sbi-foreign-securities`、`accountId`、`targetMonth`、`snapshotAsOf`、`importedAt`、`valuationCurrency: JPY`、`assetValue`、`unrealizedPnl`を用いる。stable `id`を持ち、`importBatchId`、`netAssetValue`、`cashBalance`、`reportedMonthlyRealizedPnl`は混ぜない。銘柄別Instrument／HoldingSnapshotは現時点では作らず、ユーザーが確認した円換算値を保存する。為替レートや外貨金額から推測・再計算しない。
+
+**Decided**：現金は別のmanual AccountSnapshotとし、`sourceScope: sbi-cash`、stable `id`、`accountId`、`targetMonth`、`snapshotAsOf`、`importedAt`、`valuationCurrency: JPY`、`cashBalance`を用いる。`netAssetValue`を現金残高に流用しない。対象月はInputの選択を引き継ぎ、観測日不明は`null`のまま保持する。
+
+**Decided**：空欄・未入力を0にしない。外国株なしを確認した場合は`assetValue: "0"`、`unrealizedPnl: "0"`、現金0円は`cashBalance: "0"`として明示保存できる。manual記録は国内CSVの再取込から独立して保護する。
+
+**Decided**：`MonthlyAccountState`は、口座・月の明示確定、採用した国内保有Batch、外国株／現金manual記録、月次台帳入力を保持する再生成不能な正本とする。保存キーは`tradeScopeMonthlyAccountStatesV1`、envelopeは`{schemaVersion: 1, records: [...], updatedAt}`。
+
+```text
+MonthlyAccountState {
+  id
+  accountId
+  targetMonth
+  confirmedAt
+  domesticImportBatchId
+  foreignAccountSnapshotId
+  cashAccountSnapshotId
+  realizedPnl
+  swapPnl
+  deposit
+  withdrawal
+}
+```
+
+**Decided**：上記11fieldは必須。`id`、`accountId`、`targetMonth`、タイムゾーン付き`confirmedAt`はnull不可。参照3fieldはIDまたは`null`（未採用）、金額4fieldはdecimal文字列または`null`（不明）とする。`"0"`は明示0であり、nullを0で補わない。recordの`schemaVersion`は既存モデル同様に省略可、存在時は`1`のみ。合計評価額・合計評価損益、`sourceAvailability`、`sourceFingerprint`、draft statusは追加しない。record存在は明示確定の記録であり、各値が既知・全取得元が揃ったことまでは意味しない。
+
+**Decided**：同一`accountId + targetMonth`に複数recordを許さない。初回IDは既存`newId`で生成し、将来同じ口座・月を修正するときは同じIDを維持する。口座参照を検証し、非nullの採用先は口座・対象月を一致させる。外国株／現金参照は対応するmanual scopeかつJPYであることを要求する。国内BatchはSBIのCSVで、同じBatchに属する`sourceScope: sbi-domestic-holdings`の保有record集合が存在することを根拠とする。約定Batchや名称だけで国内保有と推測しない。
+
+**Decided**：同じ月の全保有Batchを加算せず、`domesticImportBatchId`の集合だけを採用する。latest importedAtを自動採用しない。Input編集中Draftはメモリ上で分離し、明示保存成功時だけ正本を更新する。CSV保存だけでは月次確定にしない。2026年1〜8月を自動migrationせず、新方式とlegacyの同じ範囲を二重加算しない。
+
+**Current**：この仕様を使用するInput UI・manual保存・月次計算への接続は未実装。2026年9月を今回確定しない。
 
 ## 8. インポート処理の境界
 

@@ -106,6 +106,12 @@ Monthly P/L = 当月決済損益 + 当月スワップ損益
 
 ## 6. Asset Trend
 
+### SBI観測Viewと台帳式の境界
+
+**Decided**：SBI観測資産額は「採用した国内保有BatchのmarketValue合計 + 外国株manual assetValue + 現金manual cashBalance」、SBI観測評価損益は「同BatchのunrealizedPnl合計 + 外国株manual unrealizedPnl」とする。複数取得元からの派生Viewであり、合計を正本保存しない。不足成分を0として補わず、同じ月の全Batchを加算しない。
+
+**Decided**：既存の確定資産・純資産の台帳式は維持する。観測資産額と台帳式純資産を同じ値と扱わず、観測額を台帳式へ加算しない。差額から実現損益、入出金、その他金融値を逆算しない。MonthlyAccountStateの台帳入力と採用元を将来共有層で利用するが、今回Summary／Top／Asset Trendへ接続しない。
+
 ### Asset
 
 **Decided**：実際の資産額推移を表示し、入出金を含む。

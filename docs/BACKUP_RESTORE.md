@@ -152,6 +152,22 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 **Decided**：v1バックアップを復元するとき、v1に存在しない新モデルの現在値を空値で消去しない。将来の新形式復元では、新旧双方の対象を検証し、HoldingSnapshotとAccountSnapshotを含めてjournalとrollbackの保護対象にする。
 
+### MonthlyAccountStateとv3の正式仕様
+
+**Decided**：最新完全バックアップをv3へ拡張し、従来dataと既存6モデルに`monthlyAccountStates`を加えた7モデルを完全保護する。未作成collectionは`null`（キー不在）とする。manual外国株／現金は既存`accountSnapshots`で保護する。ファイル名・exportedAtは変更しない。
+
+**Decided**：v2は既存6モデルの形式として固定し、7モデル形式へ意味を変更しない。過去versionの必須モデル一覧はversion別に明示し、将来のRepositoryキー一覧から自動生成しない。未知model／field／versionは拒否し、旧アプリがv3を拒否することを許容する。
+
+| Restore形式 | 正式な適用範囲 |
+|---|---|
+| v1 / Legacy | 従来対象のみ。既存6モデルとMonthlyAccountStateは変更しない |
+| v2 | 従来data＋既存6モデルを完全復元し、MonthlyAccountStateキーはクリアする |
+| v3 | 従来data＋7モデルをバックアップ内容へ完全復元する |
+
+**Decided**：v2復元で採用先が過去状態へ置換されるため、MonthlyAccountStateを残さない。このクリアも確認後の同じjournal／rollbackに含め、途中失敗時はStateを含めて元状態へ戻す。v3と将来の月次保存も新キーを同じtransactionで保護する。journal確保失敗では開始せず、再読込不一致はrollback、rollback不能時はjournalを保持して後続保存を止める。画面表示・Repository初期化から空モデルを自動保存しない。
+
+**Current**：この節のv3は正式仕様であり、Storage／Restoreへの実装は次段階で行う。Input UI・実manual保存は未接続。
+
 ## 5. 安全な復元フロー
 
 **Decided**：復元は次の順序で行う。
