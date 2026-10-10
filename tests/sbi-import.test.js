@@ -227,8 +227,8 @@ function harness(stored = {}, writable = false, saveOverride = null) {
     localStorage: storage, sessionStorage: storage, indexedDB: storage, caches: storage,
     fetch: deny, XMLHttpRequest: deny, WebSocket: deny, console: { log: deny, error: deny } });
   vm.runInContext(fs.readFileSync(path.join(root, 'import/preview.js'), 'utf8'), context);
-  async function upload(kind, text) {
-    const input = elements[kind + '-file']; input.files = [{ text, size: text.length }];
+  async function upload(kind, text, name = 'anonymous.csv') {
+    const input = elements[kind + '-file']; input.files = [{ text, size: text.length, name }];
     await input.fire('change'); await new Promise(resolve => setImmediate(resolve));
   }
   return { elements, helps, win, upload, saved, writes };
@@ -497,6 +497,48 @@ test('provider starts closed; open/close clears preview and remains reusable wit
   h.elements['sbi-provider'].open = true; await h.elements['sbi-provider'].fire('toggle');
   await h.upload('transactions', sbiTrades); assert.equal(h.elements.preview.hidden, false);
 });
+test('SBI filename examples are quiet hints in the correct slots only', () => {
+  const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
+  const slots = html.split('<div class="file-row">').slice(1);
+  assert.equal(slots.length, 2);
+  assert.ok(slots[0].includes('保有証券CSV'));
+  assert.ok(slots[0].includes('aria-describedby="holdings-file-example"'));
+  assert.ok(slots[0].includes('class="file-example">例：SaveFile.csv</p>'));
+  assert.ok(!slots[0].includes('SaveFile_数字列.csv'));
+  assert.ok(slots[1].includes('約定履歴CSV'));
+  assert.ok(slots[1].includes('aria-describedby="transactions-file-example"'));
+  assert.ok(slots[1].includes('class="file-example">例：SaveFile_数字列.csv</p>'));
+  assert.equal((html.match(/class="file-example"/g) || []).length, 2);
+  for (const file of ['sbi-parser.js', 'preview.js']) {
+    const code = fs.readFileSync(path.join(root, 'import', file), 'utf8');
+    assert.ok(!/SaveFile|file\.name|file\[\s*['"]name['"]\s*\]/.test(code));
+  }
+});
+
+test('filename hints never influence kind detection, wrong-slot rejection or Preview facts', async () => {
+  for (const name of ['SaveFile.csv', 'SaveFile_数字列.csv', 'unrelated (1).csv']) {
+    const h = harness();
+    await h.upload('holdings', sbiHoldings, name);
+    assert.equal(h.elements.preview.hidden, false);
+    assert.equal(h.elements['detail-body'].children.length, 4);
+    assert.equal(h.elements['read-status'].textContent, '');
+    await h.upload('transactions', sbiTrades, name);
+    assert.equal(h.elements.preview.hidden, false);
+    assert.equal(h.elements['detail-body'].children.length, 2);
+    await h.upload('holdings', sbiTrades, name);
+    assert.equal(h.elements.preview.hidden, true);
+    assert.equal(h.elements['read-status'].textContent, '約定履歴CSVです。約定履歴から選択してください。');
+    await h.upload('transactions', sbiHoldings, name);
+    assert.equal(h.elements.preview.hidden, true);
+    assert.equal(h.elements['read-status'].textContent, '保有証券CSVです。保有証券から選択してください。');
+    await h.upload('holdings', 'unknown,column\nfoo,bar', name);
+    assert.equal(h.elements.preview.hidden, true);
+    assert.equal(h.elements['read-status'].textContent, '対応するSBI証券CSVを確認できませんでした');
+    assert.equal(h.writes.length, 0);
+    assert.deepEqual(h.saved, {});
+  }
+});
+
 test('both wrong file slots stop preview, show concise type errors, and allow correct reselection', async () => {
   const h = harness();
   await h.upload('holdings', sbiTrades);

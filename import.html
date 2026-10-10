@@ -8,7 +8,7 @@
   <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
-  <link rel="stylesheet" href="import/preview.css?v=20261010-1">
+  <link rel="stylesheet" href="import/preview.css?v=20261010-2">
   <script defer src="import/csv-core.js?v=20261005-1"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
   <script defer src="assets/storage-transaction.js?v=20261010-1"></script>
@@ -28,11 +28,13 @@
           <div class="file-options">
             <div class="file-row">
               <div><h3>保有証券CSV</h3><button class="help" data-help="holdings">取得方法を見る</button></div>
-              <label class="file-button">ファイルを選択<input id="holdings-file" type="file" accept=".csv,text/csv" data-kind="holdings" aria-label="保有証券CSVを選択"></label>
+              <label class="file-button">ファイルを選択<input id="holdings-file" type="file" accept=".csv,text/csv" data-kind="holdings" aria-label="保有証券CSVを選択" aria-describedby="holdings-file-example"></label>
+              <p id="holdings-file-example" class="file-example">例：SaveFile.csv</p>
             </div>
             <div class="file-row">
               <div><h3>約定履歴CSV</h3><button class="help" data-help="transactions">取得方法を見る</button></div>
-              <label class="file-button">ファイルを選択<input id="transactions-file" type="file" accept=".csv,text/csv" data-kind="transactions" aria-label="約定履歴CSVを選択"></label>
+              <label class="file-button">ファイルを選択<input id="transactions-file" type="file" accept=".csv,text/csv" data-kind="transactions" aria-label="約定履歴CSVを選択" aria-describedby="transactions-file-example"></label>
+              <p id="transactions-file-example" class="file-example">例：SaveFile_数字列.csv</p>
             </div>
           </div>
           <label class="encoding">文字コード<select id="encoding"><option value="auto">自動</option><option value="utf-8">UTF-8</option><option value="shift_jis">Shift_JIS / CP932</option></select></label>
