@@ -1,13 +1,13 @@
-const CACHE_NAME = 'tradescope-static-v268';
+const CACHE_NAME = 'tradescope-static-v269';
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./history.html",
   "./import.html",
-  "./import/pdf-extractor.mjs?v=20261011-1",
+  "./import/pdf-extractor.mjs?v=20261011-2",
   "./import/gmo-parser.js?v=20261011-1",
   "./import/gmo-save.js?v=20261011-1",
-  "./import/gmo-preview.js?v=20261011-2",
+  "./import/gmo-preview.js?v=20261011-3",
   "./vendor/pdfjs-6.4.299/pdf.mjs",
   "./vendor/pdfjs-6.4.299/pdf.worker.mjs",
   "./vendor/pdfjs-6.4.299/cmaps/90ms-RKSJ-H.bcmap",

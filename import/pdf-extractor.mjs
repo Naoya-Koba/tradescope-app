@@ -4,37 +4,75 @@ const assetRoot = new URL('../vendor/pdfjs-6.4.299/', import.meta.url);
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdf.worker.mjs', assetRoot).href;
 export const version = 'pdfjs-6.4.299-legacy';
 const abort = () => new DOMException('解析を中止しました', 'AbortError');
-export async function extract(bytes, { signal, onProgress } = {}) {
+// getTextContent() uses ReadableStream async iteration, absent in some Safari releases.
+// Use the same public text stream with its broadly supported reader, without a global polyfill.
+export async function readTextItems(page, { signal, limit = 150000 } = {}) {
+  const reader = page.streamTextContent().getReader(), items = [];
+  try {
+    while (true) {
+      if (signal?.aborted) throw abort();
+      const { value, done } = await reader.read();
+      if (done) return items;
+      if (items.length + value.items.length > limit) throw new Error('PDF_TEXT_LIMIT');
+      for (const item of value.items) items.push(item);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+const safeFailure = stage => Object.assign(new Error('PDFの読み取り処理に失敗しました'), {
+  stage, code: ({ file: 'PDF_INVALID_FILE', worker: 'PDF_WORKER_INIT_FAILED',
+    document: 'PDF_DOCUMENT_LOAD_FAILED', text: 'PDF_TEXT_EXTRACTION_FAILED' })[stage]
+});
+export function createExtractor(engine) {
+ return async function extract(bytes, { signal, onProgress, onDiagnostic } = {}) {
   if (signal?.aborted) throw abort();
   if (!(bytes instanceof Uint8Array) || bytes.length > 20 * 1024 * 1024 || bytes.length < 8
-    || !new TextDecoder('ascii').decode(bytes.subarray(0, 5)).startsWith('%PDF-')) throw new Error('PDFファイルを確認してください');
-  let task;
-  const cancel = () => { if (task) void task.destroy().catch(() => {}); };
+    || !new TextDecoder('ascii').decode(bytes.subarray(0, 5)).startsWith('%PDF-')) throw safeFailure('file');
+  let task, worker, stage = 'worker', rejectAbort;
+  const aborted = new Promise((_, reject) => { rejectAbort = reject; });
+  const wait = promise => Promise.race([promise, aborted]);
+  const diagnostic = (stage, code) => { onDiagnostic?.({ stage, code }); };
+  const cancel = () => { rejectAbort(abort()); if (task) void task.destroy().catch(() => {}); worker?.destroy(); };
   signal?.addEventListener('abort', cancel, { once: true });
   try {
-    task = pdfjs.getDocument({ data: bytes, verbosity: 0, stopAtErrors: true, useWasm: false,
+    // PDF.js itself provides its official fake-worker fallback if local worker startup fails.
+    worker = new engine.PDFWorker({ verbosity: 0 });
+    await wait(worker.promise);
+    diagnostic('worker', 'PDF_WORKER_READY');
+    stage = 'document';
+    task = engine.getDocument({ data: bytes, worker, verbosity: 0, stopAtErrors: true, useWasm: false,
       disableFontFace: true, useSystemFonts: false, cMapUrl: new URL('cmaps/', assetRoot).href, cMapPacked: true });
-    const document = await task.promise;
+    const document = await wait(task.promise);
+    diagnostic('document', 'PDF_DOCUMENT_READY');
     if (document.numPages > 100) throw new Error('ページ数が多すぎます');
     const pages = []; let itemCount = 0;
     for (let number = 1; number <= document.numPages; number++) {
       if (signal?.aborted) throw abort();
-      const page = await document.getPage(number);
-      const content = await page.getTextContent();
-      itemCount += content.items.length;
-      if (itemCount > 150000) throw new Error('PDFの内容が多すぎます');
-      pages.push({ number, items: content.items.filter(item => typeof item.str === 'string').map(item => ({
-        text: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height })) });
-      page.cleanup(); onProgress?.(number, document.numPages);
+      stage = 'document';
+      const page = await wait(document.getPage(number));
+      stage = 'text';
+      try {
+        const items = await wait(readTextItems(page, { signal, limit: 150000 - itemCount }));
+        itemCount += items.length;
+        pages.push({ number, items: items.filter(item => typeof item.str === 'string').map(item => ({
+          text: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height })) });
+      } finally { page.cleanup(); }
+      onProgress?.(number, document.numPages);
     }
     if (signal?.aborted) throw abort();
+    diagnostic('text', 'PDF_TEXT_READY');
     return { pages, extractorVersion: version };
   } catch (_) {
     if (signal?.aborted) throw abort();
     // Library errors can contain source fragments/URLs. Do not expose them or log them.
-    throw new Error('PDFを解析できません。対応する月次報告書を確認してください');
+    throw safeFailure(stage);
   } finally {
     signal?.removeEventListener('abort', cancel);
     if (task) await task.destroy().catch(() => {});
+    worker?.destroy();
   }
+ };
 }
+export const extract = createExtractor(pdfjs);

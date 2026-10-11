@@ -12,6 +12,10 @@ PDFの読み取り検証とlocalhost／匿名操作を用い、実PDFはparser-o
 
 **Current / 共通PDF基盤**：PDF.js 6.4.299 legacyのmain／local workerと実帳票で必要だった日本語CMap二つを固定vendorし、公式SHA-256を照合した。LICENSEを保持する。`import/pdf-extractor.mjs`はページ番号・文字列・位置だけを一時メモリへ返し、broker解釈・描画・保存・外部送信をしない。20MB／100ページ／150000 item上限と中止・worker cleanupを持つ。CSPは同一origin静的資産とworkerのみ許可し、unsafe-eval／CDN／WASMを使わない。オフラインnavigationは要求されたキャッシュ済みページを先に返す。実iPhone未確認。
 
+**Current / Safari互換修正**：`getTextContent()`内部のStream非同期反復を使わず、同じ公開`streamTextContent()`を`getReader().read()`で読み取る（[PDF.js公式issue #20973](https://github.com/mozilla/pdf.js/issues/20973)）。通常のmodule workerとPDF.js公式fake-worker fallbackは維持し、UA分岐・global polyfill・vendor改変を行わない。worker readiness・document load・text extractionを分離し、中止／終了時にreader・page・task・workerを解放する。
+
+読み取り失敗はfile／engine／worker／document／text／GMO detector／parser／validation／保存前確認を区別する固定codeと短い文言で表示する。診断は画面内のstage／codeのみとし、例外message・stack・PDF本文・PII・URLを出力／保存しない。金融Parser・保存・Backup仕様は変更しない。実iPhone Safari／PWAでの修正後確認は別途必要。
+
 **Current / resolver基盤**：口座policyとadapterを分離し、画面別broker計算を追加しない。SBIは従来結果を維持し、GMOも2026-09からproduction計算で有効。State・採用Snapshot・関連Batch・policy versionをfingerprintへ含める。
 
 ## 月次schema互換（Current）

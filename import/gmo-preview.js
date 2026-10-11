@@ -3,6 +3,24 @@
   const $ = id => document.getElementById(id);
   let controller = null, token = 0;
   let source = null, service = null, outcome = null, busy = false, opening = false, confirmation = null;
+  const readErrors = Object.freeze({
+    PDF_FILE_READ_FAILED: 'PDFファイルを読み取れませんでした',
+    PDF_INVALID_FILE: 'PDFファイルを確認してください',
+    PDF_FILE_HASH_FAILED: 'PDFファイルを確認できませんでした',
+    PDF_ENGINE_LOAD_FAILED: 'PDFの読み取り処理を開始できませんでした',
+    PDF_WORKER_INIT_FAILED: 'PDFの読み取り処理を開始できませんでした',
+    PDF_DOCUMENT_LOAD_FAILED: 'PDFを開けませんでした',
+    PDF_TEXT_EXTRACTION_FAILED: 'PDFの文字を読み取れませんでした',
+    GMO_DOCUMENT_NOT_RECOGNIZED: 'GMO月次取引残高報告書として認識できませんでした',
+    GMO_PARSE_FAILED: '必要な月次項目を読み取れませんでした',
+    GMO_VALIDATION_FAILED: '月次項目を確認できませんでした',
+    GMO_STORAGE_CHECK_FAILED: '保存データを確認できません。再読み込みしてください'
+  });
+  function diagnostic(stage, code) {
+    // Only controlled stage/code values; no underlying exception, document text or URL.
+    $('gmo-read-status').dataset.stage = stage;
+    $('gmo-read-status').dataset.errorCode = code;
+  }
   function saveService() {
     if (!service) service = TradeScopeGMOSave.createService(TradeScopeDataStorage.localStorageAdapter(localStorage));
     return service;
@@ -34,6 +52,7 @@
     $('gmo-preview').hidden = true; $('gmo-cancel-read').hidden = true;
     $('gmo-summary').replaceChildren(); $('gmo-issues').replaceChildren();
     $('gmo-read-status').textContent = ''; $('gmo-file').value = '';
+    delete $('gmo-read-status').dataset.stage; delete $('gmo-read-status').dataset.errorCode;
   }
   function render(preview) {
     $('gmo-preview').hidden = false;
@@ -50,24 +69,43 @@
     const file = event.target.files[0]; if (!file) return;
     clear(); const current = token; controller = new AbortController();
     const signal = controller.signal; $('gmo-read-status').textContent = '解析中…'; $('gmo-cancel-read').hidden = false;
+    let stage = 'file', code = 'PDF_FILE_READ_FAILED';
     try {
-      if (file.size > 20 * 1024 * 1024) throw new Error('PDFファイルを確認してください');
+      if (file.size > 20 * 1024 * 1024) { code = 'PDF_INVALID_FILE'; throw new Error(); }
       const bytes = new Uint8Array(await file.arrayBuffer());
+      code = 'PDF_FILE_HASH_FAILED';
       const fileHash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
-      const extractor = await import('./pdf-extractor.mjs?v=20261011-1');
-      const extracted = await extractor.extract(bytes, { signal, onProgress: (page, pages) => {
+      stage = 'engine'; code = 'PDF_ENGINE_LOAD_FAILED';
+      const extractor = await import('./pdf-extractor.mjs?v=20261011-2');
+      stage = 'document'; code = 'PDF_DOCUMENT_LOAD_FAILED';
+      const extracted = await extractor.extract(bytes, { signal, onDiagnostic: value => {
+        if (current === token) diagnostic(value.stage, value.code);
+      }, onProgress: (page, pages) => {
         if (current === token) $('gmo-read-status').textContent = `解析中… ${page}/${pages}`;
       } });
       if (current !== token) return;
+      stage = 'detector'; code = 'GMO_DOCUMENT_NOT_RECOGNIZED';
+      if (!TradeScopeGMOParser.detect(extracted)) throw new Error();
+      stage = 'parser'; code = 'GMO_PARSE_FAILED';
       const preview = TradeScopeGMOParser.parse(extracted);
+      stage = 'validation'; code = 'GMO_VALIDATION_FAILED';
       render(preview);
+      if (!preview.valid) { diagnostic(stage, code); return; }
       source = { preview, fileHash, fileSize: file.size };
+      stage = 'storage-check'; code = 'GMO_STORAGE_CHECK_FAILED';
       outcome = preview.valid ? await saveService().inspect(source) : null;
-      if (current === token) renderSave();
-    } catch (_) {
+      if (current === token) { diagnostic('preview', 'GMO_PREVIEW_READY'); renderSave(); }
+    } catch (failure) {
       if (current === token && !signal.aborted) {
+        // Accept only extractor's known safe codes/stages, never the library's message/stack.
+        if (['PDF_INVALID_FILE', 'PDF_WORKER_INIT_FAILED', 'PDF_DOCUMENT_LOAD_FAILED', 'PDF_TEXT_EXTRACTION_FAILED'].includes(failure?.code)) {
+          code = failure.code; stage = ({ PDF_INVALID_FILE: 'file', PDF_WORKER_INIT_FAILED: 'worker',
+            PDF_DOCUMENT_LOAD_FAILED: 'document', PDF_TEXT_EXTRACTION_FAILED: 'text' })[code];
+        }
+        diagnostic(stage, code);
+        source = null; outcome = null; renderSave();
         $('gmo-preview').hidden = false;
-        $('gmo-issues').append(node('p', 'PDFを解析できません。対応する月次報告書を確認してください', 'issue error'));
+        $('gmo-issues').replaceChildren(node('p', `${readErrors[code]}（${code}）`, 'issue error'));
       }
     } finally {
       if (current === token) { controller = null; $('gmo-read-status').textContent = ''; $('gmo-cancel-read').hidden = true; }

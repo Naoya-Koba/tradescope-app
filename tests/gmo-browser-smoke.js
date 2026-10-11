@@ -44,13 +44,54 @@
       pdfWorker: requests.some(r => r.url.endsWith('/pdf.worker.mjs')), importOffline: Boolean(cache && await cache.match('../import.html', { ignoreSearch: true })),
       duplicatePaths: requests.map(r => new URL(r.url).pathname).filter((p,i,a) => a.indexOf(p) !== i && !p.endsWith('/')) });
   };
-  document.getElementById('extract').onclick = async () => {
+  async function extract(mode) {
+    const descriptor = Object.getOwnPropertyDescriptor(ReadableStream.prototype, Symbol.asyncIterator), originalWorker = window.Worker;
+    const workerAttempts = [];
     try {
-      const extractor = await import('../import/pdf-extractor.mjs?v=20261011-1');
-      const extracted = await extractor.extract(AnonymousGMOFixture.pdfBytes());
+      if (mode === 'safari') delete ReadableStream.prototype[Symbol.asyncIterator];
+      window.Worker = mode === 'fallback' ? class { constructor(url) { workerAttempts.push(new URL(url).pathname); throw new Error('Anonymous worker startup failure'); } }
+        : class extends originalWorker { constructor(url, options) { super(url, options); workerAttempts.push(new URL(url).pathname); } };
+      const extractor = await import('../import/pdf-extractor.mjs?v=20261011-2'), stages = [];
+      const extracted = await extractor.extract(AnonymousGMOFixture.pdfBytes(), { onDiagnostic: value => stages.push(value) });
       const preview = TradeScopeGMOParser.parse(extracted);
-      show({ pages: extracted.pages.length, valid: preview.valid, errors: preview.errors.length, warnings: preview.warnings.length });
-    } catch (_) { show({ extractionFailed: true }); }
+      show({ mode, stages, workerAttempts, pages: extracted.pages.length, valid: preview.valid, errors: preview.errors.length, warnings: preview.warnings.length,
+        storageUnchanged: keys.every(key => localStorage.getItem(key) === original.get(key)) });
+    } catch (failure) { show({ extractionFailed: true, code: failure.code || 'PDF_ENGINE_LOAD_FAILED' }); }
+    finally {
+      if (descriptor) Object.defineProperty(ReadableStream.prototype, Symbol.asyncIterator, descriptor);
+      window.Worker = originalWorker;
+    }
+  }
+  document.getElementById('extract').onclick = () => extract('normal');
+  document.getElementById('safari-extract').onclick = () => extract('safari');
+  document.getElementById('fallback-extract').onclick = () => extract('fallback');
+  document.getElementById('app-extract').onclick = () => {
+    const frame = document.createElement('iframe'); frame.style.cssText = 'width:100%;height:700px;border:0';
+    frame.onload = () => {
+      const input = frame.contentDocument.getElementById('gmo-file');
+      const transfer = new DataTransfer(); transfer.items.add(new File([AnonymousGMOFixture.pdfBytes()], 'anonymous.pdf', { type:'application/pdf' }));
+      frame.contentDocument.getElementById('gmo-provider').open = true;
+      input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles:true }));
+    };
+    frame.src = '../import.html'; document.querySelector('iframe')?.remove(); document.body.append(frame);
+  };
+  document.getElementById('app-inspect').onclick = () => {
+    const child = document.querySelector('iframe')?.contentDocument;
+    const status = child?.getElementById('gmo-read-status');
+    show({ stage:status?.dataset.stage, code:status?.dataset.errorCode,
+      issues:child?.getElementById('gmo-issues').children.length, saveAvailable:child?.getElementById('gmo-save').hidden === false,
+      viewportWidth:child?.documentElement.clientWidth, scrollWidth:child?.documentElement.scrollWidth,
+      storageUnchanged:keys.every(key => localStorage.getItem(key) === original.get(key)),
+      externalResources:performance.getEntriesByType('resource').filter(r => new URL(r.name).origin !== location.origin).length });
+  };
+  document.getElementById('register').onclick = async () => {
+    await navigator.serviceWorker.register('../service-worker.js');
+    await navigator.serviceWorker.ready; show({ registered:true });
+  };
+  document.getElementById('sw-cleanup').onclick = async () => {
+    for (const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister();
+    for (const name of await caches.keys()) if (name.startsWith('tradescope-static-')) await caches.delete(name);
+    show({ testCacheCleaned:true, storageUnchanged:keys.every(key => localStorage.getItem(key) === original.get(key)) });
   };
   document.getElementById('cleanup').onclick = () => {
     if (!prepared) { show({ refused: 'not prepared in this session' }); return; }
