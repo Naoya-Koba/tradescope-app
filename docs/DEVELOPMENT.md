@@ -6,6 +6,12 @@
 
 `tests/monthly-display.test.js`は匿名のGMO完全／SBI部分／旧月口座、nullと0、複数候補、指標別sourceMonth、無書込、canonical回帰を検証する。`tests/monthly-display-browser.*`はlocalhost専用の架空Storageとcleanupであり、production導線／precacheには含めない。実金融データ・実Backupを使用しない。
 
+## Current — Inputレイアウト統一と手修正境界
+
+`assets/monthly-input-ui.js`の共通DOM描画で取込済みの基本5項目を既存form-groupと同じ見た目にする。読み取り専用controlには`.input-account`やDraft fieldを付けず、legacy保存収集へ混入させない。GMOは決済・swap・評価・入出金の採用値を表示し、手修正は接続しない。SBIは既存Draftの決済・入出金編集／保存serviceを維持し、swap・評価をread-only、国内／外国／現金を補助欄へ置く。Stateなしのswapは「—」で、表示から0を作らない。1〜8月のlegacyフォームは変更しない。
+
+**Under consideration**：PDF原値と採用値を別管理する将来手修正はDATA_MODELの監査案を参照する。現行Snapshotで未保持のswap／入出金原値、Stateのoverride metadata、旧v4受理範囲の固定が課題である。schema／Backup拡張を別工程で設計し、現行reportedMonthlyRealizedPnl一致規則を黙って緩めない。
+
 ## Current — GMO月次取込の完成範囲
 
 `import/gmo-parser.js`はGMO帳票判定・金融値のallowlist出口、`import/gmo-preview.js`は選択・中止・Preview・確認・状態表示、`import/gmo-save.js`は保存直前のValidation／旧入力競合／exact hash／明示訂正／一括保存を担当する。画面側はStorage writeしない。共通resolverの口座policyとadapterにより全画面へ接続し、GMO cutover後のInputはPDF採用値のread-only表示と取込入口だけにする。PDF保存だけでlegacy monthly・履歴を変更しない。

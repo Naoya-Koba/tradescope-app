@@ -4,16 +4,16 @@
     const data = root.TradeScopeDataStorage, resolver = root.TradeScopeMonthlyResolver;
     const service = root.TradeScopeSbiMonthlySave.createService(adapter);
     const inputView = root.TradeScopeSbiInput;
-    const fields = [['foreignAssetValue', '評価額', 'number'], ['foreignUnrealizedPnl', '評価損益', 'number'], ['foreignDate', '取得日', 'date'],
-      ['cashBalance', '残高', 'number'], ['cashDate', '取得日', 'date'],
-      ['realizedPnL', '実現損益', 'number'], ['deposit', '入金', 'number'], ['withdrawal', '出金', 'number']];
+    const fields = [['realizedPnL', '決済損益', 'number'], ['deposit', '入金', 'number'], ['withdrawal', '出金', 'number'],
+      ['foreignAssetValue', '評価額', 'number'], ['foreignUnrealizedPnl', '評価損益', 'number'], ['foreignDate', '取得日', 'date'],
+      ['cashBalance', '残高', 'number'], ['cashDate', '取得日', 'date']];
     function savedDraft(resolved) {
       return { foreignAssetValue: resolved.foreign?.assetValue ?? '', foreignUnrealizedPnl: resolved.foreign?.unrealizedPnl ?? '',
         foreignDate: resolved.foreign?.snapshotAsOf?.slice(0, 10) ?? '', cashBalance: resolved.cash?.cashBalance ?? '',
         cashDate: resolved.cash?.snapshotAsOf?.slice(0, 10) ?? '', realizedPnL: resolved.state?.realizedPnl ?? '',
         deposit: resolved.state?.deposit ?? '', withdrawal: resolved.state?.withdrawal ?? '' };
     }
-    function renderCard(account, view, targetMonth, label) {
+    function renderCard(account, view, targetMonth, label, monthlyView = null) {
       let models = null, resolved = null;
       try { models = data.createRepository({ getItem: key => adapter.getItem(key) }).read();
         resolved = resolver.resolve(models, legacyData(), targetMonth); } catch (_) { /* Fail closed; never seed. */ }
@@ -31,18 +31,26 @@
       const values = drafts.read(targetMonth);
       const controls = {};
       for (const [field, title, type] of fields) {
-        if (['foreignAssetValue', 'cashBalance', 'realizedPnL'].includes(field)) {
+        if (field === 'foreignAssetValue') body.appendChild(card.querySelector('.sbi-domestic-input'));
+        if (['foreignAssetValue', 'cashBalance'].includes(field)) {
           const heading = document.createElement('div'); heading.className = 'sbi-manual-heading';
-          heading.textContent = field === 'foreignAssetValue' ? '外国証券' : field === 'cashBalance' ? '現金・預り金' : '月次'; body.appendChild(heading);
+          heading.textContent = field === 'foreignAssetValue' ? '外国証券' : '現金・預り金'; body.appendChild(heading);
         }
         const group = document.createElement('div'); group.className = 'form-group';
         const labelElement = document.createElement('label'), control = document.createElement('input');
         control.id = `sbi-draft-${field}`; control.type = type; control.className = 'input-account';
         control.dataset.account = 'sbi'; control.dataset.field = field; control.dataset.draft = 'sbi';
-        control.value = values[field] ?? ''; if (type === 'number') control.step = 'any';
+        control.value = values[field] ?? ''; if (type === 'number') { control.step = 'any'; control.placeholder = '—'; }
         labelElement.htmlFor = control.id; labelElement.textContent = title; group.append(labelElement, control);
         if (type === 'number') { const suffix = document.createElement('span'); suffix.className = 'suffix'; suffix.textContent = '¥'; group.appendChild(suffix); }
         body.appendChild(group); controls[field] = control;
+        if (field === 'realizedPnL') {
+          // Swap is only explicit zero once the State exists; no zero is created by rendering.
+          body.appendChild(root.TradeScopeMonthlyInputUI.readOnlyField(document, 'swapPnL', 'スワップ損益', resolved?.state?.swapPnl ?? null, 'sbi-monthly'));
+          const unrealized = monthlyView ? monthlyView.unrealized
+            : resolved?.completeness?.complete ? resolved.unrealizedPnl : view.unrealizedPnl;
+          body.appendChild(root.TradeScopeMonthlyInputUI.readOnlyField(document, 'unrealizedPnL', '評価損益', unrealized, 'sbi-monthly'));
+        }
       }
       const actions = document.createElement('div'); actions.className = 'sbi-monthly-actions';
       const button = document.createElement('button'); button.type = 'button'; button.className = 'sbi-monthly-save'; button.textContent = '保存';

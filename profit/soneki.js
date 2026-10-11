@@ -2179,7 +2179,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
             <span class="v"${optionalSignStyle(netAssets)}>${formatOptionalJPY(netAssets)}</span>
           </div>
         </div>
-        ${view.components.map(monthlyComponentHtml).join('')}
+        ${account.key === 'sbi' ? view.components.map(monthlyComponentHtml).join('') : ''}
       </div>
     `;
   }).join('');
@@ -2352,10 +2352,13 @@ function renderAccountInputs() {
       card.querySelector('.monthly-account-label').textContent = displayAccountName('gmo');
       card.querySelector('.account-color-dot').style.backgroundColor = account.color;
       const values = card.querySelector('.monthly-import-values');
+      const displayed = monthlyDisplayView().accountMonth(currentYear, currentMonth, account);
+      window.TradeScopeMonthlyInputUI.renderReadOnly(document, values, {
+        realizedPnL: displayed.realized, swapPnL: displayed.swap, unrealizedPnL: displayed.unrealized,
+        deposit: displayed.deposit, withdrawal: displayed.withdrawal
+      }, 'gmo-monthly');
       if (resolved.source === 'canonical') {
-        for (const [label, field] of [['決済損益', 'realizedPnl'], ['スワップ', 'swapPnl'], ['評価損益', 'unrealizedPnl']]) {
-          const line = document.createElement('p'); line.textContent = `${label}　${sbiInput.formatYen(resolved[field])}`; values.appendChild(line);
-        }
+        const status = document.createElement('small'); status.className = 'monthly-import-status'; status.textContent = '取込済み'; values.appendChild(status);
       } else {
         const message = document.createElement('p'); message.textContent = resolved.source === 'conflict' ? '従来入力または月次データを確認してください' : '月次PDFを取り込んでください'; values.appendChild(message);
       }
@@ -2542,7 +2545,8 @@ function handleAccountInputFocus(event) {
 }
 
 function renderSbiDraftCard(account) {
-  return sbiMonthlyUI.renderCard(account, sbiInputView, inputTargetMonth(), displayAccountName(account.key));
+  return sbiMonthlyUI.renderCard(account, sbiInputView, inputTargetMonth(), displayAccountName(account.key),
+    monthlyDisplayView().accountMonth(currentYear, currentMonth, account));
 }
 
 function handleAccountInputBlur(event) {

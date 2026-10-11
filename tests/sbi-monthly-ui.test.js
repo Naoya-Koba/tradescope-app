@@ -2,6 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm');
 const model = require('../assets/data-model-storage.js'), input = require('../assets/sbi-input-draft.js');
 const resolver = require('../assets/monthly-account-resolver.js'), service = require('../assets/sbi-monthly-save.js');
+const monthlyInput = require('../assets/monthly-input-ui.js');
 const now = '2026-10-04T12:00:00Z', env = records => ({schemaVersion:1,records,updatedAt:now});
 const fields = {foreignAssetValue:'0',foreignUnrealizedPnl:'0',foreignDate:'2026-10-04',cashBalance:'0',cashDate:'2026-09-30',realizedPnL:'0',deposit:'0',withdrawal:'0'};
 class Element {
@@ -12,7 +13,7 @@ class Element {
  appendChild(node) { this.append(node); return node; }
  addEventListener(name,fn) { this.listeners[name]=fn; }
  set innerHTML(value) {
-   this.parts=Object.fromEntries(['.sbi-account-label','.account-color-dot','.sbi-domestic-value','.sbi-domestic-pnl','.sbi-import-status','.sbi-domestic-date','.account-body'].map(key=>[key,new Element('div')]));
+   this.parts=Object.fromEntries(['.sbi-account-label','.account-color-dot','.sbi-domestic-input','.sbi-domestic-value','.sbi-domestic-pnl','.sbi-import-status','.sbi-domestic-date','.account-body'].map(key=>[key,new Element('div')]));
  }
  querySelector(selector) { return this.parts[selector]; }
 }
@@ -26,7 +27,7 @@ function harness(mutator = () => {}) {
  const values={tradingData:'{}',...Object.fromEntries(Object.entries(models).filter(([,v])=>v).map(([key,v])=>[model.keys[key],JSON.stringify(v)]))};
  const adapter={getItem:key=>values[key]??null,setItem:(key,v)=>{values[key]=v;},removeItem:key=>{delete values[key];}};
  const drafts=input.createDrafts(), document={createElement:tag=>new Element(tag)};
- const context=vm.createContext({document,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service});
+ const context=vm.createContext({document,TradeScopeMonthlyInputUI:monthlyInput,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service});
  vm.runInContext(fs.readFileSync(require.resolve('../assets/sbi-monthly-ui.js'),'utf8'),context);
  let card, saved=0;
  const controller=context.TradeScopeSbiMonthlyUI.createController({adapter,drafts,legacyData:()=>JSON.parse(values.tradingData),onSaved:()=>{saved++;render();}});
@@ -37,13 +38,28 @@ function harness(mutator = () => {}) {
  const status=()=>children().find(el=>el.className==='sbi-monthly-status').textContent;
  const error=()=>children().find(el=>el.className==='sbi-monthly-error');
  function fill(field,value) { const el=control(field);el.value=value;el.listeners.input(); }
- render(); return {values,adapter,drafts,render,control,button,status,error,fill,fillAll:()=>Object.entries(fields).forEach(([k,v])=>fill(k,v)),saved:()=>saved,card:()=>card};
+ render(); return {values,adapter,drafts,render,control,button,status,error,fill,children,fillAll:()=>Object.entries(fields).forEach(([k,v])=>fill(k,v)),saved:()=>saved,card:()=>card};
 }
 test('Input rendering and editing remain detached; blanks have no zero placeholder',()=>{
  const h=harness(), before=JSON.stringify(h.values);h.fillAll();
  assert.equal(JSON.stringify(h.values),before);assert.equal(h.saved(),0);
- for(const key of Object.keys(fields))assert.equal(h.control(key).placeholder,undefined);
+ for(const key of Object.keys(fields))assert.equal(h.control(key).placeholder,key.endsWith('Date')?undefined:'—');
  assert.equal(h.drafts.read('2026-09').realizedPnL,'0');
+});
+test('SBI basic fields precede supplementary domestic/foreign/cash with missing swap',()=>{
+ const h=harness(),before=JSON.stringify(h.values);
+ const groups=h.children().filter(el=>el.className==='form-group');
+ assert.deepEqual(groups.slice(0,5).map(group=>group.children[0].textContent),['決済損益','スワップ損益','評価損益','入金','出金']);
+ const readonly=h.children().filter(el=>el.readOnly);
+ assert.equal(readonly.find(el=>el.dataset.monthlyField==='swapPnL').value,'');
+ assert.equal(readonly.find(el=>el.dataset.monthlyField==='unrealizedPnL').value,'0');
+ assert.ok(readonly.every(el=>!el.className.split(' ').includes('input-account')));
+ assert.equal(JSON.stringify(h.values),before);
+});
+test('SBI explicit saved swap zero is displayed without introducing an editable swap path',()=>{
+ const h=harness();h.fillAll();h.button().listeners.click();
+ const swap=h.children().find(el=>el.dataset.monthlyField==='swapPnL');assert.equal(swap.value,'0');assert.equal(swap.readOnly,true);
+ assert.equal(h.drafts.read('2026-09').swapPnL,undefined);
 });
 test('explicit-zero save verifies before saved status, hides action, and reload rehydrates',()=>{
  const h=harness();h.fillAll();h.button().listeners.click();

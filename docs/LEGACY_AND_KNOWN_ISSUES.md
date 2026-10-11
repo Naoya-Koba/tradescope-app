@@ -6,6 +6,8 @@ TopとMonthly Summaryに非永続の表示Viewを追加済み。Topは当月部�
 
 **Known issue**：複数国内候補の選択、PDF原値と採用値を分離したユーザー手修正、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。
 
+**Current**：GMO／SBI新方式Inputを既存フォーム型へ統一した。GMOはread-only、SBIの既存Draft保存は維持する。PDF手修正監査では現行State v2／Snapshotの原値不足・metadata未対応を確認したため、schema／Backup v4を変更せず、将来拡張案だけをDATA_MODELへ記載した。
+
 ## Current / Known issue — GMO PDF
 
 **Current / Safari互換**：一部Safariで未対応の`ReadableStream[Symbol.asyncIterator]`をPDF.js legacyの`getTextContent()`が使用し、document／page読込後のtext extractionで失敗する経路を匿名fixtureで再現した。公開Stream reader経路へ切替済み。固定safe codeで失敗段階を識別し、PDF本文・PII・元例外は露出しない。worker／CMap／CSPを原因と断定せず、実iPhoneでの修正後確認は未実施。

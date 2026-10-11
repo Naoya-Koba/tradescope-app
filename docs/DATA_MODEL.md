@@ -6,6 +6,12 @@
 
 TopはmetricごとにsourceMonthと使用状態をメモリに保持する。未入力成分の非加算は暫定表示だけの意味であり、0保存、legacyコピー、State生成をしない。表示Viewのための保存キー・schema・Backup変更はない。
 
+## Under consideration — PDF原値とユーザー採用値の分離監査
+
+現行AccountSnapshotはPDFのreportedMonthlyRealizedPnlを保持するが、月間swap・外部入金・外部出金の原値を独立して保持していない。MonthlyAccountState record v2には手修正を識別するmetadataがなく、GMOの報告決済損益と採用決済損益の一致をRepositoryとresolver双方で必須検証する。Stateだけの数値変更や一致Validationの緩和では原値保護・変更判別を満たさないため、現行schema／Backup v4のまま安全な一般手修正UIを接続しない。
+
+将来案：Snapshotへ月間swap／外部入出金の報告原値をallowlistで追加し、Stateの採用値を別管理する。変更項目・変更日時（必要なら理由）をStateの限定metadataとして持ち、原観測は不変に保つ。新record schemaとpolicyを明示し、旧v2の一致規則を維持する。公開済みv4の受理意味を拡張せず、導入時はBackup v5と旧v1〜v4互換・journal／rollbackの検証が必要となる方向。ただしfield名、原値の格納場所、override schema、採用条件は未確定で、今回は実装しない。
+
 ## Current / Decided — GMO正式月末採用
 
 GMOの正本取込元は月次取引残高報告書PDFのみ。明示保存でImportBatch（sourceType=pdf／sourceProvider=gmo／hash・size／importerVersionのみ、sourceScope・filename・原本なし）、AccountSnapshot（imported／gmo-fx-monthly-report／officialMonthEnd／JPY）、MonthlyAccountState record v2を一回のRepository transactionで追加・確定する。Accountは保存時だけ必要なら作成する。

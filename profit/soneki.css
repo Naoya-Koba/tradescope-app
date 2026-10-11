@@ -2210,6 +2210,8 @@ body.drawer-open {
 
 /* SBI monthly Draft: keep numeric/date controls within the existing account card. */
 .sbi-manual-heading { margin: 18px 0 10px; font-size: 13px; color: var(--muted, #9aa6b2); }
+.input-monthly-readonly { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.monthly-import-status { display: block; margin: 6px 0 10px; color: var(--muted, #9aa6b2); font-size: 11px; }
 .account-body[data-account-body="sbi"].open { max-height: 1000px; }
 .account-body[data-account-body="sbi"] .form-group { min-width: 0; }
 .account-body[data-account-body="sbi"] .input-account { min-width: 0; max-width: 100%; }
