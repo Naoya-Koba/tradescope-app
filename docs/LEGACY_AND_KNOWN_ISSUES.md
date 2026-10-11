@@ -1,5 +1,7 @@
 # Legacy, Experimental, and Known Issues
 
+**Current / v4互換**：最新Exportはv4で、旧SBI recordと新汎用採用recordを保護する。v3は旧record限定、v2は月次Stateクリア、v1は新モデル維持。GMO取込・集計は後続段階。PII・原本保存・自動Migrationは行わない。
+
 この文書は、2026-09-26時点のコード読取結果を記録する。ここへの記載は修正済みを意味しない。
 
 ## 1. 重要な仕様差異・既知の問題
@@ -7,12 +9,12 @@
 ### SBI月次cutover
 
 - **Decided**：2026-08以前はlegacyを維持、2026-09以降は月次状態と明示採用先を用いる。意味のあるlegacy月次入力があればconflictで停止し、placeholderや他口座由来の`__saved`ではSBI確定にしない。欠損月を累積値へ0で補わない。
-- **Current（内部基盤）**：共有resolver・completeness・保存service・訂正・canonical依存fingerprintを匿名fixtureで検証する。UI／全画面接続は次段階。
+- **Current**：共有resolver・completeness・保存service・訂正・canonical依存fingerprintとSBI Input UI／Summary／Top／Trendは接続済み。
 - **Known issue**：旧全ゼロ月の入力由来は保存形状だけでは確定できない。自動Migration・削除はせず、直接月次入力の有限な非ゼロ値をlegacy conflictの根拠とする。複数タブ完全排他・容量・実機iPhoneは引き続き別途確認する。
 
 ### 完全バックアップv3・v2／v1互換とLegacy部分復元
 
-- **Current**：トップexportは`backupVersion: 3`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、SBIの2026年9月以降のInput UI・manual月次保存・共有集計も接続済み。
+- **Current**：トップexportは`backupVersion: 4`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、SBIの2026年9月以降のInput UI・manual月次保存・共有集計も接続済み。
 - **Current**：v3、v2、v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
 - **Current**：v3は7モデルを完全復元し、v2は従来6モデルを復元して月次状態を同一journalでクリアする。v1は従来対象を復元して7モデルを維持する。旧形式は部分復元で未収録項目を維持する。
 - **Current**：復元前ジャーナル、書き込み後検証、失敗時ロールバック、Summary Snapshot無効化、空データ復元時のダミー投入抑止を行う。

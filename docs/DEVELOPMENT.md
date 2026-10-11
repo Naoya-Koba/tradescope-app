@@ -1,5 +1,11 @@
 # Development Guide
 
+## 月次schema互換（Current）
+
+汎用採用参照はMonthlyAccountState record v2、envelope v1、Backup v4とする。v3の旧record Validatorを固定し、Repository拡張で旧Backupの受理範囲を広げない。GMO取込は後続実装であり、既存SBI接続は維持する。
+
+**Decided**：銘柄表示名更新はstable ID／code／tickerと分離する。現在保有の表示名は更新可能、過去取引の名称は当時表記を保持し、名称変更だけのInstrument増殖・履歴上書きを行わない。
+
 ## 1. 現在の技術構成
 
 **Current**：

@@ -6,7 +6,8 @@
   // Released Backup schemas are fixed lists, not derived from current Repository keys.
   const backupModelEntities = Object.freeze({
     2: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']),
-    3: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates'])
+    3: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
+    4: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -114,7 +115,11 @@
     }
   };
   function validateRecord(entity, record) {
-    const definition = definitions[entity]; if (!definition) fail();
+    let definition = definitions[entity]; if (!definition) fail();
+    if (entity === 'monthlyAccountStates' && record?.schemaVersion === 2) {
+      definition = { ...definition, required: [...definition.required, 'schemaVersion', 'adoptedAccountSnapshotId'],
+        types: { ...definition.types, schemaVersion: value => value === 2, adoptedAccountSnapshotId: id } };
+    }
     assertJson(record); fields(record, Object.keys(definition.types), definition.required);
     for (const [field, value] of Object.entries(record)) {
       // Required identity/source fields cannot be null; unknown financial/date observations can.
@@ -185,6 +190,10 @@
       const sameMonth = record => record && record.accountId === state.accountId && record.targetMonth === state.targetMonth;
       const hasSbiReferences = ['domesticImportBatchId', 'foreignAccountSnapshotId', 'cashAccountSnapshotId']
         .some(field => state[field] !== null);
+      if (state.schemaVersion === 2) {
+        if (hasSbiReferences) fail();
+        validateAdoptedSnapshot(state, account, snapshots, batches);
+      }
       if (hasSbiReferences && (account.providerCode !== 'sbi' || account.accountType !== 'securities')) fail();
       if (state.domesticImportBatchId !== null) {
         const batch = batches.get(state.domesticImportBatchId);
@@ -203,9 +212,34 @@
     return true;
   }
   function validateModels(models) { return validateModelSet(models, Object.keys(keys)); }
+  // Only implemented policies can adopt a whole-account observation. Future brokers are not implicitly enabled.
+  const adoptionPolicies = Object.freeze({ gmo: Object.freeze({ accountType: 'fx', sourceScope: 'gmo-fx-monthly-report',
+    sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY', sourceType: 'pdf' }) });
+  function validateAdoptedSnapshot(state, account, snapshots, batches) {
+    const policy = adoptionPolicies[account.providerCode], snapshot = snapshots.get(state.adoptedAccountSnapshotId);
+    if (!policy || account.accountType !== policy.accountType || !snapshot
+      || snapshot.accountId !== state.accountId || snapshot.targetMonth !== state.targetMonth) fail();
+    for (const field of ['sourceScope', 'sourceMode', 'observationType', 'valuationCurrency']) if (snapshot[field] !== policy[field]) fail();
+    const batch = batches.get(snapshot.importBatchId);
+    const [year, month] = state.targetMonth.split('-').map(Number);
+    const lastDay = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+    if (!batch || batch.sourceProvider !== account.providerCode || batch.sourceType !== policy.sourceType
+      || snapshot.snapshotAsOf !== lastDay || state.targetMonth < '2026-09'
+      || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)
+      || !equalDecimal(snapshot.reportedMonthlyRealizedPnl, state.realizedPnl)) fail();
+  }
+  function equalDecimal(a, b) {
+    const canonical = value => value.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '').replace(/^-0$/, '0');
+    return canonical(a) === canonical(b);
+  }
   function validateBackupModels(version, models) {
     const entities = backupModelEntities[version];
     if (!entities) fail();
+    // Released v3 permits only the original State fields, even after Repository evolution.
+    if (version < 4) for (const record of models?.monthlyAccountStates?.records || []) {
+      fields(record, Object.keys(definitions.monthlyAccountStates.types), definitions.monthlyAccountStates.required);
+      if (own(record, 'schemaVersion') && record.schemaVersion !== 1) fail();
+    }
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }

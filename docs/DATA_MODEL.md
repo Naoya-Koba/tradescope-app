@@ -1,5 +1,11 @@
 # Data Model
 
+## 汎用月次採用参照（Current / Decided）
+
+MonthlyAccountState record v2は旧11fieldに`schemaVersion: 2`と`adoptedAccountSnapshotId`を追加する。GMO採用ではSBI専用3参照をnullとし、同一口座・月、PDF Batch、`gmo-fx-monthly-report`、imported、JPY、正式月末日・officialMonthEnd、報告損益と採用損益の一致を検証する。旧SBI record・保存キー・envelope v1は維持し、Migrationしない。GMO UI／保存／集計は後続段階。
+
+**Decided**：現在保有はstable Instrument ID／code／tickerで同一性を維持し、表示名を現在名へ更新できる。名称変更だけで別Instrumentを作らない。過去取引は取引当時の名称を保持する。7606のユナイテッドアローズ→TABAYA HDは説明例であり、既存履歴を書き換えない。
+
 ## 1. データ分類
 
 TradeScopeのデータは、概念上次の4層に分類する。
@@ -375,7 +381,7 @@ MonthlyAccountState {
 }
 ```
 
-**Decided**：上記11fieldは必須。`id`、`accountId`、`targetMonth`、タイムゾーン付き`confirmedAt`はnull不可。参照3fieldはIDまたは`null`（未採用）、金額4fieldはdecimal文字列または`null`（不明）とする。`"0"`は明示0であり、nullを0で補わない。recordの`schemaVersion`は既存モデル同様に省略可、存在時は`1`のみ。合計評価額・合計評価損益、`sourceAvailability`、`sourceFingerprint`、draft statusは追加しない。record存在は明示確定の記録であり、各値が既知・全取得元が揃ったことまでは意味しない。
+**Decided**：上記11fieldは必須。`id`、`accountId`、`targetMonth`、タイムゾーン付き`confirmedAt`はnull不可。参照3fieldはIDまたは`null`（未採用）、金額4fieldはdecimal文字列または`null`（不明）とする。`"0"`は明示0であり、nullを0で補わない。旧recordの`schemaVersion`は省略可、存在時は`1`。汎用採用recordは`schemaVersion: 2`と`adoptedAccountSnapshotId`を必須とする。合計評価額・合計評価損益、`sourceAvailability`、`sourceFingerprint`、draft statusは追加しない。record存在は明示確定の記録であり、各値が既知・全取得元が揃ったことまでは意味しない。
 
 **Decided**：同一`accountId + targetMonth`に複数recordを許さない。初回IDは既存`newId`で生成し、将来同じ口座・月を修正するときは同じIDを維持する。口座参照を検証し、非nullの採用先は口座・対象月を一致させる。外国株／現金参照は対応するmanual scopeかつJPYであることを要求する。国内BatchはSBIのCSVで、同じBatchに属する`sourceScope: sbi-domestic-holdings`の保有record集合が存在することを根拠とする。約定Batchや名称だけで国内保有と推測しない。
 
@@ -615,7 +621,7 @@ TransactionAnnotation {
 | `accountSnapshots` | `tradeScopeAccountSnapshotsV1` | 一取得元・一観測が報告する口座状態／取得範囲 |
 | `monthlyAccountStates` | `tradeScopeMonthlyAccountStatesV1` | 口座・月の明示確定、採用先参照、月次台帳入力。合計値は保存しない |
 
-**Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は省略可、存在時は`1`のみ。すべてのrecordにstable `id`を要求する。
+**Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は原則省略可／`1`。MonthlyAccountStateの汎用採用recordだけは明示`2`。すべてのrecordにstable `id`を要求する。
 
 **Current**：`read` / `list`は非破壊。`commit`は複数envelopeを全検証後に保存し、`save`と同一IDへの`upsert`も同じ入口を使う。既存Account IDを落とす更新は拒否し、無効化を優先する。Migration、別IDへの暗黙統合はしない。Account / Instrument / Batch / 関連Snapshotの参照、重複IDを検証する。imported Snapshotは一つのBatchへ関連付け、口座・保存時点・観測時点・対象月を照合する。同じAccountSnapshotに属するHoldingの取得範囲・出所も一致させ、複数ソースを合成保存しない。
 

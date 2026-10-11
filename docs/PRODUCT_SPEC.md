@@ -1,5 +1,7 @@
 # Product Specification
 
+**Current**：完全バックアップの最新出力はv4。旧SBI月次recordと汎用月次採用recordを保護し、v1〜v3互換を維持する。GMO PDF取込UIは後続段階。
+
 ## 1. 製品定義
 
 **Decided**：TradeScopeは、FX、株式、ETF、投資信託、暗号資産、銀行預金等を横断して管理し、資産、損益、ポジション、Riskを把握する個人向け資産管理Webアプリである。

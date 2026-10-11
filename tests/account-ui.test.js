@@ -83,6 +83,6 @@ test('All major pages load the display module; precache and HTML versions are al
       assert.ok(urls.includes('./' + relative), relative);
     }
   }
-  assert.match(read('index.html'), /topScriptVersion = '20261011-2'/);
-  assert.ok(urls.includes('./top/script.js?v=20261011-2'));
+  assert.match(read('index.html'), /topScriptVersion = '20261011-3'/);
+  assert.ok(urls.includes('./top/script.js?v=20261011-3'));
 });
