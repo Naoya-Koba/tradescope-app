@@ -99,3 +99,41 @@ test('unadopted official observation with non-month-end date is not silently use
  const f=fixture();f.models.monthlyAccountStates=null;f.models.accountSnapshots.records[0].snapshotAsOf='2026-09-29';f.models.importBatches.records[0].snapshotAsOf='2026-09-29';
  assert.equal(view(f).dashboard(2026).rows.find(r=>r.key==='gmo').metrics.net.value,null);
 });
+test('shared Summary supplies all four metrics, deltas and rates for both screens',()=>{
+ const d=view(fixture()),top=d.dashboard(2026),annual=d.series(2026).summary;
+ assert.deepEqual(top,annual);
+ for(const field of ['netGrowth','confirmedGrowth','netPnlGrowth','confirmedPnlGrowth'])assert.ok(Number.isFinite(top[field]));
+});
+test('September asset point exactly matches latest Summary, with no future invented points',()=>{
+ const d=view(fixture()),s=d.series(2026),summary=d.dashboard(2026);
+ assert.equal(s.total[8],summary.net.value);assert.equal(s.realized[8],summary.confirmed.value);
+ assert.deepEqual(s.total.slice(9),[null,null,null]);
+});
+test('known September P/L is displayed and accumulated despite missing SBI State',()=>{
+ const f=fixture(),d=view(f),p=d.monthlyPnl(2026,9),annual=d.yearlyTotals(2026);
+ assert.deepEqual(p,{realized:10,swap:5,total:15});
+ assert.equal(annual.realizedSum,view(f).yearlyTotals(2026).realizedSum);
+ assert.equal(annual.realizedSum,50);assert.equal(annual.swapSum,85);
+ assert.equal(d.monthlyPnl(2026,10).total,null);
+});
+test('partial import changes Summary and same-month trend point together',()=>{
+ const f=fixture(),before=view(f).series(2026);f.models.holdingSnapshots.records[0].marketValue='201.125';
+ const d=view(f),after=d.series(2026);assert.notEqual(before.total[8],after.total[8]);
+ assert.equal(after.total[8],d.dashboard(2026).net.value);assert.notEqual(before.sourceFingerprint,after.sourceFingerprint);
+});
+test('a missing month between two imported months remains a real chart gap',()=>{
+ const f=fixture(),b={...f.models.importBatches.records[1],id:'nov_batch',targetMonth:'2026-11'};
+ f.models.importBatches.records.push(b);f.models.holdingSnapshots.records.push({...f.models.holdingSnapshots.records[0],id:'nov_holding',importBatchId:b.id,targetMonth:b.targetMonth});
+ const s=view(f).series(2026);assert.notEqual(s.total[8],null);assert.equal(s.total[9],null);assert.notEqual(s.total[10],null);
+});
+test('partial P/L keeps known realized even when swap is missing',()=>{
+ const f=fixture();f.models.monthlyAccountStates=null;f.models.accountSnapshots=null;
+ f.tradingData[2026][9]={lightfx:{realizedPnL:7,swapPnL:null,unrealizedPnL:1}};
+ assert.deepEqual(view(f).monthlyPnl(2026,9),{realized:7,swap:null,total:7});
+});
+test('display source code keeps all Summary and trend consumers on the shared projection',()=>{
+ const top=fs.readFileSync(require.resolve('../top/script.js'),'utf8'),profit=fs.readFileSync(require.resolve('../profit/soneki.js'),'utf8');
+ assert.match(top,/latestDashboard\.netGrowth/);assert.match(profit,/summary\.netGrowth/);
+ assert.match(top,/linkedDisplay\(\)\.series\(year\)/);assert.match(profit,/display\.dashboard\(currentYear, m, targetAccounts\)/);
+ assert.match(profit,/monthlyDisplayView\(\)\.yearlyTotals/);
+});

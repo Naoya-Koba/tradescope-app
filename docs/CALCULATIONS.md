@@ -6,7 +6,9 @@
 
 純資産・口座一覧・円グラフは同一projectionの口座額を使う。確定資産、純損益、確定損益、年初比・成長率は口座別の直近完全確定値と既存calculatorだけから算出し、各metricにsourceMonthとcurrent complete／current partial／previous complete／unavailableを保持する。必要な完全値がなければそのmetricはunknown。混在月・部分取込は「最新値・一部暫定」とする。観測純資産をledgerへ加算しない。
 
-Monthly Summaryは選択月だけの表示用Viewを使う。State未確定でも取得済み国内保有等を表示し、未入力項目は「—」。取得済み項目だけの合計は「暫定」とする。前月fallbackはしない。年間Summary、Asset／Performance Trend、月次確定・保存は従来の厳密な共有calculatorのままであり、この部分Viewを入力しない。
+Topと年間Summaryは同じ`dashboard(year)`の4指標・変動額・成長率をそのまま表示する。Asset Trendの各月点は同じ`dashboard(year, throughMonth)`、Performanceも同じ指標別の完全値由来の結果を使用する。実データが存在しない月はnull点で、未来月・欠損月を補間しない。月次確定とledgerは従来の厳密calculatorを維持し、表示projectionを保存入力へ戻さない。
+
+Monthly Summary／Monthly P/Lは選択月だけを見る。State未確定でも取得済み国内保有等を表示し、未入力は「—」。月間決済・swapは既知値のみ集計し、年間決済・swap・入出金も既知月の値を積み上げる。他口座の欠損で既知値を非表示にせず、未完成合計は暫定とする。前月fallback・0永続化は行わない。
 
 表示fingerprintはprojection version、従来calculator依存、対象年のState／AccountSnapshot／HoldingSnapshot／ImportBatchに依存する。未採用の国内取込も反映する。TopはこのViewを都度read-only再計算し、古いTop Snapshotで上書きせず、hash用の元データ複製を永続保存・ログ・外部送信しない。
 
@@ -16,7 +18,7 @@ Monthly Summaryは選択月だけの表示用Viewを使う。State未確定で�
 
 GMOは2026-08までlegacy、2026-09からState record v2とadoptedAccountSnapshotIdを使用する。realizedPnlはPDF月間取引損益、swapPnlは月間スワップ、入出金は外部移動、unrealizedPnlは月末建玉評価損益。前月末swap基準値・累計swapの加算は不要。observed netAssetValueは口座状態／照合用だけでledgerへ加算しない。確定資産＝年初資金＋累計決済＋累計swap＋累計入金−累計出金、純資産＝確定資産＋当月評価損益、月次損益＝決済＋swapの式を維持する。
 
-月次確定・年間Summary・Asset／Performance Trendは同じcreateCalculatorを参照する。Top SummaryとMonthly Summaryの部分表示だけは上記の表示用Viewを使い、厳密計算へ戻さない。State不在はcanonical計算ではmissing、意味のあるlegacy値併存はconflictで、placeholderへ戻さない。必要な月が欠損なら後続累積値はunknown。保存・訂正時は派生Top Snapshotを同一journal内で削除し、元データ／採用先／Batch／計算・policy versionのfingerprintも照合する。
+月次確定はcreateCalculatorを使用し、Summary／両Trendはその結果を使う共通表示projectionを参照する。State不在はcanonical計算ではmissing、意味のあるlegacy値併存はconflictで、placeholderへ戻さない。必要な月が欠損ならその口座の厳密累積値はunknown。表示用の直近完全値と既知観測は指標別sourceMonth付きで扱う。保存・訂正時は派生Top Snapshotを同一journal内で削除し、元データ／採用先／Batch／計算・policy versionのfingerprintも照合する。
 
 ## Current — GMO PDF内照合
 

@@ -4,7 +4,7 @@
 
 月次Stateのcomplete／missing／conflictは変更しない。未確定の国内HoldingSnapshot群等から読み取り専用のpartial-month viewとlatest-dashboard projectionを生成する。同一月の国内候補Batchは1件のみなら採用表示可能で、複数なら合算・latest選択をせず停止する。完全Stateがある場合は明示採用先を優先する。対象月・取得元・口座を検証した同一観測群だけを合計し、必要値不足の群合計はnullを保つ。
 
-TopはmetricごとにsourceMonthと使用状態をメモリに保持する。未入力成分の非加算は暫定表示だけの意味であり、0保存、legacyコピー、State生成をしない。表示Viewのための保存キー・schema・Backup変更はない。
+共通SummaryはmetricごとにsourceMonthと使用状態をメモリに保持し、Top／年間Summary／月時点のTrendへ同じ結果を配る。選択月Viewと年間内訳はその期間の既知値だけを集計する。未入力成分の非加算は暫定表示だけの意味であり、0保存、legacyコピー、State生成をしない。表示Viewのための保存キー・schema・Backup変更はない。
 
 ## Under consideration — PDF原値とユーザー採用値の分離監査
 

@@ -677,7 +677,7 @@ function calculateMonthlyTotals(year, month) {
 }
 
 function calculateYearlyTotals(year) {
-  return monthlyCalculator().yearlyTotals(year, ACCOUNTS.map(account => account.key));
+  return monthlyDisplayView().yearlyTotals(year);
 }
 
 function calculateAccountNetAssets(year, month, accountKey) {
@@ -777,8 +777,8 @@ function writeTopSummarySnapshotStore(store) {
 }
 
 function buildTopSummarySnapshotForYear(year) {
-  const snapshot = monthlyCalculator().snapshot(year, ACCOUNTS);
-  return snapshot ? { ...snapshot, updatedAt: Date.now() } : null;
+  const snapshot = monthlyDisplayView().series(year);
+  return snapshot.hasData ? { ...snapshot, updatedAt: Date.now() } : null;
 }
 
 function saveTopSummarySnapshot(year) {
@@ -1390,7 +1390,7 @@ function renderPerformanceChart(options = {}) {
   const pnlEmpty = document.getElementById('pnlBarEmpty');
   if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
 
-  if (!hasStoredYearData(currentYear)) {
+  if (!hasMonthlyDisplayYear(currentYear)) {
     if (renderAssets) {
       if (assetsTrendChart) {
         assetsTrendChart.destroy();
@@ -1424,7 +1424,7 @@ function renderPerformanceChart(options = {}) {
 
   const labels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
   const assetsLabels = ['年初', ...labels];
-  const latestMonth = getLatestSavedMonth(currentYear);
+  const latestMonth = monthlyDisplayView().dashboard(currentYear).month;
   const realizedData = [];
   const swapData = [];
   const totalPnlData = [];
@@ -1448,43 +1448,18 @@ function renderPerformanceChart(options = {}) {
   const performanceAssetsTrendData = [0];
 
   for (let m = 1; m <= 12; m++) {
-    const isEnteredMonth = accountFilter && accountFilter !== 'total'
-      ? monthlyCalculator().entered(currentYear, m, accountFilter)
-      : hasMeaningfulMonthData(currentYear, m);
-    
-    // 口座別データ集計
-    if (accountFilter && accountFilter !== 'total') {
-      const monthly = {
-        realized: monthlyCalculator().monthlyFieldTotal(currentYear, m, [accountFilter], 'realizedPnL'),
-        swap: monthlyCalculator().monthlyFieldTotal(currentYear, m, [accountFilter], 'swapPnL')
-      };
-      const realized = monthly.realized;
-      const swap = monthly.swap;
-      realizedData.push(isEnteredMonth ? realized : null);
-      swapData.push(isEnteredMonth ? swap : null);
-      totalPnlData.push(isEnteredMonth && Number.isFinite(realized) && Number.isFinite(swap) ? (realized + swap) : null);
-      
-      const monthEndAssets = isEnteredMonth ? calculateAccountNetAssets(currentYear, m, accountFilter) : null;
-      const monthEndConfirmed = isEnteredMonth ? calculateAccountConfirmedAssets(currentYear, m, accountFilter) : null;
-      confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
-      assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
-    } else {
-      // 全体データ集計
-      const monthly = calculateMonthlyTotals(currentYear, m);
-      realizedData.push(isEnteredMonth ? monthly.realizedSum : null);
-      swapData.push(isEnteredMonth ? monthly.swapSum : null);
-      totalPnlData.push(isEnteredMonth && Number.isFinite(monthly.realizedSum) && Number.isFinite(monthly.swapSum)
-        ? monthly.realizedSum + monthly.swapSum
-        : null);
-      const monthEndAssets = isEnteredMonth ? calculateTotalNetAssets(currentYear, m) : null;
-      const monthEndConfirmed = isEnteredMonth ? calculateTotalConfirmedAssets(currentYear, m) : null;
-      confirmedTrendData.push(isEnteredMonth ? monthEndConfirmed : null);
-      assetsTrendData.push(isEnteredMonth ? monthEndAssets : null);
-    }
-
-    const performance = monthlyCalculator().performance(currentYear, m, targetGrowthAccounts.map(account => account.key));
-    performanceAssetsTrendData.push(isEnteredMonth ? performance.net : null);
-    performanceConfirmedTrendData.push(isEnteredMonth ? performance.confirmed : null);
+    const display = monthlyDisplayView();
+    const hasData = targetAccounts.some(account => display.accountMonth(currentYear, m, account).hasData);
+    const monthly = display.monthlyPnl(currentYear, m, targetAccounts);
+    const summary = hasData ? display.dashboard(currentYear, m, targetAccounts) : null;
+    realizedData.push(monthly.realized);
+    swapData.push(monthly.swap);
+    totalPnlData.push(monthly.total);
+    confirmedTrendData.push(summary?.confirmed.value ?? null);
+    assetsTrendData.push(summary?.net.value ?? null);
+    const performance = hasData ? display.dashboard(currentYear, m, targetGrowthAccounts) : null;
+    performanceAssetsTrendData.push(performance?.netPnl.value ?? null);
+    performanceConfirmedTrendData.push(performance?.confirmedPnl.value ?? null);
   }
 
   // 口座別表示時はPerformanceビューを強制、全体表示時はユーザー選択を尊重
@@ -1846,8 +1821,9 @@ function bindChartViewControls() {
 function renderAnnualSummary() {
   const warning = document.getElementById('annualMonthlyWarning');
   if (warning) { warning.textContent = monthlyCalculator().warning(currentYear); warning.hidden = !warning.textContent; }
-  const latestMonth = getLatestSavedMonth(currentYear);
-  if (!hasStoredYearData(currentYear) || !latestMonth) {
+  const summary = monthlyDisplayView().dashboard(currentYear);
+  const latestMonth = summary.month;
+  if (!summary.hasData || !latestMonth) {
     [
       'yearRealizedSum',
       'yearSwapSum',
@@ -1876,8 +1852,8 @@ function renderAnnualSummary() {
 
   const yearly = calculateYearlyTotals(currentYear);
   const initialCapital = calculateInitialCapital(currentYear);
-  const totalAssets = calculateTotalNetAssets(currentYear, latestMonth);
-  const confirmedAssets = calculateTotalConfirmedAssets(currentYear, latestMonth);
+  const totalAssets = summary.net.value;
+  const confirmedAssets = summary.confirmed.value;
   const growthAccounts = GROWTH_TARGET_ACCOUNTS;
 
   const fmtDeltaNumber = (value) => {
@@ -1893,10 +1869,10 @@ function renderAnnualSummary() {
 
   const yearStartTotal = initialCapital + initialUnrealizedTotal;
   const yearStartConfirmed = initialCapital;
-  const totalAssetsDelta = Number.isFinite(totalAssets) ? totalAssets - yearStartTotal : null;
-  const confirmedAssetsDelta = Number.isFinite(confirmedAssets) ? confirmedAssets - yearStartConfirmed : null;
-  const growthRate = yearStartTotal > 0 && Number.isFinite(totalAssetsDelta) ? (totalAssetsDelta / yearStartTotal * 100) : null;
-  const confirmedGrowthRate = yearStartConfirmed > 0 && Number.isFinite(confirmedAssetsDelta) ? (confirmedAssetsDelta / yearStartConfirmed * 100) : null;
+  const totalAssetsDelta = summary.netDelta;
+  const confirmedAssetsDelta = summary.confirmedDelta;
+  const growthRate = summary.netGrowth;
+  const confirmedGrowthRate = summary.confirmedGrowth;
 
   // 純損益/確定損益は投資口座のみ（bankOnly除外）でトップページと定義を一致させる
   const growthStartInitial = calculateInitialCapital(currentYear, growthAccounts);
@@ -1906,13 +1882,10 @@ function renderAnnualSummary() {
   const growthYearStartTotal = growthStartInitial + growthStartUnrealized;
   const growthYearStartConfirmed = growthStartInitial;
 
-  const performance = monthlyCalculator().performance(currentYear, latestMonth, growthAccounts.map(account => account.key));
-  const yearNetPnL = performance.net;
-  const yearConfirmedPnL = performance.confirmed;
-  const yearNetPnLGrowthRate = growthYearStartTotal > 0 && Number.isFinite(yearNetPnL)
-    ? (yearNetPnL / growthYearStartTotal * 100)
-    : null;
-  const yearConfirmedPnLGrowthRate = growthYearStartConfirmed > 0 && Number.isFinite(yearConfirmedPnL) ? (yearConfirmedPnL / growthYearStartConfirmed * 100) : null;
+  const yearNetPnL = summary.netPnl.value;
+  const yearConfirmedPnL = summary.confirmedPnl.value;
+  const yearNetPnLGrowthRate = summary.netPnlGrowth;
+  const yearConfirmedPnLGrowthRate = summary.confirmedPnlGrowth;
   const netCashFlowYear = Number.isFinite(yearly.depositSum) && Number.isFinite(yearly.withdrawSum)
     ? yearly.depositSum - yearly.withdrawSum
     : null;
@@ -1996,8 +1969,8 @@ function hasMonthlyDisplayYear(year) {
   return hasStoredYearData(year) || Array.from({ length: 12 }, (_, index) => index + 1)
     .some(month => monthlyDisplayView().month(year, month).hasData);
 }
-function buildMonthlyCardHtml(month, { realized = null, swap = null, unrealized = null, provisional = false } = {}) {
-  const totalPnL = Number.isFinite(realized) && Number.isFinite(swap) ? realized + swap : null;
+function buildMonthlyCardHtml(month, { realized = null, swap = null, unrealized = null, total = null, provisional = false } = {}) {
+  const totalPnL = total;
   return `
     <div class="monthly-label">${month}月${provisional ? ' <small>暫定</small>' : ''}</div>
     <div class="monthly-total-label">合計</div>
@@ -2042,6 +2015,7 @@ function renderMonthlyDisplay() {
       realized: monthly.realizedSum,
       swap: monthly.swapSum,
       unrealized: monthly.unrealizedSum,
+      total: monthly.total,
       provisional: monthly.provisional
     });
     
@@ -2080,7 +2054,8 @@ function renderMonthlyByAccount(accountKey) {
     const card = document.createElement('div');
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
-    card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized, provisional: view.partial });
+    card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized,
+      total: monthlyDisplayView().monthlyPnl(currentYear, m, [account]).total, provisional: view.partial });
 
     card.addEventListener('click', () => {
       selectMonth(m);
@@ -2099,9 +2074,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
     return;
   }
 
-  const totalPnL = Number.isFinite(monthly.realizedSum) && Number.isFinite(monthly.swapSum)
-    ? monthly.realizedSum + monthly.swapSum
-    : null;
+  const totalPnL = monthly.total;
   const netCashFlow = Number.isFinite(monthly.depositSum) && Number.isFinite(monthly.withdrawSum)
     ? monthly.depositSum - monthly.withdrawSum
     : null;
@@ -2112,9 +2085,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
     const { realized, swap, unrealized, deposit, withdrawal } = view;
     const netAssets = view.asset;
     const hideSwapRow = account.key === 'sbi' || account.key === 'sbivc';
-    const accountTotal = hideSwapRow
-      ? realized
-      : (Number.isFinite(realized) && Number.isFinite(swap) ? realized + swap : null);
+    const accountTotal = monthlyDisplayView().monthlyPnl(currentYear, month, [account]).total;
     const accountCashflow = Number.isFinite(deposit) && Number.isFinite(withdrawal)
       ? deposit - withdrawal
       : null;

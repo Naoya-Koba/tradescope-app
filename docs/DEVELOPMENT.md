@@ -2,7 +2,7 @@
 
 ## Current — 部分取込の表示層
 
-`assets/monthly-display-view.js`はDOM／Storage非依存で、共有resolverを変更せず、Top専用最新projectionとMonthly Summary選択月Viewを返す。画面側にbroker別金融計算を追加しない。TopのKPI・口座配分は同じprojection、年間Summaryと両Trendは厳密calculatorを維持する。部分取込を確定用Snapshotキャッシュから取得しない。正本変更時のstorage eventと再表示で再計算し、projection fingerprintに未採用観測も含める。
+`assets/monthly-display-view.js`はDOM／Storage非依存で、Top・年間Summary・口座配分へ同じ`dashboard`結果、Asset／Performance Trendへ月時点の同じprojection、Monthly P/Lと年間内訳へ既知値集計を返す。画面側で金融値や成長率を再計算しない。canonical ledgerは厳密なまま保持する。部分取込を旧Snapshotキャッシュから取得しない。正本変更時のstorage eventと再表示で再計算し、fingerprintに未採用観測とprojection versionも含める。
 
 `tests/monthly-display.test.js`は匿名のGMO完全／SBI部分／旧月口座、nullと0、複数候補、指標別sourceMonth、無書込、canonical回帰を検証する。`tests/monthly-display-browser.*`はlocalhost専用の架空Storageとcleanupであり、production導線／precacheには含めない。実金融データ・実Backupを使用しない。
 

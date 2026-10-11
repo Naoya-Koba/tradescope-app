@@ -3,7 +3,7 @@
   const node = typeof module !== 'undefined' && module.exports;
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
-  const version = 'monthly-display-v1';
+  const version = 'monthly-display-v2';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -15,7 +15,7 @@
   const years = models => [...new Set(['monthlyAccountStates', 'holdingSnapshots', 'accountSnapshots', 'importBatches']
     .flatMap(entity => records(models, entity).filter(row => row.targetMonth).map(row => Number(row.targetMonth.slice(0, 4)))))];
 
-  // Display-only projection. Never feeds the monthly ledger, saves, or strict trend series.
+  // Shared display projection for Summary and trends; never feeds the canonical ledger or saves.
   function create(legacy, tradingData, initialFunds, initialUnrealized, models, accounts) {
     const calculator = resolver.createCalculator(legacy, tradingData, initialFunds, initialUnrealized, models);
     function present(key, targetMonth) {
@@ -89,7 +89,7 @@
           totals[field] = calculator.monthlyFieldTotal(year, monthNumber, accounts.map(account => account.key), stored);
         }
       }
-      return { rows, hasData, provisional, ...totals };
+      return { rows, hasData, provisional, total: knownSum([totals.realized, totals.swap]), ...totals };
     }
     function fingerprint(year) {
       const dependencies = ['monthlyAccountStates', 'accountSnapshots', 'holdingSnapshots', 'importBatches']
@@ -99,12 +99,14 @@
       for (let i = 0; i < source.length; i++) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
       return `${version}-${(hash >>> 0).toString(16)}`;
     }
-    function dashboard(year) {
+    function dashboard(year, throughMonth = 12, selectedAccounts = accounts) {
       const currentMonths = Array.from({ length: 12 }, (_, i) => i + 1)
-        .filter(month => accounts.some(account => present(account.key, dateKey(year, month))));
-      const baseline = currentMonths.at(-1) || calculator.latestMonth(year, accounts.map(account => account.key));
+        .filter(month => month <= throughMonth && selectedAccounts.some(account => present(account.key, dateKey(year, month))));
+      const latestLegacy = Array.from({length: throughMonth}, (_, i) => i + 1)
+        .filter(month => selectedAccounts.some(account => accountMonth(year, month, account).hasData)).at(-1);
+      const baseline = currentMonths.at(-1) || latestLegacy || null;
       const metric = (value, sourceMonth, status) => ({ value: Number.isFinite(value) ? value : null, sourceMonth, status: Number.isFinite(value) ? status : 'unavailable' });
-      const rows = accounts.map(account => {
+      const rows = selectedAccounts.map(account => {
         const current = baseline ? accountMonth(year, baseline, account) : null;
         let latest = null;
         for (let m = baseline || 0; m > 0; m--) {
@@ -123,7 +125,7 @@
           completeNet: metric(latest?.asset, latest?.targetMonth ?? null, status(latest)) },
           conflict: current?.conflict || false };
       });
-      const growth = rows.filter(row => !row.bankOnly), keys = accounts.map(account => account.key), growthKeys = growth.map(row => row.key);
+      const growth = rows.filter(row => !row.bankOnly), keys = selectedAccounts.map(account => account.key), growthKeys = growth.map(row => row.key);
       const aggregate = (metricName, partialAllowed = false, sourceRows = rows) => {
         const values = sourceRows.map(row => row.metrics[metricName]);
         return { value: (partialAllowed ? knownSum : strictSum)(values.map(item => item.value)),
@@ -134,15 +136,42 @@
       const accountData = rows.filter(row => Number.isFinite(row.metrics.net.value) && row.metrics.net.value > 0)
         .map(row => ({ label: row.name, color: row.color, amount: row.metrics.net.value, sourceMonth: row.metrics.net.sourceMonth, status: row.metrics.net.status }));
       const rate = (value, initial) => Number.isFinite(value) && initial > 0 ? value / initial * 100 : null;
+      const netDelta = aggregate('completeNet').value === null ? null : aggregate('completeNet').value - calculator.initial(year, keys, true);
+      const confirmedDelta = confirmed.value === null ? null : confirmed.value - calculator.initial(year, keys);
       return { year, month: baseline, hasData: net.value !== null, rows, accountData, net, confirmed, netPnl, confirmedPnl,
-        netDelta: aggregate('completeNet').value === null ? null : aggregate('completeNet').value - calculator.initial(year, keys, true),
+        netDelta,
         confirmedDelta: confirmed.value === null ? null : confirmed.value - calculator.initial(year, keys),
+        netGrowth: rate(netDelta, calculator.initial(year, keys, true)),
+        confirmedGrowth: rate(confirmedDelta, calculator.initial(year, keys)),
         netPnlGrowth: rate(netPnl.value, calculator.initial(year, growthKeys, true)),
         confirmedPnlGrowth: rate(confirmedPnl.value, calculator.initial(year, growthKeys)),
         initialNet: calculator.initial(year, keys, true), initialConfirmed: calculator.initial(year, keys),
         provisional: rows.some(row => row.metrics.net.status !== 'current complete'), sourceFingerprint: fingerprint(year) };
     }
-    return Object.freeze({ accountMonth, month, dashboard, fingerprint });
+    function series(year, selectedAccounts = accounts) {
+      const latest = dashboard(year, 12, selectedAccounts), keys = selectedAccounts.map(account => account.key);
+      const points = Array.from({length:12}, (_, i) => {
+        const hasData = selectedAccounts.some(account => accountMonth(year, i + 1, account).hasData);
+        return hasData ? dashboard(year, i + 1, selectedAccounts) : null;
+      });
+      return { year, month: latest.month, hasData: latest.hasData, summary: latest,
+        realized: points.map(p => p?.confirmed.value ?? null), total: points.map(p => p?.net.value ?? null),
+        performanceConfirmedSeries: [0, ...points.map(p => p?.confirmedPnl.value ?? null)],
+        performanceTotalSeries: [0, ...points.map(p => p?.netPnl.value ?? null)], accountData: latest.accountData,
+        chartStartTotal: calculator.initial(year, keys), chartStartTotalWithUnrealized: calculator.initial(year, keys, true),
+        sourceFingerprint: fingerprint(year) };
+    }
+    function yearlyTotals(year) {
+      const months = Array.from({length:12}, (_, i) => month(year, i + 1));
+      return Object.fromEntries([['realizedSum','realized'],['swapSum','swap'],['depositSum','deposit'],['withdrawSum','withdrawal']]
+        .map(([name, field]) => [name, knownSum(months.filter(m => m.hasData).map(m => m[field]))]));
+    }
+    function monthlyPnl(year, monthNumber, selectedAccounts = accounts) {
+      const rows = selectedAccounts.map(account => accountMonth(year, monthNumber, account)).filter(row => row.hasData);
+      const realized = knownSum(rows.map(row => row.realized)), swap = knownSum(rows.map(row => row.swap));
+      return {realized, swap, total: knownSum([realized, swap])};
+    }
+    return Object.freeze({ accountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint });
   }
   const api = Object.freeze({ create, version, years });
   if (node) module.exports = api; else root.TradeScopeMonthlyDisplay = api;

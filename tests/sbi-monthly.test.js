@@ -77,7 +77,7 @@ test('UI routing uses shared calculation and service, preserves backup core, and
   const profit = fs.readFileSync(require.resolve('../profit/soneki.js'), 'utf8');
   const top = fs.readFileSync(require.resolve('../top/script.js'), 'utf8');
   const ui = fs.readFileSync(require.resolve('../assets/sbi-monthly-ui.js'), 'utf8');
-  assert.match(profit, /monthlyCalculator\(\)\.snapshot/); assert.match(top, /calculator\.snapshotCurrent/);
+  assert.match(profit, /monthlyDisplayView\(\)\.series/); assert.match(top, /TradeScopeMonthlyDisplay\.create/);
   assert.match(ui, /service\.save/); assert.doesNotMatch(ui, /\.setItem\(|\.commit\(/);
   assert.doesNotMatch(ui, /placeholder\s*=\s*['"]0/); assert.match(ui, /dataset.draft = 'sbi'/);
   assert.match(profit, /if \(input.dataset.draft === 'sbi'\) return/);

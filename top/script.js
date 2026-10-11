@@ -831,9 +831,7 @@ function linkedCalculator(tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADI
     parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models);
 }
 function calculateLinkedMonthlyTotals(tradingData, year, month) {
-  const calculator = linkedCalculator(tradingData), keys = LINKED_ACCOUNTS.map(account => account.key);
-  return { realized: calculator.monthlyFieldTotal(year, month, keys, 'realizedPnL'),
-    swap: calculator.monthlyFieldTotal(year, month, keys, 'swapPnL') };
+  return linkedDisplay(tradingData).monthlyPnl(year, month);
 }
 function calculateLinkedAccountConfirmedAssets(tradingData, initialFunds, year, month, key) {
   return linkedCalculator(tradingData, initialFunds).confirmed(year, month, key);
@@ -891,23 +889,19 @@ function buildTopLinkedData(selectedYear = null) {
     ...getNumericYears(initialUnrealized), ...window.TradeScopeMonthlyDisplay.years(models)])].sort((a,b) => a-b);
   const year = selectedYear || sourceYears[sourceYears.length - 1];
   if (!year) return null;
-  const calculator = window.TradeScopeMonthlyResolver.createCalculator(profitMetrics, tradingData, initialFunds, initialUnrealized, models);
-  const fresh = calculator.snapshot(year, LINKED_ACCOUNTS);
-  if (!fresh) return null;
-  const cache = parseStoredJson(PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT)?.[year];
-  const valid = calculator.snapshotCurrent(cache, year, LINKED_ACCOUNTS.map(account => account.key))
-    && Array.isArray(cache.realized) && cache.realized.length === 12 && Array.isArray(cache.total) && cache.total.length === 12;
-  return { ...(valid ? cache : fresh), hasData: true, warning: calculator.warning(year) };
+  const fresh = window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData, initialFunds, initialUnrealized, models, LINKED_ACCOUNTS).series(year);
+  return fresh.hasData ? fresh : null;
 }
 
 const linkedTopData = buildTopLinkedData();
 let topSeries = linkedTopData || createEmptyTopSeries();
-function buildLatestDashboard(year) {
+function linkedDisplay(tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING)) {
   let models = null;
   try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
-  return window.TradeScopeMonthlyDisplay.create(profitMetrics, parseStoredJson(PROFIT_STORAGE_KEY_TRADING),
-    parseStoredJson(PROFIT_STORAGE_KEY_INITIAL), parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models, LINKED_ACCOUNTS).dashboard(year);
+  return window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData,
+    parseStoredJson(PROFIT_STORAGE_KEY_INITIAL), parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models, LINKED_ACCOUNTS);
 }
+function buildLatestDashboard(year) { return linkedDisplay().dashboard(year); }
 let latestDashboard = buildLatestDashboard(topSeries.year);
 
 // ===== Portfolio Data =====
@@ -1039,8 +1033,8 @@ function updateKPIs() {
 
   const totalAssetDelta = latestDashboard.netDelta;
   const confirmedAssetDelta = latestDashboard.confirmedDelta;
-  const annualGrowthRate = yearStartTotalActual > 0 && Number.isFinite(totalAssetDelta) ? (totalAssetDelta / yearStartTotalActual) * 100 : null;
-  const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 && Number.isFinite(confirmedAssetDelta) ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : null;
+  const annualGrowthRate = latestDashboard.netGrowth;
+  const confirmedAnnualGrowthRate = latestDashboard.confirmedGrowth;
 
   const annualNetPnL = latestDashboard.netPnl.value;
   const annualConfirmedPnL = latestDashboard.confirmedPnl.value;
@@ -1119,7 +1113,6 @@ function buildSwapSummary(selectedYear = null) {
 
   const enteredMonths = [];
   for (let month = 1; month <= 12; month += 1) {
-    if (!linkedCalculator(tradingData).monthEntered(targetYear, month, LINKED_ACCOUNTS.map(account => account.key))) continue;
     if (Number.isFinite(calculateLinkedMonthlyTotals(tradingData, targetYear, month).swap)) enteredMonths.push(month);
   }
 
@@ -1482,7 +1475,7 @@ setTimeout(adjustDetailHeight, 200);
 
 // ===== Chart =====
 function buildTopPerformanceSeries(year, latestMonth) {
-  const value = linkedCalculator().snapshot(year, LINKED_ACCOUNTS);
+  const value = linkedDisplay().series(year);
   return { confirmedSeries: value?.performanceConfirmedSeries || [], totalSeries: value?.performanceTotalSeries || [] };
 }
 
