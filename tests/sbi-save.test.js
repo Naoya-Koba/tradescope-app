@@ -312,7 +312,7 @@ test('Backup v3 exports saved models exactly and round-trips; v1 keeps new data'
   const storage = new Storage(), save = service(storage);
   await save.save(source()); await save.save(source('transactions', trades, 'b'.repeat(64)));
   const h = backupHarness(storage), payload = h.build(storage, 'http://localhost', now);
-  assert.equal(payload.backupVersion, 5); assert.deepEqual(copy(payload.data.models), save.read());
+  assert.equal(payload.backupVersion, 6); assert.deepEqual(copy(payload.data.models), save.read());
   assert.equal(payload.data.models.accountSnapshots, null);
   const target = new Storage(), other = backupHarness(target); other.restore.execute(other.format.inspectValue(payload).restorePlan, target);
   assert.deepEqual(model.readModels(target), save.read());
@@ -320,7 +320,7 @@ test('Backup v3 exports saved models exactly and round-trips; v1 keeps new data'
     data: { monthly: {}, initialFunds: {}, initialUnrealized: {}, transactions: [], memos: [], symbols: [] } };
   const before = Object.fromEntries(Object.values(model.keys).map(key => [key, target.getItem(key)]));
   other.restore.execute(other.format.inspectValue(v1).restorePlan, target);
-  for (const key of Object.values(model.keys)) assert.equal(target.getItem(key), before[key]);
+  for (const key of Object.values(model.keys)) assert.equal(target.getItem(key), before[key] ?? null);
 });
 test('legacy monthly, history, Summary Snapshot and UI keys never change; holdings do not mark months entered', async () => {
   const legacy = { tradingData: '{"2026":{"8":{"__saved":true,"gmo":{"unrealizedPnL":1}},"9":{"sbi":{"holdings":[{"quantity":1}]}}}}',

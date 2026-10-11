@@ -27,8 +27,8 @@
       let busy=false,failed=false;
       function refresh(){
         const unchanged=prepared&&uiFields.every(([field])=>draft[field]===prepared.adopted[field]);
-        button.disabled=busy||!prepared;button.hidden=Boolean(unchanged&&!failed);
-        status.textContent=busy?'保存中…':unchanged&&!failed?'保存済み':'';
+        button.disabled=busy||!prepared;button.hidden=false;
+        status.textContent=busy?'保存中…':'';status.hidden=!busy;
         reset.hidden=!prepared||uiFields.every(([field])=>draft[field]===prepared.source[field]);
         error.hidden=!error.textContent;if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;
       }

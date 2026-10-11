@@ -20,6 +20,19 @@
       sbiStateAbsent:!model.createRepository({getItem:key=>localStorage.getItem(key)}).read().monthlyAccountStates?.records.some(r=>r.accountId==='acc_sbi_sec'),
       septemberLegacyAbsent:JSON.parse(localStorage.getItem('tradingData')||'{}')[2026]?.[9]===undefined});
   };
+  document.getElementById('domestic-inspect').onclick=()=>{
+    const baseline=JSON.parse(sessionStorage.getItem(sessionKey)||'null');
+    if(!baseline)return show({refused:true});
+    const models=model.createRepository({getItem:key=>localStorage.getItem(key)}).read();
+    const input=models.monthlyAccountInputs?.records.find(r=>r.accountId==='acc_sbi_sec');
+    show({saved:Boolean(input),sourceProtected:input?.sourceValues.marketValue==='200.25'&&input?.sourceValues.unrealizedPnl==='20.125',
+      adopted:input?.adoptedValues,overrideFields:input?.overrideFields,
+      missingPreserved:input&&['foreignAccountSnapshotId','cashAccountSnapshotId','realizedPnl','deposit','withdrawal'].every(k=>input[k]===null),
+      rawAndLegacyUnchanged:baseline.filter(([key])=>['tradingData','yearInitialFunds','yearInitialUnrealized',model.keys.holdingSnapshots,model.keys.importBatches,model.keys.accountSnapshots,model.keys.monthlyAccountStates].includes(key)).every(([key,value])=>localStorage.getItem(key)===value),
+      sbiStateAbsent:!models.monthlyAccountStates.records.some(r=>r.accountId==='acc_sbi_sec'),
+      acquisitionDate:models.importBatches.records.find(r=>r.id==='batch_sbi').snapshotAsOf,
+      journalAbsent:localStorage.getItem('tradeScopeRestoreJournalV1')===null});
+  };
   document.getElementById('override-inspect').onclick=()=>{
     const baseline=JSON.parse(sessionStorage.getItem(sessionKey)||'null');
     if(!baseline)return show({refused:true});

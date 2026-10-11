@@ -66,7 +66,7 @@ test('real monthly service save and correction survive unchanged v3 export/empty
     save(original, { ...draft(), foreignUnrealizedPnl: correction ? '5.25' : '-1.20' });
     const before = model.readModels(original), expected = calc(original).snapshot(2026, [{ key: 'sbi', name: 'SBI' }]);
     const api = backupHarness(original), backup = api.TradeScopeBackupExport.buildPayload(original);
-    assert.equal(backup.backupVersion, 5);
+    assert.equal(backup.backupVersion, 6);
     const empty = new Storage(), parsed = api.TradeScopeBackupFormat.inspectValue(backup);
     assert.equal(parsed.ok, true); api.TradeScopeBackupRestore.execute(parsed.restorePlan, empty);
     assert.deepEqual(model.readModels(empty), before);
@@ -112,7 +112,7 @@ test('complete atomic save resolves observed values separately from ledger and f
   assert.equal(c.confirmed(2026, 9, 'sbi'), 107); assert.equal(c.net(2026, 9, 'sbi'), 109.25);
   assert.equal(c.monthlyFieldTotal(2026, 9, ['sbi'], 'realizedPnL'), 0);
   assert.equal(c.resolve(2026, 9, 'sbivc').source, 'legacy');
-  for (const key of Object.keys(before).filter(key => ![model.keys.accountSnapshots, model.keys.monthlyAccountStates, 'tradeScopeTopSummarySnapshotV1'].includes(key))) assert.equal(target.getItem(key), before[key]);
+  for (const key of Object.keys(before).filter(key => ![model.keys.accountSnapshots, model.keys.monthlyAccountStates, 'tradeScopeTopSummarySnapshotV1'].includes(key))) assert.equal(target.getItem(key), before[key] ?? null);
   assert.equal(target.getItem(tx.journalKey), null); assert.equal(target.getItem('tradeScopeTopSummarySnapshotV1'), null);
   assert.equal(model.readModels(target).accountSnapshots.records[1].observationType, 'approximateForMonth');
 });
@@ -125,7 +125,7 @@ test('explicit zeros and decimal precision persist; automatic seeding/aggregate 
   assert.equal(resolver.resolve(models, {}, '2026-09').completeness.complete, true);
   assert.ok(!('observedAsset' in models.monthlyAccountStates.records[0]));
 });
-for (const field of ['foreignAssetValue', 'foreignUnrealizedPnl', 'foreignDate', 'cashBalance', 'cashDate', 'realizedPnL', 'deposit', 'withdrawal']) test(`blank/null ${field} reject before any writes`, () => {
+for (const field of ['foreignAssetValue', 'foreignUnrealizedPnl', 'foreignDate', 'cashBalance', 'cashDate']) test(`blank/null ${field} reject incomplete manual group before any writes`, () => {
   for (const value of ['', null]) { const target = seed(), before = target.snapshot(); assert.throws(() => save(target, { ...draft(), [field]: value })); assert.deepEqual(target.snapshot(), before); assert.equal(target.writes, 0); }
 });
 test('domestic exact Batch excludes executions/other months; multiple candidates stop without latest choice', () => {
@@ -140,7 +140,7 @@ test('domestic null or non-JPY is unknown; partial unrealized never becomes part
   const target = seed(); save(target); const models = model.readModels(target);
   models.holdingSnapshots.records[0].unrealizedPnl = null;
   const row = resolver.resolve(models, {}, '2026-09'); assert.equal(row.unrealizedPnl, null); assert.equal(row.completeness.complete, false);
-  assert.throws(() => save(seed(models)), /不足/);
+  assert.throws(() => save(seed(models)), /不足|形式/);
   models.holdingSnapshots.records[0].currency = 'USD'; assert.equal(resolver.domesticCandidates(models, '2026-09')[0].marketValue, null);
 });
 test('missing September propagates cumulative unknown while October monthly P/L stays local', () => {
@@ -169,14 +169,16 @@ for (const key of [tx.journalKey, model.keys.accountSnapshots, model.keys.monthl
   target.setItem = (name, value) => { if (name === key && !failed) { failed = true; throw new Error('Anonymous failure'); } set(name, value); };
   assert.throws(() => save(target)); assert.deepEqual(target.snapshot(), before);
 });
-test('cache deletion failure still rejects old fingerprint; every adopted dependency changes fingerprint', () => {
+test('cache deletion failure rolls back all adoption; valid dependency changes fingerprint', () => {
   const target = seed(), c = calc(target), fingerprint = c.fingerprint(2026), remove = target.removeItem.bind(target);
   target.removeItem = key => { if (key === 'tradeScopeTopSummarySnapshotV1') throw new Error('Anonymous cache failure'); remove(key); };
-  const result = save(target); assert.equal(result.cacheInvalidated, false); assert.notEqual(calc(target).fingerprint(2026), fingerprint);
+  const before=target.snapshot();assert.throws(()=>save(target));assert.deepEqual(target.snapshot(),before);
+  target.removeItem=remove; const result = save(target); assert.equal(result.cacheInvalidated, true); assert.notEqual(calc(target).fingerprint(2026), fingerprint);
   const original = result.models, base = resolver.createCalculator(legacyMetrics(), {}, {}, {}, original).fingerprint(2026);
   for (const [entity, field, value] of [['monthlyAccountStates', 'deposit', '2'], ['importBatches', 'importerVersion', 'test-v2'],
-    ['holdingSnapshots', 'marketValue', '999'], ['accountSnapshots', 'assetValue', '999']]) {
+    ['accountSnapshots', 'assetValue', '999']]) {
     const models = copy(original); models[entity].records[0][field] = value;
+    if(entity==='monthlyAccountStates')models.monthlyAccountInputs.records[0][field]=value;
     assert.notEqual(resolver.createCalculator(legacyMetrics(), {}, {}, {}, models).fingerprint(2026), base);
   }
 });

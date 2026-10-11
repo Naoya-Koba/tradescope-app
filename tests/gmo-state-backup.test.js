@@ -26,23 +26,23 @@ for (const [label, mutate] of [
   assert.throws(() => model.createRepository(target).commit(data)); assert.equal(target.writes, 0);
 });
 test('v3 rejects new State; v4 accepts old and new States; decimal equality is numerical', () => {
-  const data = fixture(); assert.throws(() => model.validateBackupModels(3, data));
-  assert.equal(model.validateBackupModels(4, data), true);
+  const data = fixture(); assert.throws(() => model.validateBackupModels(3, Object.fromEntries(model.backupModelEntities[3].map(k=>[k,data[k]]))));
+  assert.equal(model.validateBackupModels(4, Object.fromEntries(model.backupModelEntities[4].map(k=>[k,data[k]]))), true);
   data.monthlyAccountStates.records[0].realizedPnl = '10.00'; assert.equal(model.validateModels(data), true);
   const old = copy(data); delete old.monthlyAccountStates.records[0].schemaVersion; delete old.monthlyAccountStates.records[0].adoptedAccountSnapshotId;
-  assert.equal(model.validateBackupModels(3, old), true); assert.equal(model.validateBackupModels(4, old), true);
+  assert.equal(model.validateBackupModels(3, Object.fromEntries(model.backupModelEntities[3].map(k=>[k,old[k]]))), true); assert.equal(model.validateBackupModels(4, Object.fromEntries(model.backupModelEntities[4].map(k=>[k,old[k]]))), true);
 });
 test('v1-v4 Restore semantics and new State v4 roundtrip', () => {
   const api = backupHarness(), target = new MemoryStorage(); model.createRepository(target).commit(Object.fromEntries(Object.entries(fixture()).filter(([, v]) => v !== null)));
   const exported = api.TradeScopeBackupExport.buildPayload(target, 'http://localhost', now);
-  assert.equal(exported.backupVersion, 5); const empty = new MemoryStorage();
+  assert.equal(exported.backupVersion, 6); const empty = new MemoryStorage();
   api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(exported).restorePlan, empty);
   assert.deepEqual(model.readModels(empty), fixture());
   assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty, 'http://localhost', now)), copy(exported));
   for (const version of [1, 2, 3, 4]) {
     const backup = copy(exported); backup.backupVersion = version;
     if (version === 1) delete backup.data.models;
-    else { for (const entity of Object.keys(backup.data.models)) backup.data.models[entity] = null;
+    else { delete backup.data.models.monthlyAccountInputs; for (const entity of Object.keys(backup.data.models)) backup.data.models[entity] = null;
       if (version === 2) delete backup.data.models.monthlyAccountStates; }
     const seeded = new MemoryStorage(); model.createRepository(seeded).commit(Object.fromEntries(Object.entries(fixture()).filter(([, v]) => v !== null)));
     const before = seeded.getItem(model.keys.monthlyAccountStates);

@@ -63,18 +63,36 @@ test('SBI explicit canonical swap zero is retained without any swap UI',()=>{
  assert.equal(JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].swapPnl,'0');
  assert.equal(h.drafts.read('2026-09').swapPnL,undefined);
 });
-test('explicit-zero save verifies before saved status, hides action, and reload rehydrates',()=>{
+test('explicit-zero save verifies, keeps save button without saved row, and reload rehydrates',()=>{
  const h=harness();h.fillAll();h.button().listeners.click();
- assert.equal(h.saved(),1);assert.equal(h.status(),'保存済み');assert.equal(h.button().hidden,true);
- h.drafts.clear();h.render();assert.equal(h.status(),'保存済み');assert.equal(h.control('cashBalance').value,'0');
+ assert.equal(h.saved(),1);assert.equal(h.status(),'');assert.equal(h.button().hidden,false);
+ h.drafts.clear();h.render();assert.equal(h.status(),'');assert.equal(h.control('cashBalance').value,'0');
  assert.equal(JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].swapPnl,'0');
+});
+test('editable domestic fields update aggregate Draft only, persist partial and rehydrate without State',()=>{
+ const h=harness(),before=JSON.stringify(h.values),raw=h.values[model.keys.holdingSnapshots];
+ assert.notEqual(h.control('domesticMarketValue').readOnly,true);assert.notEqual(h.control('domesticUnrealizedPnl').readOnly,true);
+ h.fill('domesticMarketValue','125.25');h.fill('domesticUnrealizedPnl','-1.5');assert.equal(JSON.stringify(h.values),before);
+ const aggregate=h.children().find(el=>el.dataset.monthlyField==='assetValue');assert.equal(aggregate.value,'125.25');
+ h.button().listeners.click();assert.equal(h.saved(),1);assert.equal(h.values[model.keys.monthlyAccountStates],undefined);
+ assert.equal(h.values[model.keys.holdingSnapshots],raw);assert.equal(h.status(),'');assert.equal(h.button().hidden,false);
+ h.drafts.clear();h.render();assert.equal(h.control('domesticMarketValue').value,'125.25');assert.equal(h.control('realizedPnL').value,'');
+ assert.equal(h.children().find(el=>el.className==='sbi-domestic-date').textContent,'取得日：2026/10/04');
+});
+test('each domestic reset changes Draft only; explicit save clears metadata without changing acquisition date',()=>{
+ const h=harness();h.fill('domesticMarketValue','12');h.fill('domesticUnrealizedPnl','3');h.button().listeners.click();
+ const before=JSON.stringify(h.values),resets=h.children().filter(el=>el.className==='monthly-source-reset');assert.equal(resets.length,2);
+ resets[0].listeners.click();assert.equal(h.control('domesticMarketValue').value,'0');assert.equal(h.control('domesticUnrealizedPnl').value,'3');
+ resets[1].listeners.click();assert.equal(JSON.stringify(h.values),before);h.button().listeners.click();
+ assert.deepEqual(JSON.parse(h.values[model.keys.monthlyAccountInputs]).records[0].overrideFields,[]);
+ assert.equal(h.values[model.keys.monthlyAccountStates],undefined);
 });
 test('reediting returns action without changing canonical data; correction retains old snapshots',()=>{
  const h=harness();h.fillAll();h.button().listeners.click();const before=JSON.stringify(h.values);
  const id=JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].id;
  h.fill('foreignAssetValue','12.25');assert.equal(h.button().hidden,false);assert.equal(h.status(),'');assert.equal(JSON.stringify(h.values),before);
  h.button().listeners.click();assert.equal(JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].id,id);
- assert.equal(JSON.parse(h.values[model.keys.accountSnapshots]).records.length,3);assert.equal(h.status(),'保存済み');
+ assert.equal(JSON.parse(h.values[model.keys.accountSnapshots]).records.length,3);assert.equal(h.status(),'');
 });
 test('missing input returns specific error, keeps Draft, and expands body for visible message',()=>{
  const h=harness(),before=JSON.stringify(h.values);h.button().listeners.click();

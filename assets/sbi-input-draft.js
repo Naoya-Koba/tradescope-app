@@ -33,9 +33,12 @@
     // Historical SBI domestic CSV records omit currency. This compatibility is
     // limited to the source/account/scope-validated group above, never persisted.
     if (group.some(row => row.currency != null && row.currency !== 'JPY')) return { ...base, status: 'unavailable' };
+    const sourceMarketValue = csv.sum(group.map(row => row.marketValue ?? null));
+    const sourceUnrealizedPnl = csv.sum(group.map(row => row.unrealizedPnl ?? null));
+    const input = records(models, 'monthlyAccountInputs').find(row => row.accountId === accountId && row.targetMonth === targetMonth && row.domesticImportBatchId === selected.id);
     return { ...base, status: 'ready', importBatchId: selected.id, snapshotAsOf: selected.snapshotAsOf,
-      marketValue: csv.sum(group.map(row => row.marketValue ?? null)),
-      unrealizedPnl: csv.sum(group.map(row => row.unrealizedPnl ?? null)) };
+      sourceMarketValue, sourceUnrealizedPnl, marketValue: input?.adoptedValues.marketValue ?? sourceMarketValue,
+      unrealizedPnl: input?.adoptedValues.unrealizedPnl ?? sourceUnrealizedPnl };
   }
 
   function load(adapter, targetMonth) {
@@ -50,7 +53,7 @@
 
   function createDrafts() {
     const months = new Map();
-    const fields = ['realizedPnL', 'deposit', 'withdrawal', 'foreignAssetValue', 'foreignUnrealizedPnl', 'foreignDate', 'cashBalance', 'cashDate'];
+    const fields = ['domesticMarketValue', 'domesticUnrealizedPnl', 'realizedPnL', 'deposit', 'withdrawal', 'foreignAssetValue', 'foreignUnrealizedPnl', 'foreignDate', 'cashBalance', 'cashDate'];
     return Object.freeze({
       read: month => ({ ...(months.get(month) || {}) }),
       initialize: (month, values) => { if (!months.has(month)) months.set(month, { ...values }); },

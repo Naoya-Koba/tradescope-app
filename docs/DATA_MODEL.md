@@ -10,7 +10,7 @@
 
 GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにする。Snapshotは破壊更新しない。PDF取込は引き続きv2を生成し、Inputの5項目編集は専用serviceで採用Stateだけを保存する。
 
-v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。envelope／7キーは変更せず、Backup v5で原値・採用値・metadataを保護する。v4の受理範囲は旧recordとv2に固定する。
+v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v6で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
 
 ## Current / Decided — GMO正式月末採用
 
@@ -407,9 +407,9 @@ MonthlyAccountState {
 
 **Decided**：同じ月の全保有Batchを加算せず、`domesticImportBatchId`の集合だけを採用する。latest importedAtを自動採用しない。Input編集中Draftはメモリ上で分離し、明示保存成功時だけ正本を更新する。CSV保存だけでは月次確定にしない。2026年1〜8月を自動migrationせず、新方式とlegacyの同じ範囲を二重加算しない。
 
-**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。Inputでは2026年9月以降のSBI口座を新方式に分離し、国内保有不在でもlegacyへ戻さない。月次状態が未保存なら対象月・口座・国内保有scopeが一致するBatchが1件のときのみread-only表示し、複数なら選択せず表示を停止する。月次状態の明示採用先がある場合はその参照だけを読む。金額は既存の共通decimal加算で集計し、必要値のnull／欠損・JPY以外は不明とする。AccountSnapshotや月次状態を表示のために作成しない。
+**Current**：MonthlyAccountStateのRepository・schema・参照検証は実装済み。必須11field、null可否、同一口座・月の一意性を検証し、Repository更新では同じ口座・月のID維持とIDの付け替え防止も確認する。Inputでは2026年9月以降のSBI口座を新方式に分離し、国内保有不在でもlegacyへ戻さない。月次状態が未保存なら対象月・口座・国内保有scopeが一致するBatchが1件のときのみ表示候補として読み、複数なら選択せず表示を停止する。月次状態の明示採用先がある場合はその参照だけを読む。金額は既存の共通decimal加算で集計し、必要値のnull／欠損・JPY以外は不明とする。AccountSnapshotや月次状態を表示のために作成しない。
 
-**Current**：新方式SBIの決済・入出金編集は月別のメモリ上Draftのみとし、legacy `tradingData`へのコピー・既存保存ボタンからの保存を行わない。外国証券・現金・月次必須入力を口座内の「保存」で同時確定し、Summary／Top／Asset Trendへ接続する。2026年9月は国内値の表示だけでは入力済み・確定にならない。2026年1〜8月は従来のlegacy Inputを維持する。9月以降の未確定月をplaceholderへ戻さず、自動migrationしない。
+**Current**：新方式SBIの決済・入出金編集は月別のメモリ上Draftのみとし、legacy `tradingData`へのコピー・既存保存ボタンからの保存を行わない。国内採用値・入力済み外国証券／現金／月次値を口座内の「保存」で同時保存し、全必須入力が揃った場合のみ月次確定し、Summary／Top／Asset Trendへ接続する。2026年9月は国内値の表示だけでは入力済み・確定にならない。2026年1〜8月は従来のlegacy Inputを維持する。9月以降の未確定月をplaceholderへ戻さず、自動migrationしない。
 
 **Current / Decided**：正常に解決した`acc_sbi_sec`・`imported`・`sbi-domestic-holdings`の国内保有Batch集合に限り、既存保存経路が省略していた`currency`の未設定／`null`をInput読込時に後方互換として許容する。明示的なJPY以外は表示を停止し、空文字はschema不正として拒否する。通貨をrecordへ補完せず、他口座・他取得範囲・AccountSnapshotへ一般化しない。金額の欠損を0にせず、表示によるmigration・月次確定は行わない。
 
@@ -705,4 +705,10 @@ TransactionAnnotation {
 - 欠落項目には安全な初期値または`unknown`を使う。
 - 既存データの意味が不明な場合は変換せず、確認対象として残す。
 
-**Current / SBI Input**：外国証券の評価額・評価損益・取得日、現金残高・取得日、実現損益・入金・出金を非永続Draftとして編集する。0 placeholderは使わず明示0を受理する。検証済み保存後は操作を隠して「保存済み」、再編集は保存操作へ戻す。編集中の集計は直前の正本から計算する。
+**Current / SBI Input**：外国証券の評価額・評価損益・取得日、現金残高・取得日、実現損益・入金・出金を非永続Draftとして編集する。0 placeholderは使わず明示0を受理する。検証済み保存後も「保存」ボタンを維持し独立した「保存済み」行は置かない。編集中の集計は直前の正本から計算する。
+
+## Current / Decided — SBI国内採用値と部分入力
+
+保存キーは`tradeScopeMonthlyAccountInputsV1`、entityは`monthlyAccountInputs`。envelope v1／record v1。必須fieldはschemaVersion、id、accountId、targetMonth、domesticImportBatchId、sourceValues、adoptedValues、overrideFields、overrideUpdatedAt、foreignAccountSnapshotId、cashAccountSnapshotId、realizedPnl、deposit、withdrawal。2つのValuesはmarketValue／unrealizedPnlのdecimal文字列、手入力参照・月次3値はnull可。口座・月は一意でIDを維持する。sourceValuesは同一国内BatchのHoldingSnapshot集計と厳密一致し、overrideFieldsは原値との差の正確な集合である。
+
+MonthlyAccountInputは編集採用値の正本であり、観測Snapshotでも月次確定Stateでもない。国内原値・個別Holding・取得日は変更せず、原値はBatch＋Holdingから再構築できる。partialでも採用値を保存できるが、不足外国／現金／月次項目を0へ変換せず偽のStateを作らない。入力済みmanual Snapshotと参照・月次値を一回のRepository transactionで保存する。既存Stateとの参照・月次値一致、scope・取得元・通貨を検証し、原値・IDの書換えとmetadataの虚偽を拒否する。表示・Draft編集・readでは保存しない。国内2項目のフォームは編集可能、取得日はread-onlyとする。

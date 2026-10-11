@@ -3,7 +3,7 @@
   const node = typeof module !== 'undefined' && module.exports;
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
-  const version = 'monthly-display-v2';
+  const version = 'monthly-display-v3';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -27,8 +27,9 @@
       if (resolved.source === 'conflict') return { components: [], conflict: true };
       if (key === 'sbi') {
         const candidates = resolver.domesticCandidates(models, targetMonth);
-        const domestic = resolved.state ? candidates.find(item => item.batch.id === resolved.state.domesticImportBatchId)
-          : candidates.length === 1 ? candidates[0] : null;
+        const input = records(models, 'monthlyAccountInputs').find(row => row.accountId === resolver.accountId && row.targetMonth === targetMonth);
+        const domestic = resolver.domesticAdoption(models, targetMonth, resolved.state ? candidates.find(item => item.batch.id === resolved.state.domesticImportBatchId)
+          : candidates.length === 1 ? candidates[0] : null);
         if (!resolved.state && candidates.length > 1) return { components: [], conflict: true };
         const components = domestic ? [{ name: '国内証券', asset: domestic.marketValue, unrealized: domestic.unrealizedPnl,
           snapshotAsOf: domestic.batch.snapshotAsOf, id: domestic.batch.id }] : [];
@@ -36,8 +37,9 @@
           ['現金・預り金', 'sbi-cash', resolved.cash, 'cashBalance']]) {
           const candidates = records(models, 'accountSnapshots').filter(row => row.accountId === resolver.policies.sbi.accountId
             && row.targetMonth === targetMonth && row.sourceScope === scope && row.sourceMode === 'manual' && row.valuationCurrency === 'JPY');
-          const snapshot = resolved.state ? adopted : candidates.length === 1 ? candidates[0] : null;
-          if (!resolved.state && candidates.length > 1) return { components: [], conflict: true };
+          const inputId = input?.[scope === 'sbi-cash' ? 'cashAccountSnapshotId' : 'foreignAccountSnapshotId'];
+          const snapshot = resolved.state ? adopted : input ? candidates.find(row => row.id === inputId) : candidates.length === 1 ? candidates[0] : null;
+          if (!resolved.state && !input && candidates.length > 1) return { components: [], conflict: true };
           components.push({ name, asset: snapshot?.[value] ?? null, unrealized: snapshot?.unrealizedPnl ?? null,
             snapshotAsOf: snapshot?.snapshotAsOf ?? null, id: snapshot?.id ?? null });
         }
@@ -66,7 +68,9 @@
       const observed = observation(key, targetMonth, resolved);
       const complete = isLegacy ? entered && Number.isFinite(calculator.net(year, month, key)) : resolved.completeness?.complete === true;
       const row = calculator.row(year, month, key);
-      const read = field => hasData && resolved.source !== 'conflict' ? numeric(row[field]) : null;
+      const input = key === 'sbi' ? records(models, 'monthlyAccountInputs').find(item => item.accountId === resolver.accountId && item.targetMonth === targetMonth) : null;
+      const adoptedRow = input && !resolved.state ? {realizedPnL:input.realizedPnl, deposit:input.deposit, withdrawal:input.withdrawal} : row;
+      const read = field => hasData && resolved.source !== 'conflict' ? numeric(adoptedRow[field]) : null;
       const partial = hasData && !complete;
       const asset = complete ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
       const unrealized = complete || resolved.source === 'legacy' ? read('unrealizedPnL')
@@ -92,7 +96,7 @@
       return { rows, hasData, provisional, total: knownSum([totals.realized, totals.swap]), ...totals };
     }
     function fingerprint(year) {
-      const dependencies = ['monthlyAccountStates', 'accountSnapshots', 'holdingSnapshots', 'importBatches']
+      const dependencies = ['monthlyAccountStates', 'monthlyAccountInputs', 'accountSnapshots', 'holdingSnapshots', 'importBatches']
         .map(entity => records(models, entity).filter(row => row.targetMonth?.startsWith(`${year}-`)));
       const source = JSON.stringify([version, calculator.fingerprint(year), dependencies]);
       let hash = 2166136261;

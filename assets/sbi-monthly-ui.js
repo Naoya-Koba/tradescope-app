@@ -5,6 +5,7 @@
     const service = root.TradeScopeSbiMonthlySave.createService(adapter);
     const inputView = root.TradeScopeSbiInput;
     const fields = [['realizedPnL', '実現損益', 'number'], ['deposit', '入金', 'number'], ['withdrawal', '出金', 'number'],
+      ['domesticMarketValue', '評価額', 'number'], ['domesticUnrealizedPnl', '評価損益', 'number'],
       ['foreignAssetValue', '評価額', 'number'], ['foreignUnrealizedPnl', '評価損益', 'number'], ['foreignDate', '取得日', 'date'],
       ['cashBalance', '残高', 'number'], ['cashDate', '取得日', 'date']];
     function savedDraft(resolved) {
@@ -17,16 +18,19 @@
       let models = null, resolved = null;
       try { models = data.createRepository({ getItem: key => adapter.getItem(key) }).read();
         resolved = resolver.resolve(models, legacyData(), targetMonth); } catch (_) { /* Fail closed; never seed. */ }
-      const baseline = savedDraft(resolved || {});
+      const persisted = models?.monthlyAccountInputs?.records.find(row => row.accountId === resolver.accountId && row.targetMonth === targetMonth);
+      const baseline = {...savedDraft(persisted ? {state:persisted,
+        foreign:models.accountSnapshots?.records.find(row=>row.id===persisted.foreignAccountSnapshotId),
+        cash:models.accountSnapshots?.records.find(row=>row.id===persisted.cashAccountSnapshotId)} : resolved || {}),
+        domesticMarketValue:view.marketValue ?? '', domesticUnrealizedPnl:view.unrealizedPnl ?? ''};
       drafts.initialize(targetMonth, baseline);
       const card = document.createElement('div'); card.className = 'account-card';
-      card.innerHTML = '<button type="button" class="account-toggle" data-account-toggle="sbi" aria-expanded="false"><div class="account-title"><div class="account-color-dot"></div><span class="sbi-account-label"></span></div><span class="account-toggle-icon">▼</span></button><div class="account-body" data-account-body="sbi"><div class="sbi-domestic-input"><div class="sbi-domestic-heading">国内証券 <span class="sbi-import-status"></span></div><dl><div><dt>評価額</dt><dd class="sbi-domestic-value"></dd></div><div><dt>評価損益</dt><dd class="sbi-domestic-pnl"></dd></div></dl><p class="sbi-domestic-date"></p></div></div>';
+      card.innerHTML = '<button type="button" class="account-toggle" data-account-toggle="sbi" aria-expanded="false"><div class="account-title"><div class="account-color-dot"></div><span class="sbi-account-label"></span></div><span class="account-toggle-icon">▼</span></button><div class="account-body" data-account-body="sbi"><div class="sbi-domestic-input"><div class="sbi-domestic-heading">国内証券</div></div></div>';
       card.querySelector('.sbi-account-label').textContent = label;
       card.querySelector('.account-color-dot').style.backgroundColor = account.color;
-      card.querySelector('.sbi-domestic-value').textContent = inputView.formatYen(view.marketValue);
-      card.querySelector('.sbi-domestic-pnl').textContent = inputView.formatYen(view.unrealizedPnl, true);
-      card.querySelector('.sbi-import-status').textContent = '';
-      const date = card.querySelector('.sbi-domestic-date'); date.textContent = view.snapshotAsOf ? `取得日：${view.snapshotAsOf.slice(0, 10).replace(/-/g, '/')}` : ''; date.hidden = !date.textContent;
+      const domesticSection = card.querySelector('.sbi-domestic-input');
+      const date = document.createElement('p'); date.className='sbi-domestic-date';
+      date.textContent = view.snapshotAsOf ? `取得日：${view.snapshotAsOf.slice(0, 10).replace(/-/g, '/')}` : ''; date.hidden = !date.textContent;
       const body = card.querySelector('.account-body');
       const values = drafts.read(targetMonth);
       const controls = {};
@@ -39,7 +43,7 @@
       breakdown.appendChild(card.querySelector('.sbi-domestic-input'));
       breakdown.addEventListener('toggle', () => { if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`; });
       for (const [field, title, type] of fields) {
-        const destination = ['realizedPnL', 'deposit', 'withdrawal'].includes(field) ? body : breakdown;
+        const destination = field.startsWith('domestic') ? domesticSection : ['realizedPnL', 'deposit', 'withdrawal'].includes(field) ? body : breakdown;
         if (['foreignAssetValue', 'cashBalance'].includes(field)) {
           const heading = document.createElement('div'); heading.className = 'sbi-manual-heading';
           heading.textContent = field === 'foreignAssetValue' ? '外国証券' : '現金・預り金'; destination.appendChild(heading);
@@ -52,7 +56,14 @@
         labelElement.htmlFor = control.id; labelElement.textContent = title; group.append(labelElement, control);
         if (type === 'number') { const suffix = document.createElement('span'); suffix.className = 'suffix'; suffix.textContent = '¥'; group.appendChild(suffix); }
         destination.appendChild(group); controls[field] = control;
+        if (field.startsWith('domestic')) {
+          const reset=document.createElement('button');reset.type='button';reset.className='monthly-source-reset';reset.textContent='取込値に戻す';
+          reset.addEventListener('click',()=>{if(busy)return;const value=field==='domesticMarketValue'?view.sourceMarketValue:view.sourceUnrealizedPnl;
+            control.value=value??'';drafts.set(targetMonth,field,control.value);error.textContent=unavailable;refresh();});
+          destination.appendChild(reset);
+        }
       }
+      domesticSection.appendChild(date);
       body.appendChild(breakdown);
       const actions = document.createElement('div'); actions.className = 'sbi-monthly-actions';
       const button = document.createElement('button'); button.type = 'button'; button.className = 'sbi-monthly-save btn btn-primary btn-block monthly-account-save'; button.textContent = '保存';
@@ -68,12 +79,12 @@
         const current = drafts.read(targetMonth), csv = root.TradeScopeCSV;
         const decimal = value => { try{return csv.decimal(value);}catch(_){return null;} };
         const sum = values => { const known=values.map(decimal).filter(value=>value!==null);return known.length?csv.sum(known):null; };
-        const amount=sum([view.marketValue, current.foreignAssetValue, current.cashBalance]);
-        const pnl=sum([view.unrealizedPnl, current.foreignUnrealizedPnl]);
+        const amount=sum([current.domesticMarketValue, current.foreignAssetValue, current.cashBalance]);
+        const pnl=sum([current.domesticUnrealizedPnl, current.foreignUnrealizedPnl]);
         amountInput.value=amount??'';pnlInput.value=pnl??'';
         const unchanged = fields.every(([field]) => String(drafts.read(targetMonth)[field] ?? '') === String(baseline[field] ?? ''));
-        button.hidden = saved && unchanged; button.disabled = busy || Boolean(unavailable);
-        status.textContent = button.hidden ? '保存済み' : busy ? '保存中…' : '';
+        button.hidden = false; button.disabled = busy || Boolean(unavailable);
+        status.textContent = busy ? '保存中…' : '';status.hidden=!busy;
         error.hidden = !error.textContent;
         if (body.classList.contains('open')) body.style.maxHeight = `${body.scrollHeight}px`;
       }

@@ -8,7 +8,8 @@
     2: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']),
     3: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
     4: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
-    5: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates'])
+    5: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
+    6: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -88,6 +89,15 @@
   const provenance = { accountId: id, targetMonth: month, snapshotAsOf: observed, importedAt: timestamp,
     sourceMode, sourceScope: text, importBatchId: id, observationType };
   const definitions = {
+    monthlyAccountInputs: {
+      required: ['schemaVersion', 'id', 'accountId', 'targetMonth', 'domesticImportBatchId', 'sourceValues', 'adoptedValues',
+        'overrideFields', 'overrideUpdatedAt', 'foreignAccountSnapshotId', 'cashAccountSnapshotId', 'realizedPnl', 'deposit', 'withdrawal'],
+      nullable: ['foreignAccountSnapshotId', 'cashAccountSnapshotId', 'realizedPnl', 'deposit', 'withdrawal'],
+      types: { ...common, accountId: id, targetMonth: month, domesticImportBatchId: id,
+        sourceValues: domesticValues, adoptedValues: domesticValues, overrideUpdatedAt: timestamp,
+        overrideFields: value => Array.isArray(value) && new Set(value).size === value.length && value.every(field => ['marketValue', 'unrealizedPnl'].includes(field)),
+        foreignAccountSnapshotId: id, cashAccountSnapshotId: id, realizedPnl: decimal, deposit: decimal, withdrawal: decimal }
+    },
     accounts: { required: ['id', 'displayName', 'providerCode', 'accountType', 'enabled'],
       types: { ...common, displayName: text, providerCode: text, providerName: text,
         accountType: value => ['fx', 'securities', 'crypto', 'bank', 'other'].includes(value), enabled: boolean,
@@ -220,9 +230,44 @@
           || snapshot.valuationCurrency !== 'JPY' || snapshot.importBatchId) fail();
       }
     }
+    const inputMonths = new Set();
+    for (const input of records('monthlyAccountInputs')) {
+      const account = accounts.get(input.accountId), batch = batches.get(input.domesticImportBatchId);
+      const pair = JSON.stringify([input.accountId, input.targetMonth]);
+      if (inputMonths.has(pair) || input.accountId !== 'acc_sbi_sec' || account?.providerCode !== 'sbi'
+        || account.accountType !== 'securities' || input.targetMonth < '2026-09'
+        || !batch || batch.accountId !== input.accountId || batch.targetMonth !== input.targetMonth
+        || batch.sourceType !== 'csv' || batch.sourceProvider !== 'sbi' || !batch.snapshotAsOf) fail();
+      inputMonths.add(pair);
+      const holdings = records('holdingSnapshots').filter(row => row.importBatchId === batch.id);
+      if (!holdings.length || holdings.some(row => row.accountId !== input.accountId || row.targetMonth !== input.targetMonth
+        || row.sourceMode !== 'imported' || row.sourceScope !== 'sbi-domestic-holdings'
+        || (row.currency != null && row.currency !== 'JPY'))) fail();
+      const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
+      for (const field of ['marketValue', 'unrealizedPnl']) {
+        const sum = csv.sum(holdings.map(row => row[field] ?? null));
+        if (sum === null || !equalDecimal(sum, input.sourceValues[field])) fail();
+      }
+      const changed = ['marketValue', 'unrealizedPnl'].filter(field => !equalDecimal(input.sourceValues[field], input.adoptedValues[field]));
+      if (changed.length !== input.overrideFields.length || changed.some(field => !input.overrideFields.includes(field))) fail();
+      for (const [field, scope] of [['foreignAccountSnapshotId', 'sbi-foreign-securities'], ['cashAccountSnapshotId', 'sbi-cash']]) {
+        if (input[field] === null) continue;
+        const row = snapshots.get(input[field]);
+        if (!row || row.accountId !== input.accountId || row.targetMonth !== input.targetMonth || row.sourceMode !== 'manual'
+          || row.sourceScope !== scope || row.valuationCurrency !== 'JPY' || row.importBatchId) fail();
+      }
+      const state = records('monthlyAccountStates').find(row => row.accountId === input.accountId && row.targetMonth === input.targetMonth);
+      if (state && ['domesticImportBatchId', 'foreignAccountSnapshotId', 'cashAccountSnapshotId', 'realizedPnl', 'deposit', 'withdrawal']
+        .some(field => state[field] !== input[field])) fail();
+    }
     return true;
   }
-  function validateModels(models) { return validateModelSet(models, Object.keys(keys)); }
+  function domesticValues(value) {
+    fields(value, ['marketValue', 'unrealizedPnl'], ['marketValue', 'unrealizedPnl']);
+    if (!decimal(value.marketValue) || !decimal(value.unrealizedPnl)) fail();
+    return true;
+  }
+  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, ...models}, Object.keys(keys)); }
   // Only implemented policies can adopt a whole-account observation. Future brokers are not implicitly enabled.
   const adoptionPolicies = Object.freeze({ gmo: Object.freeze({ accountType: 'fx', sourceScope: 'gmo-fx-monthly-report',
     sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY', sourceType: 'pdf' }) });
@@ -307,9 +352,14 @@
         if (value === null) fail();
         validateEnvelope(entity, value);
         if (entity === 'accounts' && (models.accounts?.records || []).some(record => !value.records.some(item => item.id === record.id))) fail();
-        if (entity === 'monthlyAccountStates' && (models[entity]?.records || []).some(record => value.records.some(item =>
+        if (['monthlyAccountStates', 'monthlyAccountInputs'].includes(entity) && (models[entity]?.records || []).some(record => value.records.some(item =>
           (item.accountId === record.accountId && item.targetMonth === record.targetMonth && item.id !== record.id)
           || (item.id === record.id && (item.accountId !== record.accountId || item.targetMonth !== record.targetMonth))))) fail();
+        if (entity === 'monthlyAccountInputs') for (const old of models[entity]?.records || []) {
+          const next = value.records.find(item => item.id === old.id);
+          if (!next || next.domesticImportBatchId === old.domesticImportBatchId && ['marketValue', 'unrealizedPnl']
+            .some(field => !equalDecimal(next.sourceValues[field], old.sourceValues[field]))) fail();
+        }
         if (entity === 'monthlyAccountStates') for (const old of models[entity]?.records || []) {
           const next = value.records.find(item => item.id === old.id);
           if (next && old.adoptedAccountSnapshotId === next.adoptedAccountSnapshotId) {

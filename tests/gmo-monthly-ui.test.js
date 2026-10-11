@@ -23,9 +23,9 @@ test('GMO five adopted fields are editable without legacy controls or standalone
  h.change('swapPnl','7.1234567890123456789');assert.equal(h.control('swapPnl').value,'7.1234567890123456789');assert.deepEqual(h.adapter.snapshot(),before);
  assert.equal(h.elements().some(el=>el.textContent==='取込済み'),false);
 });
-test('GMO edit/save/reload adopts v3 and hides unchanged action only after verification',()=>{const h=harness();assert.equal(h.button().hidden,true);h.change('realizedPnl','11');h.button().listeners.click();
- assert.equal(h.saved(),1);assert.equal(h.button().hidden,true);assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records[0].schemaVersion,3);
- h.render();assert.equal(h.control('realizedPnl').value,'11');assert.equal(h.elements().find(el=>el.className==='sbi-monthly-status').textContent,'保存済み');
+test('GMO edit/save/reload adopts v3, keeps save button and no standalone saved row',()=>{const h=harness();assert.equal(h.button().hidden,false);h.change('realizedPnl','11');h.button().listeners.click();
+ assert.equal(h.saved(),1);assert.equal(h.button().hidden,false);assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records[0].schemaVersion,3);
+ h.render();assert.equal(h.control('realizedPnl').value,'11');assert.equal(h.elements().some(el=>el.textContent==='保存済み'),false);
 });
 test('return-to-import changes Draft only; save restores baseline without removing provenance',()=>{const h=harness();h.change('realizedPnl','11');h.button().listeners.click();const before=h.adapter.snapshot();
  const reset=h.elements().find(el=>el.className==='monthly-source-reset');assert.equal(reset.hidden,false);reset.listeners.click();assert.equal(h.control('realizedPnl').value,'10');assert.deepEqual(h.adapter.snapshot(),before);

@@ -43,6 +43,14 @@
     });
   }
 
+  function domesticAdoption(models, targetMonth, domestic) {
+    const input = records(models, 'monthlyAccountInputs').find(row => row.accountId === accountId && row.targetMonth === targetMonth);
+    if (!input || input.domesticImportBatchId !== domestic?.batch.id || !decimal(domestic?.marketValue) || !decimal(domestic?.unrealizedPnl)
+      || !storage.equalDecimal(input.sourceValues.marketValue, domestic.marketValue)
+      || !storage.equalDecimal(input.sourceValues.unrealizedPnl, domestic.unrealizedPnl)) return domestic;
+    return {...domestic, sourceMarketValue: domestic.marketValue, sourceUnrealizedPnl: domestic.unrealizedPnl,
+      marketValue: input.adoptedValues.marketValue, unrealizedPnl: input.adoptedValues.unrealizedPnl};
+  }
   function resolveSbi(models, tradingData, targetMonth, key = 'sbi') {
     if (key !== 'sbi' || targetMonth < cutover) return { source: 'legacy' };
     const base = { source: 'missing', confirmed: false, completeness: { monthly: false, observation: false, complete: false },
@@ -51,7 +59,7 @@
     if (hasLegacyConflict(tradingData, targetMonth)) return { ...base, source: 'conflict' };
     const state = records(models, 'monthlyAccountStates').find(row => row.accountId === accountId && row.targetMonth === targetMonth);
     if (!state) return base;
-    const domestic = domesticCandidates(models, targetMonth).find(item => item.batch.id === state.domesticImportBatchId);
+    const domestic = domesticAdoption(models, targetMonth, domesticCandidates(models, targetMonth).find(item => item.batch.id === state.domesticImportBatchId));
     const snapshots = records(models, 'accountSnapshots');
     const foreign = snapshots.find(row => row.id === state.foreignAccountSnapshotId);
     const cash = snapshots.find(row => row.id === state.cashAccountSnapshotId);
@@ -108,6 +116,7 @@
     const snapshotIds = new Set(states.flatMap(row => [row.foreignAccountSnapshotId, row.cashAccountSnapshotId, row.adoptedAccountSnapshotId]));
     for (const snapshot of records(models, 'accountSnapshots')) if (snapshotIds.has(snapshot.id)) batchIds.add(snapshot.importBatchId);
     return { calculationVersion, policyVersion, policies: enabledKeys.map(key => policies[key]), states,
+      inputs: records(models, 'monthlyAccountInputs').filter(row => enabledAccounts.includes(row.accountId) && row.targetMonth.startsWith(`${year}-`)),
       batches: records(models, 'importBatches').filter(row => batchIds.has(row.id)),
       holdings: records(models, 'holdingSnapshots').filter(row => batchIds.has(row.importBatchId)),
       snapshots: records(models, 'accountSnapshots').filter(row => snapshotIds.has(row.id)) };
@@ -240,6 +249,6 @@
       snapshotCurrent: (value, year, keys) => Boolean(value && value.sourceFingerprint === fingerprint(year)
         && value.month === latestMonth(year, keys) && monthEntered(year, value.month, keys)) });
   }
-  const api = Object.freeze({ accountId, cutover, calculationVersion, policyVersion, policies, hasLegacyConflict, domesticCandidates, resolve, dependencies, createCalculator });
+  const api = Object.freeze({ accountId, cutover, calculationVersion, policyVersion, policies, hasLegacyConflict, domesticCandidates, domesticAdoption, resolve, dependencies, createCalculator });
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TradeScopeMonthlyResolver = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

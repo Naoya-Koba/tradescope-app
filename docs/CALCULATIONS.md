@@ -10,7 +10,7 @@ Topと年間Summaryは同じ`dashboard(year)`の4指標・変動額・成長率�
 
 Monthly Summary／Monthly P/Lは選択月だけを見る。State未確定でも取得済み国内保有等を表示し、未入力は「—」。月間決済・swapは既知値のみ集計し、年間決済・swap・入出金も既知月の値を積み上げる。他口座の欠損で既知値を非表示にせず、未完成合計は暫定とする。前月fallback・0永続化は行わない。
 
-表示fingerprintはprojection version、従来calculator依存、対象年のState／AccountSnapshot／HoldingSnapshot／ImportBatchに依存する。未採用の国内取込も反映する。TopはこのViewを都度read-only再計算し、古いTop Snapshotで上書きせず、hash用の元データ複製を永続保存・ログ・外部送信しない。
+表示fingerprintはprojection version、従来calculator依存、対象年のState／MonthlyAccountInput／AccountSnapshot／HoldingSnapshot／ImportBatchに依存する。未採用の国内取込も反映する。TopはこのViewを都度read-only再計算し、古いTop Snapshotで上書きせず、hash用の元データ複製を永続保存・ログ・外部送信しない。
 
 **Current**：Inputは口座単位の確認・編集・保存とする。FXは決済・swap・評価・入出金、SBIは評価額・評価損益・実現損益・入出金を表示しswap欄を設けない。SBI口座全体の表示値は取得済み国内＋外国＋現金の既知成分合計で、資産内訳は初期折りたたみ。未確定DraftはSummary計算へ入れず、GMOは原値を保持して明示保存した採用値だけを使用する。
 
@@ -284,3 +284,7 @@ Monthly P/L = 当月決済損益 + 当月スワップ損益
 - **Under consideration**：小数通貨、暗号資産数量、投資信託口数、外貨換算の精度ルール。
 
 **Current**：確定後に各表示を再計算し、編集中のDraftは計算へ渡さない。競合する旧SBI入力がある場合はInputとSummaryに具体的な短い案内を表示する。未確定月は欠損点のまま、累積欠損をnullとして表示し、nullの減算・表示を0へ変換しない。Chart.jsの欠損接続は無効（spanGapsの既定false）を維持する。
+
+## Current — SBI国内手修正の共通反映
+
+国内観測群の原値にMonthlyAccountInputの採用値を適用する共通resolver helperをInput／partial View／確定月計算で使用する。保存後のTop、年間Summary、Asset Trend、Monthly Summary、Allocation、口座一覧・pie、Riskの口座資産額は同じprojectionを使用する。Performance Trend等の損益は完全月の安全な計算を維持し、国内評価額だけのpartialから実現損益・成長を逆算しない。国内採用評価損益は選択月表示へ直ちに反映するが未入力実現・入出金等はnullのまま。Draft編集時はInput上段だけ更新し、保存・cache無効化後に共通表示へ反映する。

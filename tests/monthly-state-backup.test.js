@@ -34,6 +34,7 @@ function fixture() {
       marketValue: '0', unrealizedPnl: null, quantity: '123456789012345.123456789', observationType: 'approximateForMonth' }]),
     accountSnapshots: envelope([{ id: 'as_foreign', ...manual, sourceScope: 'sbi-foreign-securities',
       assetValue: '0', unrealizedPnl: null }, { id: 'as_cash', ...manual, sourceScope: 'sbi-cash', cashBalance: '0' }]),
+    monthlyAccountInputs: null,
     monthlyAccountStates: envelope([{ id: 'mas_anonymous', accountId, targetMonth, confirmedAt: now,
       domesticImportBatchId: 'batch_domestic', foreignAccountSnapshotId: 'as_foreign', cashAccountSnapshotId: 'as_cash',
       realizedPnl: null, swapPnl: '0', deposit: '123456789012345.123456789', withdrawal: '-0.25' }])
@@ -71,7 +72,7 @@ function rejectWithoutWrites(mutate) {
 
 test('Monthly state accepts explicit confirmation, all nullable fields, decimal precision and actual zero', () => {
   const storage = new Storage(), repo = model.createRepository(storage);
-  repo.commit(fixture()); assert.deepEqual(repo.read(), fixture());
+  repo.commit(Object.fromEntries(Object.entries(fixture()).filter(([,value])=>value!==null))); assert.deepEqual(repo.read(), fixture());
   const state = repo.list('monthlyAccountStates')[0];
   assert.equal(state.realizedPnl, null); assert.equal(state.swapPnl, '0');
   assert.equal(state.deposit, '123456789012345.123456789');
@@ -134,7 +135,7 @@ test('lazy Repository/read/export neither seeds models nor generates monthly con
   const storage = new Storage(), repo = model.createRepository(storage);
   assert.deepEqual(repo.read(), absent()); assert.deepEqual(repo.list('monthlyAccountStates'), []);
   const h = harness(), value = h.build(storage, 'http://localhost', now);
-  assert.equal(value.backupVersion, 5); assert.deepEqual(copy(value.data.models), absent());
+  assert.equal(value.backupVersion, 6); assert.deepEqual(copy(value.data.models), absent());
   assert.equal(storage.writes, 0);
   const target = seed(); h.restore.execute(h.inspect(value).restorePlan, target);
   assert.deepEqual(model.readModels(target), absent());
@@ -143,7 +144,7 @@ test('lazy Repository/read/export neither seeds models nor generates monthly con
 test('v3 seven models round-trip; filename and exportedAt unchanged, no draft/aggregate fields', () => {
   const h = harness(), source = seed(), before = source.snapshot();
   const value = h.build(source, 'http://localhost', now);
-  assert.equal(value.backupVersion, 5); assert.equal(value.exportedAt, now);
+  assert.equal(value.backupVersion, 6); assert.equal(value.exportedAt, now);
   assert.deepEqual(copy(value.data.models), fixture()); assert.deepEqual(source.snapshot(), before);
   const target = new Storage(); h.restore.execute(h.inspect(value).restorePlan, target);
   assert.deepEqual(copy(h.build(target, 'http://localhost', now)), copy(value));
@@ -160,7 +161,7 @@ test('v1 and each Legacy Restore preserve all seven model keys including unreada
   for (const input of inputs) {
     const target = seed(); target.setItem(stateKey, ' {"schemaVersion":99} '); const before = target.snapshot();
     h.restore.execute(h.inspect(input).restorePlan, target);
-    for (const key of Object.values(model.keys)) assert.equal(target.getItem(key), before[key]);
+    for (const key of Object.values(model.keys)) assert.equal(target.getItem(key), before[key] ?? null);
   }
 });
 
@@ -253,7 +254,7 @@ test('monthly State save never modifies legacy monthly, financial calculations o
   const target = seed(), before = target.snapshot(), repo = model.createRepository(target);
   repo.upsert('monthlyAccountStates', { ...repo.list('monthlyAccountStates')[0], realizedPnl: '0' });
   for (const key of ['tradingData', 'yearInitialFunds', 'yearInitialUnrealized', 'tradeScopeTradeHistoryV1',
-    'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeScopeTopSummarySnapshotV1']) assert.equal(target.getItem(key), before[key]);
+    'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeScopeTopSummarySnapshotV1']) assert.equal(target.getItem(key), before[key] ?? null);
   const ui = fs.readFileSync(path.join(__dirname, '../profit/soneki.js'), 'utf8');
   assert.ok(ui.includes('monthlyCalculator()')); assert.ok(ui.includes('sbiMonthlyUI.renderCard'));
   assert.ok(!ui.includes(stateKey)); // No independent State storage writes in screen code.

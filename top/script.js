@@ -2481,7 +2481,7 @@ function updateDataByYear(inputYear = null) {
 
 // ===== Backup Format Core (pure functions; no storage writes) =====
 const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
-const COMPLETE_BACKUP_VERSION = 5;
+const COMPLETE_BACKUP_VERSION = 6;
 const backupDataStorage = window.TradeScopeDataStorage;
 const backupStorageTransaction = window.TradeScopeStorageTransaction;
 const COMPLETE_BACKUP_RESTORE_JOURNAL_KEY = 'tradeScopeRestoreJournalV1';
@@ -2507,7 +2507,7 @@ const COMPLETE_BACKUP_STORAGE_LABELS = Object.freeze({
   tradeScopeAccountsV1: '口座', tradeScopeInstrumentsV1: '商品',
   tradeScopeImportBatchesV1: '取込履歴', tradeScopeRawTransactionsV1: '取引事実',
   tradeScopeHoldingSnapshotsV1: '保有情報', tradeScopeAccountSnapshotsV1: '口座状態',
-  tradeScopeMonthlyAccountStatesV1: '月次確定状態'
+  tradeScopeMonthlyAccountStatesV1: '月次確定状態', tradeScopeMonthlyAccountInputsV1: '口座部分入力'
 });
 const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V1: 'v1-complete',
@@ -2515,6 +2515,7 @@ const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V3: 'v3-complete',
   V4: 'v4-complete',
   V5: 'v5-complete',
+  V6: 'v6-complete',
   LEGACY_ALL: 'legacy-all',
   LEGACY_PROFIT: 'legacy-profit',
   LEGACY_HISTORY: 'legacy-history',
@@ -2523,7 +2524,7 @@ const COMPLETE_BACKUP_FORMATS = Object.freeze({
 });
 
 function backupModelEntitiesForFormat(format) {
-  const version = format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : format === COMPLETE_BACKUP_FORMATS.V4 ? 4 : format === COMPLETE_BACKUP_FORMATS.V5 ? 5 : 0;
+  const version = format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : format === COMPLETE_BACKUP_FORMATS.V4 ? 4 : format === COMPLETE_BACKUP_FORMATS.V5 ? 5 : format === COMPLETE_BACKUP_FORMATS.V6 ? 6 : 0;
   return backupDataStorage.backupModelEntities[version] || [];
 }
 
@@ -2546,8 +2547,8 @@ function detectBackupFormat(value) {
 
   if (hasOwn(value, 'product') || hasOwn(value, 'backupVersion')) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) return COMPLETE_BACKUP_FORMATS.INVALID;
-    if (![1, 2, 3, 4, 5].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
-    return { 1: COMPLETE_BACKUP_FORMATS.V1, 2: COMPLETE_BACKUP_FORMATS.V2, 3: COMPLETE_BACKUP_FORMATS.V3, 4: COMPLETE_BACKUP_FORMATS.V4, 5: COMPLETE_BACKUP_FORMATS.V5 }[value.backupVersion];
+    if (![1, 2, 3, 4, 5, 6].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
+    return { 1: COMPLETE_BACKUP_FORMATS.V1, 2: COMPLETE_BACKUP_FORMATS.V2, 3: COMPLETE_BACKUP_FORMATS.V3, 4: COMPLETE_BACKUP_FORMATS.V4, 5: COMPLETE_BACKUP_FORMATS.V5, 6: COMPLETE_BACKUP_FORMATS.V6 }[value.backupVersion];
   }
 
   if (value.tradescope === 'all-backup') return COMPLETE_BACKUP_FORMATS.LEGACY_ALL;
@@ -2598,7 +2599,7 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
     return ['unsupported backupVersion'];
   }
 
-  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(format)) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6].includes(format)) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) errors.push('product must be TradeScope');
     const version = Number(format.slice(1, 2));
     if (value.backupVersion !== version) errors.push('backupVersion does not match format');
@@ -2682,13 +2683,13 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   const normalized = {
     format,
     exportedAt: typeof value?.exportedAt === 'string' ? value.exportedAt : '',
-    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(format) ? 'complete' : 'legacy-partial',
+    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6].includes(format) ? 'complete' : 'legacy-partial',
     coverage: { ...emptyCoverage },
     data: {},
     warnings: []
   };
 
-  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(format)) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6].includes(format)) {
     const data = isPlainRecord(value.data) ? value.data : {};
     const legacy = isPlainRecord(data.legacy) ? data.legacy : {};
     normalized.coverage = {
@@ -2780,6 +2781,10 @@ function buildBackupRestorePlan(normalized) {
       const value = normalized.data.models[entity];
       operations.push(value === null ? { type: 'remove', storageKey } : { type: 'set', storageKey, value });
     });
+    if (normalized.format !== COMPLETE_BACKUP_FORMATS.V6) {
+      operations.push({ type: 'remove', storageKey: backupDataStorage.keys.monthlyAccountInputs });
+      normalized.warnings.push('旧モデル復元と矛盾しないよう口座部分入力をクリアする');
+    }
     if (normalized.format === COMPLETE_BACKUP_FORMATS.V2) {
       operations.push({ type: 'remove', storageKey: backupDataStorage.keys.monthlyAccountStates });
     }
@@ -2843,6 +2848,7 @@ function getBackupFormatLabel(format) {
     [COMPLETE_BACKUP_FORMATS.V3]: '完全バックアップv3',
     [COMPLETE_BACKUP_FORMATS.V4]: '完全バックアップv4',
     [COMPLETE_BACKUP_FORMATS.V5]: '完全バックアップv5',
+    [COMPLETE_BACKUP_FORMATS.V6]: '完全バックアップv6',
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: '旧統合バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: '旧損益バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: '旧履歴バックアップ'
@@ -3034,7 +3040,8 @@ function prepareBackupRestoreActions(restorePlan, storage) {
     const entity = Object.keys(backupDataStorage.keys).find(name => backupDataStorage.keys[name] === operation.storageKey);
     if (operation.type === 'remove') {
       const clearsState = restorePlan.format === COMPLETE_BACKUP_FORMATS.V2 && entity === 'monthlyAccountStates';
-      if (!entity || (!clearsState && !backupModelEntitiesForFormat(restorePlan.format).includes(entity))) throw new Error('復元対象の削除が不正です');
+      const clearsInputs = [COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(restorePlan.format) && entity === 'monthlyAccountInputs';
+      if (!entity || (!clearsState && !clearsInputs && !backupModelEntitiesForFormat(restorePlan.format).includes(entity))) throw new Error('復元対象の削除が不正です');
       return { type: 'remove', storageKey: operation.storageKey };
     }
     if (operation.type !== 'set') throw new Error('復元操作が不正です');
@@ -3063,10 +3070,11 @@ function prepareBackupRestoreActions(restorePlan, storage) {
   const versionModelKeys = backupModelEntitiesForFormat(restorePlan.format).map(entity => backupDataStorage.keys[entity]);
   const requiredByFormat = {
     [COMPLETE_BACKUP_FORMATS.V1]: legacyCompleteKeys,
-    [COMPLETE_BACKUP_FORMATS.V2]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountStates],
-    [COMPLETE_BACKUP_FORMATS.V3]: [...legacyCompleteKeys, ...versionModelKeys],
-    [COMPLETE_BACKUP_FORMATS.V4]: [...legacyCompleteKeys, ...versionModelKeys],
-    [COMPLETE_BACKUP_FORMATS.V5]: [...legacyCompleteKeys, ...versionModelKeys],
+    [COMPLETE_BACKUP_FORMATS.V2]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountStates, backupDataStorage.keys.monthlyAccountInputs],
+    [COMPLETE_BACKUP_FORMATS.V3]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountInputs],
+    [COMPLETE_BACKUP_FORMATS.V4]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountInputs],
+    [COMPLETE_BACKUP_FORMATS.V5]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountInputs],
+    [COMPLETE_BACKUP_FORMATS.V6]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: ['tradingData', 'yearInitialFunds', 'tradeScopeTradeHistoryV1'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: ['tradingData', 'yearInitialFunds'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: ['tradeScopeTradeHistoryV1']
@@ -3088,6 +3096,7 @@ function prepareBackupRestoreActions(restorePlan, storage) {
     }
     const version = Number(restorePlan.format.slice(1, 2));
     backupDataStorage.validateBackupModels(version, models);
+    if (version >= 2 && version <= 5 && actions.find(action => action.storageKey === backupDataStorage.keys.monthlyAccountInputs)?.type !== 'remove') throw new Error('旧形式復元の部分入力クリアが不足しています');
     if (version === 2) {
       const stateAction = actions.find(action => action.storageKey === backupDataStorage.keys.monthlyAccountStates);
       if (stateAction?.type !== 'remove') throw new Error('v2復元の月次状態クリアが不足しています');

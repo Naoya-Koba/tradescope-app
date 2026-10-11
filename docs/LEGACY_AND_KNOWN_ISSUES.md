@@ -4,7 +4,7 @@
 
 Top／年間Summary／両Trendは非永続の共通表示projectionを使用する。同一年・同一指標の値と成長率を共通化し、部分観測は既知成分だけ、当月データが全くない口座だけ直近完全月を使用する。Monthlyは選択月限定、年間内訳は既知月次値の積み上げで、State未確定のSBI国内保有も表示する。null／0と厳密なcanonical ledgerは維持する。
 
-**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO手修正UI／原値保護／State v3／Backup v5は接続済み。
+**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO手修正UI／原値保護／State v3／Backup v6は接続済み。
 
 **Current**：GMO Inputの5項目編集、SBI口座全体表示＋折りたたみ内訳、口座単位保存を実装済み。legacy Draftを正本から分離し他口座を巻き込まない。原値と採用値はmetadataで区別し、明示保存だけState v3にする。独立した取込済み行／global保存／SBI swap欄を除去した。
 
@@ -16,7 +16,7 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 非ゼロ手数料・締後移動・未対応外貨・未知入出金区分・合計不一致は推定補完せず停止する。複数タブの完全排他、quota・中断・実機PWAは引き続きリスクとして扱う。未対応の他brokerへ自動拡張しない。
 
-**Current / v1〜v5互換**：最新Exportはv5。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
+**Current / v1〜v6互換**：最新Exportはv6。SBI部分入力も8collectionで保護し、v5の7collection範囲は固定する。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
 
 この文書は、2026-09-26時点のコード読取結果と、その後のCurrent更新を記録する。ここへの記載は修正済みを意味しない。
 
@@ -175,3 +175,9 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 不明点は推測で埋めず、実装開始前に確認する。
 
 **Current / SBI月次接続**：2026-09以降は未確定をlegacy placeholderで補わない。Top／Summary／Trendは共有resolverを参照し、Stateと採用元を含むfingerprintで古いキャッシュを拒否する。保存済みの旧全ゼロ値が実入力かplaceholderかは既存recordだけでは区別不能であり、Migrationせず非ゼロ直接入力を競合の証拠とする。複数国内候補の解決UI、同時タブの完全排他、実機iPhoneの保存／容量／中断検証は今回追加しない。
+
+## Current / Known issue — SBI国内部分保存
+
+国内集計の手修正はMonthlyAccountInputとBackup v6で保護し原Holding・取得日・legacyを変更しない。必要な外国／現金／月次値が不足している間はStateを作らない。旧CSV再取込と手入力履歴のcross-store重複検出・canonical削除UIは未実装で今回追加しない。実機iPhoneでの保存・容量・中断確認は別途必要。
+
+**Known issue / 要再現確認**：匿名localhostで390pxから1280pxへ連続切替した際、既存CDNのChart.jsでnull contextの`save`例外を1回観測した。通常のTop表示では再発せず、原因は未確定。今回のInput保存修正とは分離し、チャート処理は変更していない。
