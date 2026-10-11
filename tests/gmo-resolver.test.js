@@ -7,8 +7,8 @@ const { fixture, copy } = require('./gmo-support.js');
 const enabledKeys = ['gmo'];
 function metrics() { const window = {}; vm.runInNewContext(fs.readFileSync(require.resolve('../assets/profit-metrics.js'), 'utf8'), { window }); return window.TradeScopeProfitMetrics; }
 function calc(models = fixture(), legacy = {}) { return resolver.createCalculator(metrics(), legacy, { 2026: { gmo: 100 } }, {}, models, { enabledKeys }); }
-test('GMO adapter stays inactive by default, August legacy / September missing', () => {
-  assert.equal(resolver.resolve(fixture(), {}, '2026-09', 'gmo').source, 'legacy');
+test('GMO production adapter is enabled, August legacy / September missing', () => {
+  assert.equal(resolver.resolve(fixture(), {}, '2026-09', 'gmo').source, 'canonical');
   assert.equal(resolver.resolve(fixture(), {}, '2026-08', 'gmo', enabledKeys).source, 'legacy');
   const models = fixture(); models.monthlyAccountStates = null;
   assert.equal(resolver.resolve(models, { 2026: { 9: { __saved: true, gmo: { realizedPnL: 0 } } } }, '2026-09', 'gmo', enabledKeys).source, 'missing');

@@ -47,7 +47,7 @@ test('cutover preserves August legacy; absent State and other-account saved zero
   const before = copy(data);
   assert.equal(resolver.resolve(models, data, '2026-08').source, 'legacy');
   assert.equal(resolver.resolve(models, data, '2026-09').source, 'missing');
-  assert.equal(resolver.resolve(models, data, '2026-09', 'gmo').source, 'legacy');
+  assert.equal(resolver.resolve(models, data, '2026-09', 'gmo').source, 'conflict');
   assert.deepEqual(data, before);
 });
 function backupHarness(target) {

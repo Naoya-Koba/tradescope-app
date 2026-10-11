@@ -432,7 +432,7 @@ test('module load has no storage/network/log effects and PWA HTML/SW share versi
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
   for (const file of ['storage-transaction.js', 'data-model-storage.js']) {
-    const url = `assets/${file}?v=${file === 'data-model-storage.js' ? '20261011-3' : '20261010-3'}`; assert.ok(html.includes(url)); assert.ok(sw.includes('./' + url));
+    const url = `assets/${file}?v=${file === 'data-model-storage.js' ? '20261011-4' : '20261010-3'}`; assert.ok(html.includes(url)); assert.ok(sw.includes('./' + url));
   }
   assert.ok(html.indexOf('storage-transaction.js') < html.indexOf('data-model-storage.js'));
   const topVersion = html.match(/topScriptVersion = '([^']+)'/)[1];

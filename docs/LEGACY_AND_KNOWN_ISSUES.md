@@ -1,8 +1,14 @@
 # Legacy, Experimental, and Known Issues
 
-**Current / v4互換**：最新Exportはv4で、旧SBI recordと新汎用採用recordを保護する。v3は旧record限定、v2は月次Stateクリア、v1は新モデル維持。GMO取込・集計は後続段階。PII・原本保存・自動Migrationは行わない。
+## Current / Known issue — GMO PDF
 
-この文書は、2026-09-26時点のコード読取結果を記録する。ここへの記載は修正済みを意味しない。
+GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通集計を実装済み。実PDFのローカルparser検証と匿名ブラウザ保存だけを実施し、本番Storage・実PDF保存・実Backup Restoreは実施しない。実iPhone Safari／Home Screen PWAは未確認。PDF.jsは同一versionのlegacy main／workerと必要な日本語CMapのみ固定vendorし、他CMap／フォントを必要とする未確認帳票、OCR／画像だけのPDF、完全な明細を確認できない空帳票は保存不可とする。
+
+非ゼロ手数料・締後移動・未対応外貨・未知入出金区分・合計不一致は推定補完せず停止する。複数タブの完全排他、quota・中断・実機PWAは引き続きリスクとして扱う。未対応の他brokerへ自動拡張しない。
+
+**Current / v4互換**：最新Exportはv4で、旧SBI recordと新汎用採用recordを保護する。v3は旧record限定、v2は月次Stateクリア、v1は新モデル維持。GMO月次PDF取込・明示保存・共有集計は接続済み。PII・原本保存・自動Migrationは行わない。
+
+この文書は、2026-09-26時点のコード読取結果と、その後のCurrent更新を記録する。ここへの記載は修正済みを意味しない。
 
 ## 1. 重要な仕様差異・既知の問題
 

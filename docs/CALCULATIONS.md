@@ -1,10 +1,16 @@
 # Calculation Specification
 
+## Current / Decided — GMO共有計算
+
+GMOは2026-08までlegacy、2026-09からState record v2とadoptedAccountSnapshotIdを使用する。realizedPnlはPDF月間取引損益、swapPnlは月間スワップ、入出金は外部移動、unrealizedPnlは月末建玉評価損益。前月末swap基準値・累計swapの加算は不要。observed netAssetValueは口座状態／照合用だけでledgerへ加算しない。確定資産＝年初資金＋累計決済＋累計swap＋累計入金−累計出金、純資産＝確定資産＋当月評価損益、月次損益＝決済＋swapの式を維持する。
+
+Monthly／Annual Summary、Top、Asset／Performance Trendは同じcreateCalculatorを参照する。State不在はmissing、意味のあるlegacy値併存はconflictで、placeholderへ戻さない。必要な月が欠損なら後続累積値はunknown。保存・訂正時は派生Top Snapshotを同一journal内で削除し、元データ／採用先／Batch／計算・policy versionのfingerprintも照合する。
+
 ## Current — GMO PDF内照合
 
 GMO Previewでは残高明細の月間取引損益／スワップ合計をprimaryとし、入出金明細の取引損益／スワップ損益および終端区分別小計と照合する。入金・出金は分類済み全明細の外部移動を別々に集計し、差引0から推定しない。前月末現金＋月間取引損益＋月間スワップ＋入金−出金＝当月現金、当月現金＋建玉評価損益＝時価評価総額も照合する。取得可能な適用必要証拠金明細合計を正式合計と比較する。累計スワップは加算しない。不明値は0にせず、照合不能は保存候補にしない。
 
-**Current / 共通月次基盤**：cutover、State、欠損伝播、累積ledger、採用先依存fingerprintを共有resolverへ集約する。SBI観測合成と単一公式AccountSnapshot adapterを分離し、GMOは保存・UI段階まで無効。観測純資産をledgerへ加算しない。
+**Current / 共通月次基盤**：cutover、State、欠損伝播、累積ledger、採用先依存fingerprintを共有resolverへ集約する。SBI観測合成と単一公式AccountSnapshot adapterを分離し、GMOも2026-09から有効。観測純資産をledgerへ加算しない。
 
 ## 1. 共通原則
 
@@ -21,13 +27,13 @@ GMO Previewでは残高明細の月間取引損益／スワップ合計をprimar
 
 ### SBI共有resolver・計算基盤
 
-**Current**：`assets/monthly-account-resolver.js`はlegacy／canonical／missing／conflict、明示確定、月次・観測のcompleteness、採用ID、台帳入力と観測Viewを一箇所で解決する。`createCalculator`はDOM／Storage非依存で、既存`profit-metrics.js`のlegacy計算を保持し、SBI新方式だけを切り替える。Input、Monthly Summary、年間Summary、Top、Asset／Performance Trendはこの共有計算を参照する。画面独自のcutover・欠損判定は置かない。
+**Current**：`assets/monthly-account-resolver.js`はlegacy／canonical／missing／conflict、明示確定、月次・観測のcompleteness、採用ID、台帳入力と観測Viewを一箇所で解決する。`createCalculator`はDOM／Storage非依存で、既存`profit-metrics.js`のlegacy計算を保持し、SBI／GMOの新方式を口座policyで切り替える。Input、Monthly Summary、年間Summary、Top、Asset／Performance Trendはこの共有計算を参照する。画面独自のcutover・欠損判定は置かない。
 
 **Decided**：SBI cutoverは2026-09。State不在・legacy conflictを0として補わない。採用国内保有＋外国manualの評価損益が不完全なら口座評価損益はunknown。観測資産合計は国内評価額＋外国評価額＋現金、観測評価損益は国内＋外国。decimal合計は既存BigInt処理で行い、表示用の既存台帳計算へ渡す時点でのみNumberへ変換する。観測額を台帳へ加算せず、差額から損益・入出金を逆算しない。
 
 **Decided**：必要なcutover後の月次flowが一月でも欠ける場合、後続月の累積確定資産・純資産・年間Performanceはunknown。その月の月次損益自体は、Stateの月次入力が完全なら局所値として表示できる。例：9月missing／10月completeでは10月Monthly P/Lのみ既知、累積値はnull。欠損は0で飛ばさず、画面ごとに判定しない。
 
-**Current**：fingerprintは計算version、legacy入力、対象年State、採用国内Batchと保有群、採用外国／現金recordに依存する。保存成功時のキャッシュ削除に失敗してもfingerprint不一致で旧Snapshotを拒否できる。hash用元データ複製の永続化・ログ・外部送信は行わない。
+**Current**：fingerprintは計算version／policy version、legacy入力、対象年State、採用国内Batchと保有群、採用外国／現金record、GMO採用AccountSnapshotと関連PDF ImportBatchに依存する。保存成功時のキャッシュ削除に失敗してもfingerprint不一致で旧Snapshotを拒否できる。hash用元データ複製の永続化・ログ・外部送信は行わない。
 
 **Decided**：確定資産は、評価損益を除いた確定ベースの現在資産である。
 

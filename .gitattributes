@@ -1,0 +1,2 @@
+# Preserve official third-party distribution bytes (including upstream license whitespace).
+vendor/pdfjs-6.4.299/** -text whitespace=-blank-at-eol

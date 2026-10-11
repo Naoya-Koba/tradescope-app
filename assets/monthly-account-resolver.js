@@ -2,15 +2,14 @@
   'use strict';
   const storage = typeof module !== 'undefined' && module.exports ? require('./data-model-storage.js') : root.TradeScopeDataStorage;
   const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
-  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'sbi-monthly-v1';
-  const policyVersion = 'monthly-policies-v1';
+  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v2';
+  const policyVersion = 'monthly-policies-v2';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
       sourceScope: 'gmo-fx-monthly-report', sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY' })
   });
-  // GMO is testable through explicit options, but is not active in production until its save/UI phase.
-  const defaultEnabledKeys = Object.freeze(['sbi']);
+  const defaultEnabledKeys = Object.freeze(['sbi', 'gmo']);
   const records = (models, entity) => models?.[entity]?.records || [];
   const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const decimal = value => typeof value === 'string' && /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value);

@@ -45,6 +45,7 @@ function pdfBytes(document = report()) {
   const start = pdf.length;
   pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` + offsets.map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')
     + `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
-  return new Uint8Array(Buffer.from(pdf, 'ascii'));
+  return new TextEncoder().encode(pdf);
 }
-module.exports = { report, pdfBytes, text };
+if (typeof module !== 'undefined' && module.exports) module.exports = { report, pdfBytes, text };
+else window.AnonymousGMOFixture = { report, pdfBytes, text };

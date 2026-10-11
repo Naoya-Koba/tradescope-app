@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — GMO保存・訂正の保護
+
+GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2と旧観測をv4で保護する。保存／訂正は必要なAccount追加を含む一回のRepository commitで行い、Top派生Snapshot削除も同じjournalに含める。保存前Validation・expectedModels・全キー再読込一致確認後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、rollback不能時はjournalを保持して次の保存を停止する。匿名GMO保存→v4 Export→空Storage相当→Restore→resolver／再Export一致を検証する。PDF原本・本文・PIIは保護対象へ持ち込まない。
+
 ## 完全バックアップv4（Current / Decided）
 
 最新Exportはv4。モデル一覧・envelopeはv3と同じ7モデルで、旧recordとMonthlyAccountState record v2を保護する。v3検証は旧State field／省略またはschemaVersion 1に固定し、新fieldをv3へ出力・切捨てしない。
@@ -35,7 +39,7 @@ null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証�
 
 ### トップの完全バックアップ
 
-**Current**：`backupVersion: 3`を持つ完全バックアップとして、従来v1の次のデータと新Storageの7collectionを一つのJSONへ出力する。
+**Current**：`backupVersion: 4`を持つ完全バックアップとして、従来v1の次のデータと新Storageの7collectionを一つのJSONへ出力する。
 
 - `tradingData`
 - `yearInitialFunds`
@@ -49,7 +53,7 @@ null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証�
 
 **Current**：SBIの確認後保存内容は最新v4 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
 
-**Current**：v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v3は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
+**Current**：v4、v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v3は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
 
 **Current**：復元前に形式、バージョン、必須項目、型を検証し、復元内容、維持内容、警告を確認画面へ表示する。ユーザーがキャンセルした場合はlocalStorageを変更しない。
 

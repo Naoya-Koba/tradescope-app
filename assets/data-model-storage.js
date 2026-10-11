@@ -225,6 +225,10 @@
     const lastDay = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
     if (!batch || batch.sourceProvider !== account.providerCode || batch.sourceType !== policy.sourceType
       || snapshot.snapshotAsOf !== lastDay || state.targetMonth < '2026-09'
+      || ['realizedPnl', 'swapPnl', 'deposit', 'withdrawal'].some(field => !decimal(state[field]))
+      || ['deposit', 'withdrawal'].some(field => state[field].startsWith('-'))
+      || ['cashBalance', 'netAssetValue', 'unrealizedPnl'].some(field => !decimal(snapshot[field]))
+      || !decimal(snapshot.accountSpecific?.requiredMargin)
       || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)
       || !equalDecimal(snapshot.reportedMonthlyRealizedPnl, state.realizedPnl)) fail();
   }
@@ -280,6 +284,7 @@
       }
       validateModels(models);
       const actions = Object.entries(changes).map(([entity, value]) => ({ type: 'set', storageKey: keys[entity], rawValue: JSON.stringify(value) }));
+      if (guard.invalidateTopSummary === true) actions.push({ type: 'remove', storageKey: 'tradeScopeTopSummarySnapshotV1' });
       let verified;
       transaction.apply(actions, adapter, () => {
         verified = readModels(adapter);

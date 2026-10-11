@@ -1,8 +1,16 @@
 # Data Model
 
+## Current / Decided — GMO正式月末採用
+
+GMOの正本取込元は月次取引残高報告書PDFのみ。明示保存でImportBatch（sourceType=pdf／sourceProvider=gmo／hash・size／importerVersionのみ、sourceScope・filename・原本なし）、AccountSnapshot（imported／gmo-fx-monthly-report／officialMonthEnd／JPY）、MonthlyAccountState record v2を一回のRepository transactionで追加・確定する。Accountは保存時だけ必要なら作成する。
+
+SnapshotのcashBalance／netAssetValue／unrealizedPnl／reportedMonthlyRealizedPnl／accountSpecific.requiredMarginはPDF観測値。assetValueに純資産を重複保存しない。StateのrealizedPnl／swapPnl／deposit／withdrawalはその月のledgerへの明示採用値で、reportedMonthlyRealizedPnlとの数値一致を必須とする。StateはadoptedAccountSnapshotIdを参照しSBI専用3参照はnull。targetMonthと正式月末日snapshotAsOfを一致検証する。保存日時は保存開始時に付与する。
+
+同一hashは取込済みで変更なし。同月別hashは自動採用せず、ユーザーの訂正確認後だけ新Batch・新Snapshotへ切り替える。State IDは保持しconfirmedAtを更新し、旧観測・Batchは削除しない。legacyへコピーせず、2026-09以降のState不在はmissing、有限非ゼロの旧GMO月次入力はconflict。
+
 ## 汎用月次採用参照（Current / Decided）
 
-MonthlyAccountState record v2は旧11fieldに`schemaVersion: 2`と`adoptedAccountSnapshotId`を追加する。GMO採用ではSBI専用3参照をnullとし、同一口座・月、PDF Batch、`gmo-fx-monthly-report`、imported、JPY、正式月末日・officialMonthEnd、報告損益と採用損益の一致を検証する。旧SBI record・保存キー・envelope v1は維持し、Migrationしない。GMO UI／保存／集計は後続段階。
+MonthlyAccountState record v2は旧11fieldに`schemaVersion: 2`と`adoptedAccountSnapshotId`を追加する。GMO採用ではSBI専用3参照をnullとし、同一口座・月、PDF Batch、`gmo-fx-monthly-report`、imported、JPY、正式月末日・officialMonthEnd、報告損益と採用損益の一致を検証する。旧SBI record・保存キー・envelope v1は維持し、Migrationしない。GMO PDF UI／明示保存／共通集計は接続済み。
 
 **Decided**：現在保有はstable Instrument ID／code／tickerで同一性を維持し、表示名を現在名へ更新できる。名称変更だけで別Instrumentを作らない。過去取引は取引当時の名称を保持する。7606のユナイテッドアローズ→TABAYA HDは説明例であり、既存履歴を書き換えない。
 
@@ -468,7 +476,7 @@ ImportBatch {
 
 | Account / 資産 | Planned取得元 | 備考 |
 |---|---|---|
-| GMO FX | 月次PDF | Parser仕様は実ファイルと公式仕様を確認して決定 |
+| GMO FXneo | 月次取引残高報告書PDFのみ | ローカル解析・照合・明示保存・月次State採用を実装済み |
 | LIGHT FX | 月次PDF | 同上 |
 | みんなのFX | 月次PDF | 同上 |
 | SBI証券 国内株・投資信託 | 約定履歴CSV、保有証券一覧CSV | 取引事実と時点保有を別モデルへ保存 |

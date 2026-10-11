@@ -2330,6 +2330,22 @@ function renderAccountInputs() {
   sbiInputView = sbiInput.load(localStorage, inputTargetMonth());
   
   ACCOUNTS.forEach(account => {
+    if (account.key === 'gmo' && inputTargetMonth() >= window.TradeScopeMonthlyResolver.policies.gmo.cutover) {
+      const resolved = monthlyCalculator().resolve(currentYear, currentMonth, 'gmo');
+      const card = document.createElement('div'); card.className = 'account-card';
+      card.innerHTML = '<button type="button" class="account-toggle" data-account-toggle="gmo" aria-expanded="false"><div class="account-title"><div class="account-color-dot"></div><span class="monthly-account-label"></span></div><span class="account-toggle-icon">▼</span></button><div class="account-body" data-account-body="gmo"><div class="monthly-import-values"></div><a href="../import.html">データ取込</a></div>';
+      card.querySelector('.monthly-account-label').textContent = displayAccountName('gmo');
+      card.querySelector('.account-color-dot').style.backgroundColor = account.color;
+      const values = card.querySelector('.monthly-import-values');
+      if (resolved.source === 'canonical') {
+        for (const [label, field] of [['決済損益', 'realizedPnl'], ['スワップ', 'swapPnl'], ['評価損益', 'unrealizedPnl']]) {
+          const line = document.createElement('p'); line.textContent = `${label}　${sbiInput.formatYen(resolved[field])}`; values.appendChild(line);
+        }
+      } else {
+        const message = document.createElement('p'); message.textContent = resolved.source === 'conflict' ? '従来入力または月次データを確認してください' : '月次PDFを取り込んでください'; values.appendChild(message);
+      }
+      container.appendChild(card); return;
+    }
     if (account.key === 'sbi' && usesSbiDraft()) {
       container.appendChild(renderSbiDraftCard(account));
       return;
