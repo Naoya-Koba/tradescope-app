@@ -1,5 +1,7 @@
 # Development Guide
 
+**Current / resolver基盤**：口座policyとadapterを分離し、画面別broker計算を追加しない。SBIは従来結果を維持し、GMOは明示テストoptionのみ。State・採用Snapshot・関連Batch・policy versionをfingerprintへ含める。
+
 ## 月次schema互換（Current）
 
 汎用採用参照はMonthlyAccountState record v2、envelope v1、Backup v4とする。v3の旧record Validatorを固定し、Repository拡張で旧Backupの受理範囲を広げない。GMO取込は後続実装であり、既存SBI接続は維持する。

@@ -1,5 +1,7 @@
 # Calculation Specification
 
+**Current / 共通月次基盤**：cutover、State、欠損伝播、累積ledger、採用先依存fingerprintを共有resolverへ集約する。SBI観測合成と単一公式AccountSnapshot adapterを分離し、GMOは保存・UI段階まで無効。観測純資産をledgerへ加算しない。
+
 ## 1. 共通原則
 
 - **Decided**：計算の入力は正本データとユーザー付与情報とする。
