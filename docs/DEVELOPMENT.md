@@ -10,7 +10,7 @@
 
 `assets/monthly-input-ui.js`の共通DOM描画で取込済みの基本5項目を既存form-groupと同じ見た目にする。読み取り専用controlには`.input-account`やDraft fieldを付けず、legacy保存収集へ混入させない。GMOは決済・swap・評価・入出金の採用値を表示し、手修正は接続しない。SBIは既存Draftの決済・入出金編集／保存serviceを維持し、swap・評価をread-only、国内／外国／現金を補助欄へ置く。Stateなしのswapは「—」で、表示から0を作らない。1〜8月のlegacyフォームは変更しない。
 
-**Under consideration**：PDF原値と採用値を別管理する将来手修正はDATA_MODELの監査案を参照する。現行Snapshotで未保持のswap／入出金原値、Stateのoverride metadata、旧v4受理範囲の固定が課題である。schema／Backup拡張を別工程で設計し、現行reportedMonthlyRealizedPnl一致規則を黙って緩めない。
+**Current**：`assets/gmo-monthly-save.js`はState v2の不変な採用baselineを保持して初回明示編集のみv3化し、5項目の採用値と正確な差分metadataを保存する。原Snapshotを更新しない。expectedModelsと既存journalによるState＋cache無効化の一括保存／再読込検証を使用し、未編集保存は無書込。原値へ戻すAPIがある。Backup最新v5、旧v4受理範囲を固定し、v1〜v5／rollback／PII拒否を匿名fixtureで検証する。UIへの接続は次の段階とする。
 
 ## Current — GMO月次取込の完成範囲
 
@@ -188,7 +188,7 @@ TradeScope/
 
 **Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2／v3／v4復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。`tests/monthly-state-backup.test.js`は月次状態のnull／明示0、一意性、採用先参照、v2クリア、7モデル往復、新キーの書込・再読込・rollback失敗、expectedModelsと自動保存なしを確認する。実localStorage・実CSV・本番PWAへ接続しない。
 
-**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v4 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
+**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v5 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 

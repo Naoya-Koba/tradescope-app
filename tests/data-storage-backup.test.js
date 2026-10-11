@@ -109,7 +109,7 @@ test('download filename change preserves latest v3 JSON, ISO exportedAt and all 
   assert.equal(blob.type, 'application/json');
   const value = JSON.parse(await blob.text());
   assert.deepEqual(value, copy(h.build(storage, 'http://127.0.0.1:54321', date.toISOString())));
-  assert.equal(value.backupVersion, 4); assert.equal(value.exportedAt, date.toISOString());
+  assert.equal(value.backupVersion, 5); assert.equal(value.exportedAt, date.toISOString());
   assert.deepEqual(storage.snapshot(), before); assert.equal(storage.writes, writes);
 });
 
@@ -262,7 +262,7 @@ test('v1 restore does not parse, reset or migrate even an unreadable/future new-
 test('F: v3 export -> cleared anonymous fixture -> restore -> re-export exact data equality', () => {
   const source = seeded(), h = backupHarness(source), before = source.snapshot();
   const payload = h.build(source, 'http://127.0.0.1:54321', now);
-  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 4);
+  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 5);
   assert.equal(payload.source.origin, 'http://127.0.0.1:54321');
   const target = new MemoryStorage(), targetHarness = backupHarness(target);
   const inspection = targetHarness.format.inspectJson(JSON.stringify(payload)); assert.equal(inspection.ok, true);
@@ -432,7 +432,7 @@ test('module load has no storage/network/log effects and PWA HTML/SW share versi
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
   for (const file of ['storage-transaction.js', 'data-model-storage.js']) {
-    const url = `assets/${file}?v=${file === 'data-model-storage.js' ? '20261011-4' : '20261010-3'}`; assert.ok(html.includes(url)); assert.ok(sw.includes('./' + url));
+    const url = html.match(new RegExp(`assets/${file.replace('.', '\\.')}\\?v=[^"']+`))?.[0]; assert.ok(url); assert.ok(sw.includes('./' + url));
   }
   assert.ok(html.indexOf('storage-transaction.js') < html.indexOf('data-model-storage.js'));
   const topVersion = html.match(/topScriptVersion = '([^']+)'/)[1];

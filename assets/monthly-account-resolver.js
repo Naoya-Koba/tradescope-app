@@ -2,7 +2,7 @@
   'use strict';
   const storage = typeof module !== 'undefined' && module.exports ? require('./data-model-storage.js') : root.TradeScopeDataStorage;
   const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
-  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v2';
+  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v2';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
@@ -84,18 +84,19 @@
     const state = states[0], snapshot = records(models, 'accountSnapshots').find(row => row.id === state.adoptedAccountSnapshotId);
     const batch = records(models, 'importBatches').find(row => row.id === snapshot?.importBatchId);
     const monthEnd = new Date(Date.UTC(Number(targetMonth.slice(0, 4)), Number(targetMonth.slice(5)), 0)).toISOString().slice(0, 10);
-    if (state.schemaVersion !== 2 || !snapshot || snapshot.accountId !== policy.accountId || snapshot.targetMonth !== targetMonth
+    if (![2, 3].includes(state.schemaVersion) || !snapshot || snapshot.accountId !== policy.accountId || snapshot.targetMonth !== targetMonth
       || ['sourceScope', 'sourceMode', 'observationType', 'valuationCurrency'].some(field => snapshot[field] !== policy[field])
       || snapshot.snapshotAsOf !== monthEnd || !batch || batch.accountId !== policy.accountId || batch.targetMonth !== targetMonth
       || batch.snapshotAsOf !== snapshot.snapshotAsOf || batch.importedAt !== snapshot.importedAt || batch.sourceType !== 'pdf'
       || batch.sourceProvider !== key || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)) return { ...base, source: 'conflict' };
     // Validation is independent of floating-point conversion, including signed values.
-    if (!/^-?0(?:\.0+)?$/.test(csv.sum([snapshot.reportedMonthlyRealizedPnl, state.realizedPnl.startsWith('-') ? state.realizedPnl.slice(1) : '-' + state.realizedPnl]))) return { ...base, source: 'conflict' };
+    let adopted;
+    try { adopted = storage.adoptedValues(state, snapshot); } catch (_) { return {...base, source: 'conflict'}; }
     const monthly = ['realizedPnl', 'swapPnl', 'deposit', 'withdrawal'].every(field => decimal(state[field]));
     const observation = decimal(snapshot.unrealizedPnl) && decimal(snapshot.netAssetValue);
     return { ...base, source: 'canonical', confirmed: true, state, snapshot, batch,
       ...Object.fromEntries(['realizedPnl', 'swapPnl', 'deposit', 'withdrawal'].map(field => [field, state[field]])),
-      unrealizedPnl: snapshot.unrealizedPnl, observedAsset: snapshot.netAssetValue, observedUnrealized: snapshot.unrealizedPnl,
+      unrealizedPnl: adopted.unrealizedPnl, observedAsset: snapshot.netAssetValue, observedUnrealized: snapshot.unrealizedPnl,
       completeness: { monthly, observation, complete: monthly && observation },
       adoptedIds: { stateId: state.id, adoptedAccountSnapshotId: snapshot.id, importBatchId: batch.id } };
   }

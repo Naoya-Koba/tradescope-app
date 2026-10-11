@@ -7,7 +7,8 @@
   const backupModelEntities = Object.freeze({
     2: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']),
     3: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
-    4: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates'])
+    4: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
+    5: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -78,6 +79,12 @@
     return true;
   };
   const common = { schemaVersion: value => value === 1, id };
+  const adoptionFields = Object.freeze(['realizedPnl', 'swapPnl', 'unrealizedPnl', 'deposit', 'withdrawal']);
+  function sourceValues(value) {
+    fields(value, adoptionFields, adoptionFields);
+    if (adoptionFields.some(field => !decimal(value[field]))) fail();
+    return true;
+  }
   const provenance = { accountId: id, targetMonth: month, snapshotAsOf: observed, importedAt: timestamp,
     sourceMode, sourceScope: text, importBatchId: id, observationType };
   const definitions = {
@@ -116,9 +123,13 @@
   };
   function validateRecord(entity, record) {
     let definition = definitions[entity]; if (!definition) fail();
-    if (entity === 'monthlyAccountStates' && record?.schemaVersion === 2) {
+    if (entity === 'monthlyAccountStates' && [2, 3].includes(record?.schemaVersion)) {
       definition = { ...definition, required: [...definition.required, 'schemaVersion', 'adoptedAccountSnapshotId'],
-        types: { ...definition.types, schemaVersion: value => value === 2, adoptedAccountSnapshotId: id } };
+        types: { ...definition.types, schemaVersion: value => [2, 3].includes(value), adoptedAccountSnapshotId: id } };
+      if (record.schemaVersion === 3) definition = { ...definition,
+        required: [...definition.required, 'sourceValues', 'adoptedUnrealizedPnl', 'overrideFields', 'overrideUpdatedAt'],
+        types: {...definition.types, sourceValues, adoptedUnrealizedPnl: decimal, overrideUpdatedAt: timestamp,
+          overrideFields: value => Array.isArray(value) && new Set(value).size === value.length && value.every(field => adoptionFields.includes(field))} };
     }
     assertJson(record); fields(record, Object.keys(definition.types), definition.required);
     for (const [field, value] of Object.entries(record)) {
@@ -190,7 +201,7 @@
       const sameMonth = record => record && record.accountId === state.accountId && record.targetMonth === state.targetMonth;
       const hasSbiReferences = ['domesticImportBatchId', 'foreignAccountSnapshotId', 'cashAccountSnapshotId']
         .some(field => state[field] !== null);
-      if (state.schemaVersion === 2) {
+      if ([2, 3].includes(state.schemaVersion)) {
         if (hasSbiReferences) fail();
         validateAdoptedSnapshot(state, account, snapshots, batches);
       }
@@ -229,8 +240,26 @@
       || ['deposit', 'withdrawal'].some(field => state[field].startsWith('-'))
       || ['cashBalance', 'netAssetValue', 'unrealizedPnl'].some(field => !decimal(snapshot[field]))
       || !decimal(snapshot.accountSpecific?.requiredMargin)
-      || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)
-      || !equalDecimal(snapshot.reportedMonthlyRealizedPnl, state.realizedPnl)) fail();
+      || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)) fail();
+    adoptedValues(state, snapshot);
+  }
+  // The immutable v2 adoption is the baseline for swap/flows (not retained in the original Snapshot).
+  // Only an explicit, exact difference list permits adopted values to differ from that baseline.
+  function adoptedValues(state, snapshot) {
+    validateRecord('monthlyAccountStates', state);
+    if (!snapshot || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(snapshot.unrealizedPnl)) fail();
+    const values = {realizedPnl: state.realizedPnl, swapPnl: state.swapPnl,
+      unrealizedPnl: state.schemaVersion === 3 ? state.adoptedUnrealizedPnl : snapshot.unrealizedPnl,
+      deposit: state.deposit, withdrawal: state.withdrawal};
+    if (adoptionFields.some(field => !decimal(values[field]))) fail();
+    if (state.schemaVersion === 3) {
+      if (!equalDecimal(state.sourceValues.realizedPnl, snapshot.reportedMonthlyRealizedPnl)
+        || !equalDecimal(state.sourceValues.unrealizedPnl, snapshot.unrealizedPnl)
+        || ['deposit', 'withdrawal'].some(field => state.sourceValues[field].startsWith('-'))) fail();
+      const changed = adoptionFields.filter(field => !equalDecimal(values[field], state.sourceValues[field]));
+      if (changed.length !== state.overrideFields.length || changed.some(field => !state.overrideFields.includes(field))) fail();
+    } else if (state.schemaVersion !== 2 || !equalDecimal(values.realizedPnl, snapshot.reportedMonthlyRealizedPnl)) fail();
+    return values;
   }
   function equalDecimal(a, b) {
     const canonical = value => value.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '').replace(/^-0$/, '0');
@@ -244,6 +273,7 @@
       fields(record, Object.keys(definitions.monthlyAccountStates.types), definitions.monthlyAccountStates.required);
       if (own(record, 'schemaVersion') && record.schemaVersion !== 1) fail();
     }
+    if (version === 4 && (models?.monthlyAccountStates?.records || []).some(record => record.schemaVersion === 3)) fail();
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -280,6 +310,17 @@
         if (entity === 'monthlyAccountStates' && (models[entity]?.records || []).some(record => value.records.some(item =>
           (item.accountId === record.accountId && item.targetMonth === record.targetMonth && item.id !== record.id)
           || (item.id === record.id && (item.accountId !== record.accountId || item.targetMonth !== record.targetMonth))))) fail();
+        if (entity === 'monthlyAccountStates') for (const old of models[entity]?.records || []) {
+          const next = value.records.find(item => item.id === old.id);
+          if (next && old.adoptedAccountSnapshotId === next.adoptedAccountSnapshotId) {
+            if (old.schemaVersion === 3 && next.schemaVersion !== 3) fail();
+            if ([2, 3].includes(old.schemaVersion) && next.schemaVersion === 3) {
+              const original = old.schemaVersion === 3 ? old.sourceValues
+                : adoptedValues(old, models.accountSnapshots?.records.find(row => row.id === old.adoptedAccountSnapshotId));
+              if (adoptionFields.some(field => !equalDecimal(original[field], next.sourceValues[field]))) fail();
+            }
+          }
+        }
         models[entity] = value;
       }
       validateModels(models);
@@ -335,7 +376,7 @@
     return { version: 1, kind: 'facts-candidate', key: await hashBytes(new TextEncoder().encode(JSON.stringify(facts)), cryptoApi),
       automaticMerge: false };
   }
-  const api = Object.freeze({ keys, backupModelEntities, assertJson, validateRecord, validateEnvelope, validateModels, validateBackupModels,
+  const api = Object.freeze({ keys, backupModelEntities, adoptionFields, adoptedValues, equalDecimal, assertJson, validateRecord, validateEnvelope, validateModels, validateBackupModels,
     readModels, createRepository, localStorageAdapter, initialAccounts, newId, hashBytes, dedupeCandidate });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TradeScopeDataStorage = api;

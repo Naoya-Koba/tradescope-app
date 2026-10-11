@@ -4,7 +4,7 @@
 
 Top／年間Summary／両Trendは非永続の共通表示projectionを使用する。同一年・同一指標の値と成長率を共通化し、部分観測は既知成分だけ、当月データが全くない口座だけ直近完全月を使用する。Monthlyは選択月限定、年間内訳は既知月次値の積み上げで、State未確定のSBI国内保有も表示する。null／0と厳密なcanonical ledgerは維持する。
 
-**Known issue**：複数国内候補の選択、PDF原値と採用値を分離したユーザー手修正、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。
+**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO原値保護service／State v3／Backup v5は実装済みで、手修正UIは次段階で接続する。
 
 **Current**：GMO／SBI新方式Inputを既存フォーム型へ統一した。GMOはread-only、SBIの既存Draft保存は維持する。PDF手修正監査では現行State v2／Snapshotの原値不足・metadata未対応を確認したため、schema／Backup v4を変更せず、将来拡張案だけをDATA_MODELへ記載した。
 

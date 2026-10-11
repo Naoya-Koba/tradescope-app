@@ -6,11 +6,11 @@
 
 共通SummaryはmetricごとにsourceMonthと使用状態をメモリに保持し、Top／年間Summary／月時点のTrendへ同じ結果を配る。選択月Viewと年間内訳はその期間の既知値だけを集計する。未入力成分の非加算は暫定表示だけの意味であり、0保存、legacyコピー、State生成をしない。表示Viewのための保存キー・schema・Backup変更はない。
 
-## Under consideration — PDF原値とユーザー採用値の分離監査
+## Current / Decided — PDF原値とユーザー採用値の分離
 
-現行AccountSnapshotはPDFのreportedMonthlyRealizedPnlを保持するが、月間swap・外部入金・外部出金の原値を独立して保持していない。MonthlyAccountState record v2には手修正を識別するmetadataがなく、GMOの報告決済損益と採用決済損益の一致をRepositoryとresolver双方で必須検証する。Stateだけの数値変更や一致Validationの緩和では原値保護・変更判別を満たさないため、現行schema／Backup v4のまま安全な一般手修正UIを接続しない。
+GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにできる。Snapshotは破壊更新しない。取込保存は引き続きv2を生成し、手修正serviceとUI接続は分離する。
 
-将来案：Snapshotへ月間swap／外部入出金の報告原値をallowlistで追加し、Stateの採用値を別管理する。変更項目・変更日時（必要なら理由）をStateの限定metadataとして持ち、原観測は不変に保つ。新record schemaとpolicyを明示し、旧v2の一致規則を維持する。公開済みv4の受理意味を拡張せず、導入時はBackup v5と旧v1〜v4互換・journal／rollbackの検証が必要となる方向。ただしfield名、原値の格納場所、override schema、採用条件は未確定で、今回は実装しない。
+v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。envelope／7キーは変更せず、Backup v5で原値・採用値・metadataを保護する。v4の受理範囲は旧recordとv2に固定する。
 
 ## Current / Decided — GMO正式月末採用
 
@@ -641,7 +641,7 @@ TransactionAnnotation {
 | `accountSnapshots` | `tradeScopeAccountSnapshotsV1` | 一取得元・一観測が報告する口座状態／取得範囲 |
 | `monthlyAccountStates` | `tradeScopeMonthlyAccountStatesV1` | 口座・月の明示確定、採用先参照、月次台帳入力。合計値は保存しない |
 
-**Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は原則省略可／`1`。MonthlyAccountStateの汎用採用recordだけは明示`2`。すべてのrecordにstable `id`を要求する。
+**Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は原則省略可／`1`。MonthlyAccountStateの汎用採用recordは明示`2`、手修正recordは明示`3`。すべてのrecordにstable `id`を要求する。
 
 **Current**：`read` / `list`は非破壊。`commit`は複数envelopeを全検証後に保存し、`save`と同一IDへの`upsert`も同じ入口を使う。既存Account IDを落とす更新は拒否し、無効化を優先する。Migration、別IDへの暗黙統合はしない。Account / Instrument / Batch / 関連Snapshotの参照、重複IDを検証する。imported Snapshotは一つのBatchへ関連付け、口座・保存時点・観測時点・対象月を照合する。同じAccountSnapshotに属するHoldingの取得範囲・出所も一致させ、複数ソースを合成保存しない。
 

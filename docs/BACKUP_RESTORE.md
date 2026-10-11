@@ -4,18 +4,19 @@
 
 GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2と旧観測をv4で保護する。保存／訂正は必要なAccount追加を含む一回のRepository commitで行い、Top派生Snapshot削除も同じjournalに含める。保存前Validation・expectedModels・全キー再読込一致確認後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、rollback不能時はjournalを保持して次の保存を停止する。匿名GMO保存→v4 Export→空Storage相当→Restore→resolver／再Export一致を検証する。PDF原本・本文・PIIは保護対象へ持ち込まない。
 
-## 完全バックアップv4（Current / Decided）
+## 完全バックアップv5（Current / Decided）
 
-最新Exportはv4。モデル一覧・envelopeはv3と同じ7モデルで、旧recordとMonthlyAccountState record v2を保護する。v3検証は旧State field／省略またはschemaVersion 1に固定し、新fieldをv3へ出力・切捨てしない。
+最新Exportはv5。7モデル／envelopeは不変で、旧record、State v2、State v3の原値・採用値・override metadataを保護する。v3は旧State field／省略またはv1、v4は旧record＋State v2に受理範囲を固定する。新fieldを旧versionとして出力・切捨てしない。
 
 | version | Restore |
 |---|---|
 | v1 | 旧正本を復元、新モデル7キーを維持 |
 | v2 | 旧正本＋6モデルを置換、月次状態を同じjournalでclear |
 | v3 | 旧正本＋7モデルを置換、公開済み旧recordのみ |
-| v4 | 旧正本＋7モデルを置換、旧recordと新採用recordを受理 |
+| v4 | 旧正本＋7モデルを置換、旧recordとState v2のみ受理 |
+| v5 | 旧正本＋7モデルを置換、旧record・State v2・State v3原値／採用値／差分を受理 |
 
-null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証後の共通journal、rollback、再読込一致確認、派生Snapshot無効化を維持する。v3 Restore時にGMO採用先を推測・維持しない。
+null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証後の共通journal、rollback、再読込一致確認、派生Snapshot無効化を維持する。v3 Restore時にGMO採用先を推測・維持しない。v4 Restoreでも収録v2をそのまま復元し、v3へ自動昇格しない。v5の途中失敗も旧キーと新7キーを同じjournalで復元する。
 
 ## 1. 目的
 
@@ -51,9 +52,9 @@ null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証�
 
 **Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続し、MonthlyAccountStateのInput接続・manual保存UIも実装済み。
 
-**Current**：SBIの確認後保存内容は最新v4 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
+**Current**：SBIの確認後保存内容は最新v5 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
 
-**Current**：v4、v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v3は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
+**Current**：v5、v4、v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v3は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
 
 **Current**：復元前に形式、バージョン、必須項目、型を検証し、復元内容、維持内容、警告を確認画面へ表示する。ユーザーがキャンセルした場合はlocalStorageを変更しない。
 
@@ -151,13 +152,13 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 }
 ```
 
-**Current**：上記v1は従来の保存対象を表し、新モデルを含まない。v1読込は継続するが、新しいトップexportは下記v4を使用する。
+**Current**：上記v1は従来の保存対象を表し、新モデルを含まない。v1読込は継続するが、新しいトップexportはv5を使用する。
 
 **Decided**：新データモデルへ実ユーザーデータを永続保存できるようにする前に、それらの完全バックアップ、検証、復元、journal、rollbackを実装・検証する。ParserとPreviewは永続保存なしで先行してよい。
 
 ### 実装済みv2拡張
 
-**Current**：既存`backupVersion: 2`はv1の`data`へ`models`を追加した6モデル形式。`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。読込互換を維持し、最新exportはv4とする。
+**Current**：既存`backupVersion: 2`はv1の`data`へ`models`を追加した6モデル形式。`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。読込互換を維持し、最新exportはv5とする。
 
 **Current**：v2復元は6モデルのenvelopeをそのまま保存し、`null`のcollectionはキー不在へ戻す完全復元。MonthlyAccountStateも同一transactionでクリアする。v1・旧形式では新モデルキーに触れない。Legacy `tradeInfo`はv2でも未収録なら維持する。
 

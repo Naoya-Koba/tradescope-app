@@ -2481,7 +2481,7 @@ function updateDataByYear(inputYear = null) {
 
 // ===== Backup Format Core (pure functions; no storage writes) =====
 const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
-const COMPLETE_BACKUP_VERSION = 4;
+const COMPLETE_BACKUP_VERSION = 5;
 const backupDataStorage = window.TradeScopeDataStorage;
 const backupStorageTransaction = window.TradeScopeStorageTransaction;
 const COMPLETE_BACKUP_RESTORE_JOURNAL_KEY = 'tradeScopeRestoreJournalV1';
@@ -2514,6 +2514,7 @@ const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V2: 'v2-complete',
   V3: 'v3-complete',
   V4: 'v4-complete',
+  V5: 'v5-complete',
   LEGACY_ALL: 'legacy-all',
   LEGACY_PROFIT: 'legacy-profit',
   LEGACY_HISTORY: 'legacy-history',
@@ -2522,7 +2523,7 @@ const COMPLETE_BACKUP_FORMATS = Object.freeze({
 });
 
 function backupModelEntitiesForFormat(format) {
-  const version = format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : format === COMPLETE_BACKUP_FORMATS.V4 ? 4 : 0;
+  const version = format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : format === COMPLETE_BACKUP_FORMATS.V4 ? 4 : format === COMPLETE_BACKUP_FORMATS.V5 ? 5 : 0;
   return backupDataStorage.backupModelEntities[version] || [];
 }
 
@@ -2545,8 +2546,8 @@ function detectBackupFormat(value) {
 
   if (hasOwn(value, 'product') || hasOwn(value, 'backupVersion')) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) return COMPLETE_BACKUP_FORMATS.INVALID;
-    if (![1, 2, 3, 4].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
-    return { 1: COMPLETE_BACKUP_FORMATS.V1, 2: COMPLETE_BACKUP_FORMATS.V2, 3: COMPLETE_BACKUP_FORMATS.V3, 4: COMPLETE_BACKUP_FORMATS.V4 }[value.backupVersion];
+    if (![1, 2, 3, 4, 5].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
+    return { 1: COMPLETE_BACKUP_FORMATS.V1, 2: COMPLETE_BACKUP_FORMATS.V2, 3: COMPLETE_BACKUP_FORMATS.V3, 4: COMPLETE_BACKUP_FORMATS.V4, 5: COMPLETE_BACKUP_FORMATS.V5 }[value.backupVersion];
   }
 
   if (value.tradescope === 'all-backup') return COMPLETE_BACKUP_FORMATS.LEGACY_ALL;
@@ -2597,9 +2598,9 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
     return ['unsupported backupVersion'];
   }
 
-  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4].includes(format)) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(format)) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) errors.push('product must be TradeScope');
-    const version = format === COMPLETE_BACKUP_FORMATS.V1 ? 1 : format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : 4;
+    const version = Number(format.slice(1, 2));
     if (value.backupVersion !== version) errors.push('backupVersion does not match format');
     if (!isIso8601Timestamp(value.exportedAt)) errors.push('exportedAt must be an ISO-8601 timestamp');
     requireRecord(value.data, 'data');
@@ -2681,13 +2682,13 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   const normalized = {
     format,
     exportedAt: typeof value?.exportedAt === 'string' ? value.exportedAt : '',
-    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4].includes(format) ? 'complete' : 'legacy-partial',
+    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(format) ? 'complete' : 'legacy-partial',
     coverage: { ...emptyCoverage },
     data: {},
     warnings: []
   };
 
-  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4].includes(format)) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5].includes(format)) {
     const data = isPlainRecord(value.data) ? value.data : {};
     const legacy = isPlainRecord(data.legacy) ? data.legacy : {};
     normalized.coverage = {
@@ -2841,6 +2842,7 @@ function getBackupFormatLabel(format) {
     [COMPLETE_BACKUP_FORMATS.V2]: '完全バックアップv2',
     [COMPLETE_BACKUP_FORMATS.V3]: '完全バックアップv3',
     [COMPLETE_BACKUP_FORMATS.V4]: '完全バックアップv4',
+    [COMPLETE_BACKUP_FORMATS.V5]: '完全バックアップv5',
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: '旧統合バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: '旧損益バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: '旧履歴バックアップ'
@@ -3064,6 +3066,7 @@ function prepareBackupRestoreActions(restorePlan, storage) {
     [COMPLETE_BACKUP_FORMATS.V2]: [...legacyCompleteKeys, ...versionModelKeys, backupDataStorage.keys.monthlyAccountStates],
     [COMPLETE_BACKUP_FORMATS.V3]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.V4]: [...legacyCompleteKeys, ...versionModelKeys],
+    [COMPLETE_BACKUP_FORMATS.V5]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: ['tradingData', 'yearInitialFunds', 'tradeScopeTradeHistoryV1'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: ['tradingData', 'yearInitialFunds'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: ['tradeScopeTradeHistoryV1']
@@ -3083,7 +3086,7 @@ function prepareBackupRestoreActions(restorePlan, storage) {
       if (!operation) throw new Error('復元モデルが不足しています');
       models[entity] = operation.type === 'remove' ? null : operation.value;
     }
-    const version = restorePlan.format === COMPLETE_BACKUP_FORMATS.V2 ? 2 : restorePlan.format === COMPLETE_BACKUP_FORMATS.V3 ? 3 : 4;
+    const version = Number(restorePlan.format.slice(1, 2));
     backupDataStorage.validateBackupModels(version, models);
     if (version === 2) {
       const stateAction = actions.find(action => action.storageKey === backupDataStorage.keys.monthlyAccountStates);

@@ -14,6 +14,8 @@ Monthly Summary／Monthly P/Lは選択月だけを見る。State未確定でも�
 
 **Current**：Inputも基本5項目の見た目を統一するが、GMO read-only／SBI Draftと既存保存の責務は変更しない。未確定SBIの評価損益欄は選択月の取得済み観測Viewであり、月次確定・厳密計算の入力ではない。GMO手修正は未接続で、報告決済損益とState採用値の一致検証を維持する。
 
+**Current / 手修正基盤**：GMO State v3では原値5項目と採用値を分離し、resolverは採用評価損益を含む5項目だけを計算へ渡す。報告決済損益／評価損益とsource baselineは一致必須。採用との差は明示overrideFieldsの正確な差分集合がある場合だけ許容する。未編集v2の一致規則は維持し、原SnapshotのnetAssetValueをledgerへ加算しない。保存後の全consumerとfingerprintは同じ採用Stateを参照する。
+
 ## Current / Decided — GMO共有計算
 
 GMOは2026-08までlegacy、2026-09からState record v2とadoptedAccountSnapshotIdを使用する。realizedPnlはPDF月間取引損益、swapPnlは月間スワップ、入出金は外部移動、unrealizedPnlは月末建玉評価損益。前月末swap基準値・累計swapの加算は不要。observed netAssetValueは口座状態／照合用だけでledgerへ加算しない。確定資産＝年初資金＋累計決済＋累計swap＋累計入金−累計出金、純資産＝確定資産＋当月評価損益、月次損益＝決済＋swapの式を維持する。

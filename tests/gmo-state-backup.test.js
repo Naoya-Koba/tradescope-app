@@ -20,7 +20,7 @@ for (const [label, mutate] of [
   ['SBI refs mixed', m => m.monthlyAccountStates.records[0].cashAccountSnapshotId = 'as_gmo'],
   ['reported/adopted mismatch', m => m.monthlyAccountStates.records[0].realizedPnl = '11'],
   ['unknown field', m => m.monthlyAccountStates.records[0].filename = 'anonymous.pdf'],
-  ['unsupported version', m => m.monthlyAccountStates.records[0].schemaVersion = 3]
+  ['unsupported version', m => m.monthlyAccountStates.records[0].schemaVersion = 4]
 ]) test(`GMO State rejects ${label} before any write`, () => {
   const data = fixture(); mutate(data); const target = new MemoryStorage();
   assert.throws(() => model.createRepository(target).commit(data)); assert.equal(target.writes, 0);
@@ -35,7 +35,7 @@ test('v3 rejects new State; v4 accepts old and new States; decimal equality is n
 test('v1-v4 Restore semantics and new State v4 roundtrip', () => {
   const api = backupHarness(), target = new MemoryStorage(); model.createRepository(target).commit(Object.fromEntries(Object.entries(fixture()).filter(([, v]) => v !== null)));
   const exported = api.TradeScopeBackupExport.buildPayload(target, 'http://localhost', now);
-  assert.equal(exported.backupVersion, 4); const empty = new MemoryStorage();
+  assert.equal(exported.backupVersion, 5); const empty = new MemoryStorage();
   api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(exported).restorePlan, empty);
   assert.deepEqual(model.readModels(empty), fixture());
   assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty, 'http://localhost', now)), copy(exported));
