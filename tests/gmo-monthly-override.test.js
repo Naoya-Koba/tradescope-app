@@ -30,7 +30,7 @@ test('Repository cannot rewrite v3 baseline or downgrade it with same source ref
  bad.monthlyAccountStates.records[0].sourceValues.swapPnl='9';assert.throws(()=>storage.createRepository(h.adapter).commit({monthlyAccountStates:bad.monthlyAccountStates}));
  const old=fixture().monthlyAccountStates;assert.throws(()=>storage.createRepository(h.adapter).commit({monthlyAccountStates:old}));});
 test('latest backup protects source/adopted/metadata; v4 refuses new record, v4 old v2 remains readable',()=>{const h=harness();h.service.save(draft);const api=backupHarness(),b=api.TradeScopeBackupExport.buildPayload(h.adapter,'http://localhost',now);
- assert.equal(b.backupVersion,6);assert.equal(api.TradeScopeBackupFormat.inspectValue({...b,backupVersion:4,data:{...b.data,models:Object.fromEntries(storage.backupModelEntities[4].map(k=>[k,b.data.models[k]]))}}).ok,false);
+ assert.equal(b.backupVersion,7);assert.equal(api.TradeScopeBackupFormat.inspectValue({...b,backupVersion:4,data:{...b.data,models:Object.fromEntries(storage.backupModelEntities[4].map(k=>[k,b.data.models[k]]))}}).ok,false);
  const empty=new MemoryStorage();api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(b).restorePlan,empty);
  assert.deepEqual(storage.readModels(empty),storage.readModels(h.adapter));assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty,'http://localhost',now)),copy(b));
  const old={...b,backupVersion:4,data:{...b.data,models:Object.fromEntries(storage.backupModelEntities[4].map(k=>[k,fixture()[k]]))}};const inspected=api.TradeScopeBackupFormat.inspectValue(old);assert.equal(inspected.ok,true);

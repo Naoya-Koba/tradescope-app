@@ -1,5 +1,9 @@
 # Development Guide
 
+## Traders Storage / Backup v7
+
+**Current**：`import/traders-save.js`は商品別口座を固定し、PDF候補＋calendar swapを保存直前に検証する。一回のRepository commitでAccount遅延生成／FX Instrument再利用／Batch／口座観測／建玉群／State／cache無効化を保護する。blank swapはmissingで無書込、exact hashはno-op。別hash訂正は明示したState／採用Snapshotを確認して新sourceを追記し、State IDを維持する。手修正は原値を変えず採用値・正確な差分・履歴を保存する。Riskの建玉取得元は旧履歴のままとしPDF建玉を重ねて計上しない。
+
 ## Traders Securities monthly PDF
 
 **Current**：`import/traders-parser.js`は商品別detector／mappingと共通の位置付きテキスト解析を提供する。ファイル名・PIIを判定根拠にしない。回転ページの抽出座標を読み方向へ補正し、公式PDF.js 6.4.299のUniJIS-UCS2-H CMap（25,439 bytes）を追加。getReader／local worker／公式fake-worker／safe stageは維持し、CDN・別PDFライブラリは追加しない。

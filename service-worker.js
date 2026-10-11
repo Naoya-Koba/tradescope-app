@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradescope-static-v277';
+const CACHE_NAME = 'tradescope-static-v278';
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const CORE_ASSETS = [
   "./import.html",
   "./import/pdf-extractor.mjs?v=20261012-1",
   "./import/traders-parser.js?v=20261012-1",
+  "./import/traders-save.js?v=20261012-1",
   "./import/gmo-parser.js?v=20261011-1",
   "./import/gmo-save.js?v=20261011-1",
   "./import/gmo-preview.js?v=20261012-1",
@@ -24,10 +25,10 @@ const CORE_ASSETS = [
   "./assets/app-gestures.js",
   "./assets/account-ui.js?v=20261011-1",
   "./assets/storage-transaction.js?v=20261011-1",
-  "./assets/data-model-storage.js?v=20261011-6",
+  "./assets/data-model-storage.js?v=20261012-1",
   "./assets/trade-history-core.js?v=20261003-1",
   "./top/style.css?v=20261003-2",
-  "./top/script.js?v=20261011-7",
+  "./top/script.js?v=20261012-1",
   "./history/history.css",
   "./history/history.js?v=20261011-1",
   "./profit/soneki.html",
@@ -35,8 +36,8 @@ const CORE_ASSETS = [
   "./profit/soneki.js?v=20261011-8",
   "./assets/sbi-input-draft.js?v=20261011-3",
   "./assets/profit-metrics.js?v=20261011-3",
-  "./assets/monthly-account-resolver.js?v=20261011-7",
-  "./assets/monthly-display-view.js?v=20261011-3",
+  "./assets/monthly-account-resolver.js?v=20261012-1",
+  "./assets/monthly-display-view.js?v=20261012-1",
   "./assets/sbi-monthly-save.js?v=20261011-2",
   "./assets/gmo-monthly-save.js?v=20261011-1",
   "./assets/legacy-monthly-save.js?v=20261011-1",

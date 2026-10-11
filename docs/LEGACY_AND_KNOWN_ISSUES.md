@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Traders Storage / Backup v7
+
+**Current**：建玉はFX HoldingSnapshot v2に原資料の数量単位で保存する。**Planned**：Position画面／Riskへの新建玉consumer接続は別工程で取得元の排他・lot仕様を監査する。今回Riskのtransactions sourceは変えない。**Known issue**：本番8月legacyの認識基準および未提示の9月calendar合計とのledger照合は未検証。PDF内照合とanonymous ledger往復を分け、差を補正しない。
+
 ## Traders Securities monthly PDF
 
 **Current / 検証**：指定されたLIGHT FX／みんなのFXの2026-09 private PDFをread-onlyで解析し、口座評価・建玉・未決済swap・月次flowの内部照合は一致した。実PDF・PII・実数値はfixtureへコピーしない。**Known issue**：2026-08 legacyのswap認識根拠および9月収益カレンダー値は本番Storageを読まずには検証できないため、実口座ledgerとPDF純資産の差を自動補正しない。Chart.js幅切替の既知問題は別件。

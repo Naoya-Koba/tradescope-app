@@ -3,13 +3,15 @@
   const storage = typeof module !== 'undefined' && module.exports ? require('./data-model-storage.js') : root.TradeScopeDataStorage;
   const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
-  const policyVersion = 'monthly-policies-v2';
+  const policyVersion = 'monthly-policies-v3';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
-      sourceScope: 'gmo-fx-monthly-report', sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY' })
+      sourceScope: 'gmo-fx-monthly-report', sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY' }),
+    lightfx:Object.freeze({accountId:'acc_lightfx_fx',cutover:'2026-09',adapter:'official-account',sourceScope:'lightfx-monthly-report',sourceMode:'imported',observationType:'officialMonthEnd',valuationCurrency:'JPY'}),
+    minano:Object.freeze({accountId:'acc_minna_fx',cutover:'2026-09',adapter:'official-account',sourceScope:'minna-monthly-report',sourceMode:'imported',observationType:'officialMonthEnd',valuationCurrency:'JPY',provider:'minna'})
   });
-  const defaultEnabledKeys = Object.freeze(['sbi', 'gmo']);
+  const defaultEnabledKeys = Object.freeze(['sbi', 'gmo', 'lightfx', 'minano']);
   const records = (models, entity) => models?.[entity]?.records || [];
   const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const decimal = value => typeof value === 'string' && /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value);
@@ -22,11 +24,12 @@
   function hasLegacyConflict(tradingData, targetMonth, key = 'sbi') {
     const [year, month] = targetMonth.split('-').map(Number);
     const row = tradingData?.[year]?.[month]?.[key] || {};
-    return ['realizedPnL', 'swapPnL', 'deposit', 'withdrawal', ...(key === 'gmo' ? ['unrealizedPnL'] : [])].some(field => {
+    return ['realizedPnL', 'swapPnL', 'deposit', 'withdrawal', ...(key !== 'sbi' ? ['unrealizedPnL'] : [])].some(field => {
       const value = row[field];
       return (typeof value === 'number' || typeof value === 'string' && value.trim() !== '')
         && Number.isFinite(Number(value)) && Number(value) !== 0;
-    });
+    }) || ['lightfx','minano'].includes(key) && Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.some(value=>
+      value!==null&&value!==''&&Number.isFinite(Number(value))&&Number(value)!==0);
   }
 
   function domesticCandidates(models, targetMonth) {
@@ -92,11 +95,11 @@
     const state = states[0], snapshot = records(models, 'accountSnapshots').find(row => row.id === state.adoptedAccountSnapshotId);
     const batch = records(models, 'importBatches').find(row => row.id === snapshot?.importBatchId);
     const monthEnd = new Date(Date.UTC(Number(targetMonth.slice(0, 4)), Number(targetMonth.slice(5)), 0)).toISOString().slice(0, 10);
-    if (![2, 3].includes(state.schemaVersion) || !snapshot || snapshot.accountId !== policy.accountId || snapshot.targetMonth !== targetMonth
+    if (![2, 3, 4].includes(state.schemaVersion) || !snapshot || snapshot.accountId !== policy.accountId || snapshot.targetMonth !== targetMonth
       || ['sourceScope', 'sourceMode', 'observationType', 'valuationCurrency'].some(field => snapshot[field] !== policy[field])
       || snapshot.snapshotAsOf !== monthEnd || !batch || batch.accountId !== policy.accountId || batch.targetMonth !== targetMonth
       || batch.snapshotAsOf !== snapshot.snapshotAsOf || batch.importedAt !== snapshot.importedAt || batch.sourceType !== 'pdf'
-      || batch.sourceProvider !== key || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)) return { ...base, source: 'conflict' };
+      || batch.sourceProvider !== (policy.provider||key) || !decimal(snapshot.reportedMonthlyRealizedPnl) || !decimal(state.realizedPnl)) return { ...base, source: 'conflict' };
     // Validation is independent of floating-point conversion, including signed values.
     let adopted;
     try { adopted = storage.adoptedValues(state, snapshot); } catch (_) { return {...base, source: 'conflict'}; }

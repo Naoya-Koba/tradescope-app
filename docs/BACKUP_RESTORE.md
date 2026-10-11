@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Traders Storage / Backup v7
+
+**Current / Decided**：完全Backupの新規exportはv7。v6の意味は固定し、TradersのState v4／Snapshot v2／FX Holding v2はv7のみ受理する。新キーは追加せず従来8正本モデルを同一Journal・rollback・再読込検証で保護する。v1は8モデル維持、v2は6モデル置換＋State／Input clear、v3〜v5は旧7モデル置換＋Input clear、v6は旧8モデル置換、v7は新recordも含む8モデル置換。null＝キー不存在、tradeInfo保護、派生cache無効化は不変。PDF原本・全文・PII・filenameは含めない。
+
 ## Current — GMO保存・訂正の保護
 
 GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2／v3を最新v6で保護する。取込・訂正・Input手修正は各専用serviceから一回のRepository commitで行い、Top派生cache削除も同じjournalに含める。保存前Validation・expectedModels・全キー再読込一致後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、不能時はjournal保持で次の保存を停止する。匿名保存→Export→空Storage相当→Restore→resolver／再Export一致を検証する。原本・PIIは含めない。

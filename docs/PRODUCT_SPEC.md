@@ -1,5 +1,9 @@
 # Product Specification
 
+## Traders Storage / Backup v7
+
+**Current**：LIGHT FX／みんなのFXのPDF保存serviceと共通集計接続を実装。スワップ付与月間合計がない状態では確定保存不可。Import／Input UI接続は次commitで実施する。**Decided**：2026-09以降、個別建玉評価損益の手入力を廃止しPDF集計を採用する。
+
 ## Traders Securities monthly PDF
 
 **Current**：トレイダーズ証券の共通月次PDF ParserはLIGHT FX／みんなのFXを帳票の口座商品で区別する。取込UI・保存接続は次段階。SBI VCは対象外。

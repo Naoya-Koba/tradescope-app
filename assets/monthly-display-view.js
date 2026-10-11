@@ -52,7 +52,7 @@
           && row.targetMonth === targetMonth && ['sourceScope','sourceMode','observationType','valuationCurrency'].every(field => row[field] === policy[field])
           && row.snapshotAsOf === monthEnd
           && records(models, 'importBatches').some(batch => batch.id === row.importBatchId && batch.accountId === policy.accountId
-            && batch.sourceType === 'pdf' && batch.sourceProvider === key && batch.targetMonth === targetMonth
+            && batch.sourceType === 'pdf' && batch.sourceProvider === (policy.provider||key) && batch.targetMonth === targetMonth
             && batch.snapshotAsOf === row.snapshotAsOf && batch.importedAt === row.importedAt));
         const snapshot = resolved.state ? resolved.snapshot : snapshots.length === 1 ? snapshots[0] : null;
         if (!resolved.state && snapshots.length > 1) return { components: [], conflict: true };

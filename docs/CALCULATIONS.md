@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Traders Storage / Backup v7
+
+**Current**：LIGHT FX／みんなのFXは2026-08以前legacy、2026-09以降official-account adapterで明示採用Stateを解決する。Stateなしはmissing、非ゼロlegacy併存はconflict。共通ledgerはrealized＋calendar accrual swap＋外部入出金を累積し、純資産にはprice unrealizedのみ加える。PDF netAssetValue・settled swap・未決済swapを追加加算しない。全Summary／Trend／Monthly P/L／Allocation／口座一覧／pieは既存shared calculator/projectionを使用する。
+
 ## Traders Securities monthly PDF
 
 **Decided**：トレイダーズ証券のrealizedは月次PDFの売買損益、unrealizedは全建玉の価格評価損益合計（未決済スワップ除外）。口座報告評価損益＝価格評価損益＋未決済スワップとして検算する。canonical swapは収益カレンダー「スワップ付与」の月間発生額でありPDF受渡済みスワップではない。前月末swap basisによる算出は採用しない。外部入出金は明示行を正負別に集計する。

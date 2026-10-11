@@ -1,5 +1,9 @@
 # Data Model
 
+## Traders Storage / Backup v7
+
+**Current / Decided**：Backup v7でTraders専用AccountSnapshot record v2、FX HoldingSnapshot record v2、MonthlyAccountState record v4を導入する（8キー／envelope v1は不変）。State v4は既存採用5項目・sourceValues・overrideFieldsに加えfieldSourcesとsourceHistoryを必須とする。swapの出所は`manual-income-calendar-swap-accrual`、他4項目は`imported-monthly-pdf`。original entered swapは同一採用で不変、採用値訂正／PDF訂正前のsource/adopted値・Snapshot参照・確定日時を追記履歴として保護する。Snapshot accountSpecificはrequiredMargin、orderRequiredMargin、maintenanceRate、transferableAmount、unsettledAmount、reportedAccountEvaluationPnl、monthEndUnsettledSwap、reportedSettledSwapPnl、reportedDeposit、reportedWithdrawal。FX Holdingは共通観測参照とquantity／acquisitionPrice／marketPrice／price unrealizedにfxPosition（orderId／executedAt／side／quantityUnit=reportedQuantity／unsettledSwap／requiredMargin）を保持し、FXのmarketValueを捏造しない。数量のロット換算は行わない。
+
 ## Traders Securities monthly PDF
 
 **Decided**：LIGHT FX／みんなのFXの2026-09以降は月次PDFと収益カレンダー「スワップ付与」月間合計を組み合わせる。口座／Batch／観測／Stateは独立する。PDFの建玉原値を将来保存する際も、原本・全文・PIIは含めない。

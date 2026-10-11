@@ -128,7 +128,8 @@ test('a missing month between two imported months remains a real chart gap',()=>
 });
 test('partial P/L keeps known realized even when swap is missing',()=>{
  const f=fixture();f.models.monthlyAccountStates=null;f.models.accountSnapshots=null;
- f.tradingData[2026][9]={lightfx:{realizedPnL:7,swapPnL:null,unrealizedPnL:1}};
+ // SBI VC remains legacy in September; Traders now deliberately rejects post-cutover legacy inputs.
+ f.tradingData[2026][9]={sbivc:{realizedPnL:7,swapPnL:null,unrealizedPnL:1}};
  assert.deepEqual(view(f).monthlyPnl(2026,9),{realized:7,swap:null,total:7});
 });
 test('display source code keeps all Summary and trend consumers on the shared projection',()=>{
