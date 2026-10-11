@@ -33,7 +33,7 @@
         const anchor=rows[basis].items.find(i=>i.text.includes('作成基準日'));
         const text=clean(rows[basis].items.filter(i=>i.x>anchor.x+40).map(i=>i.text).join(''));
         if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(text))issue('TRADERS_PERIOD_INVALID');
-        else{targetMonth=text;snapshotAsOf=new Date(Date.UTC(Number(text.slice(0,4)),Number(text.slice(5)),0)).toISOString().slice(0,10);}
+        else{if(targetMonth&&targetMonth!==text)issue('TRADERS_PERIOD_INVALID');targetMonth=text;snapshotAsOf=new Date(Date.UTC(Number(text.slice(0,4)),Number(text.slice(5)),0)).toISOString().slice(0,10);}
       }
       for(let i=0;i<rows.length;i++) {
         const header=rows[i];
@@ -83,6 +83,8 @@
           for(const r of block){if(!r.items.some(c=>c.x<100&&/^\d+$/.test(c.text)))continue;
             const value=r.items.filter(c=>c.x>=320&&c.x<375).map(c=>c.text).join('');
             const next=block.find(v=>v.y<r.y&&r.y-v.y<16);
+            const fee=decimal(r.items.filter(c=>c.x>=375&&c.x<420).map(c=>c.text).join(''));
+            if(fee===null)issue('TRADERS_TRADE_ROW_INVALID');else if(!equal(fee,'0'))issue('TRADERS_UNSUPPORTED_FEE');
             trades.push({realizedPnl:decimal(value),swap:next?decimal(next.items.filter(c=>c.x>=320&&c.x<375).map(c=>c.text).join('')):null});
           }
         }
@@ -91,6 +93,7 @@
     if(!targetMonth||!snapshotAsOf||snapshotAsOf!==new Date(Date.UTC(Number(targetMonth?.slice(0,4)),Number(targetMonth?.slice(5)),0)).toISOString().slice(0,10))issue('TRADERS_PERIOD_INVALID');
     if(accountSeen!==1||!positionSeen||!ledgerSeen||!tradeSeen||!ledger.length)issue('TRADERS_SECTION_MISSING');
     if(ledger.some(r=>Object.values(r).some(v=>v===null)||r.date.slice(0,7)!==targetMonth))issue('TRADERS_LEDGER_ROW_INVALID');
+    for(const r of ledger)for(const field of ['fee','other'])if(r[field]!=null&&!equal(r[field],'0'))issue(`TRADERS_UNSUPPORTED_${field.toUpperCase()}`);
     values.unrealizedPnl=sum(positions.map(r=>r.unrealizedPnl));values.monthEndUnsettledSwap=sum(positions.map(r=>r.unsettledSwap));
     values.realizedPnl=sum(ledger.map(r=>r.realizedPnl));values.reportedSettledSwapPnl=sum(ledger.map(r=>r.settledSwap));
     values.deposit=sum(ledger.filter(r=>r.movement!==null&&!r.movement.startsWith('-')).map(r=>r.movement));

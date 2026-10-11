@@ -2,11 +2,13 @@
 
 ## Traders Storage / Backup v7
 
+**Current / Decided**：1ファイルのPDF観測・全FX Holding・calendar原入力・Stateを同一保存操作で確定する。partial saveは行わない。calendar原入力はPDF overrideではなく独立したmanual sourceであり、後の採用値訂正は原値を保持する。PDF訂正は新Batch／新Snapshot／新Holdingを追加し同じState IDの採用参照を明示切替する。表示・月切替だけでモデルをseed／保存しない。
+
 **Current / Decided**：Backup v7でTraders専用AccountSnapshot record v2、FX HoldingSnapshot record v2、MonthlyAccountState record v4を導入する（8キー／envelope v1は不変）。State v4は既存採用5項目・sourceValues・overrideFieldsに加えfieldSourcesとsourceHistoryを必須とする。swapの出所は`manual-income-calendar-swap-accrual`、他4項目は`imported-monthly-pdf`。original entered swapは同一採用で不変、採用値訂正／PDF訂正前のsource/adopted値・Snapshot参照・確定日時を追記履歴として保護する。Snapshot accountSpecificはrequiredMargin、orderRequiredMargin、maintenanceRate、transferableAmount、unsettledAmount、reportedAccountEvaluationPnl、monthEndUnsettledSwap、reportedSettledSwapPnl、reportedDeposit、reportedWithdrawal。FX Holdingは共通観測参照とquantity／acquisitionPrice／marketPrice／price unrealizedにfxPosition（orderId／executedAt／side／quantityUnit=reportedQuantity／unsettledSwap／requiredMargin）を保持し、FXのmarketValueを捏造しない。数量のロット換算は行わない。
 
 ## Traders Securities monthly PDF
 
-**Decided**：LIGHT FX／みんなのFXの2026-09以降は月次PDFと収益カレンダー「スワップ付与」月間合計を組み合わせる。口座／Batch／観測／Stateは独立する。PDFの建玉原値を将来保存する際も、原本・全文・PIIは含めない。
+**Current / Decided**：LIGHT FX／みんなのFXの2026-09以降は月次PDFと収益カレンダー「スワップ付与」月間合計を組み合わせる。口座／Batch／観測／Stateは独立する。PDF建玉原値はFX HoldingSnapshot v2へ保存し、原本・全文・PIIは含めない。
 
 ## Current / Decided — 非永続の部分観測View
 
@@ -18,7 +20,7 @@
 
 GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにする。Snapshotは破壊更新しない。PDF取込は引き続きv2を生成し、Inputの5項目編集は専用serviceで採用Stateだけを保存する。
 
-v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v6で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
+v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v7で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
 
 ## Current / Decided — GMO正式月末採用
 

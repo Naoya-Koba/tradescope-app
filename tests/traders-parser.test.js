@@ -25,3 +25,11 @@ test('local text-only extraction feeds shared parser for both products',async()=
  const e=await import('../import/pdf-extractor.mjs');for(const broker of ['lightfx','minano'])assert.equal(parser.parse(await e.extract(pdfBytes(report(broker))),broker).valid,true);
 });
 test('additional fixed Japanese CMap is local and licensed',()=>{const fs=require('node:fs');assert.ok(fs.statSync('vendor/pdfjs-6.4.299/cmaps/UniJIS-UCS2-H.bcmap').size>0);assert.ok(fs.existsSync('vendor/pdfjs-6.4.299/cmaps/LICENSE'));});
+test('trade fee and offsetting nonzero ledger fees/other are blocked even if monthly net is zero',()=>{
+ for(const x of [307,447]){const r=report();r.pages[0].items.find(i=>i.x===x&&i.y===320).text='1';r.pages[0].items.find(i=>i.x===x&&i.y===304).text='-1';assert.equal(parser.parse(r).valid,false);}
+ const r=report();r.pages[0].items.find(i=>i.x===380&&i.y===535).text='1';assert.ok(parser.parse(r).errors.includes('TRADERS_UNSUPPORTED_FEE'));
+});
+test('conflicting report periods and foreign unit suffix do not silently become a JPY observation',()=>{
+ const r=report();r.pages.push({number:2,items:[text('作成基準日：',366,700),text('2026-10',422,700)]});assert.ok(parser.parse(r).errors.includes('TRADERS_PERIOD_INVALID'));
+ const foreign=report();foreign.pages[0].items.find(i=>i.x===36&&i.y===617).text='1028(USD)';assert.equal(parser.parse(foreign).valid,false);
+});

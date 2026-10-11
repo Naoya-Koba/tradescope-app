@@ -64,7 +64,10 @@ dialog::backdrop { background: #0008; } dialog ol { padding-left: 22px; font-siz
 button:disabled { opacity: .55; cursor: default; }
 .dialog-actions { display: flex; gap: 12px; margin-top: 24px; }
 .dialog-actions button { flex: 1; margin: 0; min-height: 48px; }
-body:has(#save-dialog[open], #gmo-save-dialog[open]) { overflow: hidden; }
+body:has(dialog[open]) { overflow: hidden; }
+.calendar-swap { display: grid; gap: 6px; margin-top: 20px; }
+.calendar-swap input { width: min(100%, 320px); min-height: 44px; border: 1px solid #ffffff24; border-radius: 8px; padding: 8px; background: #0c1328; color: var(--text); }
+.calendar-swap .muted { overflow-wrap: anywhere; }
 dl > * { min-width: 0; overflow-wrap: anywhere; }
 [hidden] { display: none !important; }
 @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }

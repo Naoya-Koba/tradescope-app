@@ -2,6 +2,8 @@
 
 ## Traders Storage / Backup v7
 
+**Current / UI**：`import/traders-preview.js`は口座別PDF Previewとcalendar入力を担当し、保存は`import/traders-save.js`だけを呼ぶ。`assets/traders-monthly-ui.js`は非永続Draftの5項目を同serviceで訂正する。成功はRepository再読込検証後のみ。新方式のcontrolをlegacy Inputの収集対象から分離し、legacy serviceもcutover以降のLIGHT／みんなへの保存を拒否する。PWA v279、変更資産のqueryは20261012-1。匿名localhostで1280／390幅・保存・reload・再取込・不正帳票・Backupを確認し、実iPhoneの新broker実機確認は別途必要。
+
 **Current**：`import/traders-save.js`は商品別口座を固定し、PDF候補＋calendar swapを保存直前に検証する。一回のRepository commitでAccount遅延生成／FX Instrument再利用／Batch／口座観測／建玉群／State／cache無効化を保護する。blank swapはmissingで無書込、exact hashはno-op。別hash訂正は明示したState／採用Snapshotを確認して新sourceを追記し、State IDを維持する。手修正は原値を変えず採用値・正確な差分・履歴を保存する。Riskの建玉取得元は旧履歴のままとしPDF建玉を重ねて計上しない。
 
 ## Traders Securities monthly PDF
@@ -18,7 +20,7 @@
 
 Inputは口座カード内に青い全幅「保存」を置き、global保存は廃止する。legacy編集は`legacyInputData`の非永続Draftで、`assets/legacy-monthly-save.js`が最新Storageから対象口座だけを差し替える。既存month.__savedは維持し、今後の保存は口座row.__savedで明示0の証拠を付ける。他口座Draftを混入させず、expectedRow・journal・再読込検証・cache無効化で保護する。GMOは`assets/gmo-monthly-ui.js`から既存手修正serviceへ接続し、5項目編集と小さな「取込値に戻す」を提供する。SBIは既存保存serviceを維持し、swap欄なし、口座全体の既知評価値と初期折りたたみ「資産内訳」を表示する。国内評価額・評価損益もDraft、取得日はread-only。独立した「取込済み」行・個別銘柄一覧は置かない。
 
-**Current**：`assets/gmo-monthly-save.js`は初回明示編集だけv3化し原値5項目と採用値の差分metadataを保存する。原Snapshotは更新しない。GMO Inputはこのserviceだけを呼び、expectedModelsとjournalによるState＋cache無効化／再読込一致後に表示を更新する。未編集保存は無書込。取込値へ戻す操作はまずDraftだけを更新し、明示保存で採用値を戻す。Backup v6、旧v4／v5範囲固定、v1〜v6／rollback／PII拒否を匿名fixtureで検証する。
+**Current**：`assets/gmo-monthly-save.js`は初回明示編集だけv3化し原値5項目と採用値の差分metadataを保存する。原Snapshotは更新しない。GMO Inputはこのserviceだけを呼び、expectedModelsとjournalによるState＋cache無効化／再読込一致後に表示を更新する。未編集保存は無書込。取込値へ戻す操作はまずDraftだけを更新し、明示保存で採用値を戻す。Backup v7、旧v4〜v6範囲固定、v1〜v7／rollback／PII拒否を匿名fixtureで検証する。
 
 ## Current — GMO月次取込の完成範囲
 
@@ -131,7 +133,7 @@ TradeScope/
 
 **Current**：`assets/data-model-storage.js`がAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountState、MonthlyAccountInputのschema検証・Repository・注入式localStorage Adapterを提供する。module読込・Repository生成・readでseedやMigrationはしない。具体的なallowlist・参照制約はコードと`DATA_MODEL.md`のCurrentを参照する。
 
-**Current**：`assets/storage-transaction.js`は複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあれば保存を拒否する。最新完全バックアップv6は8collectionを保護する。v1は8キー維持、v2は6collection復元＋Stateと新Inputクリア、v3〜v5は公開済み7collection復元＋新Inputクリア。各versionの受理範囲を固定する。
+**Current**：`assets/storage-transaction.js`は複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあれば保存を拒否する。最新完全バックアップv7は8collectionを保護する。v1は8キー維持、v2は6collection復元＋Stateと新Inputクリア、v3〜v5は公開済み7collection復元＋新Inputクリア。各versionの受理範囲を固定する。
 
 **Current**：SBI Previewと保存可否判定は新Storageを読み取り専用で参照する。確認後保存だけを既存保存serviceへ接続する。UI独自のRepository commitやStorage writeは設けない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
@@ -196,9 +198,9 @@ TradeScope/
 
 **Current / 検証**：`node --test tests/sbi-import.test.js tests/sbi-model-preview.test.js`で架空の最小CSVとDOM harnessを使う。読み取り専用Storageを注入し、storage書き込み・送信・console APIに接続したら失敗するテストを含む。両CSV変換、null / 0、日付分離、銘柄照合・曖昧一致、重複候補、参照検証、PII項目除外、候補表示と破棄、既存月次状態不変を確認する。実ブラウザでの実ファイル確認とは区別する。
 
-**Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名Storageの往復、decimal、quota／journal／rollback、v1〜v6互換、未知field／version、PII拒否を確認する。gmo-monthly-override／gmo-monthly-ui／account-monthly-save testsで原値保護、未編集v2不変、初回昇格、採用値反映、口座単位保存と他Draft非混入を確認する。実Storage・実CSV・実Backup・本番PWAに接続しない。
+**Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名Storageの往復、decimal、quota／journal／rollback、v1〜v7互換、未知field／version、PII拒否を確認する。gmo-monthly-override／gmo-monthly-ui／account-monthly-save testsで原値保護、未編集v2不変、初回昇格、採用値反映、口座単位保存と他Draft非混入を確認する。実Storage・実CSV・実Backup・本番PWAに接続しない。
 
-**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v6 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
+**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v7 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 

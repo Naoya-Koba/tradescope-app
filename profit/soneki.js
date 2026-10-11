@@ -457,6 +457,7 @@ const sbiMonthlyUI = window.TradeScopeSbiMonthlyUI.createController({ adapter: l
     if (body) requestAnimationFrame(() => { body.style.maxHeight = `${body.scrollHeight}px`; });
   } });
 const gmoMonthlyUI = window.TradeScopeGmoMonthlyUI.createController({adapter:localStorage, onSaved:refreshAccountAfterSave});
+const tradersMonthlyUI = window.TradeScopeTradersMonthlyUI.createController({adapter:localStorage,onSaved:refreshAccountAfterSave});
 const legacyMonthlySave = window.TradeScopeLegacyMonthlySave.createService(localStorage);
 function refreshAccountAfterSave(key) {
   refreshMonthlyModels(); renderAnnualSummary(); renderPerformanceChart(); renderMonthlySection(); renderAccountInputs();
@@ -467,7 +468,7 @@ function refreshAccountAfterSave(key) {
 function ensureLegacyDraftMonth(year,month) {
   legacyInputData[year] ??= {}; legacyInputData[year][month] ??= {};
   for(const account of ACCOUNTS) {
-    if(['sbi','gmo'].includes(account.key)&&`${year}-${String(month).padStart(2,'0')}`>='2026-09')continue;
+    if(['sbi','gmo','lightfx','minano'].includes(account.key)&&`${year}-${String(month).padStart(2,'0')}`>='2026-09')continue;
     legacyInputData[year][month][account.key] ??= {};
   }
 }
@@ -2342,6 +2343,9 @@ function renderAccountInputs() {
   sbiInputView = sbiInput.load(localStorage, inputTargetMonth());
   
   ACCOUNTS.forEach(account => {
+    if (['lightfx','minano'].includes(account.key) && inputTargetMonth() >= window.TradeScopeMonthlyResolver.policies[account.key].cutover) {
+      container.appendChild(tradersMonthlyUI.renderCard(account,inputTargetMonth(),displayAccountName(account.key))); return;
+    }
     if (account.key === 'gmo' && inputTargetMonth() >= window.TradeScopeMonthlyResolver.policies.gmo.cutover) {
       container.appendChild(gmoMonthlyUI.renderCard(account,inputTargetMonth(),displayAccountName('gmo'))); return;
     }

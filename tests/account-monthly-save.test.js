@@ -9,10 +9,10 @@ test('one legacy account save preserves other accounts, months and existing mont
  assert.deepEqual(result.data[2026][7],data[2026][7]);assert.equal(result.data[2026][8].__saved,true);assert.equal(adapter.getItem('yearInitialFunds'),'{"anonymous":1}');
 });
 test('new zero month saves account-level evidence only, not another zero placeholder',()=>{
- const adapter=new MemoryStorage({tradingData:'{"2026":{"9":{"minano":{"realizedPnL":0}}}}'});
- const data=legacy.createService(adapter).save({year:2026,month:9,accountKey:'lightfx',row:{realizedPnL:0,swapPnL:0,unrealizedPnL:0},expectedRow:{}}).data;
- assert.equal(data[2026][9].__saved,undefined);assert.equal(metrics.isAccountMonthEntered(data[2026],9,'lightfx'),true);
- assert.equal(metrics.isAccountMonthEntered(data[2026],9,'minano'),false);assert.equal(metrics.isMonthEntered(data[2026],9,['lightfx']),true);
+ const adapter=new MemoryStorage({tradingData:'{"2026":{"8":{"minano":{"realizedPnL":0}}}}'});
+ const data=legacy.createService(adapter).save({year:2026,month:8,accountKey:'lightfx',row:{realizedPnL:0,swapPnL:0,unrealizedPnL:0},expectedRow:{}}).data;
+ assert.equal(data[2026][8].__saved,undefined);assert.equal(metrics.isAccountMonthEntered(data[2026],8,'lightfx'),true);
+ assert.equal(metrics.isAccountMonthEntered(data[2026],8,'minano'),false);assert.equal(metrics.isMonthEntered(data[2026],8,['lightfx']),true);
 });
 test('legacy save starts from fresh persisted data, not another account memory Draft',()=>{
  const adapter=new MemoryStorage({tradingData:'{"2026":{"8":{"gmo":{"realizedPnL":1},"lightfx":{"realizedPnL":5}}}}'});
@@ -21,7 +21,7 @@ test('legacy save starts from fresh persisted data, not another account memory D
 });
 test('legacy service rejects empty row and canonical cutover accounts without writes',()=>{
  const adapter=new MemoryStorage(),service=legacy.createService(adapter);
- for(const params of [{accountKey:'lightfx',row:{}},{accountKey:'sbi',row:{realizedPnL:1}},{accountKey:'gmo',row:{realizedPnL:1}}])assert.throws(()=>service.save({year:2026,month:9,...params}));assert.equal(adapter.writes,0);
+ for(const params of [{accountKey:'lightfx',row:{}},...['sbi','gmo','lightfx','minano'].map(accountKey=>({accountKey,row:{realizedPnL:1}}))])assert.throws(()=>service.save({year:2026,month:9,...params}));assert.equal(adapter.writes,0);
 });
 test('legacy stale row and quota failure preserve exact saved data and derived cache',()=>{
  const adapter=new MemoryStorage({tradingData:' {"2026":{"8":{"gmo":{"realizedPnL":1}}}} ',tradeScopeTopSummarySnapshotV1:'{}'}),service=legacy.createService(adapter),before=adapter.snapshot();

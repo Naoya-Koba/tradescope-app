@@ -2,7 +2,7 @@
 
 ## Traders Storage / Backup v7
 
-**Current**：建玉はFX HoldingSnapshot v2に原資料の数量単位で保存する。**Planned**：Position画面／Riskへの新建玉consumer接続は別工程で取得元の排他・lot仕様を監査する。今回Riskのtransactions sourceは変えない。**Known issue**：本番8月legacyの認識基準および未提示の9月calendar合計とのledger照合は未検証。PDF内照合とanonymous ledger往復を分け、差を補正しない。
+**Current**：建玉はFX HoldingSnapshot v2に原資料の数量単位で保存する。**Planned**：Position画面／Riskへの新建玉consumer接続は別工程で取得元の排他・lot仕様を監査する。今回Riskのtransactions sourceは変えない。**Known issue**：8月以前の旧swap欄は手入力値だけで、発生／受渡基準を識別するsource metadataがない。本番8月の実入力基準および未提示の9月calendar合計とのledger照合は未検証。PDF内照合とanonymous ledger往復を分け、差を補正しない。
 
 ## Traders Securities monthly PDF
 
@@ -12,7 +12,7 @@
 
 Top／年間Summary／両Trendは非永続の共通表示projectionを使用する。同一年・同一指標の値と成長率を共通化し、部分観測は既知成分だけ、当月データが全くない口座だけ直近完全月を使用する。Monthlyは選択月限定、年間内訳は既知月次値の積み上げで、State未確定のSBI国内保有も表示する。null／0と厳密なcanonical ledgerは維持する。
 
-**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO手修正UI／原値保護／State v3／Backup v6は接続済み。
+**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO手修正UI／原値保護／State v3／最新Backup v7は接続済み。
 
 **Current**：GMO Inputの5項目編集、SBI口座全体表示＋折りたたみ内訳、口座単位保存を実装済み。legacy Draftを正本から分離し他口座を巻き込まない。原値と採用値はmetadataで区別し、明示保存だけState v3にする。独立した取込済み行／global保存／SBI swap欄を除去した。
 
@@ -24,7 +24,7 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 非ゼロ手数料・締後移動・未対応外貨・未知入出金区分・合計不一致は推定補完せず停止する。複数タブの完全排他、quota・中断・実機PWAは引き続きリスクとして扱う。未対応の他brokerへ自動拡張しない。
 
-**Current / v1〜v6互換**：最新Exportはv6。SBI部分入力も8collectionで保護し、v5の7collection範囲は固定する。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
+**Current / v1〜v7互換**：最新Exportはv7。SBI部分入力も8collectionで保護し、v6の旧8collection・v5の7collection範囲は固定する。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
 
 この文書は、2026-09-26時点のコード読取結果と、その後のCurrent更新を記録する。ここへの記載は修正済みを意味しない。
 
@@ -38,9 +38,9 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 ### 完全バックアップv3・v2／v1互換とLegacy部分復元
 
-- **Current**：トップexportは`backupVersion: 4`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateを保存する。SBI CSVの確認後保存は接続済みだが、SBIの2026年9月以降のInput UI・manual月次保存・共有集計も接続済み。
+- **Current**：トップexportは`backupVersion: 7`。従来正本とAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountState、MonthlyAccountInputを保存する。SBI CSVの確認後保存は接続済みだが、SBIの2026年9月以降のInput UI・manual月次保存・共有集計も接続済み。
 - **Current**：v3、v2、v1と旧3形式の判定・検証・正規化・Restore plan生成基盤は存在する。
-- **Current**：v3は7モデルを完全復元し、v2は従来6モデルを復元して月次状態を同一journalでクリアする。v1は従来対象を復元して7モデルを維持する。旧形式は部分復元で未収録項目を維持する。
+- **Current**：v3は7モデルを完全復元し、v2は従来6モデルを復元して月次状態を同一journalでクリアする。v1は従来対象を復元して8モデルを維持する。旧形式は部分復元で未収録項目を維持する。
 - **Current**：復元前ジャーナル、書き込み後検証、失敗時ロールバック、Summary Snapshot無効化、空データ復元時のダミー投入抑止を行う。
 - **Current**：未完了ジャーナルが残る場合は新しい復元を開始せず、ユーザー確認後に復元前状態へ戻す。
 - **Current / Confirmed**：2026年9月23日に現行統合形式の `tradescope-all-backup-2026-09-23.json` を出力済みである。
@@ -186,6 +186,6 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 ## Current / Known issue — SBI国内部分保存
 
-国内集計の手修正はMonthlyAccountInputとBackup v6で保護し原Holding・取得日・legacyを変更しない。必要な外国／現金／月次値が不足している間はStateを作らない。旧CSV再取込と手入力履歴のcross-store重複検出・canonical削除UIは未実装で今回追加しない。実機iPhoneでの保存・容量・中断確認は別途必要。
+国内集計の手修正はMonthlyAccountInputと最新Backup v7で保護し原Holding・取得日・legacyを変更しない。必要な外国／現金／月次値が不足している間はStateを作らない。旧CSV再取込と手入力履歴のcross-store重複検出・canonical削除UIは未実装で今回追加しない。実機iPhoneでの保存・容量・中断確認は別途必要。
 
 **Known issue / 要再現確認**：匿名localhostで390pxから1280pxへ連続切替した際、既存CDNのChart.jsでnull contextの`save`例外を1回観測した。通常のTop表示では再発せず、原因は未確定。今回のInput保存修正とは分離し、チャート処理は変更していない。

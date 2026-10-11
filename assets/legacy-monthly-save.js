@@ -7,7 +7,7 @@
   function createService(adapter) {
     function save({year,month,accountKey,row,expectedRow}) {
       if(!Number.isInteger(year)||year<1000||!Number.isInteger(month)||month<1||month>12||!keys.includes(accountKey)
-        ||(['sbi','gmo'].includes(accountKey)&&`${year}-${String(month).padStart(2,'0')}`>='2026-09')) throw Error('保存対象を確認してください');
+        ||(['sbi','gmo','lightfx','minano'].includes(accountKey)&&`${year}-${String(month).padStart(2,'0')}`>='2026-09')) throw Error('保存対象を確認してください');
       storage.assertJson(row);
       if(!row||Array.isArray(row)||typeof row!=='object')throw Error('入力値を確認してください');
       if(!['realizedPnL','swapPnL','unrealizedPnL','deposit','withdrawal','monthEndBalance','netAssets']

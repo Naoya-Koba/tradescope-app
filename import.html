@@ -8,7 +8,7 @@
   <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
-  <link rel="stylesheet" href="import/preview.css?v=20261011-2">
+  <link rel="stylesheet" href="import/preview.css?v=20261012-1">
   <script defer src="assets/account-ui.js?v=20261011-1"></script>
   <script defer src="import/csv-core.js?v=20261005-1"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
@@ -21,6 +21,9 @@
   <script defer src="assets/monthly-account-resolver.js?v=20261012-1"></script>
   <script defer src="import/gmo-save.js?v=20261011-1"></script>
   <script defer src="import/gmo-preview.js?v=20261012-1"></script>
+  <script defer src="import/traders-parser.js?v=20261012-1"></script>
+  <script defer src="import/traders-save.js?v=20261012-1"></script>
+  <script defer src="import/traders-preview.js?v=20261012-1"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
@@ -85,8 +88,32 @@
           </section>
         </div>
       </details>
-      <button class="provider-pending" disabled><span>LIGHT FX</span><span class="muted">準備中</span></button>
-      <button class="provider-pending" disabled><span>みんなのFX</span><span class="muted">準備中</span></button>
+      <details id="lightfx-provider" class="provider">
+        <summary>LIGHT FX<span class="disclosure" aria-hidden="true">⌄</span></summary>
+        <div class="provider-content">
+          <div class="file-row"><h3>月次取引報告書PDF</h3><label class="file-button">ファイルを選択<input id="lightfx-file" type="file" accept=".pdf,application/pdf" aria-label="LIGHT FX月次PDFを選択"></label></div>
+          <div class="save-actions"><p id="lightfx-read-status" class="muted" role="status" aria-live="polite"></p><button id="lightfx-cancel-read" class="secondary" hidden>中止</button></div>
+          <section id="lightfx-preview" hidden aria-label="LIGHT FX月次データ">
+            <div class="preview-heading"><h2>確認</h2><button id="lightfx-close" class="secondary">閉じる</button></div>
+            <dl id="lightfx-summary"></dl><div id="lightfx-issues" aria-live="polite"></div>
+            <label id="lightfx-swap-group" class="calendar-swap" hidden>スワップ損益<input id="lightfx-swap" type="text" inputmode="numeric" placeholder="—"><span class="muted">収益カレンダー「スワップ付与」月間合計</span></label>
+            <div class="save-actions"><p id="lightfx-save-status" class="muted" role="status"></p><button id="lightfx-save" class="primary" hidden>保存</button></div>
+          </section>
+        </div>
+      </details>
+      <details id="minano-provider" class="provider">
+        <summary>みんなのFX<span class="disclosure" aria-hidden="true">⌄</span></summary>
+        <div class="provider-content">
+          <div class="file-row"><h3>月次取引報告書PDF</h3><label class="file-button">ファイルを選択<input id="minano-file" type="file" accept=".pdf,application/pdf" aria-label="みんなのFX月次PDFを選択"></label></div>
+          <div class="save-actions"><p id="minano-read-status" class="muted" role="status" aria-live="polite"></p><button id="minano-cancel-read" class="secondary" hidden>中止</button></div>
+          <section id="minano-preview" hidden aria-label="みんなのFX月次データ">
+            <div class="preview-heading"><h2>確認</h2><button id="minano-close" class="secondary">閉じる</button></div>
+            <dl id="minano-summary"></dl><div id="minano-issues" aria-live="polite"></div>
+            <label id="minano-swap-group" class="calendar-swap" hidden>スワップ損益<input id="minano-swap" type="text" inputmode="numeric" placeholder="—"><span class="muted">収益カレンダー「スワップ付与」月間合計</span></label>
+            <div class="save-actions"><p id="minano-save-status" class="muted" role="status"></p><button id="minano-save" class="primary" hidden>保存</button></div>
+          </section>
+        </div>
+      </details>
       <button class="provider-pending" disabled><span data-account-label="sbivc">SBI VC</span><span class="muted">準備中</span></button>
     </div>
   </main>
@@ -111,6 +138,14 @@
       <button id="gmo-cancel-save" class="secondary" autofocus>キャンセル</button>
       <button id="gmo-confirm-save" class="primary">保存</button>
     </div>
+  </dialog>
+  <dialog id="lightfx-dialog" aria-labelledby="lightfx-confirm-title">
+    <h2 id="lightfx-confirm-title">LIGHT FX</h2><dl id="lightfx-confirm-summary"></dl>
+    <div class="dialog-actions"><button id="lightfx-cancel-save" class="secondary" autofocus>キャンセル</button><button id="lightfx-confirm-save" class="primary">保存</button></div>
+  </dialog>
+  <dialog id="minano-dialog" aria-labelledby="minano-confirm-title">
+    <h2 id="minano-confirm-title">みんなのFX</h2><dl id="minano-confirm-summary"></dl>
+    <div class="dialog-actions"><button id="minano-cancel-save" class="secondary" autofocus>キャンセル</button><button id="minano-confirm-save" class="primary">保存</button></div>
   </dialog>
 </body>
 </html>

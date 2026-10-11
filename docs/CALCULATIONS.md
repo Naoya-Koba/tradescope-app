@@ -2,6 +2,8 @@
 
 ## Traders Storage / Backup v7
 
+**Current / Input**：2026-09以降のLIGHT／みんなはPDF集計値とcalendar swapを同じFX5項目フォームに表示する。入力イベントはDraftのみ、口座単位の明示保存で採用値と訂正履歴を更新する。建玉別の旧手入力は2026-08以前だけ残し、Risk consumerは今回変更しない。
+
 **Current**：LIGHT FX／みんなのFXは2026-08以前legacy、2026-09以降official-account adapterで明示採用Stateを解決する。Stateなしはmissing、非ゼロlegacy併存はconflict。共通ledgerはrealized＋calendar accrual swap＋外部入出金を累積し、純資産にはprice unrealizedのみ加える。PDF netAssetValue・settled swap・未決済swapを追加加算しない。全Summary／Trend／Monthly P/L／Allocation／口座一覧／pieは既存shared calculator/projectionを使用する。
 
 ## Traders Securities monthly PDF

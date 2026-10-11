@@ -137,9 +137,9 @@ test('Read-only holdings and Draft do not change monthly entered/latest predicat
 function editHarness(mode = 'draft') {
   const source = fs.readFileSync(path.join(root, 'profit/soneki.js'), 'utf8');
   const draft = { dataset: { account: 'sbi', field: 'realizedPnL', draft: 'sbi' }, value: '99' };
-  const other = { dataset: { account: 'lightfx', field: 'realizedPnL' }, value: '' };
+  const other = { dataset: { account: 'sbivc', field: 'realizedPnL' }, value: '' };
   const legacy = { 2026: { 8: { sbi: { realizedPnL: 12 } }, 9: { sbi: { holdings: [{ quantity: 5 }] } } } };
-  const context = vm.createContext({ currentYear: 2026, currentMonth: 9, tradingData: legacy, legacyInputData:JSON.parse(JSON.stringify(legacy)), ACCOUNTS: [{ key: 'sbi' }, { key: 'lightfx' }],
+  const context = vm.createContext({ currentYear: 2026, currentMonth: 9, tradingData: legacy, legacyInputData:JSON.parse(JSON.stringify(legacy)), ACCOUNTS: [{ key: 'sbi' }, { key: 'sbivc' }],
     sbiInputDrafts: input.createDrafts(), inputTargetMonth: () => '2026-09', usesSbiDraft: () => mode === 'draft',
     UNREALIZED_HELPER_ACCOUNTS: new Set(), document: { querySelectorAll: () => [draft, other] },
     applyBankBalanceInputsForMonth() {}, normalizeCashflowValue: (_, value) => value });
@@ -154,7 +154,7 @@ test('Real SBI input event changes only Draft, not legacy memory or __saved', ()
 });
 test('Other account synchronization cannot copy SBI Draft into legacy', () => {
   const h = editHarness(); h.other.value = '3'; h.context.updateInputs({ render: false });
-  assert.equal(h.context.legacyInputData[2026][9].lightfx.realizedPnL, 3); assert.equal(h.legacy[2026][9].lightfx, undefined); assert.equal(h.legacy[2026][9].sbi.realizedPnL, undefined);
+  assert.equal(h.context.legacyInputData[2026][9].sbivc.realizedPnL, 3); assert.equal(h.legacy[2026][9].sbivc, undefined); assert.equal(h.legacy[2026][9].sbi.realizedPnL, undefined);
   assert.equal(h.legacy[2026][9].__saved, undefined); assert.equal(h.legacy[2026][8].sbi.realizedPnL, 12);
 });
 test('Global save is removed; SBI Draft has no independent storage write path', () => {
@@ -168,9 +168,9 @@ test('Account save persists only the selected legacy Draft, never SBI domestic o
  const values={tradingData:JSON.stringify(h.legacy)};
  const adapter={getItem:key=>values[key]??null,setItem:(key,value)=>{values[key]=value;},removeItem:key=>{delete values[key];}};
  const service=require('../assets/legacy-monthly-save.js').createService(adapter);
- service.save({year:2026,month:9,accountKey:'lightfx',row:h.context.legacyInputData[2026][9].lightfx,expectedRow:{}});
+ service.save({year:2026,month:9,accountKey:'sbivc',row:h.context.legacyInputData[2026][9].sbivc,expectedRow:{}});
  const saved=JSON.parse(values.tradingData);
- assert.equal(saved[2026][9].lightfx.realizedPnL,3);assert.equal(saved[2026][9].sbi.realizedPnL,undefined);
+ assert.equal(saved[2026][9].sbivc.realizedPnL,3);assert.equal(saved[2026][9].sbi.realizedPnL,undefined);
  assert.deepEqual(saved[2026][9].sbi.holdings,[{quantity:5}]);assert.equal(saved[2026][8].sbi.realizedPnL,12);
  assert.equal(saved[2026][9].__saved,undefined);
 });
