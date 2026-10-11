@@ -21,6 +21,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .provider > summary::-webkit-details-marker { display: none; }
 .disclosure { color: var(--muted); transition: transform .18s ease; }
 .provider[open] .disclosure { transform: rotate(180deg); }
+.provider + .provider { margin-top: 8px; }
 .provider-content { padding: 0 20px 20px; }
 .provider[open] .provider-content { animation: reveal .18s ease-out; }
 .provider-pending { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; margin-top: 8px; border-color: #ffffff12; background: transparent; text-align: left; cursor: default; }

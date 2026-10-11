@@ -8,7 +8,7 @@
   <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
-  <link rel="stylesheet" href="import/preview.css?v=20261010-2">
+  <link rel="stylesheet" href="import/preview.css?v=20261011-1">
   <script defer src="assets/account-ui.js?v=20261011-1"></script>
   <script defer src="import/csv-core.js?v=20261005-1"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
@@ -17,6 +17,8 @@
   <script defer src="import/model-preview.js?v=20261010-1"></script>
   <script defer src="import/sbi-save.js?v=20261010-1"></script>
   <script defer src="import/preview.js?v=20261010-1"></script>
+  <script defer src="import/gmo-parser.js?v=20261011-1"></script>
+  <script defer src="import/gmo-preview.js?v=20261011-1"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
@@ -65,7 +67,21 @@
           </section>
         </div>
       </details>
-      <button class="provider-pending" disabled><span data-account-label="gmo">GMO FXneo</span><span class="muted">準備中</span></button>
+      <details id="gmo-provider" class="provider">
+        <summary><span data-account-label="gmo">GMO FXneo</span><span class="disclosure" aria-hidden="true">⌄</span></summary>
+        <div class="provider-content">
+          <div class="file-row">
+            <h3>月次取引残高報告書PDF</h3>
+            <label class="file-button">ファイルを選択<input id="gmo-file" type="file" accept=".pdf,application/pdf" aria-label="GMO月次PDFを選択"></label>
+          </div>
+          <div class="save-actions"><p id="gmo-read-status" class="muted" role="status" aria-live="polite"></p><button id="gmo-cancel-read" class="secondary" hidden>中止</button></div>
+          <section id="gmo-preview" hidden aria-label="GMO月次データ">
+            <div class="preview-heading"><h2>確認</h2><button id="gmo-close" class="secondary">閉じる</button></div>
+            <dl id="gmo-summary"></dl>
+            <div id="gmo-issues" aria-live="polite"></div>
+          </section>
+        </div>
+      </details>
       <button class="provider-pending" disabled><span>LIGHT FX</span><span class="muted">準備中</span></button>
       <button class="provider-pending" disabled><span>みんなのFX</span><span class="muted">準備中</span></button>
       <button class="provider-pending" disabled><span data-account-label="sbivc">SBI VC</span><span class="muted">準備中</span></button>

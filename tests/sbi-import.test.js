@@ -485,7 +485,7 @@ test('SBI-format UTF-8 fixtures preview with no noise and display search/actual 
 test('provider starts closed; open/close clears preview and remains reusable without persistence', async () => {
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
   assert.match(html, /<details id="sbi-provider" class="provider">/);
-  for (const provider of ['GMO FXneo', 'LIGHT FX', 'みんなのFX', 'SBI VC']) {
+  for (const provider of ['LIGHT FX', 'みんなのFX', 'SBI VC']) {
     assert.match(html, new RegExp(`<button class="provider-pending" disabled><span(?: data-account-label="[a-z]+")?>${provider}</span>`));
   }
   const h = harness();
@@ -499,7 +499,7 @@ test('provider starts closed; open/close clears preview and remains reusable wit
 });
 test('SBI filename examples are quiet hints in the correct slots only', () => {
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
-  const slots = html.split('<div class="file-row">').slice(1);
+  const slots = html.slice(html.indexOf('id="sbi-provider"'), html.indexOf('id="gmo-provider"')).split('<div class="file-row">').slice(1);
   assert.equal(slots.length, 2);
   assert.ok(slots[0].includes('保有証券CSV'));
   assert.ok(slots[0].includes('aria-describedby="holdings-file-example"'));

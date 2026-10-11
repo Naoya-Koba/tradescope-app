@@ -1,10 +1,12 @@
-const CACHE_NAME = 'tradescope-static-v266';
+const CACHE_NAME = 'tradescope-static-v267';
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./history.html",
   "./import.html",
   "./import/pdf-extractor.mjs?v=20261011-1",
+  "./import/gmo-parser.js?v=20261011-1",
+  "./import/gmo-preview.js?v=20261011-1",
   "./vendor/pdfjs-6.4.299/pdf.mjs",
   "./vendor/pdfjs-6.4.299/pdf.worker.mjs",
   "./vendor/pdfjs-6.4.299/cmaps/90ms-RKSJ-H.bcmap",
@@ -14,7 +16,7 @@ const CORE_ASSETS = [
   "./import/model-preview.js?v=20261010-1",
   "./import/sbi-save.js?v=20261010-1",
   "./import/preview.js?v=20261010-1",
-  "./import/preview.css?v=20261010-2",
+  "./import/preview.css?v=20261011-1",
   "./manifest.webmanifest",
   "./assets/app-gestures.js",
   "./assets/account-ui.js?v=20261011-1",
