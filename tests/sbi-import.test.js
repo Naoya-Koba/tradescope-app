@@ -611,7 +611,7 @@ test('latest monthly logic remains independent and non-destructive', () => {
 });
 test('standalone page uses read-only model preview without legacy app modules, local assets and CSP', () => {
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
-  assert.ok(html.includes("connect-src 'none'"));
+  assert.ok(html.includes("connect-src 'self'"));
   assert.ok(!/top\/script|soneki.js|profit-metrics|trade-history-core/.test(html));
   assert.ok(!/src="https?:/.test(html));
   for (const file of ['csv-core.js', 'sbi-parser.js', 'preview.js', 'model-preview.js']) {

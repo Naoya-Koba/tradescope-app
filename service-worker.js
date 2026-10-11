@@ -1,9 +1,14 @@
-const CACHE_NAME = 'tradescope-static-v265';
+const CACHE_NAME = 'tradescope-static-v266';
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./history.html",
   "./import.html",
+  "./import/pdf-extractor.mjs?v=20261011-1",
+  "./vendor/pdfjs-6.4.299/pdf.mjs",
+  "./vendor/pdfjs-6.4.299/pdf.worker.mjs",
+  "./vendor/pdfjs-6.4.299/cmaps/90ms-RKSJ-H.bcmap",
+  "./vendor/pdfjs-6.4.299/cmaps/Adobe-Japan1-UCS2.bcmap",
   "./import/csv-core.js?v=20261005-1",
   "./import/sbi-parser.js?v=20261009-2",
   "./import/model-preview.js?v=20261010-1",
@@ -62,7 +67,7 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("./index.html"))
+      fetch(event.request).catch(async () => (await caches.match(event.request, { ignoreSearch: true })) || caches.match("./index.html"))
     );
     return;
   }
