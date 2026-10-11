@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current — 部分取込でTop全体が欠損になる表示を改善
+
+TopとMonthly Summaryに非永続の表示Viewを追加済み。Topは当月部分観測を既知成分だけ反映し、当月データが全くない口座だけ直近完全月を使用する。損益等は完全値からのみ算出する。Monthlyは選択月限定の暫定表示で、State未確定のSBI国内保有も表示する。null／0、正本・Backup・厳密な年間／Trend計算は変更しない。
+
+**Known issue**：複数国内候補の選択、PDF原値と採用値を分離したユーザー手修正、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。
+
 ## Current / Known issue — GMO PDF
 
 **Current / Safari互換**：一部Safariで未対応の`ReadableStream[Symbol.asyncIterator]`をPDF.js legacyの`getTextContent()`が使用し、document／page読込後のtext extractionで失敗する経路を匿名fixtureで再現した。公開Stream reader経路へ切替済み。固定safe codeで失敗段階を識別し、PDF本文・PII・元例外は露出しない。worker／CMap／CSPを原因と断定せず、実iPhoneでの修正後確認は未実施。

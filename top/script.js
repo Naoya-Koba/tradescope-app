@@ -888,7 +888,7 @@ function buildTopLinkedData(selectedYear = null) {
   let models = null;
   try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
   const sourceYears = [...new Set([...getNumericYears(tradingData), ...getNumericYears(initialFunds),
-    ...getNumericYears(initialUnrealized), ...(models?.monthlyAccountStates?.records || []).map(row => Number(row.targetMonth.slice(0, 4)))])].sort((a,b) => a-b);
+    ...getNumericYears(initialUnrealized), ...window.TradeScopeMonthlyDisplay.years(models)])].sort((a,b) => a-b);
   const year = selectedYear || sourceYears[sourceYears.length - 1];
   if (!year) return null;
   const calculator = window.TradeScopeMonthlyResolver.createCalculator(profitMetrics, tradingData, initialFunds, initialUnrealized, models);
@@ -902,9 +902,16 @@ function buildTopLinkedData(selectedYear = null) {
 
 const linkedTopData = buildTopLinkedData();
 let topSeries = linkedTopData || createEmptyTopSeries();
+function buildLatestDashboard(year) {
+  let models = null;
+  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
+  return window.TradeScopeMonthlyDisplay.create(profitMetrics, parseStoredJson(PROFIT_STORAGE_KEY_TRADING),
+    parseStoredJson(PROFIT_STORAGE_KEY_INITIAL), parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models, LINKED_ACCOUNTS).dashboard(year);
+}
+let latestDashboard = buildLatestDashboard(topSeries.year);
 
 // ===== Portfolio Data =====
-let accountData = topSeries.accountData?.length ? topSeries.accountData : [];
+let accountData = latestDashboard.accountData;
 
 function buildPortfolioAllocationFromAccounts(accounts) {
   const byKey = accounts.reduce((acc, item) => {
@@ -947,7 +954,7 @@ function updateRiskSection() {
   }
 
   const entries = historyCore.parseEntries();
-  const cryptoAccount = accountData.find((item) => item.label === 'SBI VC');
+  const cryptoAccount = (topSeries.accountData || []).find((item) => item.label === 'SBI VC');
   const hasCryptoRiskData = Number(cryptoAccount?.amount) > 0;
   const cryptoValue = hasCryptoRiskData ? Number(cryptoAccount.amount) : 0;
   const riskSummary = historyCore.calculateRiskSummary(entries, cryptoValue);
@@ -979,6 +986,16 @@ function updateRiskSection() {
 function updateKPIs() {
   const warning = document.getElementById('topMonthlyWarning');
   if (warning) { warning.textContent = linkedCalculator().warning(topSeries.year); warning.hidden = !warning.textContent; }
+  const status = document.getElementById('topLatestStatus');
+  if (status) {
+    status.hidden = !latestDashboard.hasData || !latestDashboard.provisional;
+    status.textContent = status.hidden ? '' : '最新値・一部暫定';
+    status.title = latestDashboard.rows.map(row => {
+      const source = row.metrics.net;
+      const label = window.TradeScopeAccountUI?.displayAccountName?.(row.key) || row.name;
+      return `${label}　${source.sourceMonth ? Number(source.sourceMonth.slice(5)) + '月' : ''}${source.status === 'current partial' ? '暫定' : source.status === 'unavailable' ? '未取得' : '確定'}`;
+    }).join('\n');
+  }
   const summaryElements = [
     'kpiTotal',
     'kpiRealized',
@@ -992,7 +1009,7 @@ function updateKPIs() {
     'annualConfirmedPnLGrowth'
   ].map((id) => document.getElementById(id)).filter(Boolean);
 
-  if (!topSeries?.hasData) {
+  if (!latestDashboard.hasData) {
     summaryElements.forEach((el) => {
       el.textContent = '—';
       el.classList.remove('positive', 'negative');
@@ -1001,9 +1018,8 @@ function updateKPIs() {
     return;
   }
 
-  const i = Math.max(0, (topSeries.month || topSeries.realized.length) - 1);
-  const rLast = topSeries.realized[i];
-  const tLast = topSeries.total[i];
+  const rLast = latestDashboard.confirmed.value;
+  const tLast = latestDashboard.net.value;
   const fmtDeltaNumber = (value) => {
     const abs = Math.round(Math.abs(value)).toLocaleString();
     if (value > 0) return `+${abs}`;
@@ -1018,29 +1034,18 @@ function updateKPIs() {
   elReal.textContent = Number.isFinite(rLast) ? fmtJPY(rLast) : '—';
 
   const elNet = document.getElementById('growthNet');
-  const yearStartTotalActual = topSeries.chartStartTotalWithUnrealized || 0;
-  const yearStartConfirmedActual = topSeries.chartStartTotal || 0;
-  const yearStartTotalPerformance = topSeries.yearStartTotal || 0;
-  const yearStartConfirmedPerformance = topSeries.yearStartConfirmed || 0;
-  const growthCurrentTotal = Number.isFinite(topSeries.growthCurrentTotal) ? topSeries.growthCurrentTotal : tLast;
-  const growthCurrentConfirmed = Number.isFinite(topSeries.growthCurrentConfirmed) ? topSeries.growthCurrentConfirmed : rLast;
-  const cumulativeDeposits = topSeries.cumulativeDeposits;
-  const cumulativeWithdrawals = topSeries.cumulativeWithdrawals;
+  const yearStartTotalActual = latestDashboard.initialNet;
+  const yearStartConfirmedActual = latestDashboard.initialConfirmed;
 
-  const totalAssetDelta = Number.isFinite(tLast) ? tLast - yearStartTotalActual : null;
-  const confirmedAssetDelta = Number.isFinite(rLast) ? rLast - yearStartConfirmedActual : null;
+  const totalAssetDelta = latestDashboard.netDelta;
+  const confirmedAssetDelta = latestDashboard.confirmedDelta;
   const annualGrowthRate = yearStartTotalActual > 0 && Number.isFinite(totalAssetDelta) ? (totalAssetDelta / yearStartTotalActual) * 100 : null;
   const confirmedAnnualGrowthRate = yearStartConfirmedActual > 0 && Number.isFinite(confirmedAssetDelta) ? (confirmedAssetDelta / yearStartConfirmedActual) * 100 : null;
 
-  const annualNetPnL = Number.isFinite(growthCurrentTotal) && Number.isFinite(cumulativeDeposits) && Number.isFinite(cumulativeWithdrawals)
-    ? growthCurrentTotal - yearStartTotalPerformance - cumulativeDeposits + cumulativeWithdrawals
-    : null;
-  const annualConfirmedPnL = Number.isFinite(growthCurrentConfirmed) && Number.isFinite(cumulativeDeposits) && Number.isFinite(cumulativeWithdrawals)
-    ? growthCurrentConfirmed - yearStartConfirmedPerformance - cumulativeDeposits + cumulativeWithdrawals : null;
-  const annualNetPnLGrowth = yearStartTotalPerformance > 0 && Number.isFinite(annualNetPnL)
-    ? (annualNetPnL / yearStartTotalPerformance) * 100
-    : null;
-  const annualConfirmedPnLGrowth = yearStartConfirmedPerformance > 0 && Number.isFinite(annualConfirmedPnL) ? (annualConfirmedPnL / yearStartConfirmedPerformance) * 100 : null;
+  const annualNetPnL = latestDashboard.netPnl.value;
+  const annualConfirmedPnL = latestDashboard.confirmedPnl.value;
+  const annualNetPnLGrowth = latestDashboard.netPnlGrowth;
+  const annualConfirmedPnLGrowth = latestDashboard.confirmedPnlGrowth;
 
   const elTotalDelta = document.getElementById('deltaTotal');
   const elNetDelta = document.getElementById('deltaNet');
@@ -2413,8 +2418,8 @@ function initializeYearSelector() {
   const persistedYear = getPersistedSelectedYear();
   const years = (() => {
     const set = new Set([TOP_BASE_YEAR]);
-    try { window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read().monthlyAccountStates?.records
-      .forEach(row => set.add(Number(row.targetMonth.slice(0, 4)))); } catch (_) {}
+    try { window.TradeScopeMonthlyDisplay.years(window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read())
+      .forEach(year => set.add(year)); } catch (_) {}
     getNumericYears(tradingDataMap)
       .filter((year) => year >= TOP_BASE_YEAR)
       .forEach((year) => set.add(year));
@@ -2467,10 +2472,11 @@ function updateDataByYear(inputYear = null) {
 
   saveSelectedYear(selectedYear);
   topSeries = resolveTopSeriesForYear(selectedYear);
+  latestDashboard = buildLatestDashboard(selectedYear);
 
   updateKPIs();
 
-  accountData = topSeries.accountData?.length ? topSeries.accountData : [];
+  accountData = latestDashboard.accountData;
   portfolioData = buildPortfolioAllocationFromAccounts(accountData);
   renderPortfolio();
   updateRiskSection();
@@ -3270,10 +3276,15 @@ function importAllData(file) {
 }
 
 window.addEventListener('storage', (event) => {
+  if (event.key === null || [PROFIT_STORAGE_KEY_TRADING, PROFIT_STORAGE_KEY_INITIAL, PROFIT_STORAGE_KEY_INITIAL_UNREALIZED,
+    ...Object.values(window.TradeScopeDataStorage.keys)].includes(event.key)) updateDataByYear(topSeries.year);
   if (!historyCore?.STORAGE_KEY) return;
   if (event.key !== historyCore.STORAGE_KEY) return;
   updateRiskSection();
   renderCurrentPortfolioSection();
+});
+window.addEventListener('pageshow', event => {
+  if (event.persisted) updateDataByYear(topSeries.year);
 });
 
 // Backup button listeners

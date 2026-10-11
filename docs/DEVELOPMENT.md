@@ -1,5 +1,11 @@
 # Development Guide
 
+## Current — 部分取込の表示層
+
+`assets/monthly-display-view.js`はDOM／Storage非依存で、共有resolverを変更せず、Top専用最新projectionとMonthly Summary選択月Viewを返す。画面側にbroker別金融計算を追加しない。TopのKPI・口座配分は同じprojection、年間Summaryと両Trendは厳密calculatorを維持する。部分取込を確定用Snapshotキャッシュから取得しない。正本変更時のstorage eventと再表示で再計算し、projection fingerprintに未採用観測も含める。
+
+`tests/monthly-display.test.js`は匿名のGMO完全／SBI部分／旧月口座、nullと0、複数候補、指標別sourceMonth、無書込、canonical回帰を検証する。`tests/monthly-display-browser.*`はlocalhost専用の架空Storageとcleanupであり、production導線／precacheには含めない。実金融データ・実Backupを使用しない。
+
 ## Current — GMO月次取込の完成範囲
 
 `import/gmo-parser.js`はGMO帳票判定・金融値のallowlist出口、`import/gmo-preview.js`は選択・中止・Preview・確認・状態表示、`import/gmo-save.js`は保存直前のValidation／旧入力競合／exact hash／明示訂正／一括保存を担当する。画面側はStorage writeしない。共通resolverの口座policyとadapterにより全画面へ接続し、GMO cutover後のInputはPDF採用値のread-only表示と取込入口だけにする。PDF保存だけでlegacy monthly・履歴を変更しない。

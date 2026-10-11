@@ -1,5 +1,11 @@
 # Data Model
 
+## Current / Decided — 非永続の部分観測View
+
+月次Stateのcomplete／missing／conflictは変更しない。未確定の国内HoldingSnapshot群等から読み取り専用のpartial-month viewとlatest-dashboard projectionを生成する。同一月の国内候補Batchは1件のみなら採用表示可能で、複数なら合算・latest選択をせず停止する。完全Stateがある場合は明示採用先を優先する。対象月・取得元・口座を検証した同一観測群だけを合計し、必要値不足の群合計はnullを保つ。
+
+TopはmetricごとにsourceMonthと使用状態をメモリに保持する。未入力成分の非加算は暫定表示だけの意味であり、0保存、legacyコピー、State生成をしない。表示Viewのための保存キー・schema・Backup変更はない。
+
 ## Current / Decided — GMO正式月末採用
 
 GMOの正本取込元は月次取引残高報告書PDFのみ。明示保存でImportBatch（sourceType=pdf／sourceProvider=gmo／hash・size／importerVersionのみ、sourceScope・filename・原本なし）、AccountSnapshot（imported／gmo-fx-monthly-report／officialMonthEnd／JPY）、MonthlyAccountState record v2を一回のRepository transactionで追加・確定する。Accountは保存時だけ必要なら作成する。

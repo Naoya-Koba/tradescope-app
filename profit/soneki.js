@@ -1978,10 +1978,28 @@ function getStoredNumber(row, field) {
   return profitMetrics?.hasStoredNumber?.(row, field) ? Number(row[field]) : null;
 }
 
-function buildMonthlyCardHtml(month, { realized = null, swap = null, unrealized = null } = {}) {
+function monthlyDisplayView() {
+  return window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData, yearInitialFunds,
+    yearInitialUnrealized, monthlyModels, ACCOUNTS);
+}
+function monthlyDisplayTotals(year, month) {
+  const view = monthlyDisplayView().month(year, month);
+  return { ...view, realizedSum: view.realized, swapSum: view.swap, unrealizedSum: view.unrealized,
+    depositSum: view.deposit, withdrawSum: view.withdrawal };
+}
+function monthlyComponentHtml(component) {
+  const amount = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
+  const cash = component.name === '現金・預り金';
+  return `<div class="detail-account-stats"><div class="item"><span class="k">${component.name} ${cash ? '残高' : '評価額'}</span><span class="v">${formatOptionalJPY(amount(component.asset))}</span></div>${cash ? '' : `<div class="item"><span class="k">${component.name} 評価損益</span><span class="v">${formatOptionalJPY(amount(component.unrealized))}</span></div>`}</div>`;
+}
+function hasMonthlyDisplayYear(year) {
+  return hasStoredYearData(year) || Array.from({ length: 12 }, (_, index) => index + 1)
+    .some(month => monthlyDisplayView().month(year, month).hasData);
+}
+function buildMonthlyCardHtml(month, { realized = null, swap = null, unrealized = null, provisional = false } = {}) {
   const totalPnL = Number.isFinite(realized) && Number.isFinite(swap) ? realized + swap : null;
   return `
-    <div class="monthly-label">${month}月</div>
+    <div class="monthly-label">${month}月${provisional ? ' <small>暫定</small>' : ''}</div>
     <div class="monthly-total-label">合計</div>
     <div class="monthly-total-value"${optionalSignStyle(totalPnL)}>${formatOptionalJPY(totalPnL)}</div>
     <div class="monthly-breakdown">
@@ -2010,20 +2028,21 @@ function renderMonthlyDisplay() {
     accountHeader.innerHTML = '';
   }
 
-  if (!hasStoredYearData(currentYear)) {
+  if (!hasMonthlyDisplayYear(currentYear)) {
     container.innerHTML = '<p class="data-empty-state">データなし</p>';
     return;
   }
   
   for (let m = 1; m <= 12; m++) {
-    const monthly = calculateMonthlyTotals(currentYear, m);
+    const monthly = monthlyDisplayTotals(currentYear, m);
     const card = document.createElement('div');
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
     card.innerHTML = buildMonthlyCardHtml(m, {
       realized: monthly.realizedSum,
       swap: monthly.swapSum,
-      unrealized: monthly.unrealizedSum
+      unrealized: monthly.unrealizedSum,
+      provisional: monthly.provisional
     });
     
     card.addEventListener('click', () => {
@@ -2049,21 +2068,19 @@ function renderMonthlyByAccount(accountKey) {
     accountHeader.innerHTML = `<span class="monthly-account-dot" style="background:${account.color}"></span><span class="monthly-account-name">${displayAccountName(account.key)}</span>`;
   }
 
-  if (!hasStoredYearData(currentYear)) {
+  if (!hasMonthlyDisplayYear(currentYear)) {
     container.innerHTML = '<p class="data-empty-state">データなし</p>';
     return;
   }
 
   for (let m = 1; m <= 12; m++) {
-    const fieldTotal = (field) => monthlyCalculator().monthlyFieldTotal(currentYear, m, [account.key], field);
-    const realized = fieldTotal('realizedPnL');
-    const swap = fieldTotal('swapPnL');
-    const unrealized = fieldTotal('unrealizedPnL');
+    const view = monthlyDisplayView().accountMonth(currentYear, m, account);
+    const { realized, swap, unrealized } = view;
 
     const card = document.createElement('div');
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
-    card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized });
+    card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized, provisional: view.partial });
 
     card.addEventListener('click', () => {
       selectMonth(m);
@@ -2074,14 +2091,14 @@ function renderMonthlyByAccount(accountKey) {
 }
 
 function renderMonthlyDetailPane(month = currentMonth) {
-  const hasData = hasMeaningfulMonthData(currentYear, month);
-  monthlyDetailTitle.textContent = `${month}月 詳細`;
+  const monthly = monthlyDisplayTotals(currentYear, month);
+  const hasData = monthly.hasData;
+  monthlyDetailTitle.textContent = `${month}月 詳細${monthly.provisional ? '・暫定' : ''}`;
   if (!hasData) {
     monthlyDetailBody.innerHTML = '<p class="data-empty-state">—</p>';
     return;
   }
 
-  const monthly = calculateMonthlyTotals(currentYear, month);
   const totalPnL = Number.isFinite(monthly.realizedSum) && Number.isFinite(monthly.swapSum)
     ? monthly.realizedSum + monthly.swapSum
     : null;
@@ -2090,13 +2107,10 @@ function renderMonthlyDetailPane(month = currentMonth) {
     : null;
 
   const accountCards = ACCOUNTS.map(account => {
-    const data = monthlyCalculator().row(currentYear, month, account.key);
-    const realized = getStoredNumber(data, 'realizedPnL');
-    const swap = getStoredNumber(data, 'swapPnL');
-    const unrealized = getStoredNumber(data, 'unrealizedPnL');
-    const deposit = getStoredNumber(data, 'deposit');
-    const withdrawal = getStoredNumber(data, 'withdrawal');
-    const netAssets = calculateAccountNetAssets(currentYear, month, account.key);
+    const view = monthly.rows.find(row => row.key === account.key);
+    if (!view.hasData) return '';
+    const { realized, swap, unrealized, deposit, withdrawal } = view;
+    const netAssets = view.asset;
     const hideSwapRow = account.key === 'sbi' || account.key === 'sbivc';
     const accountTotal = hideSwapRow
       ? realized
@@ -2135,7 +2149,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
     return `
       <div class="detail-account-card">
         <div class="detail-account-head">
-          <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}</span>
+          <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}${view.partial ? ' <small>暫定</small>' : ''}</span>
         </div>
         <div class="detail-account-summary">
           <div class="detail-account-summary-label">損益合計</div>
@@ -2161,15 +2175,16 @@ function renderMonthlyDetailPane(month = currentMonth) {
         </div>
         <div class="detail-account-cashflow" style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.08)">
           <div class="detail-account-cashflow-head">
-            <span class="k">時価評価額</span>
+            <span class="k">${view.partial ? '取得済み評価額' : '時価評価額'}</span>
             <span class="v"${optionalSignStyle(netAssets)}>${formatOptionalJPY(netAssets)}</span>
           </div>
         </div>
+        ${view.components.map(monthlyComponentHtml).join('')}
       </div>
     `;
   }).join('');
 
-  const deleteButton = hasData ? `
+  const deleteButton = profitMetrics.isMonthEntered(tradingData?.[currentYear] || {}, month, ACCOUNTS.map(account => account.key)) ? `
     <button type="button" class="detail-delete-button" data-delete-month="${month}">
       <span class="detail-delete-icon">🗑</span>
       <span class="detail-delete-text">この月のデータを削除</span>
@@ -2835,7 +2850,7 @@ function getSelectableYears() {
   Object.keys(tradingData || {}).forEach((y) => years.add(Number(y)));
   Object.keys(yearInitialFunds || {}).forEach((y) => years.add(Number(y)));
   Object.keys(yearInitialUnrealized || {}).forEach((y) => years.add(Number(y)));
-  (monthlyModels?.monthlyAccountStates?.records || []).forEach(state => years.add(Number(state.targetMonth.slice(0, 4))));
+  window.TradeScopeMonthlyDisplay.years(monthlyModels).forEach(year => years.add(year));
 
   const normalizedYears = [...years]
     .filter((y) => Number.isInteger(y) && y >= PROFIT_BASE_YEAR && y <= 2100);
@@ -3312,4 +3327,14 @@ window.addEventListener('load', () => {
   currentMonth = new Date().getMonth() + 1;
   renderAll();
   applyInitialCapitalDefaultOpen();
+});
+// Returning from import (including the browser back/forward cache) reads new observations.
+// Existing in-memory edit Drafts stay detached; this path never saves or confirms a month.
+window.addEventListener('pageshow', event => {
+  if (event.persisted) { refreshMonthlyModels(); renderAll(); }
+});
+window.addEventListener('storage', event => {
+  if (event.key === null || Object.values(window.TradeScopeDataStorage.keys).includes(event.key)) {
+    refreshMonthlyModels(); renderAll();
+  }
 });
