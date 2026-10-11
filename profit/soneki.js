@@ -148,7 +148,7 @@ function monthlyCalculator() {
 }
 
 function getUnrealizedLegs(year, month, accountKey) {
-  const row = tradingData[year]?.[month]?.[accountKey] || {};
+  const row = legacyInputData[year]?.[month]?.[accountKey] || {};
   return Array.isArray(row.unrealizedLegs) ? [...row.unrealizedLegs] : [];
 }
 
@@ -250,11 +250,11 @@ function commitUnrealizedLegInput(inputEl, { focusNew = false } = {}) {
 }
 
 function syncUnrealizedFromLegInputs(accountKey) {
-  ensureYearMonth(currentYear, currentMonth);
+  ensureLegacyDraftMonth(currentYear, currentMonth);
   const inputs = document.querySelectorAll(`.unrealized-leg-input[data-account="${accountKey}"]`);
   const legs = Array.from(inputs).map((input) => Number(input.value) || 0);
 
-  const row = tradingData[currentYear][currentMonth][accountKey];
+  const row = legacyInputData[currentYear][currentMonth][accountKey];
 
   if (!legs.length) {
     const fallback = Number(row.unrealizedBackup ?? row.unrealizedPnL) || 0;
@@ -289,8 +289,8 @@ function bindUnrealizedHelperEvents(container) {
       if (!rowsWrap) return;
 
       const legs = getUnrealizedLegs(currentYear, currentMonth, accountKey);
-      const row = tradingData[currentYear]?.[currentMonth]?.[accountKey] || {};
-      const currentUnrealized = Number(tradingData[currentYear]?.[currentMonth]?.[accountKey]?.unrealizedPnL) || 0;
+      const row = legacyInputData[currentYear]?.[currentMonth]?.[accountKey] || {};
+      const currentUnrealized = Number(legacyInputData[currentYear]?.[currentMonth]?.[accountKey]?.unrealizedPnL) || 0;
       if (!legs.length) {
         // 初回は「既存の評価損益」行に加えて、新規追加行も同時に作る
         row.unrealizedBackup = currentUnrealized;
@@ -442,6 +442,7 @@ drawer?.addEventListener('touchmove', (e) => {
 let currentYear = 2025;
 let currentMonth = new Date().getMonth() + 1; // 1-12
 let tradingData = {}; // { year: { month: { account: { realizedPnL, swapPnL, unrealizedPnL, maintenanceRate, deposit, withdrawal } } } }
+let legacyInputData = {}; // Memory-only edits; never passed to whole-page persistence or Summary.
 let yearInitialFunds = {}; // { year: { account: amount } }
 let yearInitialUnrealized = {}; // { year: { account: amount } }
 const sbiInput = window.TradeScopeSbiInput;
@@ -455,6 +456,26 @@ const sbiMonthlyUI = window.TradeScopeSbiMonthlyUI.createController({ adapter: l
     body?.classList.add('open'); toggle?.classList.add('open'); toggle?.setAttribute('aria-expanded', 'true');
     if (body) requestAnimationFrame(() => { body.style.maxHeight = `${body.scrollHeight}px`; });
   } });
+const gmoMonthlyUI = window.TradeScopeGmoMonthlyUI.createController({adapter:localStorage, onSaved:refreshAccountAfterSave});
+const legacyMonthlySave = window.TradeScopeLegacyMonthlySave.createService(localStorage);
+function refreshAccountAfterSave(key) {
+  refreshMonthlyModels(); renderAnnualSummary(); renderPerformanceChart(); renderMonthlySection(); renderAccountInputs();
+  const body=document.querySelector(`[data-account-body="${key}"]`),toggle=document.querySelector(`[data-account-toggle="${key}"]`);
+  body?.classList.add('open');toggle?.classList.add('open');toggle?.setAttribute('aria-expanded','true');
+  if(body)requestAnimationFrame(()=>{body.style.maxHeight=`${body.scrollHeight}px`;});
+}
+function ensureLegacyDraftMonth(year,month) {
+  legacyInputData[year] ??= {}; legacyInputData[year][month] ??= {};
+  for(const account of ACCOUNTS) {
+    if(['sbi','gmo'].includes(account.key)&&`${year}-${String(month).padStart(2,'0')}`>='2026-09')continue;
+    legacyInputData[year][month][account.key] ??= {};
+  }
+}
+function legacyDraftCalculator(accountKey) {
+  const data=JSON.parse(JSON.stringify(tradingData));data[currentYear]??={};data[currentYear][currentMonth]??={};
+  data[currentYear][currentMonth][accountKey]=legacyInputData[currentYear]?.[currentMonth]?.[accountKey]||{};
+  return window.TradeScopeMonthlyResolver.createCalculator(profitMetrics,data,yearInitialFunds,yearInitialUnrealized,monthlyModels);
+}
 let sbiInputView = { mode: 'legacy' };
 const inputTargetMonth = () => `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 const usesSbiDraft = () => sbiInputView.mode === 'draft';
@@ -560,6 +581,7 @@ function importData(file) {
       }
       if (!confirm('現在のデータをインポートデータで上書きします。よろしいですか？')) return;
       tradingData = parsed.tradingData;
+      legacyInputData = JSON.parse(JSON.stringify(tradingData));
       yearInitialFunds = parsed.yearInitialFunds;
       yearInitialUnrealized = parsed.yearInitialUnrealized || {};
       saveToStorage();
@@ -583,6 +605,7 @@ function loadFromStorage() {
   sbiInputDrafts.clear();
   refreshMonthlyModels();
   tradingData = JSON.parse(localStorage.getItem(STORAGE_KEY_TRADING) || '{}');
+  legacyInputData = JSON.parse(JSON.stringify(tradingData));
   yearInitialFunds = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL) || '{}');
   yearInitialUnrealized = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL_UNREALIZED) || '{}');
 }
@@ -696,10 +719,10 @@ function getBankMonthEndBalance(year, month, accountKey) {
 }
 
 function applyBankBalanceInputsForMonth(year, month) {
-  ensureYearMonth(year, month);
+  ensureLegacyDraftMonth(year, month);
 
   ACCOUNTS.filter((account) => account.bankOnly).forEach((account) => {
-    const row = tradingData[year][month][account.key];
+    const row = legacyInputData[year][month][account.key];
     const monthEndBalance = getStoredNumber(row, 'monthEndBalance');
     if (!Number.isFinite(monthEndBalance)) return;
 
@@ -1035,8 +1058,8 @@ function getLatestHoldingQuantityFromTradingData(accountKey, symbol, year, month
 }
 
 function ensureHoldings(year, month, accountKey) {
-  ensureYearMonth(year, month);
-  const row = tradingData[year][month][accountKey];
+  ensureLegacyDraftMonth(year, month);
+  const row = legacyInputData[year][month][accountKey];
   if (!Array.isArray(row.holdings)) {
     row.holdings = [];
   }
@@ -1044,16 +1067,16 @@ function ensureHoldings(year, month, accountKey) {
 }
 
 function calculateUnrealizedFromNetAssets(year, month, accountKey) {
-  ensureYearMonth(year, month);
-  const row = tradingData[year][month][accountKey];
+  ensureLegacyDraftMonth(year, month);
+  const row = legacyInputData[year][month][accountKey];
   const netAssets = Number(row.netAssets) || 0;
-  const confirmedAssets = calculateAccountConfirmedAssets(year, month, accountKey);
+  const confirmedAssets = legacyDraftCalculator(accountKey).confirmed(year, month, accountKey);
   return netAssets - confirmedAssets;
 }
 
 function syncUnrealizedFromNetAssets(accountKey) {
-  ensureYearMonth(currentYear, currentMonth);
-  const row = tradingData[currentYear][currentMonth][accountKey];
+  ensureLegacyDraftMonth(currentYear, currentMonth);
+  const row = legacyInputData[currentYear][currentMonth][accountKey];
   const netAssets = Number(row.netAssets) || 0;
   
   if (netAssets === 0) return; // 純資産額が未入力の場合はスキップ
@@ -2251,6 +2274,7 @@ function clearMonthData(year, month) {
     row.withdrawal = 0;
     row.unrealizedLegs = [];
     row.unrealizedBackup = undefined;
+    delete row.__saved;
     
     // 銀行口座の月末残高も削除
     if (account.bankOnly) {
@@ -2260,6 +2284,8 @@ function clearMonthData(year, month) {
   
   // __savedフラグも削除
   delete tradingData[year][month].__saved;
+  legacyInputData[year] ??= {};
+  legacyInputData[year][month] = JSON.parse(JSON.stringify(tradingData[year][month]));
   
   saveToStorage();
 }
@@ -2317,29 +2343,13 @@ function renderAccountInputs() {
   
   ACCOUNTS.forEach(account => {
     if (account.key === 'gmo' && inputTargetMonth() >= window.TradeScopeMonthlyResolver.policies.gmo.cutover) {
-      const resolved = monthlyCalculator().resolve(currentYear, currentMonth, 'gmo');
-      const card = document.createElement('div'); card.className = 'account-card';
-      card.innerHTML = '<button type="button" class="account-toggle" data-account-toggle="gmo" aria-expanded="false"><div class="account-title"><div class="account-color-dot"></div><span class="monthly-account-label"></span></div><span class="account-toggle-icon">▼</span></button><div class="account-body" data-account-body="gmo"><div class="monthly-import-values"></div><a href="../import.html">データ取込</a></div>';
-      card.querySelector('.monthly-account-label').textContent = displayAccountName('gmo');
-      card.querySelector('.account-color-dot').style.backgroundColor = account.color;
-      const values = card.querySelector('.monthly-import-values');
-      const displayed = monthlyDisplayView().accountMonth(currentYear, currentMonth, account);
-      window.TradeScopeMonthlyInputUI.renderReadOnly(document, values, {
-        realizedPnL: displayed.realized, swapPnL: displayed.swap, unrealizedPnL: displayed.unrealized,
-        deposit: displayed.deposit, withdrawal: displayed.withdrawal
-      }, 'gmo-monthly');
-      if (resolved.source === 'canonical') {
-        const status = document.createElement('small'); status.className = 'monthly-import-status'; status.textContent = '取込済み'; values.appendChild(status);
-      } else {
-        const message = document.createElement('p'); message.textContent = resolved.source === 'conflict' ? '従来入力または月次データを確認してください' : '月次PDFを取り込んでください'; values.appendChild(message);
-      }
-      container.appendChild(card); return;
+      container.appendChild(gmoMonthlyUI.renderCard(account,inputTargetMonth(),displayAccountName('gmo'))); return;
     }
     if (account.key === 'sbi' && usesSbiDraft()) {
       container.appendChild(renderSbiDraftCard(account));
       return;
     }
-    const data = tradingData?.[currentYear]?.[currentMonth]?.[account.key] || {};
+    const data = legacyInputData?.[currentYear]?.[currentMonth]?.[account.key] || {};
     const unrealizedLegs = getUnrealizedLegs(currentYear, currentMonth, account.key);
     const unrealizedHelper = UNREALIZED_HELPER_ACCOUNTS.has(account.key)
       ? `
@@ -2428,10 +2438,29 @@ function renderAccountInputs() {
         ${tradingFields}
         ${unrealizedHelper}
         ${cashflowFields}
+        <div class="monthly-account-actions"><button type="button" class="btn btn-primary btn-block monthly-account-save" data-save-account="${account.key}">保存</button></div>
+        <p class="sbi-monthly-error" data-save-error hidden role="alert"></p>
       </div>
     `;
     
     container.appendChild(card);
+    const saveButton=card.querySelector('[data-save-account]'), saveError=card.querySelector('[data-save-error]');
+    const expectedRow=JSON.parse(JSON.stringify(tradingData?.[currentYear]?.[currentMonth]?.[account.key]||{}));
+    saveButton.addEventListener('click',()=>{
+      if(saveButton.disabled)return;
+      const hasExplicitInput=Array.from(card.querySelectorAll('.input-account:not([readonly]), .input-holdings'))
+        .some(input=>String(input.value??'').trim()!=='');
+      if(!hasExplicitInput){saveError.textContent='入力されたデータがありません';saveError.hidden=false;return;}
+      saveButton.disabled=true;
+      try{
+        updateInputs({render:false});updateHoldingsInputs();
+        const result=legacyMonthlySave.save({year:currentYear,month:currentMonth,accountKey:account.key,
+          row:legacyInputData[currentYear][currentMonth][account.key],expectedRow});
+        tradingData=result.data;legacyInputData[currentYear][currentMonth][account.key]=JSON.parse(JSON.stringify(result.row));
+        refreshAccountAfterSave(account.key);
+      }catch(_){saveError.textContent='保存できませんでした。入力値と保存データを確認してください';saveError.hidden=false;}
+      finally{saveButton.disabled=false;}
+    });
   });
   
   // Attach event listeners
@@ -2614,8 +2643,8 @@ function handleHoldingsInput(event) {
 }
 
 function updateCryptoUnrealizedPnL(accountKey) {
-  ensureYearMonth(currentYear, currentMonth);
-  const holdings = tradingData[currentYear][currentMonth][accountKey]?.holdings || [];
+  ensureLegacyDraftMonth(currentYear, currentMonth);
+  const holdings = legacyInputData[currentYear][currentMonth][accountKey]?.holdings || [];
   
   // JPYの数量を取得
   const jpyHolding = holdings.find(h => h.symbol === 'JPY');
@@ -2628,16 +2657,16 @@ function updateCryptoUnrealizedPnL(accountKey) {
   
   // 純資産額 = JPY + 暗号資産の合計
   const netAssets = jpyAmount + cryptoTotalValue;
-  tradingData[currentYear][currentMonth][accountKey].netAssets = netAssets;
+  legacyInputData[currentYear][currentMonth][accountKey].netAssets = netAssets;
   
   // 確定資産を計算
-  const confirmedAssets = calculateAccountConfirmedAssets(currentYear, currentMonth, accountKey);
+  const confirmedAssets = legacyDraftCalculator(accountKey).confirmed(currentYear, currentMonth, accountKey);
   
   // 評価損益 = 純資産額 - 確定資産
   const unrealizedPnL = netAssets - confirmedAssets;
   
-  // tradingDataに保存
-  tradingData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
+  // legacyInputDataに保存
+  legacyInputData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
   
   // UIを更新
   const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
@@ -2653,8 +2682,8 @@ function updateCryptoUnrealizedPnL(accountKey) {
 
 function updateSecuritiesUnrealizedPnL(accountKey) {
   if (accountKey === 'sbi' && usesSbiDraft()) return;
-  ensureYearMonth(currentYear, currentMonth);
-  const holdings = tradingData[currentYear][currentMonth][accountKey]?.holdings || [];
+  ensureLegacyDraftMonth(currentYear, currentMonth);
+  const holdings = legacyInputData[currentYear][currentMonth][accountKey]?.holdings || [];
 
   let securitiesTotalValue = 0;
   let holdingsPnL = 0;
@@ -2669,11 +2698,11 @@ function updateSecuritiesUnrealizedPnL(accountKey) {
       if (pnlSummary) holdingsPnL += pnlSummary.pnl;
     });
 
-  tradingData[currentYear][currentMonth][accountKey].netAssets = securitiesTotalValue;
+  legacyInputData[currentYear][currentMonth][accountKey].netAssets = securitiesTotalValue;
 
   const unrealizedPnL = securitiesTotalValue > 0 ? Math.round(holdingsPnL) : 0;
 
-  tradingData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
+  legacyInputData[currentYear][currentMonth][accountKey].unrealizedPnL = unrealizedPnL;
 
   const unrealizedInput = document.querySelector(`.input-account[data-account="${accountKey}"][data-field="unrealizedPnL"]`);
   if (unrealizedInput) unrealizedInput.value = String(unrealizedPnL);
@@ -2685,8 +2714,8 @@ function updateInputs({ render = true, target } = {}) {
     sbiInputDrafts.set(inputTargetMonth(), target.dataset.field, target.value);
     return;
   }
-  ensureYearMonth(currentYear, currentMonth);
-  // 入力値をtradingDataに保存
+  ensureLegacyDraftMonth(currentYear, currentMonth);
+  // 入力値をlegacyInputDataに保存
   document.querySelectorAll('.input-account').forEach(el => {
     const account = el.dataset.account;
     const field = el.dataset.field;
@@ -2695,7 +2724,7 @@ function updateInputs({ render = true, target } = {}) {
       return;
     }
     const rawValue = String(el.value ?? '').trim();
-    const row = tradingData[currentYear][currentMonth][account];
+    const row = legacyInputData[currentYear][currentMonth][account];
     if (rawValue === '') {
       delete row[field];
       return;
@@ -2715,7 +2744,7 @@ function updateInputs({ render = true, target } = {}) {
   applyBankBalanceInputsForMonth(currentYear, currentMonth);
 
   UNREALIZED_HELPER_ACCOUNTS.forEach((accountKey) => {
-    const row = tradingData[currentYear]?.[currentMonth]?.[accountKey];
+    const row = legacyInputData[currentYear]?.[currentMonth]?.[accountKey];
     if (!row) return;
     if (Array.isArray(row.unrealizedLegs) && row.unrealizedLegs.length > 0) return;
     if (profitMetrics?.hasStoredNumber?.(row, 'unrealizedPnL')) {
@@ -2737,7 +2766,7 @@ function updateInputs({ render = true, target } = {}) {
 }
 
 function updateHoldingsInputs() {
-  // 保有明細入力値をtradingDataに保存
+  // 保有明細入力値をlegacyInputDataに保存
   const holdingsData = {};
   
   document.querySelectorAll('.input-holdings').forEach(el => {
@@ -2760,7 +2789,7 @@ function updateHoldingsInputs() {
   // holdingsDataを各口座のholdingsに反映
   Object.values(holdingsData).forEach(({ accountKey, symbol, quantity, acquisitionRate, rate, valueJPY, raw_valueJPY, raw_quantity }) => {
     ensureHoldings(currentYear, currentMonth, accountKey);
-    const holdings = tradingData[currentYear][currentMonth][accountKey].holdings;
+    const holdings = legacyInputData[currentYear][currentMonth][accountKey].holdings;
     
     const existingIndex = holdings.findIndex(h => h.symbol === symbol);
     const existing = existingIndex >= 0 ? holdings[existingIndex] : null;
@@ -2804,12 +2833,12 @@ function updateHoldingsInputs() {
 
     // JPY以外で数量と評価額が両方とも0の場合は削除
     if (symbol !== 'JPY' && qty === 0 && val === 0) {
-      tradingData[currentYear][currentMonth][accountKey].holdings = 
+      legacyInputData[currentYear][currentMonth][accountKey].holdings =
         holdings.filter(h => h.symbol !== symbol);
     }
     // JPYで数量が0の場合は削除
     if (symbol === 'JPY' && qty === 0) {
-      tradingData[currentYear][currentMonth][accountKey].holdings = 
+      legacyInputData[currentYear][currentMonth][accountKey].holdings =
         holdings.filter(h => h.symbol !== symbol);
     }
   });
@@ -3026,40 +3055,6 @@ document.getElementById('importDataInput')?.addEventListener('change', (e) => {
   e.target.value = '';
 });
 
-document.getElementById('saveMonthData').addEventListener('click', () => {
-  const confirmed = window.confirm('現在の入力データを保存します。');
-  if (!confirmed) return;
-
-  const hasExplicitInput = Array.from(document.querySelectorAll('.input-account:not([readonly]), .input-holdings'))
-    .some((input) => input.dataset.draft !== 'sbi' && String(input.value ?? '').trim() !== '');
-  if (!hasExplicitInput) {
-    window.alert('入力されたデータがありません。');
-    return;
-  }
-
-  updateInputs({ render: false });
-  
-  // 保有明細は入力状態をそのまま同期（SBIの評価額空欄状態も保持）
-  updateHoldingsInputs();
-
-  tradingData[currentYear][currentMonth].__saved = true;
-
-  applyBankBalanceInputsForMonth(currentYear, currentMonth);
-  
-  saveToStorage();
-  renderAnnualSummary();
-  renderPerformanceChart();
-  renderMonthlySection();
-  if (monthlyDetailPane.classList.contains('open')) {
-    renderMonthlyDetailPane(currentMonth);
-  }
-  
-  const toast = document.createElement('div');
-  toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(62,224,143,.2); color: #3EE08F; padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(62,224,143,.3); font-size: 12px; font-weight: 600; z-index: 100;';
-  toast.textContent = '✔ 現在の入力データを保存しました';
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
-});
 
 monthlyDetailClose?.addEventListener('click', closeMonthlyDetailPane);
 monthlyDetailScrim?.addEventListener('click', closeMonthlyDetailPane);

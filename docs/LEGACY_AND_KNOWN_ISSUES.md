@@ -4,9 +4,9 @@
 
 Top／年間Summary／両Trendは非永続の共通表示projectionを使用する。同一年・同一指標の値と成長率を共通化し、部分観測は既知成分だけ、当月データが全くない口座だけ直近完全月を使用する。Monthlyは選択月限定、年間内訳は既知月次値の積み上げで、State未確定のSBI国内保有も表示する。null／0と厳密なcanonical ledgerは維持する。
 
-**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO原値保護service／State v3／Backup v5は実装済みで、手修正UIは次段階で接続する。
+**Known issue**：複数国内候補の選択、実iPhoneでの表示確認は別工程とする。部分Viewは月次確定の代替ではない。GMO手修正UI／原値保護／State v3／Backup v5は接続済み。
 
-**Current**：GMO／SBI新方式Inputを既存フォーム型へ統一した。GMOはread-only、SBIの既存Draft保存は維持する。PDF手修正監査では現行State v2／Snapshotの原値不足・metadata未対応を確認したため、schema／Backup v4を変更せず、将来拡張案だけをDATA_MODELへ記載した。
+**Current**：GMO Inputの5項目編集、SBI口座全体表示＋折りたたみ内訳、口座単位保存を実装済み。legacy Draftを正本から分離し他口座を巻き込まない。原値と採用値はmetadataで区別し、明示保存だけState v3にする。独立した取込済み行／global保存／SBI swap欄を除去した。
 
 ## Current / Known issue — GMO PDF
 
@@ -16,7 +16,7 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 非ゼロ手数料・締後移動・未対応外貨・未知入出金区分・合計不一致は推定補完せず停止する。複数タブの完全排他、quota・中断・実機PWAは引き続きリスクとして扱う。未対応の他brokerへ自動拡張しない。
 
-**Current / v4互換**：最新Exportはv4で、旧SBI recordと新汎用採用recordを保護する。v3は旧record限定、v2は月次Stateクリア、v1は新モデル維持。GMO月次PDF取込・明示保存・共有集計は接続済み。PII・原本保存・自動Migrationは行わない。
+**Current / v1〜v5互換**：最新Exportはv5。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
 
 この文書は、2026-09-26時点のコード読取結果と、その後のCurrent更新を記録する。ここへの記載は修正済みを意味しない。
 

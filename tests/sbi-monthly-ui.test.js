@@ -27,14 +27,14 @@ function harness(mutator = () => {}) {
  const values={tradingData:'{}',...Object.fromEntries(Object.entries(models).filter(([,v])=>v).map(([key,v])=>[model.keys[key],JSON.stringify(v)]))};
  const adapter={getItem:key=>values[key]??null,setItem:(key,v)=>{values[key]=v;},removeItem:key=>{delete values[key];}};
  const drafts=input.createDrafts(), document={createElement:tag=>new Element(tag)};
- const context=vm.createContext({document,TradeScopeMonthlyInputUI:monthlyInput,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service});
+ const context=vm.createContext({document,TradeScopeCSV:require('../import/csv-core.js'),TradeScopeMonthlyInputUI:monthlyInput,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service});
  vm.runInContext(fs.readFileSync(require.resolve('../assets/sbi-monthly-ui.js'),'utf8'),context);
  let card, saved=0;
  const controller=context.TradeScopeSbiMonthlyUI.createController({adapter,drafts,legacyData:()=>JSON.parse(values.tradingData),onSaved:()=>{saved++;render();}});
  function render() { card=controller.renderCard({key:'sbi',color:'red'},input.load(adapter,'2026-09'),'2026-09','SBI証券');return card; }
  function children() { const walk=node=>[node,...node.children.flatMap(walk)];return walk(card.parts['.account-body']); }
  const control=field=>children().find(el=>el.dataset.field===field);
- const button=()=>children().find(el=>el.className==='sbi-monthly-save');
+ const button=()=>children().find(el=>el.className?.split(' ').includes('sbi-monthly-save'));
  const status=()=>children().find(el=>el.className==='sbi-monthly-status').textContent;
  const error=()=>children().find(el=>el.className==='sbi-monthly-error');
  function fill(field,value) { const el=control(field);el.value=value;el.listeners.input(); }
@@ -46,19 +46,21 @@ test('Input rendering and editing remain detached; blanks have no zero placehold
  for(const key of Object.keys(fields))assert.equal(h.control(key).placeholder,key.endsWith('Date')?undefined:'—');
  assert.equal(h.drafts.read('2026-09').realizedPnL,'0');
 });
-test('SBI basic fields precede supplementary domestic/foreign/cash with missing swap',()=>{
+test('SBI account totals precede collapsed breakdown and no swap control exists',()=>{
  const h=harness(),before=JSON.stringify(h.values);
  const groups=h.children().filter(el=>el.className==='form-group');
- assert.deepEqual(groups.slice(0,5).map(group=>group.children[0].textContent),['決済損益','スワップ損益','評価損益','入金','出金']);
+ assert.deepEqual(groups.slice(0,5).map(group=>group.children[0].textContent),['評価額','評価損益','実現損益','入金','出金']);
  const readonly=h.children().filter(el=>el.readOnly);
- assert.equal(readonly.find(el=>el.dataset.monthlyField==='swapPnL').value,'');
+ assert.equal(readonly.find(el=>el.dataset.monthlyField==='swapPnL'),undefined);
  assert.equal(readonly.find(el=>el.dataset.monthlyField==='unrealizedPnL').value,'0');
  assert.ok(readonly.every(el=>!el.className.split(' ').includes('input-account')));
  assert.equal(JSON.stringify(h.values),before);
+ const breakdown=h.children().find(el=>el.tag==='details');assert.notEqual(breakdown.open,true);assert.equal(breakdown.children[0].textContent,'資産内訳');
 });
-test('SBI explicit saved swap zero is displayed without introducing an editable swap path',()=>{
+test('SBI explicit canonical swap zero is retained without any swap UI',()=>{
  const h=harness();h.fillAll();h.button().listeners.click();
- const swap=h.children().find(el=>el.dataset.monthlyField==='swapPnL');assert.equal(swap.value,'0');assert.equal(swap.readOnly,true);
+ const swap=h.children().find(el=>el.dataset.monthlyField==='swapPnL');assert.equal(swap,undefined);
+ assert.equal(JSON.parse(h.values[model.keys.monthlyAccountStates]).records[0].swapPnl,'0');
  assert.equal(h.drafts.read('2026-09').swapPnL,undefined);
 });
 test('explicit-zero save verifies before saved status, hides action, and reload rehydrates',()=>{
@@ -97,4 +99,9 @@ test('failed transaction never shows saved status or clears edited values',()=>{
  let failed=false;h.adapter.setItem=(key,value)=>{if(key===model.keys.monthlyAccountStates&&!failed){failed=true;throw Error('Anonymous write failure');}set(key,value);};
  h.button().listeners.click();assert.equal(h.saved(),0);assert.equal(h.status(),'');assert.equal(h.error().hidden,false);
  assert.equal(h.drafts.read('2026-09').cashBalance,'0');assert.equal(JSON.stringify(h.values),before);
+});
+test('SBI known component totals update with Draft without changing Storage or domestic observations',()=>{
+ const h=harness(),before=JSON.stringify(h.values);h.fill('foreignAssetValue','12.25');h.fill('foreignUnrealizedPnl','-2.5');h.fill('cashBalance','4');
+ const readonly=h.children().filter(el=>el.readOnly);assert.equal(readonly.find(el=>el.dataset.monthlyField==='assetValue').value,'16.25');
+ assert.equal(readonly.find(el=>el.dataset.monthlyField==='unrealizedPnL').value,'-2.5');assert.equal(JSON.stringify(h.values),before);
 });

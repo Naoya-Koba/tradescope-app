@@ -8,13 +8,15 @@
 
 ## Current — Inputレイアウト統一と手修正境界
 
-`assets/monthly-input-ui.js`の共通DOM描画で取込済みの基本5項目を既存form-groupと同じ見た目にする。読み取り専用controlには`.input-account`やDraft fieldを付けず、legacy保存収集へ混入させない。GMOは決済・swap・評価・入出金の採用値を表示し、手修正は接続しない。SBIは既存Draftの決済・入出金編集／保存serviceを維持し、swap・評価をread-only、国内／外国／現金を補助欄へ置く。Stateなしのswapは「—」で、表示から0を作らない。1〜8月のlegacyフォームは変更しない。
+Inputは口座カード内に青い全幅「保存」を置き、global保存は廃止する。legacy編集は`legacyInputData`の非永続Draftで、`assets/legacy-monthly-save.js`が最新Storageから対象口座だけを差し替える。既存month.__savedは維持し、今後の保存は口座row.__savedで明示0の証拠を付ける。他口座Draftを混入させず、expectedRow・journal・再読込検証・cache無効化で保護する。GMOは`assets/gmo-monthly-ui.js`から既存手修正serviceへ接続し、5項目編集と小さな「取込値に戻す」を提供する。SBIは既存保存serviceを維持し、swap欄なし、口座全体の既知評価値と初期折りたたみ「資産内訳」を表示する。国内はread-only、外国／現金はDraft。独立した「取込済み」行・個別銘柄一覧は置かない。
 
-**Current**：`assets/gmo-monthly-save.js`はState v2の不変な採用baselineを保持して初回明示編集のみv3化し、5項目の採用値と正確な差分metadataを保存する。原Snapshotを更新しない。expectedModelsと既存journalによるState＋cache無効化の一括保存／再読込検証を使用し、未編集保存は無書込。原値へ戻すAPIがある。Backup最新v5、旧v4受理範囲を固定し、v1〜v5／rollback／PII拒否を匿名fixtureで検証する。UIへの接続は次の段階とする。
+**Current**：`assets/gmo-monthly-save.js`は初回明示編集だけv3化し原値5項目と採用値の差分metadataを保存する。原Snapshotは更新しない。GMO Inputはこのserviceだけを呼び、expectedModelsとjournalによるState＋cache無効化／再読込一致後に表示を更新する。未編集保存は無書込。取込値へ戻す操作はまずDraftだけを更新し、明示保存で採用値を戻す。Backup v5、旧v4範囲固定、v1〜v5／rollback／PII拒否を匿名fixtureで検証する。
 
 ## Current — GMO月次取込の完成範囲
 
-`import/gmo-parser.js`はGMO帳票判定・金融値のallowlist出口、`import/gmo-preview.js`は選択・中止・Preview・確認・状態表示、`import/gmo-save.js`は保存直前のValidation／旧入力競合／exact hash／明示訂正／一括保存を担当する。画面側はStorage writeしない。共通resolverの口座policyとadapterにより全画面へ接続し、GMO cutover後のInputはPDF採用値のread-only表示と取込入口だけにする。PDF保存だけでlegacy monthly・履歴を変更しない。
+口座保存は各カードの「保存」を明示クリックしたときだけ実行する。GMO・SBI・legacyとも追加のネイティブ確認ダイアログを挟まない。空欄、stale data、quota等の検証をserviceで行い、他口座は書き換えない。取込／訂正や削除の既存確認とは別責務である。
+
+`import/gmo-parser.js`は帳票判定とallowlist出口、`import/gmo-preview.js`は選択・Preview・確認、`import/gmo-save.js`は取込保存／明示訂正を担当する。Input手修正は別のgmo-monthly-save serviceで原Snapshotを保持する。画面側に独自Storage writeや金融計算を置かず、全画面で共有resolver／表示projectionを使用する。PDF保存だけでlegacy monthly・履歴を変更しない。
 
 PDFの読み取り検証とlocalhost／匿名操作を用い、実PDFはparser-onlyのローカル確認に限定する。`tests/gmo-*.test.js`とPDF／PWA integrity testsを既存全テストへ追加する。`tests/gmo-browser-smoke.html`はlocalhost専用の匿名fixture／状態確認／cleanup／ローカルPDF解析用で、production画面・precacheから参照しない。実iPhone PWA、他社帳票、OCRは未確認／未対応である。
 
@@ -121,7 +123,7 @@ TradeScope/
 
 **Current**：`assets/data-model-storage.js`がAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountStateのschema検証・Repository・注入式localStorage Adapterを提供する。module読込・Repository生成・readでseedやMigrationはしない。具体的なallowlist・参照制約はコードと`DATA_MODEL.md`のCurrentを参照する。
 
-**Current**：`assets/storage-transaction.js`は既存復元journal形式を引き継ぎ、複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあればRepositoryも保存を拒否し、既存の明示確認経路で復旧する。トップ完全バックアップはv4で7collectionを保護する。v1復元は7キーを維持し、v2は既存6collectionを復元してMonthlyAccountStateを同一transactionでクリアする。
+**Current**：`assets/storage-transaction.js`は複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあれば保存を拒否する。最新完全バックアップv5は7collectionと手修正Stateを保護する。v1は7キー維持、v2は6collection復元＋Stateクリア、v3／v4の受理範囲を固定する。
 
 **Current**：SBI Previewと保存可否判定は新Storageを読み取り専用で参照する。確認後保存だけを既存保存serviceへ接続する。UI独自のRepository commitやStorage writeは設けない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
@@ -186,7 +188,7 @@ TradeScope/
 
 **Current / 検証**：`node --test tests/sbi-import.test.js tests/sbi-model-preview.test.js`で架空の最小CSVとDOM harnessを使う。読み取り専用Storageを注入し、storage書き込み・送信・console APIに接続したら失敗するテストを含む。両CSV変換、null / 0、日付分離、銘柄照合・曖昧一致、重複候補、参照検証、PII項目除外、候補表示と破棄、既存月次状態不変を確認する。実ブラウザでの実ファイル確認とは区別する。
 
-**Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名MemoryStorageによる新モデル往復、decimal、重複候補、quota失敗、journal、中断復旧、v1互換・v2／v3／v4復元、未知field/version、原本・個人識別情報フィールドの拒否と保存予定Previewを確認する。`tests/monthly-state-backup.test.js`は月次状態のnull／明示0、一意性、採用先参照、v2クリア、7モデル往復、新キーの書込・再読込・rollback失敗、expectedModelsと自動保存なしを確認する。実localStorage・実CSV・本番PWAへ接続しない。
+**Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名Storageの往復、decimal、quota／journal／rollback、v1〜v5互換、未知field／version、PII拒否を確認する。gmo-monthly-override／gmo-monthly-ui／account-monthly-save testsで原値保護、未編集v2不変、初回昇格、採用値反映、口座単位保存と他Draft非混入を確認する。実Storage・実CSV・実Backup・本番PWAに接続しない。
 
 **Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v5 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
 

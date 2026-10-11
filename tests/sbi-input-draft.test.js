@@ -137,13 +137,14 @@ test('Read-only holdings and Draft do not change monthly entered/latest predicat
 function editHarness(mode = 'draft') {
   const source = fs.readFileSync(path.join(root, 'profit/soneki.js'), 'utf8');
   const draft = { dataset: { account: 'sbi', field: 'realizedPnL', draft: 'sbi' }, value: '99' };
-  const other = { dataset: { account: 'gmo', field: 'realizedPnL' }, value: '' };
+  const other = { dataset: { account: 'lightfx', field: 'realizedPnL' }, value: '' };
   const legacy = { 2026: { 8: { sbi: { realizedPnL: 12 } }, 9: { sbi: { holdings: [{ quantity: 5 }] } } } };
-  const context = vm.createContext({ currentYear: 2026, currentMonth: 9, tradingData: legacy, ACCOUNTS: [{ key: 'sbi' }, { key: 'gmo' }],
+  const context = vm.createContext({ currentYear: 2026, currentMonth: 9, tradingData: legacy, legacyInputData:JSON.parse(JSON.stringify(legacy)), ACCOUNTS: [{ key: 'sbi' }, { key: 'lightfx' }],
     sbiInputDrafts: input.createDrafts(), inputTargetMonth: () => '2026-09', usesSbiDraft: () => mode === 'draft',
     UNREALIZED_HELPER_ACCOUNTS: new Set(), document: { querySelectorAll: () => [draft, other] },
     applyBankBalanceInputsForMonth() {}, normalizeCashflowValue: (_, value) => value });
   vm.runInContext(source.slice(source.indexOf('function ensureYearMonth('), source.indexOf('function calculateMonthlyTotals(')), context);
+  vm.runInContext(source.slice(source.indexOf('function ensureLegacyDraftMonth('), source.indexOf('function legacyDraftCalculator(')), context);
   vm.runInContext(source.slice(source.indexOf('function updateInputs('), source.indexOf('function updateHoldingsInputs(')), context);
   return { context, draft, other, legacy, source };
 }
@@ -153,33 +154,25 @@ test('Real SBI input event changes only Draft, not legacy memory or __saved', ()
 });
 test('Other account synchronization cannot copy SBI Draft into legacy', () => {
   const h = editHarness(); h.other.value = '3'; h.context.updateInputs({ render: false });
-  assert.equal(h.legacy[2026][9].gmo.realizedPnL, 3); assert.equal(h.legacy[2026][9].sbi.realizedPnL, undefined);
+  assert.equal(h.context.legacyInputData[2026][9].lightfx.realizedPnL, 3); assert.equal(h.legacy[2026][9].lightfx, undefined); assert.equal(h.legacy[2026][9].sbi.realizedPnL, undefined);
   assert.equal(h.legacy[2026][9].__saved, undefined); assert.equal(h.legacy[2026][8].sbi.realizedPnL, 12);
 });
-test('Month save excludes Draft-only input before __saved or Storage save', () => {
-  const h = editHarness(); let click, saves = 0;
-  h.context.document.getElementById = () => ({ addEventListener: (_, fn) => { click = fn; } });
-  h.context.window = { confirm: () => true, alert() {} }; h.context.saveToStorage = () => saves++;
-  const start = h.source.indexOf("document.getElementById('saveMonthData').addEventListener");
-  vm.runInContext(h.source.slice(start, h.source.indexOf('monthlyDetailClose?.addEventListener', start)), h.context);
-  const before = JSON.stringify(h.legacy); click(); assert.equal(saves, 0); assert.equal(JSON.stringify(h.legacy), before);
+test('Global save is removed; SBI Draft has no independent storage write path', () => {
+ const h=editHarness(),before=JSON.stringify(h.legacy);h.context.updateInputs({target:h.draft});
+ assert.equal(JSON.stringify(h.legacy),before);
+ assert.doesNotMatch(h.source,/getElementById\('saveMonthData'\)/);
+ assert.match(h.source,/legacyMonthlySave\.save/);
 });
-test('Another account month save persists only legacy inputs, never SBI Draft/domestic values', () => {
-  const h = editHarness(); h.other.value = '3'; let click, saved;
-  h.context.document.getElementById = () => ({ addEventListener: (_, fn) => { click = fn; } });
-  h.context.document.createElement = () => ({ style: {}, remove() {} });
-  h.context.document.body = { appendChild() {} };
-  h.context.document.querySelectorAll = selector => selector === '.input-holdings' ? [] : [h.draft, h.other];
-  h.context.window = { confirm: () => true, alert() {} };
-  h.context.saveToStorage = () => { saved = JSON.parse(JSON.stringify(h.legacy)); };
-  h.context.monthlyDetailPane = { classList: { contains: () => false } };
-  h.context.setTimeout = () => {};
-  for (const name of ['updateHoldingsInputs', 'renderAnnualSummary', 'renderPerformanceChart', 'renderMonthlySection']) h.context[name] = () => {};
-  const start = h.source.indexOf("document.getElementById('saveMonthData').addEventListener");
-  vm.runInContext(h.source.slice(start, h.source.indexOf('monthlyDetailClose?.addEventListener', start)), h.context);
-  click(); assert.equal(saved[2026][9].gmo.realizedPnL, 3);
-  assert.equal(saved[2026][9].sbi.realizedPnL, undefined); assert.deepEqual(saved[2026][9].sbi.holdings, [{ quantity: 5 }]);
-  assert.equal(saved[2026][8].sbi.realizedPnL, 12);
+test('Account save persists only the selected legacy Draft, never SBI domestic or another Draft', () => {
+ const h=editHarness();h.other.value='3';h.context.updateInputs({render:false});
+ const values={tradingData:JSON.stringify(h.legacy)};
+ const adapter={getItem:key=>values[key]??null,setItem:(key,value)=>{values[key]=value;},removeItem:key=>{delete values[key];}};
+ const service=require('../assets/legacy-monthly-save.js').createService(adapter);
+ service.save({year:2026,month:9,accountKey:'lightfx',row:h.context.legacyInputData[2026][9].lightfx,expectedRow:{}});
+ const saved=JSON.parse(values.tradingData);
+ assert.equal(saved[2026][9].lightfx.realizedPnL,3);assert.equal(saved[2026][9].sbi.realizedPnL,undefined);
+ assert.deepEqual(saved[2026][9].sbi.holdings,[{quantity:5}]);assert.equal(saved[2026][8].sbi.realizedPnL,12);
+ assert.equal(saved[2026][9].__saved,undefined);
 });
 test('Other input synchronization never creates an SBI row for Draft', () => {
   const h = editHarness(); delete h.legacy[2026][9].sbi; h.other.value = '3'; h.context.updateInputs({ render: false });

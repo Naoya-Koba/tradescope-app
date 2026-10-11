@@ -19,7 +19,7 @@ test('Input UI has no writes, network, calculation, override or save engine chan
  assert.doesNotMatch(source,/localStorage|setItem|removeItem|\.commit\(|fetch\(|console\.|reportedMonthlyRealizedPnl/);
  const profit=fs.readFileSync(require.resolve('../profit/soneki.js'),'utf8');
  const render=profit.slice(profit.indexOf('function renderAccountInputs()'),profit.indexOf('function handleAccountInputBlur('));
- assert.match(render,/TradeScopeMonthlyInputUI.renderReadOnly/);assert.doesNotMatch(render,/\.setItem\(|\.commit\(|__saved\s*=/);
+ assert.match(render,/gmoMonthlyUI.renderCard/);assert.doesNotMatch(render,/\.setItem\(|\.commit\(|__saved\s*=/);
 });
 test('readonly helper is loaded before SBI and profit UI with aligned precache version',()=>{
  const html=fs.readFileSync(require.resolve('../profit/soneki.html'),'utf8');

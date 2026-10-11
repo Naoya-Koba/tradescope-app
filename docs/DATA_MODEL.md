@@ -8,7 +8,7 @@
 
 ## Current / Decided — PDF原値とユーザー採用値の分離
 
-GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにできる。Snapshotは破壊更新しない。取込保存は引き続きv2を生成し、手修正serviceとUI接続は分離する。
+GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにする。Snapshotは破壊更新しない。PDF取込は引き続きv2を生成し、Inputの5項目編集は専用serviceで採用Stateだけを保存する。
 
 v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。envelope／7キーは変更せず、Backup v5で原値・採用値・metadataを保護する。v4の受理範囲は旧recordとv2に固定する。
 
@@ -401,7 +401,7 @@ MonthlyAccountState {
 }
 ```
 
-**Decided**：上記11fieldは必須。`id`、`accountId`、`targetMonth`、タイムゾーン付き`confirmedAt`はnull不可。参照3fieldはIDまたは`null`（未採用）、金額4fieldはdecimal文字列または`null`（不明）とする。`"0"`は明示0であり、nullを0で補わない。旧recordの`schemaVersion`は省略可、存在時は`1`。汎用採用recordは`schemaVersion: 2`と`adoptedAccountSnapshotId`を必須とする。合計評価額・合計評価損益、`sourceAvailability`、`sourceFingerprint`、draft statusは追加しない。record存在は明示確定の記録であり、各値が既知・全取得元が揃ったことまでは意味しない。
+**Decided**：上記11fieldは必須。id／accountId／targetMonth／タイムゾーン付きconfirmedAtはnull不可。参照3fieldはIDまたはnull、金額4fieldはdecimal文字列またはnullで、明示0と不明を区別する。旧recordのschemaVersionは省略または1、汎用採用は2＋adoptedAccountSnapshotId、手修正は3＋本書のsource/adopted/override必須fieldを持つ。合計評価額・Draft・表示fingerprintは追加保存しない。record存在だけで全項目既知とはしない。
 
 **Decided**：同一`accountId + targetMonth`に複数recordを許さない。初回IDは既存`newId`で生成し、将来同じ口座・月を修正するときは同じIDを維持する。口座参照を検証し、非nullの採用先は口座・対象月を一致させる。外国株／現金参照は対応するmanual scopeかつJPYであることを要求する。国内BatchはSBIのCSVで、同じBatchに属する`sourceScope: sbi-domestic-holdings`の保有record集合が存在することを根拠とする。約定Batchや名称だけで国内保有と推測しない。
 

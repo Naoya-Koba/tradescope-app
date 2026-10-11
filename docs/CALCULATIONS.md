@@ -12,7 +12,7 @@ Monthly Summary／Monthly P/Lは選択月だけを見る。State未確定でも�
 
 表示fingerprintはprojection version、従来calculator依存、対象年のState／AccountSnapshot／HoldingSnapshot／ImportBatchに依存する。未採用の国内取込も反映する。TopはこのViewを都度read-only再計算し、古いTop Snapshotで上書きせず、hash用の元データ複製を永続保存・ログ・外部送信しない。
 
-**Current**：Inputも基本5項目の見た目を統一するが、GMO read-only／SBI Draftと既存保存の責務は変更しない。未確定SBIの評価損益欄は選択月の取得済み観測Viewであり、月次確定・厳密計算の入力ではない。GMO手修正は未接続で、報告決済損益とState採用値の一致検証を維持する。
+**Current**：Inputは口座単位の確認・編集・保存とする。FXは決済・swap・評価・入出金、SBIは評価額・評価損益・実現損益・入出金を表示しswap欄を設けない。SBI口座全体の表示値は取得済み国内＋外国＋現金の既知成分合計で、資産内訳は初期折りたたみ。未確定DraftはSummary計算へ入れず、GMOは原値を保持して明示保存した採用値だけを使用する。
 
 **Current / 手修正基盤**：GMO State v3では原値5項目と採用値を分離し、resolverは採用評価損益を含む5項目だけを計算へ渡す。報告決済損益／評価損益とsource baselineは一致必須。採用との差は明示overrideFieldsの正確な差分集合がある場合だけ許容する。未編集v2の一致規則は維持し、原SnapshotのnetAssetValueをledgerへ加算しない。保存後の全consumerとfingerprintは同じ採用Stateを参照する。
 
@@ -35,9 +35,9 @@ GMO Previewでは残高明細の月間取引損益／スワップ合計をprimar
 - **Decided**：共通計算ロジックは一箇所に置き、各画面は同じ結果を表示する。
 - **Current**：過去にTopと損益管理でAsset Trend等の差異が発生したため、同じ値を利用する目的でSnapshotを使う経路が導入されている。
 - **Decided**：Snapshotやキャッシュを共通結果の共有・表示高速化に使用してよく、廃止を要件とはしない。ただし正本にはせず、入力変更時に無効化または即時再生成する。
-- **Current**：月次データは`__saved === true`、または旧形式でユーザーが明示入力できる月次値に非ゼロ値がある場合だけ入力済みと判定する。取引履歴や表示処理から自動生成された`holdings`、証券・暗号資産の派生評価値、描画由来の全ゼロ月は入力済みの根拠にせず、未入力値と明示的な0を区別する。
+- **Current**：月次データは旧month.__saved、口座別の明示保存を表すrow.__saved、または旧形式の有限非ゼロ月次入力で判定する。口座別の全0保存はその口座だけを有効にし、他口座placeholderを入力済みにしない。holdings・自動生成値・描画由来の全ゼロ月は根拠にしない。既存month.__savedは保持し、Migrationしない。
 - **Current**：Top Summary Snapshotは対象年の正本データから生成したfingerprintと最新入力済み月を照合し、不一致または旧形式のSnapshotは使用せず正本データから再計算する。
-- **Known issue**：現在は`assets/profit-metrics.js`、`profit/soneki.js`、`top/script.js`等に同種の計算が重複している。
+- **Current**：Top・年間Summary・Trend・配分の同一指標は共有projectionで統一する。旧入力由来の銘柄別評価・Riskなど別責務の計算は、今回の最新資産projectionとは分離して保持する。
 
 ## 2. 確定資産
 

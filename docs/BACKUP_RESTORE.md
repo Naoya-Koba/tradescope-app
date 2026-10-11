@@ -2,7 +2,7 @@
 
 ## Current — GMO保存・訂正の保護
 
-GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2と旧観測をv4で保護する。保存／訂正は必要なAccount追加を含む一回のRepository commitで行い、Top派生Snapshot削除も同じjournalに含める。保存前Validation・expectedModels・全キー再読込一致確認後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、rollback不能時はjournalを保持して次の保存を停止する。匿名GMO保存→v4 Export→空Storage相当→Restore→resolver／再Export一致を検証する。PDF原本・本文・PIIは保護対象へ持ち込まない。
+GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2／v3を最新v5で保護する。取込・訂正・Input手修正は各専用serviceから一回のRepository commitで行い、Top派生cache削除も同じjournalに含める。保存前Validation・expectedModels・全キー再読込一致後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、不能時はjournal保持で次の保存を停止する。匿名保存→Export→空Storage相当→Restore→resolver／再Export一致を検証する。原本・PIIは含めない。
 
 ## 完全バックアップv5（Current / Decided）
 

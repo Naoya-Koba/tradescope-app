@@ -67,6 +67,7 @@
     const monthData = yearData?.[month] || yearData?.[String(month)];
     if (!monthData || typeof monthData !== 'object' || Array.isArray(monthData)) return false;
     if (monthData.__saved === true) return true;
+    if ((accountKeys || []).some(key => monthData[key]?.__saved === true)) return true;
     return hasLegacyMonthData(yearData, month, accountKeys);
   }
 
@@ -74,7 +75,7 @@
     const monthData = yearData?.[month] || yearData?.[String(month)];
     if (!monthData || typeof monthData !== 'object' || Array.isArray(monthData)) return false;
     const row = getMonthRow(yearData, month, accountKey);
-    return hasLegacyMonthlyInput(row, accountKey, monthData.__saved === true);
+    return row.__saved === true || hasLegacyMonthlyInput(row, accountKey, monthData.__saved === true);
   }
 
   function getLatestEnteredMonth(yearData, accountKeys) {

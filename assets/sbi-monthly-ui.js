@@ -4,7 +4,7 @@
     const data = root.TradeScopeDataStorage, resolver = root.TradeScopeMonthlyResolver;
     const service = root.TradeScopeSbiMonthlySave.createService(adapter);
     const inputView = root.TradeScopeSbiInput;
-    const fields = [['realizedPnL', '決済損益', 'number'], ['deposit', '入金', 'number'], ['withdrawal', '出金', 'number'],
+    const fields = [['realizedPnL', '実現損益', 'number'], ['deposit', '入金', 'number'], ['withdrawal', '出金', 'number'],
       ['foreignAssetValue', '評価額', 'number'], ['foreignUnrealizedPnl', '評価損益', 'number'], ['foreignDate', '取得日', 'date'],
       ['cashBalance', '残高', 'number'], ['cashDate', '取得日', 'date']];
     function savedDraft(resolved) {
@@ -25,16 +25,24 @@
       card.querySelector('.account-color-dot').style.backgroundColor = account.color;
       card.querySelector('.sbi-domestic-value').textContent = inputView.formatYen(view.marketValue);
       card.querySelector('.sbi-domestic-pnl').textContent = inputView.formatYen(view.unrealizedPnl, true);
-      card.querySelector('.sbi-import-status').textContent = view.status === 'ready' ? '取込済み' : '';
+      card.querySelector('.sbi-import-status').textContent = '';
       const date = card.querySelector('.sbi-domestic-date'); date.textContent = view.snapshotAsOf ? `取得日：${view.snapshotAsOf.slice(0, 10).replace(/-/g, '/')}` : ''; date.hidden = !date.textContent;
       const body = card.querySelector('.account-body');
       const values = drafts.read(targetMonth);
       const controls = {};
+      const amountGroup = root.TradeScopeMonthlyInputUI.readOnlyField(document, 'assetValue', '評価額', null, 'sbi-monthly');
+      const pnlGroup = root.TradeScopeMonthlyInputUI.readOnlyField(document, 'unrealizedPnL', '評価損益', null, 'sbi-monthly');
+      const amountInput = amountGroup.children[1], pnlInput = pnlGroup.children[1];
+      body.append(amountGroup, pnlGroup);
+      const breakdown = document.createElement('details'); breakdown.className = 'sbi-asset-breakdown';
+      const summary = document.createElement('summary'); summary.textContent = '資産内訳'; breakdown.appendChild(summary);
+      breakdown.appendChild(card.querySelector('.sbi-domestic-input'));
+      breakdown.addEventListener('toggle', () => { if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`; });
       for (const [field, title, type] of fields) {
-        if (field === 'foreignAssetValue') body.appendChild(card.querySelector('.sbi-domestic-input'));
+        const destination = ['realizedPnL', 'deposit', 'withdrawal'].includes(field) ? body : breakdown;
         if (['foreignAssetValue', 'cashBalance'].includes(field)) {
           const heading = document.createElement('div'); heading.className = 'sbi-manual-heading';
-          heading.textContent = field === 'foreignAssetValue' ? '外国証券' : '現金・預り金'; body.appendChild(heading);
+          heading.textContent = field === 'foreignAssetValue' ? '外国証券' : '現金・預り金'; destination.appendChild(heading);
         }
         const group = document.createElement('div'); group.className = 'form-group';
         const labelElement = document.createElement('label'), control = document.createElement('input');
@@ -43,17 +51,11 @@
         control.value = values[field] ?? ''; if (type === 'number') { control.step = 'any'; control.placeholder = '—'; }
         labelElement.htmlFor = control.id; labelElement.textContent = title; group.append(labelElement, control);
         if (type === 'number') { const suffix = document.createElement('span'); suffix.className = 'suffix'; suffix.textContent = '¥'; group.appendChild(suffix); }
-        body.appendChild(group); controls[field] = control;
-        if (field === 'realizedPnL') {
-          // Swap is only explicit zero once the State exists; no zero is created by rendering.
-          body.appendChild(root.TradeScopeMonthlyInputUI.readOnlyField(document, 'swapPnL', 'スワップ損益', resolved?.state?.swapPnl ?? null, 'sbi-monthly'));
-          const unrealized = monthlyView ? monthlyView.unrealized
-            : resolved?.completeness?.complete ? resolved.unrealizedPnl : view.unrealizedPnl;
-          body.appendChild(root.TradeScopeMonthlyInputUI.readOnlyField(document, 'unrealizedPnL', '評価損益', unrealized, 'sbi-monthly'));
-        }
+        destination.appendChild(group); controls[field] = control;
       }
+      body.appendChild(breakdown);
       const actions = document.createElement('div'); actions.className = 'sbi-monthly-actions';
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'sbi-monthly-save'; button.textContent = '保存';
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'sbi-monthly-save btn btn-primary btn-block monthly-account-save'; button.textContent = '保存';
       const status = document.createElement('span'); status.className = 'sbi-monthly-status'; status.setAttribute('role', 'status');
       const error = document.createElement('p'); error.className = 'sbi-monthly-error'; error.setAttribute('role', 'alert');
       let busy = false, saved = resolved?.source === 'canonical' && resolved.completeness.complete;
@@ -63,6 +65,12 @@
         : view.status !== 'ready' ? '国内証券データを取り込んでください'
         : view.marketValue === null || view.unrealizedPnl === null ? '国内証券の評価額・評価損益が不足しています' : '';
       function refresh() {
+        const current = drafts.read(targetMonth), csv = root.TradeScopeCSV;
+        const decimal = value => { try{return csv.decimal(value);}catch(_){return null;} };
+        const sum = values => { const known=values.map(decimal).filter(value=>value!==null);return known.length?csv.sum(known):null; };
+        const amount=sum([view.marketValue, current.foreignAssetValue, current.cashBalance]);
+        const pnl=sum([view.unrealizedPnl, current.foreignUnrealizedPnl]);
+        amountInput.value=amount??'';pnlInput.value=pnl??'';
         const unchanged = fields.every(([field]) => String(drafts.read(targetMonth)[field] ?? '') === String(baseline[field] ?? ''));
         button.hidden = saved && unchanged; button.disabled = busy || Boolean(unavailable);
         status.textContent = button.hidden ? '保存済み' : busy ? '保存中…' : '';
