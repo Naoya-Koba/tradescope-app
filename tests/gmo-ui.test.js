@@ -17,7 +17,7 @@ function harness(storage=new MemoryStorage(),extracted=report(),overrides={}) {
   const context={document,localStorage:storage,crypto,Uint8Array,AbortController,TradeScopeDataStorage:model,TradeScopeGMOParser:parser,
     fakeExtractor:{extract:async()=>extracted},TradeScopeGMOSave:{createService:adapter=>{const s=engine.createService(adapter);return{inspect:s.inspect,save:async(...args)=>{saves++;return s.save(...args);}}}}};
   Object.defineProperties(context,Object.getOwnPropertyDescriptors(overrides));
-  const code=fs.readFileSync(require.resolve('../import/gmo-preview.js'),'utf8').replace("await import('./pdf-extractor.mjs?v=20261011-2')",'fakeExtractor');
+  const code=fs.readFileSync(require.resolve('../import/gmo-preview.js'),'utf8').replace(/await import\('\.\/pdf-extractor\.mjs\?v=[^']+'\)/,'fakeExtractor');
   vm.runInNewContext(code,context);
   return {elements,storage,saves:()=>saves,upload:async(char='a',fileOverride={})=>{
     const bytes=Buffer.from('%PDF-1.7 anonymous '+char);await elements['gmo-file'].fire('change',{target:{files:[{size:bytes.length,arrayBuffer:async()=>new Uint8Array(bytes).buffer,...fileOverride}]}});

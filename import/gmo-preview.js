@@ -76,7 +76,7 @@
       code = 'PDF_FILE_HASH_FAILED';
       const fileHash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
       stage = 'engine'; code = 'PDF_ENGINE_LOAD_FAILED';
-      const extractor = await import('./pdf-extractor.mjs?v=20261011-2');
+      const extractor = await import('./pdf-extractor.mjs?v=20261012-1');
       stage = 'document'; code = 'PDF_DOCUMENT_LOAD_FAILED';
       const extracted = await extractor.extract(bytes, { signal, onDiagnostic: value => {
         if (current === token) diagnostic(value.stage, value.code);

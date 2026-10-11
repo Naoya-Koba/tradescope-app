@@ -56,8 +56,12 @@ export function createExtractor(engine) {
       try {
         const items = await wait(readTextItems(page, { signal, limit: 150000 - itemCount }));
         itemCount += items.length;
-        pages.push({ number, items: items.filter(item => typeof item.str === 'string').map(item => ({
-          text: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height })) });
+        const viewport = page.rotate ? page.getViewport({ scale: 1 }) : null;
+        pages.push({ number, items: items.filter(item => typeof item.str === 'string').map(item => {
+          const point = viewport?.convertToViewportPoint(item.transform[4], item.transform[5]);
+          return { text: item.str, x: point ? point[0] : item.transform[4],
+            y: point ? viewport.height - point[1] : item.transform[5], width: item.width, height: item.height };
+        }) });
       } finally { page.cleanup(); }
       onProgress?.(number, document.numPages);
     }

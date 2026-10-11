@@ -21,7 +21,7 @@ function report() {
   return { pages };
 }
 // Generate a text-only anonymous PDF at runtime; no PDF binary or user information in Git.
-function pdfBytes(document = report()) {
+function pdfBytes(document = report(), {width=842,height=595} = {}) {
   const objects = ['<< /Type /Catalog /Pages 2 0 R >>', ''];
   const chars = [...new Set(document.pages.flatMap(p => p.items.flatMap(i => [...i.text])))];
   const ids = new Map(chars.map((char, i) => [char, i + 1]));
@@ -30,7 +30,7 @@ function pdfBytes(document = report()) {
   const kids = [];
   document.pages.forEach(page => {
     const pageId = objects.length + 1, streamId = pageId + 1; kids.push(`${pageId} 0 R`);
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${streamId} 0 R >>`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${streamId} 0 R >>`);
     const content = page.items.map(i => `BT /F1 8 Tf 1 0 0 1 ${i.x} ${i.y} Tm <${[...i.text].map(hex).join('')}> Tj ET`).join('\n');
     objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
   });

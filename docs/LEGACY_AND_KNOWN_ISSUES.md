@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Traders Securities monthly PDF
+
+**Current / 検証**：指定されたLIGHT FX／みんなのFXの2026-09 private PDFをread-onlyで解析し、口座評価・建玉・未決済swap・月次flowの内部照合は一致した。実PDF・PII・実数値はfixtureへコピーしない。**Known issue**：2026-08 legacyのswap認識根拠および9月収益カレンダー値は本番Storageを読まずには検証できないため、実口座ledgerとPDF純資産の差を自動補正しない。Chart.js幅切替の既知問題は別件。
+
 ## Current — 部分取込でTop全体が欠損になる表示を改善
 
 Top／年間Summary／両Trendは非永続の共通表示projectionを使用する。同一年・同一指標の値と成長率を共通化し、部分観測は既知成分だけ、当月データが全くない口座だけ直近完全月を使用する。Monthlyは選択月限定、年間内訳は既知月次値の積み上げで、State未確定のSBI国内保有も表示する。null／0と厳密なcanonical ledgerは維持する。

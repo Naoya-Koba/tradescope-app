@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Traders Securities monthly PDF
+
+**Decided**：トレイダーズ証券のrealizedは月次PDFの売買損益、unrealizedは全建玉の価格評価損益合計（未決済スワップ除外）。口座報告評価損益＝価格評価損益＋未決済スワップとして検算する。canonical swapは収益カレンダー「スワップ付与」の月間発生額でありPDF受渡済みスワップではない。前月末swap basisによる算出は採用しない。外部入出金は明示行を正負別に集計する。
+
 ## Current / Decided — 部分取込の表示用View
 
 `assets/monthly-display-view.js`は共有月次calculatorとは別の、非永続・読み取り専用の表示層である。Top Summaryは同一年内の新方式データが存在する最新月を基準とし、口座ごとに当月完全値、当月取得済み成分だけの暫定額、当月データがない場合だけ直近完全確定月を使用する。部分口座の未入力成分へ前月値を補完しない。既知成分のdecimal合計だけを表示時にNumberへ変換する。nullを正本の0へ変換しない。

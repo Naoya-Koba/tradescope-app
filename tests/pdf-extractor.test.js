@@ -80,6 +80,14 @@ test('public worker readiness precedes document/text and worker/task/page cleanu
   assert.deepEqual(fake.counts(), { workerDestroyed:1,taskDestroyed:1,cleaned:1 });
 });
 
+test('rotated report pages use reading-direction coordinates without changing unrotated pages',async()=>{
+ const e=await extractor(),fake=fakeEngine();const get=fake.engine.getDocument;
+ fake.engine.getDocument=()=>{const task=get();task.promise=task.promise.then(doc=>({...doc,getPage:async()=>{
+  const page=await doc.getPage();return {...page,rotate:90,getViewport:()=>({height:100,convertToViewportPoint:(x,y)=>[y,100-x]})};
+ }}));return task;};
+ const result=await e.createExtractor(fake.engine)(samplePdf());assert.equal(result.pages[0].items[0].x,2);assert.equal(result.pages[0].items[0].y,1);
+});
+
 for (const stage of ['worker', 'document', 'text']) test(`${stage} failure exposes only safe stage/code, never library/source fragments`, async () => {
   const e = await extractor(), fake = fakeEngine(stage);
   await assert.rejects(e.createExtractor(fake.engine)(samplePdf()), error => {

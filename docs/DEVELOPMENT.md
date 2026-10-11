@@ -1,5 +1,9 @@
 # Development Guide
 
+## Traders Securities monthly PDF
+
+**Current**：`import/traders-parser.js`は商品別detector／mappingと共通の位置付きテキスト解析を提供する。ファイル名・PIIを判定根拠にしない。回転ページの抽出座標を読み方向へ補正し、公式PDF.js 6.4.299のUniJIS-UCS2-H CMap（25,439 bytes）を追加。getReader／local worker／公式fake-worker／safe stageは維持し、CDN・別PDFライブラリは追加しない。
+
 ## Current — 部分取込の表示層
 
 `assets/monthly-display-view.js`はDOM／Storage非依存で、Top・年間Summary・口座配分へ同じ`dashboard`結果、Asset／Performance Trendへ月時点の同じprojection、Monthly P/Lと年間内訳へ既知値集計を返す。画面側で金融値や成長率を再計算しない。canonical ledgerは厳密なまま保持する。部分取込を旧Snapshotキャッシュから取得しない。正本変更時のstorage eventと再表示で再計算し、fingerprintに未採用観測とprojection versionも含める。

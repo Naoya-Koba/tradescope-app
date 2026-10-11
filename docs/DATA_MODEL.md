@@ -1,5 +1,9 @@
 # Data Model
 
+## Traders Securities monthly PDF
+
+**Decided**：LIGHT FX／みんなのFXの2026-09以降は月次PDFと収益カレンダー「スワップ付与」月間合計を組み合わせる。口座／Batch／観測／Stateは独立する。PDFの建玉原値を将来保存する際も、原本・全文・PIIは含めない。
+
 ## Current / Decided — 非永続の部分観測View
 
 月次Stateのcomplete／missing／conflictは変更しない。未確定の国内HoldingSnapshot群等から読み取り専用のpartial-month viewとlatest-dashboard projectionを生成する。同一月の国内候補Batchは1件のみなら採用表示可能で、複数なら合算・latest選択をせず停止する。完全Stateがある場合は明示採用先を優先する。対象月・取得元・口座を検証した同一観測群だけを合計し、必要値不足の群合計はnullを保つ。
