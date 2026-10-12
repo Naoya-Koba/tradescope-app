@@ -36,3 +36,20 @@ test('crypto without explicit amount uses quantity/price; no speculative convers
 test('close P/L null omitted, explicit zero retained, positive/negative signs and existing colors classifiable',()=>{for(const [value,text,sign]of [[null,null,'positive'],['0','0円','neutral'],['12.30','+12.3円','positive'],['-12.30','-12.3円','negative']]){const p=display.present(base({type:'close',realizedPnl:value}));assert.equal(p.pnl,text);assert.equal(p.pnlSign,sign);}assert.equal(display.present(base({realizedPnl:'12'})).pnl,null);});
 test('date-only never gains fabricated time; complete timestamp and short date remain distinct',()=>{const p=display.present(base({executedAt:'2026-09-02T11:18:42'}));assert.equal(p.shortDate,'09/02 11:18');assert.equal(p.fullDate,'2026-09-02 11:18:42');assert.equal(display.present(base()).shortDate,'09/02');});
 test('formatter has no Storage, network, logging or resolver modification capability',()=>{const code=fs.readFileSync(require.resolve('../assets/transaction-display.js'),'utf8');assert.doesNotMatch(code,/localStorage|sessionStorage|indexedDB|console\.|fetch\(|XMLHttpRequest|sendBeacon|\.commit\(/);});
+
+for(const [symbol,price,quote,text]of [['CAD/JPY','110.251','JPY','110.251円'],['USD/JPY','157.380','JPY','157.380円'],['GBP/USD','1.32570','USD','1.32570 USD'],['EUR/USD','1.123456789','USD','1.123456789 USD'],['EUR/GBP','0.83210','GBP','0.83210 GBP']])test(`FX ${symbol} explicitly labels rate with canonical ${quote} and source precision`,()=>{
+  const {r,models,context}=gmoReported(symbol);models.instruments.records[0].quoteCurrency=quote;models.importedTransactions.records[0].price=price;
+  r.price=price.replace(/0+$/,'');r.currency='JPY';const before=JSON.stringify({r,models}),p=display.present(r,context);
+  assert.equal(p.price,text);assert.equal(p.summary,'1Lot　約定レート '+text);assert.equal(p.priceLabel,'約定レート');assert.doesNotMatch(p.summary,/@/);assert.equal(JSON.stringify({r,models}),before);
+});
+test('missing FX quote has no invented yen; canonical quote wins over P/L currency and symbol inference',()=>{
+  const unknown=display.present(base({symbol:'不明な商品',price:'0.123456789'}));assert.equal(unknown.price,'0.123456789');assert.doesNotMatch(unknown.summary,/円|JPY/);
+  const {r,models,context}=gmoReported('GBP/USD');models.instruments.records[0].quoteCurrency='USD';assert.equal(display.present(r,context).price,'110.209 USD');
+});
+test('SBI date-only raw source and original slash date are preserved in collapsed and expanded presentation',()=>{
+  const {r,models,context}=security({extra:{executedAt:'2026-09-25',executedAtRaw:'2026/09/25'}}),before=JSON.stringify(models),p=display.present(r,context);
+  assert.equal(p.shortDate,'09/25');assert.equal(p.fullDate,'2026-09-25');assert.equal(p.dateLabel,'日付');assert.equal(r.executedAt,null);assert.equal(JSON.stringify(models),before);assert.doesNotMatch(p.fullDate,/00:00|12:00/);
+});
+test('display never fabricates time even if directly given a date-only executedAt',()=>{
+  const r=base({executedAt:'2026-09-02'}),p=display.present(r);assert.equal(p.shortDate,'09/02');assert.equal(p.fullDate,'2026-09-02');assert.equal(p.dateLabel,'日付');assert.equal(r.executedAt,'2026-09-02');
+});

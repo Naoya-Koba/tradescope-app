@@ -869,6 +869,8 @@ body.drawer-open {
 .transaction-detail { padding: 4px 0 16px; }
 .transaction-detail[hidden] { display: none; }
 .transaction-detail-content { padding: 12px; border-radius: 10px; background: rgba(255,255,255,.035); }
+.transaction-detail-title { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.transaction-audit-title { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); }
 .transaction-detail-grid { margin: 0; display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 7px 14px; font-size: 12px; line-height: 1.5; }
 .transaction-detail-grid dt { color: var(--muted); }
 .transaction-detail-grid dd { min-width: 0; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }

@@ -2,6 +2,10 @@
 
 ## Current / Decided — Transaction derived presentation
 
+FXは一覧・詳細とも「約定レート」と表示し、canonical InstrumentのquoteCurrency（未設定なら安全に識別できる通貨ペア）を単位とする。損益通貨からJPYを推測せず、原source価格の小数桁・末尾0を保持する。日時sourceが日付のみなら時刻を生成しない。表示のために保存値・並び順を変更しない。
+
+詳細は「取引詳細」と「原本・監査情報」に分離する。FX数量は判明した場合だけLotと原通貨数量を1行にまとめ、出典と原本位置は重複させない。GMOのsourceRowは認識した明細順で原本の物理行ではないため、原本位置はPDFページまでとする。SBIのsourceRowNumberはCSVの物理開始行として表示可能。位置不明は非表示、任意値のnullと明示0は区別する。
+
 `assets/transaction-display.js`は共通resolverが返す同じ論理取引集合に対する非永続の表示層。原source参照を読み、decimal文字列をBigIntの係数／桁数として計算し、Lot／株式概算だけを生成する。Instrument・quantity・quantityUnit・contractSize・dedupe identity・月次計算・Backup v9契約へ書き戻さない。明示金額を優先し、SBI国内CSV由来でStock／ETF・株数・JPY単価の意味が明確な場合のみ数量×単価を「約」として表示する。投信の基準価額単位や外貨換算を推測しない。
 
 Lot sizeはbroker／canonical pairごとの表示ルールに一元化。GMOは通常10,000通貨、HUF/JPY・ZAR/JPY・MXN/JPYは100,000通貨。LIGHT FX／みんなのFXは通常10,000通貨、RUB/JPY・HUF/JPY・HUF/JPY LIGHTは100,000通貨。未対応provider／pairまたは数量単位未確認なら換算しない。明示されたLot数量は再度割らず、通貨数量が明示された時だけLotへ換算する。GMO PDFの`gmo-reported-count`は、約定数×約定単価＝約定金額の整合により通貨数量とユーザー確認済み（2026-10-12）。GMO口座／provider／PDF取引sourceが一致する原recordに限り表示時だけLotへ換算し、保存済み約定数・数量単位・resolver／dedupeの既存挙動は変えない。

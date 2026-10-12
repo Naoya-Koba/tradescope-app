@@ -13,20 +13,27 @@
     function options(id, values) { const select = $(id), old = select.value; select.replaceChildren(...values.map(([value, label]) => { const o = node('option', label); o.value = value; return o; })); select.value = values.some(([v]) => v === old) ? old : ''; }
     function selection() { return { month: $('filterMonth').value, account: $('filterAccount').value, symbol: $('filterSymbol').value, type: $('filterCategory').value, source: $('filterSource').value, strategy: $('filterStrategy').value, order: $('sortOrder').value === 'oldest' ? 'asc' : 'desc' }; }
     function detail(r, p) {
-      const dl = node('dl', '', 'transaction-detail-grid');
-      const add = (label, value) => { if (value !== null && value !== undefined && value !== '' && value !== '—') dl.append(node('dt', label), node('dd', String(value))); };
-      add('日時', p.fullDate); add('口座', r.account); add('資産', asset(r.assetType)); add('銘柄', r.symbol); add('売買', side(r)); add('区分', category(r));
-      add('数量', p.quantity); add('実通貨数量', p.units === null ? null : display.number(p.units) + '通貨'); add(r.assetType === 'MutualFund' ? '基準価額' : '約定価格', p.price); add(p.amountLabel, p.amount); add('個別損益', p.pnl);
+      const fragment = node('div', '', 'transaction-detail-content'), dl = node('dl', '', 'transaction-detail-grid'), audit = node('dl', '', 'transaction-detail-grid');
+      const addTo = (target, label, value) => { if (value !== null && value !== undefined && value !== '' && value !== '—') target.append(node('dt', label), node('dd', String(value))); };
+      const add = (label, value) => addTo(dl, label, value), addAudit = (label, value) => addTo(audit, label, value);
+      add(p.dateLabel, p.fullDate); add('口座', r.account); if (r.assetType !== 'FX') add('資産', asset(r.assetType)); add('銘柄', r.symbol); add('売買', side(r)); add('区分', category(r));
+      add('数量', p.quantity === null ? null : p.quantity + (p.lots !== null && p.units !== null ? `（${display.number(p.units)}通貨）` : '')); add(p.priceLabel, p.price); add(p.amountLabel, p.amount); add('個別損益', p.pnl);
       if (p.amountLabel !== '受渡金額 / 決済損益' || p.amount === null) add('受渡金額 / 決済損益', p.settlementObservation);
-      add('取得元', r.sourceLabel);
-      const sourceLabels = { manual: '手入力', sbi: 'SBI CSV', gmo: 'GMO PDF' };
-      if (r.sources.length > 1 || r.sources.some(s => s.page)) add('取得元の内訳', r.sources.map(s => (sourceLabels[s.kind] || s.kind) + (s.page ? ` · ${s.page}ページ` : '') + (s.row ? ` · ${s.row}行` : '')).join(' / '));
-      add('注文番号', r.orderId); add('約定ID', r.executionId);
-      const raw = p.facts.raw;
-      for (const [key, label] of [['custody', '預り区分'], ['market', '市場'], ['settlementDate', '受渡日'], ['transactionType', '原取引区分']]) add(label, raw[key]);
       add('手数料', p.facts.original.fee == null ? null : display.number(p.facts.original.fee) + (p.facts.original.feeCurrency === 'JPY' ? '円' : p.facts.original.feeCurrency ? ' ' + p.facts.original.feeCurrency : ''));
       add('戦略', r.strategy); add('メモ', r.memo);
-      const fragment = node('div', '', 'transaction-detail-content'); fragment.append(dl);
+      addAudit('出典', r.sourceLabel);
+      const locations = r.sources.map(s => {
+        // GMO sourceRow counts recognized table records, not a printed PDF line.
+        if (s.kind === 'gmo') return Number.isSafeInteger(s.page) && s.page > 0 ? `PDF ${s.page}ページ` : null;
+        const source = s.kind === 'sbi' ? context?.raw.get(s.id) : null;
+        return Number.isSafeInteger(source?.sourceRowNumber) && source.sourceRowNumber > 0 ? `CSV ${source.sourceRowNumber}行` : null;
+      }).filter(Boolean);
+      addAudit('原本位置', [...new Set(locations)].join(' / '));
+      addAudit('注文番号', r.orderId); addAudit('約定ID', r.executionId);
+      const raw = p.facts.raw;
+      for (const [key, label] of [['custody', '預り区分'], ['market', '市場'], ['settlementDate', '受渡日']]) add(label, raw[key]);
+      addAudit('原取引区分', raw.transactionType || p.facts.original.rawTransactionType);
+      fragment.append(node('h3', '取引詳細', 'transaction-detail-title'), dl, node('h3', '原本・監査情報', 'transaction-detail-title transaction-audit-title'), audit);
       if (r.manualId) { const b = node('button', '手入力を編集', 'edit-btn memo-edit-btn'); b.type = 'button'; b.dataset.entryId = r.manualId; fragment.append(b); }
       return fragment;
     }

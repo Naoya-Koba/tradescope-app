@@ -41,7 +41,12 @@
   function parts(value) { const d = decimal(value); if (d === null) return null; const [a, b = ''] = d.split('.'); return { n: BigInt(a + b), scale: b.length }; }
   function multiply(a, b) { const x = parts(a), y = parts(b); return x && y ? scaled(x.n * y.n, x.scale + y.scale) : null; }
   function divideUnits(value, size) { const p = parts(value); return p ? scaled(p.n, p.scale + (size === 100000 ? 5 : 4)) : null; }
-  function amount(value, currency) { return decimal(value) === null ? null : number(value) + (currency === 'JPY' ? '円' : currency ? ' ' + currency : ''); }
+  function amount(value, currency, preservePrecision = false) {
+    if (decimal(value) === null) return null;
+    const [integer, fraction] = String(value).split('.');
+    const text = preservePrecision ? integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : '.' + fraction) : number(value);
+    return text + (currency === 'JPY' ? '円' : currency ? ' ' + currency : '');
+  }
   function createContext(manual, models) {
     const records = key => models?.[key]?.records || [];
     return { manual: new Map((manual || []).map(r => [r.id, r])), raw: new Map(records('rawTransactions').map(r => [r.id, r])),
@@ -72,7 +77,7 @@
     }
     const quantity = q === null ? null : lots !== null ? number(lots) + 'Lot' : number(q) + (units !== null ? '通貨' : unit === 'gmo-reported-count' ? ' 約定数' : unit ? ' ' + unit : '');
     const quote = fact.master?.quoteCurrency || pair(record.symbol)?.split('/')[1].split(' ')[0];
-    return { quantity, lots, units, price: amount(record.price, quote), amount: null };
+    return { quantity, lots, units, price: amount(fact.original.price ?? record.price, quote, true), amount: null };
   }
   function present(record, context) {
     const fact = facts(record, context), { raw, original, currency } = fact;
@@ -93,9 +98,11 @@
     }
     const pnl = record.type === 'close' ? amount(record.realizedPnl, record.currency) : null;
     const signedPnl = pnl !== null && !pnl.startsWith('-') && decimal(record.realizedPnl) !== '0' ? '+' + pnl : pnl;
-    const fullDate = (record.executedAt || record.date).replace('T', ' '), shortDate = record.executedAt ? record.executedAt.slice(5, 10).replace('-', '/') + ' ' + record.executedAt.slice(11, 16) : record.date.slice(5).replace('-', '/');
-    return { ...info, shortDate, fullDate, settlementObservation: amount(raw.settlementOrPnl, currency), pnl: signedPnl, pnlSign: decimal(record.realizedPnl)?.startsWith('-') ? 'negative' : decimal(record.realizedPnl) === '0' ? 'neutral' : 'positive',
-      summary: [info.amount || info.quantity, info.amount ? null : info.price].filter(Boolean).join('　'), facts: fact };
+    const hasTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(record.executedAt || '');
+    const fullDate = (hasTime ? record.executedAt : record.date).replace('T', ' '), shortDate = record.date.slice(5).replace('-', '/') + (hasTime ? ' ' + record.executedAt.slice(11, 16) : '');
+    const priceLabel = record.assetType === 'FX' ? '約定レート' : record.assetType === 'MutualFund' ? '基準価額' : '約定価格';
+    return { ...info, shortDate, fullDate, dateLabel: hasTime ? '日時' : '日付', priceLabel, settlementObservation: amount(raw.settlementOrPnl, currency), pnl: signedPnl, pnlSign: decimal(record.realizedPnl)?.startsWith('-') ? 'negative' : decimal(record.realizedPnl) === '0' ? 'neutral' : 'positive',
+      summary: [info.amount || info.quantity, info.amount || !info.price ? null : record.assetType === 'FX' ? priceLabel + ' ' + info.price : info.price].filter(Boolean).join('　'), facts: fact };
   }
   const api = Object.freeze({ getFxLotSize, number, multiply, createContext, present });
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TradeScopeTransactionDisplay = api;
