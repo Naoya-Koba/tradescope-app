@@ -2,7 +2,9 @@
 
 ## Current / Decided — 共通取引履歴
 
-**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9を使用する。GMO PDF保存は明示された約定内訳を月次sourceと同じ操作で保護する。取引履歴UIは月・口座・銘柄・新規／決済・取得元で絞り込み、日時降順、50件単位で追加表示する。手入力の戦略／メモ／編集は維持し、取込行は読み取り専用。スマートフォンでは同じ項目を縦積みで表示する。元sourceを保持し月次canonicalとは分離する。履歴ページのBackupは引き続き手入力だけ、取込データはTopの完全Backupに含む。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
+**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9を使用する。GMO PDF保存は明示された約定内訳を月次sourceと同じ操作で保護する。履歴一覧は短縮日時・口座・銘柄・売買／区分・数量または金額・明示個別損益のコンパクトな行とし、タップで1件だけ詳細展開する。取得元／監査参照・注文番号・資産種別・戦略／メモ・手入力編集は詳細側へ置き、空の任意項目は表示しない。対象月・口座は常設、銘柄・戦略・区分・取得元・並び順は「絞り込み」へ収納し、閉じても適用状態を維持して有効数を示す。50件単位の追加表示と既存filter／dedupe結果は維持する。件数は全件表示なら「44件」、途中なら「100件中50件表示」。取込行は読み取り専用、元sourceを保持し月次canonicalとは分離する。履歴ページのBackupは引き続き手入力だけ、取込データはTopの完全Backupに含む。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
+
+**Current / Decided — 表示要約**：Lotは単位が判明した数量から表示時だけ換算し、未知単位は原数量を維持する。国内株式の株数・1株単価が明確な場合だけ金額を概算し「約」を付ける。原資料に明示された取引／受渡金額を優先し、混在する受渡金額／決済損益列はその名称を詳細に保持してrealizedPnlへ変換しない。投信は口数×基準価額を計算せず、外貨は元通貨のまま。個別損益は決済の明示値だけを符号付きで表示し、nullは非表示、明示0は0円。数量・元資料・保存形式・共通月次計算は変更しない。
 
 ## Traders PDF-only partial保存 / Backup v8
 

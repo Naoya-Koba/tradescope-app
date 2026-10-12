@@ -6,7 +6,7 @@
 
 `assets/transaction-view.js`はDOM／Storage非依存の表示resolver。legacy manual、SBI raw、新ImportedTransactionsを読み、adopted Snapshot→ImportBatchでactive GMO sourceを選び、latest importedAtを正本にしない。曖昧dedupeは保持する。新RepositoryキーはtradeScopeImportedTransactionsV1、Backup v9／旧1〜8互換／同一journal・rollbackで保護する。画面読込からseed・Migrationしない。月次calculatorとRisk sourceは変更しない。新取引Viewは共通履歴UIからのみ使う。
 
-**Current — 履歴UI**：`history/transaction-ui.js`は安全なtextContentで表示、絞込後50件を描画し「さらに表示」で50件追加する。`history.js`はraw manualとread-only Repositoryを共通Viewへ渡す。旧parseEntries／Open Positions／manual編集・履歴部分Backupは維持し、取込データの編集や取込建玉へのRisk接続を追加しない。データ読取失敗時は明示し、旧キャッシュやダミー金融値へfallbackしない。匿名2,000件／月500件、実ブラウザGMO500件／DOM50件を検証する。PC1280／mobile390、Consoleと正本不変確認を使用し実機iPhone検証とは区別する。PWA v283、変更履歴資産queryは20261012-5／6でprecacheへ同期する。
+**Current — 履歴UI**：`history/transaction-ui.js`は安全なtextContentでコンパクトな一覧を描画し、1件のみ展開する。詳細DOMは展開時だけ生成し、閉じた時に破棄する。絞込後50件、「さらに表示」で50件追加し、追加時は開いていた1件を維持する。`assets/transaction-display.js`にbroker Lot size／単位確認／精度を落とさない表示計算／原source金額参照をまとめ、共通resolverとdedupeは変更しない。詳細filterはnative detailsに収納し、閉じてもselect値・適用数を維持する。`history.js`のread-only読込、旧parseEntries／Open Positions／manual編集・履歴部分Backupは維持し、取込編集やRisk接続を追加しない。匿名2,000件／月500件、DOM50件、PC1280／mobile390、Consoleと正本不変を検証し実iPhoneとは区別する。PWA v285、display／transaction-ui／history CSSはquery 20261012-8でHTMLとprecacheへ同期する。
 
 ## Traders Storage / Backup v8
 

@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — Transaction derived presentation
+
+`assets/transaction-display.js`は共通resolverが返す同じ論理取引集合に対する非永続の表示層。原source参照を読み、decimal文字列をBigIntの係数／桁数として計算し、Lot／株式概算だけを生成する。Instrument・quantity・quantityUnit・contractSize・dedupe identity・月次計算・Backup v9契約へ書き戻さない。明示金額を優先し、SBI国内CSV由来でStock／ETF・株数・JPY単価の意味が明確な場合のみ数量×単価を「約」として表示する。投信の基準価額単位や外貨換算を推測しない。
+
+Lot sizeはbroker／canonical pairごとの表示ルールに一元化。GMOは通常10,000通貨、HUF/JPY・ZAR/JPY・MXN/JPYは100,000通貨。LIGHT FX／みんなのFXは通常10,000通貨、RUB/JPY・HUF/JPY・HUF/JPY LIGHTは100,000通貨。未対応provider／pairまたは数量単位未確認なら換算しない。明示されたLot数量は再度割らず、通貨数量が明示された時だけLotへ換算する。GMO PDFの`gmo-reported-count`は、約定数×約定単価＝約定金額の整合により通貨数量とユーザー確認済み（2026-10-12）。GMO口座／provider／PDF取引sourceが一致する原recordに限り表示時だけLotへ換算し、保存済み約定数・数量単位・resolver／dedupeの既存挙動は変えない。
+
+出典（2026-10-12確認）：[GMO FXネオ取引ルール](https://www.click-sec.com/corp/guide/fxneo/rule/)、[LIGHT FXサービス概要](https://lightfx.jp/service/outline/)、[みんなのFXサービス概要](https://min-fx.jp/lineup/fx/service/outline/)。サービス変更時は表示helperの一箇所を更新し、正本や履歴の統合条件は別途扱う。
+
 ## Current / Decided — Imported trade source / Backup v9
 
 **Current / Decided — 旧取込の明細補完**：同一PDFの再選択は通常no-op。ただし口座・provider・PDF種別・importer・対象月・月末日・hash（保存済みsizeがあればsizeも）が一致するBatchが一意で、そのBatchのImportedTransactionsが0件の場合だけ、現在のParserで再検証した明示取引をユーザー確認後に追加できる。原Snapshotの報告値との一致、完全な取引明細取得を要求し、個別決済損益が完全取得できる場合は公式月次合計と照合する。不一致・曖昧Instrumentは停止する。1件以上の不完全／不一致集合は自動補完しない。全明細が既存と一致すればno-op。

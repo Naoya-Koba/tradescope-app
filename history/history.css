@@ -838,23 +838,51 @@ body.drawer-open {
 }
 
 /* Shared history only: keep the existing position table and other screens unchanged. */
-.transaction-history .filters-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.transaction-history .filters-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.transaction-history .history-primary-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 540px; }
 .transaction-history .filter-item input { min-width: 0; width: 100%; box-sizing: border-box; padding: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; color: var(--text); font: inherit; font-size: 12px; color-scheme: dark; }
 .transaction-history select { min-width: 0; width: 100%; }
 .history-count { color: var(--muted); font-size: 12px; margin: 10px 0; }
-.transaction-table { table-layout: fixed; min-width: 0; }
-.transaction-table td, .transaction-table th { overflow-wrap: anywhere; white-space: normal; padding: 7px 5px; }
-.transaction-table th:nth-child(1) { width: 116px; }
-.transaction-table th:nth-child(4) { width: 120px; }
-.transaction-table th:last-child { width: 24px; }
+.history-advanced { margin: 0 0 12px; }
+.history-advanced summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 10px 0; width: fit-content; min-height: 44px; }
+.history-advanced .filters-grid { margin: 6px 0 12px; }
+.transaction-list { min-width: 0; }
+.transaction-row { min-width: 0; border-top: 1px solid rgba(255,255,255,.12); }
+.transaction-summary { position: relative; display: grid; gap: 5px; width: 100%; border: 0; padding: 12px 24px 12px 0; background: transparent; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.transaction-summary:hover { background: rgba(255,255,255,.035); }
+.transaction-summary:focus-visible, .history-advanced summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 6px; }
+.transaction-meta, .transaction-main, .transaction-values { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.transaction-meta { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.transaction-main { font-size: 14px; line-height: 1.5; }
+.transaction-symbol { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.transaction-account { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.transaction-date, .transaction-type { flex-shrink: 0; }
+.transaction-type { font-size: 12px; color: var(--muted); }
+.transaction-values { flex-wrap: wrap; font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.transaction-amount { min-width: 0; overflow-wrap: anywhere; }
+.transaction-pnl { margin-left: auto; white-space: nowrap; font-weight: 600; }
+.transaction-pnl.positive { color: var(--green); }
+.transaction-pnl.negative { color: var(--red); }
+.transaction-pnl.neutral { color: var(--muted); }
+.transaction-chevron { position: absolute; right: 2px; top: 50%; color: var(--muted); font-size: 22px; transform: translateY(-50%); }
+.transaction-summary[aria-expanded="true"] .transaction-chevron { transform: translateY(-50%) rotate(90deg); }
+.transaction-detail { padding: 4px 0 16px; }
+.transaction-detail[hidden] { display: none; }
+.transaction-detail-content { padding: 12px; border-radius: 10px; background: rgba(255,255,255,.035); }
+.transaction-detail-grid { margin: 0; display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 7px 14px; font-size: 12px; line-height: 1.5; }
+.transaction-detail-grid dt { color: var(--muted); }
+.transaction-detail-grid dd { min-width: 0; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.transaction-detail-content .memo-edit-btn { margin-top: 12px; min-height: 40px; padding: 8px 12px; }
+.history-empty { color: var(--muted); font-size: 13px; }
 #historyMore { margin-top: 12px; }
+@media (min-width: 701px) {
+ .transaction-summary { grid-template-columns: 168px minmax(0,1fr) minmax(160px,1fr); gap: 20px; padding: 14px 24px 14px 0; align-items: center; }
+ .transaction-meta, .transaction-main { flex-direction: column; gap: 4px; }
+ .transaction-account { text-align: left; }
+ .transaction-values { justify-content: flex-end; gap: 8px; }
+ .transaction-detail-grid { grid-template-columns: 120px minmax(0,1fr) 104px minmax(0,1fr); }
+}
 @media (max-width: 700px) {
  .transaction-history .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
- .transaction-table, .transaction-table tbody { display: block; min-width: 0; }
- .transaction-table thead { display: none; }
- .transaction-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.12); }
- .transaction-table td { display: block; min-width: 0; padding: 0; border: none; font-size: 12px; }
- .transaction-table td::before { content: attr(data-label); display: block; font-size: 10px; color: var(--muted); margin-bottom: 2px; }
- .transaction-table td:nth-child(4), .transaction-table td:nth-child(11) { grid-column: 1 / -1; }
- .transaction-table td[colspan] { grid-column: 1 / -1; }
+ .transaction-history .filter-item select, .transaction-history .filter-item input { min-height: 40px; }
 }
