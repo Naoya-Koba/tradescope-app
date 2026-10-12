@@ -44,7 +44,7 @@ test('PDF correction alone preserves original calendar AND later adopted calenda
  assert.equal(p.input.sourceHistory.length,2);assert.equal(p.state.sourceHistory.length,2);assert.equal(p.snapshot.accountSpecific.reportedSettledSwapPnl,'5');
 });
 test('old v7 complete source without partial input remains readable and calendar survives PDF correction',async()=>{
- const s=new MemoryStorage(),a=api(s);await a.save(source('lightfx','a','13'));s.removeItem(model.keys.monthlyAccountInputs);const old=model.readModels(s);assert.doesNotThrow(()=>model.validateBackupModels(7,old));
+ const s=new MemoryStorage(),a=api(s);await a.save(source('lightfx','a','13'));s.removeItem(model.keys.monthlyAccountInputs);const old=model.readModels(s);assert.doesNotThrow(()=>model.validateBackupModels(7,Object.fromEntries(model.backupModelEntities[7].map(k=>[k,old[k]]))));
  assert.equal(a.monthlyInspect('2026-09').source.swapPnl,'13');const next=source('lightfx','b');await a.save(next,await a.inspect(next));assert.equal(a.monthlyInspect('2026-09').source.swapPnl,'13');
 });
 for(const broker of ['lightfx','minano'])test(`${broker}: opposite product is rejected without mutation`,async()=>{
@@ -59,7 +59,7 @@ test('blank later Input fails without changing partial source; stale guard and i
  assert.throws(()=>a.correct({targetMonth:'2026-09',...p.adopted,swapPnl:'1.5'}));assert.deepEqual(s.snapshot(),before);
 });
 test('partial Backup v8 roundtrip includes null swap and history; frozen v7 refuses new input',async()=>{
- const s=new MemoryStorage();await api(s).save(source());const b=backupHarness(),payload=b.TradeScopeBackupExport.buildPayload(s,'http://localhost',now);assert.equal(payload.backupVersion,8);
+ const s=new MemoryStorage();await api(s).save(source());const b=backupHarness(),payload=b.TradeScopeBackupExport.buildPayload(s,'http://localhost',now);assert.equal(payload.backupVersion,9);
  assert.equal(b.TradeScopeBackupFormat.inspectValue({...payload,backupVersion:7}).ok,false);const empty=new MemoryStorage();const info=b.TradeScopeBackupFormat.inspectValue(payload);assert.equal(info.ok,true);b.TradeScopeBackupRestore.execute(info.restorePlan,empty);
  assert.deepEqual(model.readModels(empty),model.readModels(s));assert.deepEqual(copy(b.TradeScopeBackupExport.buildPayload(empty,'http://localhost',now)),copy(payload));
  for(const version of [1,2,3,4,5,6,7]){const old=copy(payload);old.backupVersion=version;if(version===1)delete old.data.models;else old.data.models=Object.fromEntries(model.backupModelEntities[version].map(k=>[k,null]));const plan=b.TradeScopeBackupFormat.inspectValue(old);assert.equal(plan.ok,true);const target=new MemoryStorage(s.snapshot());b.TradeScopeBackupRestore.execute(plan.restorePlan,target);if(version===1)assert.deepEqual(model.readModels(target),model.readModels(s));else assert.equal(model.readModels(target).monthlyAccountInputs,null);}

@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — Imported trade source / Backup v9
+
+`tradeScopeImportedTransactionsV1`を追加し、envelope v1／record v1で明示的なGMO約定イベントを保持する。必須fieldはid、accountId、instrumentId、importBatchId、sourceProvider、sourceType、sourceScope、targetMonth、tradeDate、executedAt、side、normalizedTransactionType、rawTransactionType、quantity、quantityUnit、price、realizedPnl、fee、feeCurrency、currency、providerExecutionId、providerOrderId、sourcePage、sourceRow、importedAt、schemaVersion。日時・個別損益・手数料／通貨・公式IDはnull可。decimalは文字列。現在の許可sourceはGMO PDF／gmo-fx-trades、数量は帳票の約定数（gmo-reported-count）でLotへ推測換算しない。
+
+旧RawTransactionは口座全体のexternal ID一意制約があるため、同一公式IDを含み得る訂正前後のPDF source保持へ無理に流用しない。新モデルはBatch内execution ID／page-row重複と口座・銘柄・Batch・月・日付の参照を検証する。旧legacy／SBI rawは移行・削除しない。表示Viewはmanual／SBI raw／adopted GMO sourceを共通化し、原source refsとmanual metadataを保持する。HoldingSnapshot、月次swap、入出金から売買イベントを生成しない。
+
+**Current**：`assets/transaction-view.js`は非永続resolver。公式ID優先でも値不一致・同一source内の複数候補は統合しない。manual/importは口座・銘柄・売買・日付・明示数量単位・数量・価格・open/closeが一致し候補が双方一意の場合のみ表示統合。数量単位不明、部分一致、価格許容差、曖昧候補は統合しない。物理削除なし。過去表示名はsource当時表記を保持する。
+
 ## Traders PDF-only partial保存 / Backup v8
 
 **Current / Decided**：1ファイルのPDF観測・全FX Holding・PDF月次原値の採用参照を同一保存操作で保護する。calendar swapは独立したmanual sourceで、空欄はnull。PDFだけのpartial保存ではStateを作らず、後入力または同時入力で全5項目が揃った時だけState v4を確定する。PDF訂正は新Batch／新Snapshot／新Holdingへ明示切替し、calendar原値・採用値・履歴と既存State IDを保持する。表示・月切替でseed／保存しない。

@@ -5,7 +5,8 @@
     accounts: 'tradeScopeAccountsV1', instruments: 'tradeScopeInstrumentsV1',
     importBatches: 'tradeScopeImportBatchesV1', rawTransactions: 'tradeScopeRawTransactionsV1',
     holdingSnapshots: 'tradeScopeHoldingSnapshotsV1', accountSnapshots: 'tradeScopeAccountSnapshotsV1',
-    monthlyAccountStates: 'tradeScopeMonthlyAccountStatesV1', monthlyAccountInputs: 'tradeScopeMonthlyAccountInputsV1'
+    monthlyAccountStates: 'tradeScopeMonthlyAccountStatesV1', monthlyAccountInputs: 'tradeScopeMonthlyAccountInputsV1',
+    importedTransactions: 'tradeScopeImportedTransactionsV1'
   });
   const PRIMARY_KEYS = Object.freeze(['tradingData', 'yearInitialFunds', 'yearInitialUnrealized',
     'tradeScopeTradeHistoryV1', 'tradeScopeMemos', 'tradeScopeSymbolListV1', 'tradeInfo', ...Object.values(MODEL_KEYS)]);

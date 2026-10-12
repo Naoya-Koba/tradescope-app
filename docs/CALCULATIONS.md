@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Decided — Monthly canonicalと取引内訳の分離
+
+月次損益の正本は既存MonthlyAccountStateと正式採用source。個別売買損益はdrill-down／auditであり、合計や不一致を理由に公式月間損益・Stateを上書きしない。GMO個別P/Lは明示円換算損益のみ、価格差から算出しない。quantity単位・contract sizeも推測変換しない。HoldingSnapshotは時点保有で、約定日時があっても当月Transactionにはしない。新取引source／表示resolverはTop・Summary・Trend・Allocation・Portfolio・Risk consumerへ接続しない。
+
 ## Traders Storage / Backup v8
 
 **Current / Decided — PDF-only partial**：PDF由来のrealized／deposit／withdrawalはMonthlyAccountInput v2の原値・採用値を共通表示層で読む。価格評価損益・純資産観測も当月partialとして表示し、Monthly P/L／年間内訳は既知値だけの暫定集計を行う。swap nullはcanonicalの0と同一視しない。Stateなしの厳密ledgerはmissingのまま、後からcalendar入力を保存すると共有表示とfingerprintを更新する。観測netAssetValueをledgerへ加算しない。

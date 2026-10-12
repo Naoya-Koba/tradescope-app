@@ -11,7 +11,8 @@
     5: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
     6: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
     7: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
-    8: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs'])
+    8: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
+    9: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -111,6 +112,14 @@
   const provenance = { accountId: id, targetMonth: month, snapshotAsOf: observed, importedAt: timestamp,
     sourceMode, sourceScope: text, importBatchId: id, observationType };
   const definitions = {
+    importedTransactions: {
+      required:['schemaVersion','id','accountId','instrumentId','importBatchId','sourceProvider','sourceType','sourceScope','targetMonth','tradeDate','executedAt','side','normalizedTransactionType','rawTransactionType','quantity','quantityUnit','price','realizedPnl','fee','feeCurrency','currency','providerExecutionId','providerOrderId','sourcePage','sourceRow','importedAt'],
+      nullable:['executedAt','realizedPnl','fee','feeCurrency','providerExecutionId','providerOrderId'],
+      types:{...common,accountId:id,instrumentId:id,importBatchId:id,sourceProvider:v=>v==='gmo',sourceType:v=>v==='pdf',sourceScope:v=>v==='gmo-fx-trades',targetMonth:month,
+        tradeDate:v=>observed(v)&&v.length===10,executedAt:observed,side:v=>['buy','sell'].includes(v),normalizedTransactionType:v=>['open','close','other'].includes(v),rawTransactionType:text,
+        quantity:decimal,quantityUnit:v=>v==='gmo-reported-count',price:decimal,realizedPnl:decimal,fee:decimal,feeCurrency:currency,currency:v=>v==='JPY',
+        providerExecutionId:v=>typeof v==='string'&&/^\d{1,64}$/.test(v),providerOrderId:v=>typeof v==='string'&&/^\d{1,64}$/.test(v),sourcePage:positiveInteger,sourceRow:positiveInteger,importedAt:timestamp}
+    },
     monthlyAccountInputs: {
       required: ['schemaVersion', 'id', 'accountId', 'targetMonth', 'domesticImportBatchId', 'sourceValues', 'adoptedValues',
         'overrideFields', 'overrideUpdatedAt', 'foreignAccountSnapshotId', 'cashAccountSnapshotId', 'realizedPnl', 'deposit', 'withdrawal'],
@@ -204,7 +213,7 @@
     const batches = new Map(records('importBatches').map(item => [item.id, item]));
     const snapshots = new Map(records('accountSnapshots').map(item => [item.id, item]));
     const externalIds = new Set(), sourceRows = new Set();
-    for (const entity of ['importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']) {
+    for (const entity of ['importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'importedTransactions']) {
       for (const record of records(entity)) {
         if (!accounts.has(record.accountId) || (record.instrumentId && !instruments.has(record.instrumentId))) fail();
         if (record.importBatchId) {
@@ -219,6 +228,16 @@
           const snapshot = snapshots.get(record.accountSnapshotId);
           if (!snapshot || ['accountId', 'snapshotAsOf', 'importedAt', 'sourceMode', 'sourceScope', 'importBatchId', 'targetMonth']
             .some(field => (snapshot[field] ?? null) !== (record[field] ?? null))) fail();
+        }
+        if(entity==='importedTransactions'){
+          const batch=batches.get(record.importBatchId),account=accounts.get(record.accountId),instrument=records('instruments').find(i=>i.id===record.instrumentId);
+          if(account.id!=='acc_gmo_fx'||account.providerCode!=='gmo'||account.accountType!=='fx'||instrument?.assetType!=='FX'
+            ||batch.sourceType!=='pdf'||batch.sourceProvider!==record.sourceProvider||batch.targetMonth!==record.targetMonth
+            ||record.tradeDate.slice(0,7)!==record.targetMonth||record.executedAt!==null&&record.executedAt.slice(0,10)!==record.tradeDate
+            ||record.quantity.startsWith('-')||equalDecimal(record.quantity,'0')||record.price.startsWith('-')
+            ||record.fee!==null&&(record.fee.startsWith('-')||record.feeCurrency===null))fail();
+          const rowKey=JSON.stringify([record.importBatchId,record.sourcePage,record.sourceRow]);if(sourceRows.has(rowKey))fail();sourceRows.add(rowKey);
+          if(record.providerExecutionId!==null){const key=JSON.stringify(['imported',record.importBatchId,record.providerExecutionId]);if(externalIds.has(key))fail();externalIds.add(key);}
         }
         if (entity === 'rawTransactions') {
           if (record.externalTransactionId) {
@@ -356,7 +375,7 @@
     const changed=adoptionFields.filter(f=>!equalNullable(input.sourceValues[f],input.adoptedValues[f]));
     if(changed.length!==input.overrideFields.length||changed.some(f=>!input.overrideFields.includes(f)))fail();
   }
-  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, ...models}, Object.keys(keys)); }
+  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, importedTransactions:null, ...models}, Object.keys(keys)); }
   // Only implemented policies can adopt a whole-account observation. Future brokers are not implicitly enabled.
   const adoptionPolicies = Object.freeze({ gmo: Object.freeze({ accountType: 'fx', sourceScope: 'gmo-fx-monthly-report',
     sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY', sourceType: 'pdf' }),

@@ -1,5 +1,9 @@
 # Product Specification
 
+## Current / Planned — 共通取引履歴
+
+**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9の保存基盤を追加。元資料・manual metadataを保持し、月次canonicalとは分離する。**Planned（次commit）**：GMO取引明細の保存接続、取引履歴UIの月・口座・銘柄・open/close・source絞込、50件単位の追加表示。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
+
 ## Traders PDF-only partial保存 / Backup v8
 
 **Current / Decided**：LIGHT FX／みんなのFXはswap空欄でも確認後にPDF原値・建玉・部分入力を保存できる。空欄はmissingで、MonthlyAccountStateを作らない。後からInputで収益カレンダー「スワップ付与」月間合計を入力し、口座内「保存」で完全時だけ確定する。正数・負数・明示0を受理し、PDF＋swapの同時確定も可能。成功後は「保存済み」、同一hashはpartialでも無書込。訂正版は明示確認が必要で、既存calendar原入力／採用値はPDF訂正だけでは消さない。Inputは同じFX5項目・非永続Draft・口座単位保存を維持する。2026-09以降は建玉別手入力を表示せず、2026-08以前は不変。

@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current / Decided — Backup v9
+
+最新exportはv9。新しいImportedTransactionsを含む9モデルを保護するためv8契約を固定する。v9だけが新collectionを受理し、v1は9モデル維持、v2〜v8は各公開済み旧範囲を復元する際に未収録ImportedTransactionsを同じjournalでクリアする（事前確認へ表示）。旧Batch／Account置換後に参照切れsourceを残さないためである。v9は9モデル完全復元。legacy部分復元は新モデルを維持。null＝キー不在、tradeInfo保護、再読込検証、rollback、派生cache無効化は維持する。filename／PDF原本／全文／PIIは保存しない。
+
 ## Current / Decided — Backup v8
 
 最新exportはv8。TradersのPDF-only partial source／calendar missing／明示採用参照／訂正履歴をMonthlyAccountInput record v2で保護するため、v7契約を固定してversionを上げる。8モデル・保存キー・envelopeは不変。v8は従来recordと新Input v2を受理し、v7は新Inputを拒否する。null swapを0へ変換せず、partialではState不在を保つ。v1〜v7の適用範囲、tradeInfo保護、journal／rollback、再読込検証、derived cache無効化は維持する。

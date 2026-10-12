@@ -35,14 +35,14 @@ test('v3 rejects new State; v4 accepts old and new States; decimal equality is n
 test('v1-v4 Restore semantics and new State v4 roundtrip', () => {
   const api = backupHarness(), target = new MemoryStorage(); model.createRepository(target).commit(Object.fromEntries(Object.entries(fixture()).filter(([, v]) => v !== null)));
   const exported = api.TradeScopeBackupExport.buildPayload(target, 'http://localhost', now);
-  assert.equal(exported.backupVersion, 8); const empty = new MemoryStorage();
+  assert.equal(exported.backupVersion, 9); const empty = new MemoryStorage();
   api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(exported).restorePlan, empty);
   assert.deepEqual(model.readModels(empty), fixture());
   assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty, 'http://localhost', now)), copy(exported));
   for (const version of [1, 2, 3, 4]) {
     const backup = copy(exported); backup.backupVersion = version;
     if (version === 1) delete backup.data.models;
-    else { delete backup.data.models.monthlyAccountInputs; for (const entity of Object.keys(backup.data.models)) backup.data.models[entity] = null;
+    else { delete backup.data.models.monthlyAccountInputs; delete backup.data.models.importedTransactions; for (const entity of Object.keys(backup.data.models)) backup.data.models[entity] = null;
       if (version === 2) delete backup.data.models.monthlyAccountStates; }
     const seeded = new MemoryStorage(); model.createRepository(seeded).commit(Object.fromEntries(Object.entries(fixture()).filter(([, v]) => v !== null)));
     const before = seeded.getItem(model.keys.monthlyAccountStates);

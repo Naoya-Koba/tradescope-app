@@ -1,5 +1,9 @@
 # Development Guide
 
+## Current — 共通取引source基盤
+
+`assets/transaction-view.js`はDOM／Storage非依存の表示resolver。legacy manual、SBI raw、新ImportedTransactionsを読み、adopted Snapshot→ImportBatchでactive GMO sourceを選び、latest importedAtを正本にしない。曖昧dedupeは保持する。新RepositoryキーはtradeScopeImportedTransactionsV1、Backup v9／旧1〜8互換／同一journal・rollbackで保護する。画面読込からseed・Migrationしない。月次calculatorとRisk sourceは変更しない。新取引Viewは共通履歴UIからのみ使う。
+
 ## Traders Storage / Backup v8
 
 **Current / UI**：`import/traders-preview.js`は口座別PDF Previewとcalendar入力を担当し、保存は`import/traders-save.js`だけを呼ぶ。blankでもPDF-only partial保存可能。`assets/traders-monthly-ui.js`は保存済みPDF源をread-onlyで表示し、非永続Draftのcalendar後入力・5項目訂正を同serviceへ渡す。成功はRepository再読込検証後のみ。legacy Inputへの混入・cutover後legacy保存は拒否する。PWA v280、今回変更資産のqueryは20261012-2。匿名localhostで1280／390幅・保存・reload・再取込・Backupを検証する。実iPhoneは別途必要。

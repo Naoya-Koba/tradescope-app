@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known issue — 共通取引source
+
+ImportedTransactionsの新モデル・非破壊resolver・Backup v9を追加。legacy manual／SBI raw原本を維持し、HoldingSnapshotは売買履歴に変換しない。GMOの帳票「約定数」は単位根拠未確定のためLot換算・manual FXとの数量単位一致dedupeをしない。false positiveより重複表示を優先する。Risk／Position consumerの統合は別工程。GMO parser保存と履歴UIは次commitで接続する。
+
 ## Traders Storage / Backup v8
 
 **Current**：建玉はFX HoldingSnapshot v2に原資料の数量単位で保存する。**Planned**：Position画面／Riskへの新建玉consumer接続は別工程で取得元の排他・lot仕様を監査する。今回Riskのtransactions sourceは変えない。**Known issue**：8月以前の旧swap欄は手入力値だけで、発生／受渡基準を識別するsource metadataがない。過去の一致確認はhistorical consistency checkであり、9月以降の保存・計算条件ではない。calendarは月単位で独立し、前月PDF／未決済basis不要。差を自動補正しない。
