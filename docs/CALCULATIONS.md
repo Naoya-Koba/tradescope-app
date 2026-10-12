@@ -2,7 +2,7 @@
 
 ## Decided — Monthly canonicalと取引内訳の分離
 
-月次損益の正本は既存MonthlyAccountStateと正式採用source。個別売買損益はdrill-down／auditであり、合計や不一致を理由に公式月間損益・Stateを上書きしない。GMO個別P/Lは明示円換算損益のみ、価格差から算出しない。quantity単位・contract sizeも推測変換しない。HoldingSnapshotは時点保有で、約定日時があっても当月Transactionにはしない。新取引source／表示resolverはTop・Summary・Trend・Allocation・Portfolio・Risk consumerへ接続しない。
+月次損益の正本は既存MonthlyAccountStateと正式採用source。個別売買損益はdrill-down／auditであり、合計や不一致を理由に公式月間損益・Stateを上書きしない。GMO個別P/Lは明示JPY損益または明示円換算損益のみ、価格差から算出しない。quantity単位・contract sizeも推測変換しない。HoldingSnapshotは時点保有で、約定日時があっても当月Transactionにはしない。新取引source／表示resolverは共通履歴UIだけへ接続し、Top・Summary・Trend・Allocation・Portfolio・Risk consumerへ接続しない。SBIの受渡金額／決済損益混在列も個別realizedPnlへ変換しない。
 
 ## Traders Storage / Backup v8
 

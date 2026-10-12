@@ -44,10 +44,11 @@
      let amount=decimal(line.items.filter(i=>i.x>=yen.x-12&&i.x<yen.x+45).map(i=>i.text).join(''));
      const receivedCurrency=currency(line.items.filter(i=>i.x>=received.x-0.5&&i.x<yen.x-12).map(i=>i.text).join(''));
      const original=header.items.find(i=>clean(i.text)==='取引損益'&&i.x<received.x);
-     const rawAmount=original&&line.items.filter(i=>i.x>=original.x-12&&i.x<received.x-1).map(i=>i.text).join('').trim();
+     const rawAmount=original&&line.items.filter(i=>i.x>=original.x-12&&i.x<received.x-1).map(i=>i.text).join(' ').trim();
      const sourceAmount=rawAmount&&/^([+-]?[\d,]+(?:\.\d+)?)\s+(JPY|USD)$/.exec(rawAmount);
      // A dash in conversion is not zero. Explicit original JPY needs no conversion.
      if(amount===null&&sourceAmount?.[2]==='JPY')amount=decimal(sourceAmount[1]);
+     if(amount!==null&&sourceAmount?.[2]==='JPY'&&!equal(amount,decimal(sourceAmount[1]))){issue('GMO_CLOSE_PNL_MISMATCH');continue;}
      if(!d||qty===null||price===null){issue('GMO_CLOSE_ROW_INVALID');continue;}
      closeRows.push({providerOrderId:clean(v[0]),...d,symbol:combined[1],side:combined[3]==='買'?'buy':'sell',quantity:qty,price,realizedPnl:receivedCurrency==='JPY'?amount:null});
     }
@@ -57,7 +58,7 @@
   const same=(a,b)=>['providerOrderId','tradeDate','executedAt','symbol','side'].every(k=>a[k]===b[k])&&equal(a.quantity,b.quantity)&&equal(a.price,b.price);
   for(const row of rows.filter(r=>r.normalizedTransactionType==='close')){const matches=closeRows.filter(r=>same(row,r)),siblings=rows.filter(r=>r.normalizedTransactionType==='close'&&same(row,r));if(matches.length===1&&siblings.length===1)row.realizedPnl=matches[0].realizedPnl;}
   const closing=rows.filter(r=>r.normalizedTransactionType==='close'),coverage=sectionCount&&errors.length===0?'complete':sectionCount?'partial':'unavailable';
-  const pnlCoverage=coverage==='complete'&&closing.every(r=>r.realizedPnl!==null)&&(!closing.length||closeSectionCount&&closeRows.length===closing.length)?'complete':'incomplete';
+  const pnlCoverage=coverage==='complete'&&closing.every(r=>r.realizedPnl!==null)&&closeRows.length===closing.length&&(!closing.length||closeSectionCount)?'complete':'incomplete';
   const audit=pnlCoverage==='complete'?(equal(closing.length?csv.sum(closing.map(r=>r.realizedPnl)):'0',official)?'matched':'mismatch'):'not-comparable';if(audit==='mismatch')warnings.push('GMO_TRADE_PNL_MISMATCH');
   return {rows,coverage,pnlCoverage,audit,errors,warnings};
  }

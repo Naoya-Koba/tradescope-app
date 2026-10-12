@@ -1,8 +1,8 @@
 # Product Specification
 
-## Current / Planned — 共通取引履歴
+## Current / Decided — 共通取引履歴
 
-**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9の保存基盤を追加。GMO PDF保存は明示された約定内訳を月次sourceと同じ操作で保護する。元資料・manual metadataを保持し、月次canonicalとは分離する。**Planned（次commit）**：取引履歴UIの月・口座・銘柄・open/close・source絞込、50件単位の追加表示。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
+**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9を使用する。GMO PDF保存は明示された約定内訳を月次sourceと同じ操作で保護する。取引履歴UIは月・口座・銘柄・新規／決済・取得元で絞り込み、日時降順、50件単位で追加表示する。手入力の戦略／メモ／編集は維持し、取込行は読み取り専用。スマートフォンでは同じ項目を縦積みで表示する。元sourceを保持し月次canonicalとは分離する。履歴ページのBackupは引き続き手入力だけ、取込データはTopの完全Backupに含む。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
 
 ## Traders PDF-only partial保存 / Backup v8
 
@@ -30,7 +30,7 @@ GMO FXneoの月次PDFはPreviewだけでは保存せず、確認後に月次採�
 
 GMO FXneoは月次の取引残高報告書PDFだけをローカル解析する。Previewは対象月、月末日、決済損益、スワップ、入出金、評価損益、現金残高、純資産、必要証拠金を表示し、個人情報を表示しない。明示確認後にPDF Batch・口座Snapshot・月次Stateを同時保存する。正式合計と取得できた明細・区分別小計・残高式を照合し、不一致、必須値不足、未知区分、非ゼロ手数料、締後移動、未対応の外貨残高は保存不可とする。
 
-**Current**：完全バックアップの最新出力はv8。旧record、State v2、手修正State v3の原値・採用値・変更metadataとSBI部分入力を保護し、v1〜v7互換を維持する。GMO PDF取込UI・月次保存は接続済み。手修正は原Snapshotを保持し、明示編集保存だけでv3化するserviceを用意し、表示だけでは旧v2を変更しない。
+**Current**：完全バックアップの最新出力はv9。旧record、State v2、手修正State v3の原値・採用値・変更metadataとSBI部分入力を保護し、v1〜v7互換を維持する。GMO PDF取込UI・月次保存は接続済み。手修正は原Snapshotを保持し、明示編集保存だけでv3化するserviceを用意し、表示だけでは旧v2を変更しない。
 
 ## 1. 製品定義
 

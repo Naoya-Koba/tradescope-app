@@ -8,6 +8,8 @@
 
 **Current**：`assets/transaction-view.js`は非永続resolver。公式ID優先でも値不一致・同一source内の複数候補は統合しない。manual/importは口座・銘柄・売買・日付・明示数量単位・数量・価格・open/closeが一致し候補が双方一意の場合のみ表示統合。数量単位不明、部分一致、価格許容差、曖昧候補は統合しない。物理削除なし。過去表示名はsource当時表記を保持する。
 
+**Current**：公式IDなしのimported同士は、同一provider・口座・商品・完全日時・売買・数量単位・数量・価格・種別が一致し、異なるBatchで双方一意の場合だけ表示統合する。日付だけ・単位不明・不一致・複数候補は維持する。訂正版の表示はStateが採用したSnapshotのBatchだけとし旧recordは削除しない。取引recordの`currency: JPY`は個別損益の表示通貨で、FX価格のquote currencyはInstrumentにある。新履歴UIから正本を変更せず、既存manual編集だけは従来serviceへ渡す。
+
 ## Traders PDF-only partial保存 / Backup v8
 
 **Current — GMO取引保存**：`gmo-fx-monthly-v2`は取引明細と決済取引明細を分離して読む。注文番号は保持するがexecution ID／一意な約定IDとは断定しない。日時は帳票の日時（タイムゾーン付加なし）、数量は約定数の原値。明示JPY取引損益または明示円換算額だけを個別P/Lとし、未取得はnull。スワップは加えない。手数料0は原値を保持し通貨不明はnull、非ゼロは現状保存停止。新規FX Instrumentのみ遅延生成し既存の表記差を照合、複数ID一致は停止する。Batch／Snapshot／State／Instrument／取引を同一journalで保存する。
@@ -34,7 +36,7 @@
 
 GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにする。Snapshotは破壊更新しない。PDF取込は引き続きv2を生成し、Inputの5項目編集は専用serviceで採用Stateだけを保存する。
 
-v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v8で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
+v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v9で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
 
 ## Current / Decided — GMO正式月末採用
 
@@ -653,7 +655,7 @@ TransactionAnnotation {
 
 ### 実装済みStorage基盤（Previewは読み取りのみ）
 
-**Current**：`assets/data-model-storage.js`のRepositoryはAdapterを注入して使用する。実装済みcollectionとキーは次の7つ。
+**Current**：`assets/data-model-storage.js`のRepositoryはAdapterを注入して使用する。実装済みcollectionとキーは次の9つ。
 
 | collection | 保存キー | 責務 |
 |---|---|---|
@@ -664,6 +666,8 @@ TransactionAnnotation {
 | `holdingSnapshots` | `tradeScopeHoldingSnapshotsV1` | 一取得元・一観測の保有状態 |
 | `accountSnapshots` | `tradeScopeAccountSnapshotsV1` | 一取得元・一観測が報告する口座状態／取得範囲 |
 | `monthlyAccountStates` | `tradeScopeMonthlyAccountStatesV1` | 口座・月の明示確定、採用先参照、月次台帳入力。合計値は保存しない |
+| `monthlyAccountInputs` | `tradeScopeMonthlyAccountInputsV1` | 月次のpartial／原値／採用値／訂正履歴 |
+| `importedTransactions` | `tradeScopeImportedTransactionsV1` | PDF等の明示売買source。月次・時点保有とは分離 |
 
 **Current**：キーが存在する場合は`{schemaVersion: 1, records: [...], updatedAt: ISO日時}`。キー不在は読み込み・バックアップ上`null`で表し、空envelope、架空の更新日時、Account seedを自動保存しない。recordの`schemaVersion`は原則省略可／`1`。MonthlyAccountStateの汎用採用recordは明示`2`、手修正recordは明示`3`。すべてのrecordにstable `id`を要求する。
 

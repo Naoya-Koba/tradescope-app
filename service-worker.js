@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradescope-static-v282';
+const CACHE_NAME = 'tradescope-static-v283';
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -9,7 +9,7 @@ const CORE_ASSETS = [
   "./import/traders-save.js?v=20261012-2",
   "./import/traders-preview.js?v=20261012-2",
   "./assets/traders-monthly-ui.js?v=20261012-2",
-  "./import/gmo-transactions-parser.js?v=20261012-4",
+  "./import/gmo-transactions-parser.js?v=20261012-6",
   "./import/gmo-parser.js?v=20261012-4",
   "./import/gmo-save.js?v=20261012-4",
   "./import/gmo-preview.js?v=20261012-4",
@@ -29,12 +29,13 @@ const CORE_ASSETS = [
   "./assets/account-ui.js?v=20261011-1",
   "./assets/storage-transaction.js?v=20261012-3",
   "./assets/data-model-storage.js?v=20261012-4",
-  "./assets/transaction-view.js?v=20261012-3",
+  "./assets/transaction-view.js?v=20261012-6",
   "./assets/trade-history-core.js?v=20261003-1",
   "./top/style.css?v=20261003-2",
   "./top/script.js?v=20261012-3",
-  "./history/history.css",
-  "./history/history.js?v=20261011-1",
+  "./history/history.css?v=20261012-5",
+  "./history/history.js?v=20261012-5",
+  "./history/transaction-ui.js?v=20261012-6",
   "./profit/soneki.html",
   "./profit/soneki.css?v=20261012-1",
   "./profit/soneki.js?v=20261012-1",

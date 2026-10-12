@@ -32,19 +32,17 @@ test('Legacy/new Input renderers use the same mapping but old calculation names 
   assert.match(source, /return ACCOUNTS.find\(\(account\) => account.key === accountKey\)\?\.name/);
   assert.match(read('assets/monthly-account-resolver.js'), /label: account.name/); // Snapshot serialization retains old labels.
 });
-test('History selects retain original values for create/edit/filter/close operations', () => {
+test('History manual selects retain original values for create/edit/close; shared filter uses canonical IDs', () => {
   const source = read('history/history.js'), elements = {};
   const context = vm.createContext({ displayAccountName: display, escapeHtml: value => String(value),
     ACCOUNTS: ['GMO', 'SBI'], ASSET_TYPES: [], CATEGORIES: [], CATEGORY_LABELS: {}, STRATEGIES: [], STRATEGY_LABELS: {},
     document: { getElementById: id => elements[id] ||= { value: '', innerHTML: '' } } });
   vm.runInContext(section(source, 'function toOptionHtml(', 'function normalizeOpenPositionsView('), context);
-  vm.runInContext(section(source, 'function buildBaseSelectOptions(', 'function readFilters('), context);
+  vm.runInContext(section(source, 'function buildBaseSelectOptions(', 'function buildFilters('), context);
   context.buildBaseSelectOptions();
   assert.match(elements.entryAccount.innerHTML, /value="GMO" selected>GMO FXneo/);
   assert.match(elements.entryAccount.innerHTML, /value="SBI">SBI証券/);
-  context.buildFilters([{ account: 'GMO' }, { account: 'SBI' }]);
-  assert.match(elements.filterAccount.innerHTML, /value="GMO">GMO FXneo/);
-  assert.match(elements.filterAccount.innerHTML, /value="SBI">SBI証券/);
+  assert.match(source,/transactionHistory.refresh\(manual, models\)/);
   assert.match(source, /accountSel.innerHTML = ACCOUNTS.map\(\(v\) => toOptionHtml\(v, displayAccountName\(v\)\)\)/);
   assert.match(source, /accountList.map\(\(a\) => toOptionHtml\(a, displayAccountName\(a\)\)\)/);
   assert.match(source, /const account = document.getElementById\('entryAccount'\).value/);

@@ -1,5 +1,6 @@
 const historyCore = window.TradeScopeHistory;
 const displayAccountName = window.TradeScopeAccountUI.displayAccountName;
+let transactionHistory = null;
 
 const ACCOUNTS = ['GMO', 'Light FX', 'みんなのFX', 'SBI', 'SBI VC', '三井住友銀行'];
 const ASSET_TYPES = ['FX', '証券', '暗号資産', 'その他'];
@@ -247,29 +248,14 @@ function buildBaseSelectOptions() {
 }
 
 function buildFilters(entries) {
-  const filterAccount = document.getElementById('filterAccount');
-  const filterSymbol = document.getElementById('filterSymbol');
-  const filterStrategy = document.getElementById('filterStrategy');
-  const filterCategory = document.getElementById('filterCategory');
-
-  const current = {
-    account: filterAccount.value,
-    symbol: filterSymbol.value,
-    strategy: filterStrategy.value,
-    category: filterCategory.value
-  };
-
-  const accounts = uniqueSortedValues(entries, 'account');
-  const symbols = uniqueSortedValues(entries, 'symbol');
-  const strategies = uniqueSortedValues(entries, 'strategy');
-
-  filterAccount.innerHTML = [toOptionHtml('', 'すべて', current.account === ''), ...accounts.map((v) => toOptionHtml(v, displayAccountName(v), current.account === v))].join('');
-  filterSymbol.innerHTML = [toOptionHtml('', 'すべて', current.symbol === ''), ...symbols.map((v) => toOptionHtml(v, v, current.symbol === v))].join('');
-  filterStrategy.innerHTML = [toOptionHtml('', 'すべて', current.strategy === ''), ...strategies.map((v) => toOptionHtml(v, v, current.strategy === v))].join('');
-  filterCategory.innerHTML = [toOptionHtml('', 'すべて', current.category === ''), ...CATEGORIES.map((v) => toOptionHtml(v, CATEGORY_LABELS[v], current.category === v))].join('');
-
-  // symbolHints は入力フォームで選択中の資産区分に絞って候補を出す
-  // (カスタムドロップダウンで管理するためここでは更新しない)
+  transactionHistory ||= window.TradeScopeTransactionUI.create(document);
+  try {
+    // Raw manual facts: do not infer quantity units/contract size from legacy defaults.
+    const manual = JSON.parse(localStorage.getItem('tradeScopeTradeHistoryV1') || '[]');
+    if (!Array.isArray(manual)) throw new Error('INVALID_HISTORY');
+    const models = window.TradeScopeDataStorage.readModels(window.TradeScopeDataStorage.localStorageAdapter(localStorage));
+    transactionHistory.refresh(manual, models);
+  } catch (_) { transactionHistory.fail(); }
 }
 
 function readFilters() {
@@ -546,33 +532,7 @@ function renderOpenPositions(entries) {
 }
 
 function renderHistoryTable(entries) {
-  const filters = readFilters();
-  const sortOrder = document.getElementById('sortOrder').value;
-  const filtered = historyCore.filterEntries(entries, filters);
-  const sorted = historyCore.getSortedEntries(filtered, sortOrder);
-  const tbody = document.getElementById('historyBody');
-
-  if (!sorted.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="color:#aab5d0;">履歴がありません</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = sorted.map((entry) => `
-    <tr>
-      <td>${escapeHtml(entry.date)}</td>
-      <td>${escapeHtml(displayAccountName(entry.account))}</td>
-      <td>${escapeHtml(entry.assetType)}</td>
-      <td>${escapeHtml(entry.symbol)}</td>
-      <td><span class="${entry.side === 'buy' ? 'tag-buy' : 'tag-sell'}">${entry.side === 'buy' ? '買い' : '売り'}</span></td>
-      <td>${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}</td>
-      <td>${fmtQuantity(entry.quantity)}${entry.assetType === 'FX' ? ' Lot' : (entry.assetType === '暗号資産' ? ' ' + entry.symbol.split('/')[0] : '')}</td>
-      <td>${fmtRate(entry.rate, entry.assetType, entry.symbol)}</td>
-      <td>${escapeHtml(entry.strategy || '-')}</td>
-      <td>${escapeHtml(entry.memo || '-')}</td>
-      <td><button type="button" class="edit-btn memo-edit-btn" data-entry-id="${escapeHtml(entry.id)}" aria-label="編集">✎</button></td>
-    </tr>
-  `).join('');
-
+  transactionHistory?.render();
 }
 
 function populateEditSelects() {
@@ -708,7 +668,7 @@ function bindEvents() {
     renderAll();
   });
 
-  ['filterAccount', 'filterSymbol', 'filterStrategy', 'filterCategory', 'sortOrder'].forEach((id) => {
+  ['filterMonth', 'filterAccount', 'filterSymbol', 'filterStrategy', 'filterCategory', 'filterSource', 'sortOrder'].forEach((id) => {
     document.getElementById(id).addEventListener('change', () => {
       const entries = historyCore.parseEntries();
       renderHistoryTable(entries);

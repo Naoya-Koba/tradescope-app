@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="history/history.css" />
+  <link rel="stylesheet" href="history/history.css?v=20261012-5" />
   <link rel="stylesheet" href="assets/bottom-nav.css" />
   <link rel="stylesheet" href="assets/transitions.css" />
   <script src="assets/transitions.js"></script>
@@ -168,39 +168,44 @@
     </section>
 
     <h2 class="heading-muted">History List</h2>
-    <section class="section glass">
+    <section class="section glass transaction-history">
       <div class="filters-grid">
+        <label class="filter-item"><span>対象月</span><input id="filterMonth" type="month" /></label>
         <label class="filter-item"><span>口座</span><select id="filterAccount"></select></label>
-        <label class="filter-item"><span>通貨ペア</span><select id="filterSymbol"></select></label>
+        <label class="filter-item"><span>銘柄 / 通貨ペア</span><select id="filterSymbol"></select></label>
         <label class="filter-item"><span>戦略区分</span><select id="filterStrategy"></select></label>
         <label class="filter-item"><span>区分</span><select id="filterCategory"></select></label>
+        <label class="filter-item"><span>取得元</span><select id="filterSource"></select></label>
         <label class="filter-item"><span>並び順</span><select id="sortOrder"><option value="newest">新しい順</option><option value="oldest">古い順</option></select></label>
       </div>
+      <p id="historyCount" class="history-count" role="status"></p>
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table transaction-table">
           <thead>
             <tr>
-              <th>日付</th>
+              <th>日時</th>
               <th>口座</th>
               <th>資産</th>
-              <th>通貨ペア</th>
+              <th>銘柄</th>
               <th>売買</th>
               <th>区分</th>
               <th>数量</th>
-              <th>レート</th>
-              <th>戦略</th>
-              <th>メモ</th>
+              <th>約定価格</th>
+              <th>個別損益</th>
+              <th>取得元</th>
+              <th>戦略 / メモ</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="historyBody"></tbody>
         </table>
       </div>
+      <button id="historyMore" class="btn btn-secondary" type="button" hidden>さらに表示</button>
     </section>
 
     <h2 class="heading-muted">Backup</h2>
     <section class="section glass backup-section">
-      <p class="section-description">取引履歴ページのデータのみをバックアップ・復元します。</p>
+      <p class="section-description">手入力の取引履歴をバックアップ・復元します。取込データはTopの完全バックアップに含まれます。</p>
       <div class="backup-actions">
         <button id="exportHistoryBtn" class="btn btn-secondary backup-action-btn" type="button">エクスポート</button>
         <label class="btn btn-secondary backup-action-btn backup-action-label" for="importHistoryInput">
@@ -317,7 +322,12 @@
   <script src="assets/app-gestures.js"></script>
   <script src="assets/trade-history-core.js?v=20261003-1"></script>
   <script src="assets/account-ui.js?v=20261011-1"></script>
-  <script src="history/history.js?v=20261011-1"></script>
+  <script src="import/csv-core.js?v=20261005-1"></script>
+  <script src="assets/storage-transaction.js?v=20261012-3"></script>
+  <script src="assets/data-model-storage.js?v=20261012-4"></script>
+  <script src="assets/transaction-view.js?v=20261012-6"></script>
+  <script src="history/transaction-ui.js?v=20261012-6"></script>
+  <script src="history/history.js?v=20261012-5"></script>
   <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

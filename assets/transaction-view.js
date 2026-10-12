@@ -8,11 +8,15 @@
  function accountId(value,models){if(labels[value])return value;const match=aliases[accountKey(value)];if(match)return match;
   const candidates=rows(models,'accounts').filter(a=>[a.displayName,...(a.legacyRefs||[])].some(n=>accountKey(n)===accountKey(value)));return candidates.length===1?candidates[0].id:null;}
  function fxPair(value){const m=/^([A-Za-z]{3})[-/]?([A-Za-z]{3})$/.exec(String(value??'').trim());return m?`${m[1].toUpperCase()}/${m[2].toUpperCase()}`:null;}
- const decimal=v=>v===null||v===undefined||v===''?null:/^-?\d+(?:\.\d+)?$/.test(String(v))?String(v).replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace(/^-0$/,'0'):null;
+ function decimal(v){if(v===null||v===undefined||v==='')return null;let text=String(v);
+  // Preserve finite legacy Number facts, including tiny crypto quantities. No rounding or unit conversion.
+  if(typeof v==='number'&&Number.isFinite(v)&&/e/i.test(text)){const [coefficient,exponent]=text.toLowerCase().split('e'),sign=coefficient.startsWith('-')?'-':'',parts=coefficient.replace('-','').split('.'),digits=parts.join(''),point=parts[0].length+Number(exponent);
+   text=sign+(point<=0?'0.'+'0'.repeat(-point)+digits:point>=digits.length?digits+'0'.repeat(point-digits.length):digits.slice(0,point)+'.'+digits.slice(point));}
+  return /^-?\d+(?:\.\d+)?$/.test(text)?text.replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace(/^-0$/,'0'):null;}
  const types=Object.freeze({new:'open',add:'open',partial_close:'close',full_close:'close','新規':'open','決済':'close','投信金額買付':'open','現物買':'open','現物売':'close'});
  // Only explicit unit labels are comparable. GMO's printed 約定数 has no verified lot size.
  function unit(value,assetType,contractSize){if(['株','shares'].includes(value))return 'shares';if(['口','fundUnits'].includes(value))return 'fundUnits';
-  if(['lot','lots'].includes(value)&&contractSize!=null)return `lots:${decimal(contractSize)}`;return null;}
+  const size=decimal(contractSize);if(['lot','lots'].includes(value)&&size!==null&&!/^(?:-|0$)/.test(size))return `lots:${size}`;return null;}
  function instrument(symbol,assetType,id,models){const master=rows(models,'instruments').find(r=>r.id===id),type=master?.assetType||assetType;
   const pair=type==='FX'?fxPair(symbol)||fxPair(master?.symbol):null;
   if(pair)return{instrumentId:id||null,instrumentKey:'FX:'+pair,symbol:pair,assetType:'FX'};
@@ -42,10 +46,13 @@
   return normalized;
  }
  const signature=r=>r.accountId&&r.instrumentKey&&r.side&&r.quantity!==null&&r.price!==null&&r.type!=='other'
-  ?JSON.stringify([r.accountId,r.instrumentKey,r.side,r.date,r.type,r.unitKey,r.quantity,r.price]):null;
+  ?JSON.stringify([r.accountId,r.instrumentKey,r.side,r.date,r.type,r.unitKey,decimal(r.quantity),decimal(r.price)]):null;
  const compatible=(a,b)=>['realizedPnl','currency'].every(k=>a[k]===null||b[k]===null||a[k]===b[k]);
  function resolve(manual,models){const records=normalize(manual,models),hidden=new Set(),groups=new Map();
-  for(const r of records.filter(r=>!r.manualId&&(r.executionId||r.orderId&&r.executedAt))){const key=JSON.stringify([r.accountId,r.sourceProvider,r.executionId?'execution':'order',r.executionId||r.orderId]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+  for(const r of records.filter(r=>r.sources[0].kind!=='manual')){let key;
+   if(r.executionId||r.orderId&&r.executedAt)key=JSON.stringify([r.accountId,r.sourceProvider,r.executionId?'execution':'order',r.executionId||r.orderId]);
+   else if(!r.orderId&&r.executedAt&&r.quantityUnit&&signature(r))key=JSON.stringify([r.sourceProvider,'exact-facts',r.executedAt,r.quantityUnit,signature(r)]);
+   if(!key)continue;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
   for(const group of groups.values()){if(group.length<2||new Set(group.map(r=>r.sources[0].importBatchId)).size!==group.length)continue;
    const first=group[0];if(signature(first)&&group.every(r=>signature(r)===signature(first)&&r.quantityUnit===first.quantityUnit&&r.executedAt===first.executedAt&&compatible(r,first))){for(const r of group.slice(1)){first.sources.push(...r.sources);hidden.add(r.id);}}}
   const official=new Map(),manuals=new Map();for(const r of records.filter(r=>!hidden.has(r.id))){const key=r.unitKey?signature(r):null;if(!key)continue;const map=r.manualId?manuals:official;if(!map.has(key))map.set(key,[]);map.get(key).push(r);}
