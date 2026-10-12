@@ -2345,7 +2345,7 @@ function renderAccountInputs() {
   ACCOUNTS.forEach(account => {
     if(account.key==='sbivc'){
       const observation=window.TradeScopeObservationInputUI.render({document,adapter:{getItem:key=>localStorage.getItem(key)},
-        accountId:'acc_sbivc_crypto',targetMonth:inputTargetMonth(),displayName:displayAccountName(account.key)});
+        accountId:'acc_sbivc_crypto',targetMonth:inputTargetMonth(),displayName:displayAccountName(account.key),accountKey:account.key,color:account.color});
       if(observation){container.appendChild(observation);return;}
     }
     if (['lightfx','minano'].includes(account.key) && inputTargetMonth() >= window.TradeScopeMonthlyResolver.policies[account.key].cutover) {

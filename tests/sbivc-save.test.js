@@ -78,8 +78,56 @@ for(let version=1;version<=9;version++)test('old v'+version+' restore preserves 
 test('v10 absent optional data and explicit null model roundtrip',()=>{const s=new Memory(),h=backup(s),p=h.build(),target=new Memory(),r=backup(target);r.restore.execute(r.format.inspectValue(p).restorePlan,target);assert.deepEqual(copy(r.build().data),copy(p.data));assert.ok(Object.values(p.data.models).every(v=>v===null));});
 test('unknown observation field/version/missing reference/month mismatch reject before restore writes',async()=>{const s=await saved(),payload=backup(s).build();for(const mutate of [p=>p.data.models.monthlyAccountInputs.records[0].unknown=true,p=>p.data.models.monthlyAccountInputs.records[0].schemaVersion=77,p=>p.data.models.monthlyAccountInputs.records[0].adoptedAccountSnapshotId='missing',p=>p.data.models.monthlyAccountInputs.records[0].targetMonth='2031-03',p=>p.data.models.accountSnapshots.records[0].netAssetValue='123']){const p=copy(payload);mutate(p);const target=new Memory(),r=backup(target),before=target.snapshot();assert.equal(r.format.inspectValue(p).ok,false);assert.equal(target.snapshot(),before);}});
 test('v10 restore partial failure rolls back old legacy and every new-model key',async()=>{const s=await saved(),payload=backup(s).build(),target=new Memory(),before=target.snapshot(),r=backup(target);target.failKey=model.keys.monthlyAccountInputs;assert.throws(()=>r.restore.execute(r.format.inspectValue(payload).restorePlan,target));assert.equal(target.snapshot(),before);});
-class Element{constructor(){this.children=[];this.textContent='';}append(...v){this.children.push(...v);}}
+class Element{
+ constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.dataset={};this.style={};this.attributes={};this.events={};
+  this.classList={contains:k=>this.className.split(' ').includes(k),add:k=>{if(!this.classList.contains(k))this.className+=' '+k;},remove:k=>{this.className=this.className.split(' ').filter(c=>c!==k).join(' ');},toggle:k=>{const open=!this.classList.contains(k);this.classList[open?'add':'remove'](k);return open;}};}
+ append(...v){this.children.push(...v);}
+ setAttribute(k,v){this.attributes[k]=v;}
+ addEventListener(k,fn){this.events[k]=fn;}
+}
 const text=e=>[e.textContent,...e.children.map(text)].join(' ');
+async function observationCard(){const adapter=await saved();return{adapter,card:inputUI.render({document:{createElement:tag=>new Element(tag)},adapter,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC',color:'#123456'})};}
+function bindAccountToggle(card){
+ const [button,body]=card.children;body.scrollHeight=120;
+ const source=fs.readFileSync('profit/soneki.js','utf8');
+ const start=source.indexOf("  document.querySelectorAll('.account-toggle').forEach(btn => {");
+ const end=source.indexOf('\n  UNREALIZED_HELPER_ACCOUNTS.forEach',start);
+ vm.runInNewContext(source.slice(start,end),{document:{querySelectorAll:()=>[button]},container:{querySelector:selector=>selector==='[data-account-body="sbivc"]'?body:null},requestAnimationFrame:fn=>fn()});
+ return{button,body};
+}
+test('SBI VC saved Input defaults collapsed with common button, color and accessible controls',async()=>{
+ const {card}=await observationCard(),[button,body]=card.children;
+ assert.equal(card.className,'account-card');assert.equal(button.tagName,'button');assert.equal(button.type,'button');
+ assert.equal(button.dataset.accountToggle,'sbivc');assert.equal(button.attributes['aria-expanded'],'false');
+ assert.equal(button.attributes['aria-controls'],body.id);assert.equal(body.dataset.accountBody,'sbivc');assert.equal(body.className,'account-body');
+ assert.equal(button.children[0].className,'account-title');assert.equal(button.children[0].children[0].style.backgroundColor,'#123456');
+ assert.equal(text(button).trim(),'SBI VC ▼');assert.doesNotMatch(text(button),/保存済み|2031|JPY|現物保有/);
+ const css=fs.readFileSync('profit/soneki.css','utf8');assert.match(css,/\.account-body\s*\{[^}]*visibility: hidden/s);assert.match(css,/\.account-body\.open\s*\{[^}]*visibility: visible/s);
+});
+test('shared Input header click expands and collapses SBI VC without Storage writes',async()=>{
+ const {card,adapter}=await observationCard(),before=adapter.snapshot(),{button,body}=bindAccountToggle(card);
+ button.events.click();assert.equal(button.attributes['aria-expanded'],'true');assert.equal(body.classList.contains('open'),true);assert.equal(body.style.maxHeight,'120px');
+ assert.match(text(body),/資産・保有情報を保存済み/);assert.match(text(body),/2031\/02|JPY残高|帳票上の資産合計|現物保有（3銘柄）/);
+ button.events.click();assert.equal(button.attributes['aria-expanded'],'false');assert.equal(body.classList.contains('open'),false);assert.equal(body.style.maxHeight,'0px');
+ button.events.click();assert.equal(body.classList.contains('open'),true);assert.equal(adapter.snapshot(),before);
+});
+test('holdings disclosure resizes the common expanded body without opening a collapsed card',async()=>{
+ const {card}=await observationCard(),{button,body}=bindAccountToggle(card),details=body.children[2];
+ details.events.toggle();assert.equal(body.style.maxHeight,undefined);button.events.click();body.scrollHeight=640;details.events.toggle();assert.equal(body.style.maxHeight,'640px');
+ button.events.click();details.events.toggle();assert.equal(body.style.maxHeight,'0px');
+});
+test('reload reads identical saved observation into a newly collapsed read-only card',async()=>{
+ const {card,adapter}=await observationCard(),before=adapter.snapshot();bindAccountToggle(card).button.events.click();
+ const reloaded=new Memory();for(const key of Object.values(model.keys)){const value=adapter.getItem(key);if(value!==null)reloaded.setItem(key,value);}
+ const next=inputUI.render({document:{createElement:tag=>new Element(tag)},adapter:reloaded,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC'});
+ assert.equal(next.children[0].attributes['aria-expanded'],'false');assert.equal(text(next.children[1]),text(card.children[1]));
+ const tags=e=>[e.tagName,...e.children.flatMap(tags)];assert.ok(!tags(next.children[1]).some(t=>t==='input'||t==='button'));assert.equal(adapter.snapshot(),before);
+});
+test('45-row saved source shows only relevant positive holdings inside the shared body',async()=>{
+ const adapter=new Memory();await service(adapter).save(listedSource());const before=adapter.snapshot();
+ const card=inputUI.render({document:{createElement:tag=>new Element(tag)},adapter,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC'});
+ assert.match(text(card.children[1]),/現物保有（1銘柄）/);assert.doesNotMatch(text(card),/COIN2\/JPY|COIN45\/JPY/);assert.equal(adapter.snapshot(),before);
+});
 test('asset observations do not alter shared Top, allocation, Summary or trend amounts',async()=>{
  const s=new Memory(),context={window:{}};vm.runInNewContext(fs.readFileSync('assets/profit-metrics.js','utf8'),context);
  const display=require('../assets/monthly-display-view.js'),f=require('./monthly-display-fixture.js').fixture();
