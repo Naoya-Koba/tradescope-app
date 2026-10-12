@@ -2344,7 +2344,7 @@ function renderAccountInputs() {
   
   ACCOUNTS.forEach(account => {
     if(account.key==='sbivc'){
-      const observation=window.TradeScopeObservationInputUI.render({document,adapter:{getItem:key=>localStorage.getItem(key)},
+      const observation=window.TradeScopeObservationInputUI.render({document,adapter:window.TradeScopeDataStorage.localStorageAdapter(localStorage),
         accountId:'acc_sbivc_crypto',targetMonth:inputTargetMonth(),displayName:displayAccountName(account.key),accountKey:account.key,color:account.color});
       if(observation){container.appendChild(observation);return;}
     }

@@ -4,7 +4,7 @@
 
 **Current / Decided**：標準入口は月次報告書PDF一つ。SBI VCカードでローカル解析し、対象月・date-only基準日・JPY残高・帳票上の資産合計・現物数量／評価レート／公式円換算額を確認する。残高0の銘柄とレバレッジ口座・入出庫／報酬は折りたたむ。共通「PDF原本を確認」を使用する。資産合計を完全な純資産と呼ばず、現物取得原価・月次損益を推定／0表示しない。
 
-**Current**：Previewで確認後「保存」から資産・現物保有だけを保存する。成功後は「資産・保有情報を保存済み」。同一PDFは全保存内容照合後no-op、訂正版は確認後に採用sourceを切り替えて旧sourceを残す。Inputでは対象月・基準日・JPY残高・帳票資産合計と採用sourceの現物をread-only表示する。損益未確定でありMonthlyAccountStateは作らない。Backup v10で保護し、legacy・履歴・Risk・Top／月次consumerは不変。ZIP／CSVを標準フローへ追加しない。
+**Current**：Previewで確認後「保存」から資産・現物保有だけを保存する。成功後は「資産・保有情報を保存済み」。同一PDFは全原本保存内容照合後no-op、訂正版は確認後に採用sourceを切り替えて旧sourceと補正履歴を残す。Inputは共通accordion内で対象月・基準日・JPY残高・帳票資産合計と採用sourceの現物を通常read-only表示し、「修正」で値だけを非永続Draftへ編集する。「保存」で補正を確定、「キャンセル」で元の採用値に戻る。「PDF値に戻す」も最後の保存まで永続変更しない。補正があれば控えめに「手動補正あり」と表示する。原本値・identity・対象月・基準日は編集しない。訂正版の新公式値に旧補正を自動適用しない。損益未確定でありMonthlyAccountStateは作らない。Backup v11で保護し、legacy・履歴・Risk・Top／月次consumerは不変。ZIP／CSVを標準フローへ追加しない。
 
 **Known limitation / Planned**：実売買・建玉・貸出行は未検証で、見出し／列名／明示該当なしの認識に限定する。現物原価・実現／評価損益、報酬・cashflowのcanonical化、実取引保存、暗号資産partial projectionは別工程。帳票資産合計をレバレッジ込み完全純資産として扱わない。
 

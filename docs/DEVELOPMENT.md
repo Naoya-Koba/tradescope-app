@@ -2,7 +2,11 @@
 
 ## SBI VC月次PDF資産・保有保存（Current）
 
-`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放・確認保存を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDNを追加しない。`import/sbivc-save.js`が保存直前再検証、Instrument解決、same-source検算、訂正guard、全レコードのatomic journal保存を担当する。Inputの`assets/observation-input-ui.js`はMonthlyAccountInput v3の採用先だけをread-only表示し、共通account cardの開閉処理を利用する。初期状態は閉じ、保存済みstatusと観測内容は展開内に置く。開閉状態は永続化しない。PWA v291、observation Input／soneki資産query 20261012-14、save／preview資産query 20261012-13、その他資産／PDF.jsは不変。
+**Current — 手動補正**：`assets/observation-adoption.js`がimmutable原本＋疎なoverrideを共通解決し、`assets/observation-override-save.js`がGMOと同じCSV decimal処理／Storage decimal同値比較／Repository expectedModels／journalを使用する。UIは独自Storage writeを持たず、修正・reset・キャンセルは画面内Draft、明示保存だけInput v4へ更新する。holding ID＋Instrument ID＋採用Snapshotで参照を検証し、補正履歴は原本参照＋旧差分を追記する。訂正版PDFではactive補正を空にして新公式値を採用し、旧補正は残す。MonthlyAccountState／取引／損益／下流consumerへ接続しない。Backup v11、旧v1〜v10の検証意味を維持。PWA v292、変更資産query 20261012-15。
+
+**Current — 補正検証**：既存766＋追加54の全820 testsを検証。匿名localhostの実ブラウザで補正保存／reload／reset／cancel／訂正版／容量不足相当rollbackを確認し、原本不変・State不在・旧補正履歴保持を確認する。PC1280／mobile390は横overflowなし、Console Error／Warningなし。本番Storage・実PDF・実Backupは使用しない。実iPhoneは未確認。
+
+`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放・確認保存を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDNを追加しない。`import/sbivc-save.js`が保存直前再検証、Instrument解決、same-source検算、訂正guard、全レコードのatomic journal保存を担当する。Inputの`assets/observation-input-ui.js`はMonthlyAccountInput v3／v4の採用先を通常read-only表示し、共通account cardの開閉処理を利用する。初期状態は閉じ、保存済みstatusと観測内容は展開内に置く。開閉状態は永続化しない。PWA v292、observation Input／soneki資産query 20261012-15、save資産query 20261012-15、preview資産query 20261012-13、その他資産／PDF.jsは不変。
 
 保存層の`persistableHoldings`で正の保有と、同じ口座の採用済み正の保有履歴に根拠がある明示0だけを選ぶ。ParserはStorageを参照せず全行を保持する。訂正／same-hash照合も同じ選別を使用し、再取込時は採用履歴から保存当時の根拠を再現する。無関係な0についてInstrument／Holdingを作らず、旧データの削除・schema変更は行わない。匿名45行（正1／0が44）、全0、過去保有、訂正、口座分離、no-op、rollback、Backup v10を回帰検証する。
 

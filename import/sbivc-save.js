@@ -4,6 +4,7 @@
   const model=node?require('../assets/data-model-storage.js'):root.TradeScopeDataStorage;
   const parser=node?require('./sbivc-parser.js'):root.TradeScopeSBIVCParser;
   const tx=node?require('../assets/storage-transaction.js'):root.TradeScopeStorageTransaction;
+  const adoption=node?require('../assets/observation-adoption.js'):root.TradeScopeObservationAdoption;
   const copy=v=>JSON.parse(JSON.stringify(v)),rows=(m,e)=>m[e]?.records||[];
   const accountId='acc_sbivc_crypto',scope='sbivc-monthly-assets',importerId='sbivc-monthly';
   const decimal=v=>typeof v==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(v)&&v.length<=128;
@@ -29,7 +30,7 @@
     return p;
   }
   function resolve(models,targetMonth){
-    const input=rows(models,'monthlyAccountInputs').find(r=>r.schemaVersion===3&&r.accountId===accountId&&r.targetMonth===targetMonth);
+    const input=rows(models,'monthlyAccountInputs').find(r=>[3,4].includes(r.schemaVersion)&&r.accountId===accountId&&r.targetMonth===targetMonth);
     if(!input)return null;
     const snapshot=rows(models,'accountSnapshots').find(r=>r.id===input.adoptedAccountSnapshotId);
     if(!snapshot)return null;
@@ -39,7 +40,7 @@
   function persistableHoldings(models,preview,savedSnapshot=null){
     const positiveSymbols=new Set(),instruments=new Map(rows(models,'instruments').map(i=>[i.id,i]));
     for(const input of rows(models,'monthlyAccountInputs')){
-      if(input.schemaVersion!==3||input.accountId!==accountId||input.targetMonth>preview.report.targetMonth)continue;
+      if(![3,4].includes(input.schemaVersion)||input.accountId!==accountId||input.targetMonth>preview.report.targetMonth)continue;
       const refs=[...input.sourceHistory,{adoptedAccountSnapshotId:input.adoptedAccountSnapshotId,adoptedAt:input.adoptedAt}];
       let ref=refs.at(-1);
       if(savedSnapshot){
@@ -92,13 +93,13 @@
       }
       return{status:view?'review-required':'ready',before,p,account,view,ids,newSymbols,selected,holdingCount:selected.length};
     }
-    const result=p=>({status:p.status,...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt}:{})});
+    const result=p=>({status:p.status,...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt,...(p.view.input.schemaVersion===4?{overrideUpdatedAt:p.view.input.overrideUpdatedAt,overrideRevision:p.view.input.overrideHistory.length}:{})}:{})});
     async function inspect(source){return result(prepare(copy(source)));}
     async function save(source,confirmation={}){
       if(busy)return{status:'busy'};busy=true;
       try{
         const input=copy(source),prepared=prepare(input),guard=result(prepared);
-        const correction=prepared.status==='review-required'&&confirmation.inputId===guard.inputId&&confirmation.adoptedSnapshotId===guard.adoptedSnapshotId&&confirmation.adoptedAt===guard.adoptedAt;
+        const correction=prepared.status==='review-required'&&confirmation.inputId===guard.inputId&&confirmation.adoptedSnapshotId===guard.adoptedSnapshotId&&confirmation.adoptedAt===guard.adoptedAt&&confirmation.overrideUpdatedAt===guard.overrideUpdatedAt&&confirmation.overrideRevision===guard.overrideRevision;
         if(prepared.status!=='ready'&&!correction)return guard;
         const {before,p,account,view,ids,newSymbols,selected}=prepared,now=clock(),changes={},envelope=records=>({schemaVersion:1,records,updatedAt:now});
         if(!account)changes.accounts=envelope([...rows(before,'accounts'),model.initialAccounts().find(a=>a.id===accountId)]);
@@ -115,6 +116,8 @@
           quantity:h.quantity,marketPrice:h.valuationRate,marketValue:h.officialJPYValue,acquisitionPrice:null,unrealizedPnl:null,currency:'JPY'}));
         const monthly={schemaVersion:3,id:view?.input.id||model.newId('mai',cryptoApi),accountId,targetMonth:p.report.targetMonth,adoptedAccountSnapshotId:snapshotId,adoptedAt:now,
           sourceHistory:view?[...view.input.sourceHistory,{adoptedAccountSnapshotId:view.snapshot.id,adoptedAt:view.input.adoptedAt}]:[]};
+        if(view?.input.schemaVersion===4)Object.assign(monthly,{schemaVersion:4,observationOverrides:adoption.empty(),overrideUpdatedAt:now,
+          overrideHistory:[...view.input.overrideHistory,adoption.revision(view.input)]});
         changes.importBatches=envelope([...rows(before,'importBatches'),batch]);changes.accountSnapshots=envelope([...rows(before,'accountSnapshots'),snapshot]);
         changes.holdingSnapshots=envelope([...rows(before,'holdingSnapshots'),...holdings]);
         changes.monthlyAccountInputs=envelope([...rows(before,'monthlyAccountInputs').filter(r=>r.id!==monthly.id),monthly]);

@@ -2,7 +2,7 @@
 
 ## SBI VC月次PDF資産・保有保存
 
-**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有だけで、Backup v10の観測採用Input v3からInputへread-only表示する。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴・Risk・Top／月次consumerへ接続しない。
+**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有だけ。Inputは旧観測採用v3／補正v4を読み、通常read-only、明示「修正」時だけ採用値を編集する。原本Snapshotは不変、active補正と訂正履歴はBackup v11で保護し、v1〜v10も復元可能。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴・Risk・Top／月次consumerへ接続しない。
 
 **Known limitation**：確認済み実PDFの売買・建玉・貸出表は該当なし。実行行は未検証、ヘッダーmappingと空／未検証状態を返す。月次canonical P/L、現物原価・実現／評価P/Lは生成不可。非空表・未知入出庫区分は短い警告で示す。実iPhone Safari／Home Screen PWAの今回のPreview操作は未確認。
 

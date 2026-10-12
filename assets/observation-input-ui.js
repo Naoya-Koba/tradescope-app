@@ -2,32 +2,78 @@
   'use strict';
   const node=typeof module!=='undefined'&&module.exports;
   const storage=node?require('./data-model-storage.js'):root.TradeScopeDataStorage;
+  const adoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
+  const save=node?require('./observation-override-save.js'):root.TradeScopeObservationOverrideSave;
   function render({document,adapter,accountId,targetMonth,displayName,accountKey='sbivc',color}){
     let models;try{models=storage.createRepository(adapter).read();}catch(_){
       const error=document.createElement('div');error.className='account-card';error.textContent='保存された資産・保有情報を確認できませんでした';return error;
     }
-    const input=models.monthlyAccountInputs?.records.find(i=>i.schemaVersion===3&&i.accountId===accountId&&i.targetMonth===targetMonth);
-    if(!input)return null;
-    const snapshot=models.accountSnapshots.records.find(s=>s.id===input.adoptedAccountSnapshotId);
-    const holdings=models.holdingSnapshots?.records.filter(h=>h.accountSnapshotId===snapshot.id)||[];
+    let view=adoption.resolve(models,accountId,targetMonth);if(!view)return null;
+    const service=save.createService(adapter);let editing=false,busy=false;
     const make=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el;};
     const amount=value=>{if(value==null)return'—';const [integer,fraction]=value.split('.');return integer.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction===undefined?'':'.'+fraction);};
-    const card=make('div','','account-card'),dl=make('dl','','observation-values');
+    const card=make('div','','account-card');
     const toggle=make('button','','account-toggle'),title=make('div','','account-title'),dot=make('div','','account-color-dot');
     const body=make('div','','account-body');
     toggle.type='button';toggle.dataset.accountToggle=accountKey;toggle.setAttribute('aria-expanded','false');
     body.id=`account-body-${accountKey}`;body.dataset.accountBody=accountKey;toggle.setAttribute('aria-controls',body.id);
     if(color)dot.style.backgroundColor=color;
     title.append(dot,make('span',displayName));toggle.append(title,make('span','▼','account-toggle-icon'));
-    body.append(make('p','資産・保有情報を保存済み','muted'));
-    for(const [label,value]of[['対象月',targetMonth.replace('-','/')],['基準日',snapshot.snapshotAsOf.replaceAll('-','/')],['JPY残高',amount(snapshot.cashBalance)+'円'],['帳票上の資産合計',amount(snapshot.assetValue)+'円']])dl.append(make('dt',label),make('dd',value));
-    body.append(dl);
-    const details=make('details',''),active=holdings.filter(h=>!/^0(?:\.0+)?$/.test(h.quantity));
-    details.append(make('summary',`現物保有（${active.length}銘柄）`));
-    for(const h of active){const instrument=models.instruments.records.find(i=>i.id===h.instrumentId),row=make('div','','observation-holding');
-      row.append(make('strong',instrument.displayName),make('p',`数量 ${amount(h.quantity)}`),make('p',`円換算額 ${amount(h.marketValue)}円`));details.append(row);}
-    details.addEventListener('toggle',()=>{if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;});
-    body.append(details);card.append(toggle,body);return card;
+    const resize=()=>{if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;};
+    const yen=value=>value===null?'—':amount(value)+'円';
+    function draw(){
+      body.replaceChildren();
+      body.append(make('p','資産・保有情報を保存済み','muted'));
+      const dl=make('dl','','observation-values');
+      for(const[label,value]of[['対象月',targetMonth.replace('-','/')],['基準日',view.snapshot.snapshotAsOf.replaceAll('-','/')]])dl.append(make('dt',label),make('dd',value));
+      const controls=[],actions=make('div','','monthly-account-actions'),error=make('p','','sbi-monthly-error');error.setAttribute('role','alert');error.hidden=true;
+      function editor(parent,label,value,identity){
+        const group=make('div','','form-group'),caption=make('label',label),input=make('input','');
+        input.type='text';input.inputMode='decimal';input.className='observation-edit-input';input.id=identity;input.value=value??'';input.placeholder='—';caption.htmlFor=input.id;
+        group.append(caption,input);parent.append(group);controls.push(input);return input;
+      }
+      const accountControls={};
+      body.append(dl);
+      for(const[field,label]of[['cashBalance','JPY残高'],['assetValue','帳票上の資産合計']]){
+        if(editing)accountControls[field]=editor(body,label,view.adopted[field],`observation-${accountKey}-${field}`);
+        else dl.append(make('dt',label),make('dd',yen(view.adopted[field])));
+      }
+      // Metadata stays read-only in either mode.
+      const details=make('details',''),active=editing?view.holdings:view.holdings.filter(h=>!/^0(?:\.0+)?$/.test(h.adopted.quantity));
+      details.append(make('summary',`現物保有（${active.length}銘柄）`));details.open=editing;
+      const holdingControls=[];
+      for(const h of active){
+        const instrument=models.instruments.records.find(i=>i.id===h.instrumentId),row=make('div','','observation-holding');row.append(make('strong',instrument.displayName));
+        if(editing){const values={};for(const[field,label]of[['quantity','数量'],['marketPrice','評価レート'],['marketValue','円換算額']])values[field]=editor(row,label,h.adopted[field],`observation-${h.holdingSnapshotId}-${field}`);
+          holdingControls.push({holdingSnapshotId:h.holdingSnapshotId,instrumentId:h.instrumentId,values});}
+        else row.append(make('p',`数量 ${amount(h.adopted.quantity)}`),make('p',`円換算額 ${yen(h.adopted.marketValue)}`));
+        details.append(row);
+      }
+      details.addEventListener('toggle',resize);body.append(details);
+      if(view.hasOverrides)body.append(make('p','手動補正あり','muted'));
+      if(!editing){
+        const edit=make('button','修正','monthly-source-reset');edit.type='button';edit.addEventListener('click',()=>{editing=true;draw();});actions.append(edit);
+      }else{
+        const reset=make('button','PDF値に戻す','monthly-source-reset'),cancel=make('button','キャンセル','monthly-source-reset'),submit=make('button','保存','btn btn-primary monthly-account-save');
+        for(const b of[reset,cancel,submit])b.type='button';
+        reset.addEventListener('click',()=>{if(busy)return;for(const f of adoption.accountFields)accountControls[f].value=view.source[f]??'';
+          for(const h of holdingControls){const original=view.holdings.find(r=>r.holdingSnapshotId===h.holdingSnapshotId);for(const f of adoption.holdingFields)h.values[f].value=original.source[f]??'';}error.hidden=true;resize();});
+        cancel.addEventListener('click',()=>{if(busy)return;editing=false;draw();});
+        submit.addEventListener('click',()=>{
+          if(busy)return;busy=true;for(const c of[...controls,reset,cancel,submit])c.disabled=true;
+          try{
+            const draft={accountId,targetMonth,account:Object.fromEntries(adoption.accountFields.map(f=>[f,accountControls[f].value])),
+              holdings:holdingControls.map(h=>({holdingSnapshotId:h.holdingSnapshotId,instrumentId:h.instrumentId,values:Object.fromEntries(adoption.holdingFields.map(f=>[f,h.values[f].value]))}))};
+            const result=service.save(draft,{expectedModels:models});
+            if(['saved','unchanged'].includes(result.status)){models=result.models;view=adoption.resolve(models,accountId,targetMonth);editing=false;draw();}
+          }catch(_){error.textContent='保存できませんでした。入力値と保存情報を確認してください';error.hidden=false;}
+          finally{busy=false;for(const c of[...controls,reset,cancel,submit])c.disabled=false;resize();}
+        });
+        actions.append(reset,cancel,submit);
+      }
+      body.append(actions,error);resize();
+    }
+    draw();card.append(toggle,body);return card;
   }
   const api=Object.freeze({render});if(node)module.exports=api;else root.TradeScopeObservationInputUI=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

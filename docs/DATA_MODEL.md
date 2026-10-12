@@ -1,6 +1,16 @@
 # Data Model
 
-## SBI VC資産観測保存（Current / Decided）
+## SBI VC観測採用の手動補正（Current / Decided）
+
+明示的な補正保存時のみMonthlyAccountInput record v4を使用し、旧v3は表示・再読込だけで更新しない。v4はv3の全fieldにobservationOverrides／overrideUpdatedAt／overrideHistoryを追加する。既存9キー・envelope v1・Snapshot／Holding schemaは維持し、Backup v11で正式受理する。新しいpartialキーやMonthlyAccountStateは作らない。
+
+observationOverridesはaccount（cashBalance／assetValueの疎な差分）とholdings配列を持つ。各holding差分はholdingSnapshotId＋instrumentId＋values（quantity／marketPrice／marketValue）で現在の採用Snapshotへ厳密に紐付ける。原値はimmutableなAccountSnapshot／HoldingSnapshotに一度だけ保存し、共通observation-adoption helperが原値＋active overrideを解決する。未知field・別source／別Instrument・配列順identity・重複参照を拒否する。
+
+GMOと同じdecimal比較で原値と同値のfieldは差分から外す。数値は非負decimal文字列、末尾精度を保持し、空欄はnull／不明、明示0は0。差分なしfieldは原値を採用する。補正・resetは非永続Draftであり「保存」でのみInputを一回のexpectedModels／journal保護commitにより更新する。overrideHistoryは旧adoptedAccountSnapshotId／observationOverrides／overrideUpdatedAtを追記し、原値は参照で復元できる。reset後も履歴を削除しない。
+
+訂正版PDFは旧sourceHistoryと補正履歴を保持し、新公式sourceを採用してactive overrideを空にする。旧sourceの補正を新sourceへ自動適用しない。保存前確認後に補正内容が変化した場合も再確認を要求する。same-hash照合は補正値ではなく原本値を検証しno-opを維持する。未保存の無関係な0銘柄は補正対象外。損益・原価・取引は生成せず、Top等へ接続しない。
+
+## SBI VC資産観測保存（Decided — 公開済みv3契約）
 
 既存9キーを維持し、MonthlyAccountInputに観測採用専用record v3を追加する。必須fieldはschemaVersion=3、id、accountId、targetMonth、adoptedAccountSnapshotId、adoptedAt、sourceHistory。履歴は旧adoptedAccountSnapshotId／adoptedAtのみ。損益入力・overrideを持たず、SBI input v1／Traders input v2へ未知値を補完しない。口座・月の一意性、参照先、provider policy、PDF Batch、officialMonthEnd・date-only月末日、JPYを検証する。今回はsbivc policyのみ有効。新しいpartial専用キーやMonthlyAccountStateは作らない。envelope v1、他record schemaは不変、Backup v10で正式に受理する。
 

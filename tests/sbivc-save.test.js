@@ -68,7 +68,7 @@ test('PII, PDF body, path/name, cashflow and reward do not persist',async()=>{co
 test('malformed source cannot write; invalid quantity/ticker/provider/month/zero-vs-null reject',async()=>{
  for(const mutate of [x=>x.preview.valid=false,x=>x.preview.report.provider='gmo',x=>x.preview.report.snapshotAsOf='2031-02-27',x=>x.preview.spotHoldings[0].quantity=null,x=>x.preview.spotHoldings[0].asset='PRIVATE NAME',x=>x.filename='private.pdf']){const s=new Memory(),before=s.snapshot(),a=source();mutate(a);await assert.rejects(()=>service(s).save(a));assert.equal(s.snapshot(),before);}
 });
-test('v10 export/empty restore/re-export exactly protects active and old sources',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b'),await svc.inspect(source('b')));const h=backup(s),payload=h.build();assert.equal(payload.backupVersion,10);const target=new Memory(),r=backup(target),p=r.format.inspectValue(payload);assert.equal(p.ok,true);r.restore.execute(p.restorePlan,target);assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(service(target).read('2031-02').holdings.length,3);});
+test('v10 export/empty restore/re-export exactly protects active and old sources',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b'),await svc.inspect(source('b')));const h=backup(s),payload=h.build();assert.equal(payload.backupVersion,11);const target=new Memory(),r=backup(target),p=r.format.inspectValue(payload);assert.equal(p.ok,true);r.restore.execute(p.restorePlan,target);assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(service(target).read('2031-02').holdings.length,3);});
 test('v9 rejects new observation-only Input, v10 accepts; fields are not silently stripped',async()=>{const s=await saved(),payload=backup(s).build();assert.throws(()=>model.validateBackupModels(9,payload.data.models));assert.equal(model.validateBackupModels(10,payload.data.models),true);});
 for(let version=1;version<=9;version++)test('old v'+version+' restore preserves published semantics',async()=>{const sourceStorage=new Memory(),h=backup(sourceStorage),payload=copy(h.build());payload.backupVersion=version;
  if(version===1)delete payload.data.models;else{const keys=model.backupModelEntities[version];payload.data.models=Object.fromEntries(keys.map(k=>[k,null]));}
@@ -82,6 +82,7 @@ class Element{
  constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.dataset={};this.style={};this.attributes={};this.events={};
   this.classList={contains:k=>this.className.split(' ').includes(k),add:k=>{if(!this.classList.contains(k))this.className+=' '+k;},remove:k=>{this.className=this.className.split(' ').filter(c=>c!==k).join(' ');},toggle:k=>{const open=!this.classList.contains(k);this.classList[open?'add':'remove'](k);return open;}};}
  append(...v){this.children.push(...v);}
+ replaceChildren(...v){this.children=[...v];}
  setAttribute(k,v){this.attributes[k]=v;}
  addEventListener(k,fn){this.events[k]=fn;}
 }
@@ -121,18 +122,21 @@ test('reload reads identical saved observation into a newly collapsed read-only 
  const reloaded=new Memory();for(const key of Object.values(model.keys)){const value=adapter.getItem(key);if(value!==null)reloaded.setItem(key,value);}
  const next=inputUI.render({document:{createElement:tag=>new Element(tag)},adapter:reloaded,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC'});
  assert.equal(next.children[0].attributes['aria-expanded'],'false');assert.equal(text(next.children[1]),text(card.children[1]));
- const tags=e=>[e.tagName,...e.children.flatMap(tags)];assert.ok(!tags(next.children[1]).some(t=>t==='input'||t==='button'));assert.equal(adapter.snapshot(),before);
+ const tags=e=>[e.tagName,...e.children.flatMap(tags)];assert.ok(!tags(next.children[1]).includes('input'));assert.match(text(next.children[1]),/修正/);assert.equal(adapter.snapshot(),before);
 });
 test('45-row saved source shows only relevant positive holdings inside the shared body',async()=>{
  const adapter=new Memory();await service(adapter).save(listedSource());const before=adapter.snapshot();
  const card=inputUI.render({document:{createElement:tag=>new Element(tag)},adapter,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC'});
  assert.match(text(card.children[1]),/現物保有（1銘柄）/);assert.doesNotMatch(text(card),/COIN2\/JPY|COIN45\/JPY/);assert.equal(adapter.snapshot(),before);
 });
-test('asset observations do not alter shared Top, allocation, Summary or trend amounts',async()=>{
+test('asset observations and manual overrides do not alter shared Top, allocation, Summary or trend amounts',async()=>{
  const s=new Memory(),context={window:{}};vm.runInNewContext(fs.readFileSync('assets/profit-metrics.js','utf8'),context);
  const display=require('../assets/monthly-display-view.js'),f=require('./monthly-display-fixture.js').fixture();
  const view=models=>display.create(context.window.TradeScopeProfitMetrics,f.tradingData,f.initialFunds,f.initialUnrealized,models,f.accounts);
  const before=view(f.models);await service(s).save(source('a',{period:'2026/09/01 ～ 2026/09/30',basis:'2026/09/30'}));
+ const manual=require('../assets/observation-override-save.js').createService(s),prepared=manual.inspect('acc_sbivc_crypto','2026-09');
+ manual.save({accountId:'acc_sbivc_crypto',targetMonth:'2026-09',account:{...prepared.adopted,assetValue:'9'},
+  holdings:prepared.holdings.map(h=>({holdingSnapshotId:h.holdingSnapshotId,instrumentId:h.instrumentId,values:h.adopted}))},{expectedModels:prepared.models});
  const added=model.readModels(s),merged=copy(f.models);for(const entity of Object.keys(model.keys))if(added[entity])merged[entity]={...added[entity],records:[...(merged[entity]?.records||[]),...added[entity].records]};
  const after=view(merged),amounts=d=>({month:d.month,net:d.net,confirmed:d.confirmed,netPnl:d.netPnl,accountData:d.accountData});
  assert.deepEqual(amounts(after.dashboard(2026)),amounts(before.dashboard(2026)));assert.deepEqual(after.month(2026,9),before.month(2026,9));
@@ -222,7 +226,7 @@ test('filtered Instrument creation rolls back atomically when holdings fail',asy
 });
 test('Backup v10 roundtrip preserves filtered positive and adopted explicit zero observations',async()=>{
  const s=new Memory(),svc=service(s);await svc.save(listedSource());const zero=listedSource('b','2031-03',false);await svc.save(zero);
- const payload=backup(s).build(),target=new Memory(),r=backup(target);assert.equal(payload.backupVersion,10);r.restore.execute(r.format.inspectValue(payload).restorePlan,target);
+ const payload=backup(s).build(),target=new Memory(),r=backup(target);assert.equal(payload.backupVersion,11);r.restore.execute(r.format.inspectValue(payload).restorePlan,target);
  assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(records(target,'instruments').length,1);assert.equal(records(target,'holdingSnapshots').length,2);
  assert.equal((await service(target).save(zero)).status,'already-imported');
 });

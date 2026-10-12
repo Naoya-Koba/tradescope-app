@@ -13,7 +13,8 @@
     7: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
     8: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
     9: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
-    10: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
+    10: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
+    11: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -165,10 +166,14 @@
   };
   function validateRecord(entity, record) {
     let definition = definitions[entity]; if (!definition) fail();
-    if(entity==='monthlyAccountInputs'&&record?.schemaVersion===3)definition={
+    if(entity==='monthlyAccountInputs'&&[3,4].includes(record?.schemaVersion))definition={
       required:['schemaVersion','id','accountId','targetMonth','adoptedAccountSnapshotId','adoptedAt','sourceHistory'],
-      types:{schemaVersion:v=>v===3,id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,adoptedAt:timestamp,
+      types:{schemaVersion:v=>[3,4].includes(v),id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,adoptedAt:timestamp,
         sourceHistory:v=>Array.isArray(v)&&v.every(r=>{fields(r,['adoptedAccountSnapshotId','adoptedAt'],['adoptedAccountSnapshotId','adoptedAt']);return id(r.adoptedAccountSnapshotId)&&timestamp(r.adoptedAt);})}};
+    if(entity==='monthlyAccountInputs'&&record?.schemaVersion===4)definition={
+      required:[...definition.required,'observationOverrides','overrideUpdatedAt','overrideHistory'],
+      types:{...definition.types,schemaVersion:v=>v===4,observationOverrides:observationOverrides,overrideUpdatedAt:timestamp,
+        overrideHistory:v=>Array.isArray(v)&&v.every(r=>{fields(r,['adoptedAccountSnapshotId','observationOverrides','overrideUpdatedAt'],['adoptedAccountSnapshotId','observationOverrides','overrideUpdatedAt']);return id(r.adoptedAccountSnapshotId)&&observationOverrides(r.observationOverrides)&&timestamp(r.overrideUpdatedAt);})}};
     if(entity==='monthlyAccountInputs'&&record?.schemaVersion===2)definition={
       required:['schemaVersion','id','accountId','targetMonth','adoptedAccountSnapshotId','sourceValues','adoptedValues','fieldSources','overrideFields','overrideUpdatedAt','sourceHistory','pdfObservations'],
       types:{schemaVersion:v=>v===2,id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,
@@ -314,7 +319,7 @@
     }
     const inputMonths = new Set();
     for (const input of records('monthlyAccountInputs')) {
-      if(input.schemaVersion===3){
+      if([3,4].includes(input.schemaVersion)){
         const pair=JSON.stringify([input.accountId,input.targetMonth]);if(inputMonths.has(pair))fail();inputMonths.add(pair);
         validateObservationInput(input, accounts, snapshots, batches, records('holdingSnapshots'), records('instruments'));
         if(records('monthlyAccountStates').some(r=>r.accountId===input.accountId&&r.targetMonth===input.targetMonth))fail();
@@ -370,9 +375,39 @@
   }
   // Observation-only adoption: no ledger inputs, invented P/L or broker-specific cashflow.
   const observationPolicies=Object.freeze({sbivc:Object.freeze({accountId:'acc_sbivc_crypto',accountType:'crypto',sourceScope:'sbivc-monthly-assets',importerId:'sbivc-monthly'})});
+  function observationOverrides(value){
+    fields(value,['account','holdings'],['account','holdings']);
+    fields(value.account,['cashBalance','assetValue']);
+    const values=v=>Object.values(v).every(x=>x===null||decimal(x)&&!x.startsWith('-'));
+    if(!values(value.account)||!Array.isArray(value.holdings))fail();
+    const ids=new Set();
+    for(const row of value.holdings){
+      fields(row,['holdingSnapshotId','instrumentId','values'],['holdingSnapshotId','instrumentId','values']);
+      fields(row.values,['quantity','marketPrice','marketValue']);
+      if(!id(row.holdingSnapshotId)||!id(row.instrumentId)||ids.has(row.holdingSnapshotId)||!Object.keys(row.values).length||!values(row.values))fail();
+      ids.add(row.holdingSnapshotId);
+    }
+    return true;
+  }
+  function validateObservationOverrides(value,snapshot,holdings){
+    if(!snapshot)fail();
+    for(const [field,adopted] of Object.entries(value.account))if(equalNullable(snapshot[field]??null,adopted))fail();
+    for(const row of value.holdings){
+      const source=holdings.find(h=>h.id===row.holdingSnapshotId&&h.accountSnapshotId===snapshot.id&&h.instrumentId===row.instrumentId);
+      if(!source||Object.entries(row.values).some(([field,adopted])=>equalNullable(source[field]??null,adopted)))fail();
+    }
+  }
   function validateObservationInput(input,accounts,snapshots,batches,holdings,instruments){
     const account=accounts.get(input.accountId),policy=observationPolicies[account?.providerCode];
     if(!policy||account.id!==policy.accountId||account.accountType!==policy.accountType)fail();
+    if(input.schemaVersion===4){
+      validateObservationOverrides(input.observationOverrides,snapshots.get(input.adoptedAccountSnapshotId),holdings);
+      const refs=new Set([...input.sourceHistory.map(r=>r.adoptedAccountSnapshotId),input.adoptedAccountSnapshotId]);
+      for(const revision of input.overrideHistory){
+        if(!refs.has(revision.adoptedAccountSnapshotId))fail();
+        validateObservationOverrides(revision.observationOverrides,snapshots.get(revision.adoptedAccountSnapshotId),holdings);
+      }
+    }
     for(const ref of [...input.sourceHistory,{adoptedAccountSnapshotId:input.adoptedAccountSnapshotId,adoptedAt:input.adoptedAt}]){
       const snapshot=snapshots.get(ref.adoptedAccountSnapshotId),batch=batches.get(snapshot?.importBatchId);
       if(!snapshot||snapshot.accountId!==input.accountId||snapshot.targetMonth!==input.targetMonth||snapshot.sourceScope!==policy.sourceScope
@@ -479,6 +514,7 @@
       ||(models?.monthlyAccountStates?.records||[]).some(record=>record.schemaVersion===4)))fail();
     if(version<8&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===2))fail();
     if(version<10&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===3))fail();
+    if(version<11&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===4))fail();
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -517,11 +553,19 @@
           || (item.id === record.id && (item.accountId !== record.accountId || item.targetMonth !== record.targetMonth))))) fail();
         if (entity === 'monthlyAccountInputs') for (const old of models[entity]?.records || []) {
           const next = value.records.find(item => item.id === old.id);
-          if(old.schemaVersion===3){
-            if(!next||next.schemaVersion!==3||JSON.stringify(next.sourceHistory.slice(0,old.sourceHistory.length))!==JSON.stringify(old.sourceHistory))fail();
+          if([3,4].includes(old.schemaVersion)){
+            if(!next||![3,4].includes(next.schemaVersion)||old.schemaVersion===4&&next.schemaVersion!==4||JSON.stringify(next.sourceHistory.slice(0,old.sourceHistory.length))!==JSON.stringify(old.sourceHistory))fail();
             const changed=next.adoptedAccountSnapshotId!==old.adoptedAccountSnapshotId;
             if(changed&&(next.sourceHistory.length!==old.sourceHistory.length+1||JSON.stringify(next.sourceHistory.at(-1))!==JSON.stringify({adoptedAccountSnapshotId:old.adoptedAccountSnapshotId,adoptedAt:old.adoptedAt})))fail();
             if(!changed&&(next.adoptedAt!==old.adoptedAt||next.sourceHistory.length!==old.sourceHistory.length))fail();
+            if(old.schemaVersion===4){
+              if(JSON.stringify(next.overrideHistory.slice(0,old.overrideHistory.length))!==JSON.stringify(old.overrideHistory))fail();
+              const edited=changed||JSON.stringify(next.observationOverrides)!==JSON.stringify(old.observationOverrides);
+              if(edited){const revision={adoptedAccountSnapshotId:old.adoptedAccountSnapshotId,observationOverrides:old.observationOverrides,overrideUpdatedAt:old.overrideUpdatedAt};
+                if(next.overrideHistory.length!==old.overrideHistory.length+1||JSON.stringify(next.overrideHistory.at(-1))!==JSON.stringify(revision))fail();
+              }else if(next.overrideHistory.length!==old.overrideHistory.length||next.overrideUpdatedAt!==old.overrideUpdatedAt)fail();
+              if(changed&&(Object.keys(next.observationOverrides.account).length||next.observationOverrides.holdings.length))fail();
+            }else if(next.schemaVersion===4&&next.overrideHistory.length)fail();
             continue;
           }
           if(old.schemaVersion===2){
@@ -559,6 +603,9 @@
               if (adoptionFields.some(field => !equalDecimal(original[field], next.sourceValues[field]))) fail();
             }
           }
+        }
+        if(['accountSnapshots','holdingSnapshots'].includes(entity))for(const old of models[entity]?.records||[]){
+          if(old.sourceScope==='sbivc-monthly-assets'&&JSON.stringify(value.records.find(r=>r.id===old.id))!==JSON.stringify(old))fail();
         }
         models[entity] = value;
       }

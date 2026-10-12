@@ -2234,3 +2234,4 @@ body.drawer-open {
 .observation-values dt { color: var(--muted); }
 .observation-values dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .observation-holding { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; font-size: 13px; }
+.observation-edit-input { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
