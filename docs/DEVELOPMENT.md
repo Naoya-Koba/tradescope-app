@@ -1,5 +1,13 @@
 # Development Guide
 
+## SBI VC月次PDF Preview（Current）
+
+`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDN・保存service接続を追加しない。PWA v288、追加／変更したPreview資産はquery 20261012-11。
+
+匿名fixturesで複数ticker、長いdecimal、明示0／欠損／該当なし、報酬対象月、入出庫、レバレッジ観測、PII除外、wrong provider、破損表、中止／closeを検証する。実PDFはローカルread-only Parser検証のみ。取引・建玉・貸出の非空表はunverifiedとして警告し、実行行Parser完成と報告しない。既存655件の回帰とPC1280／mobile390を確認する。Storage・月次計算・Backup・履歴・Riskは変更しない。
+
+**Planned**：安全な永続mapping、実売買行のsource validation、暗号資産partial projection。原PDF／全文／PIIの保存は行わない。
+
 ## Current — 共通取引source基盤
 
 **Current — GMO旧取込の明細補完**：`gmo-save.js`のinspectは非破壊。完全一致する一意Batch・明細0件・再解析／原観測照合成功時のみ`backfill-ready`を返し、UIの「取引明細を追加」確認後に同serviceが再検証する。通常取込と共通のInstrument依存補完・取引生成を使用し、必要Instrumentと全取引を一回のjournalで保存する。月／backfill専用の銘柄identityは作らない。既存月次正本・Top cacheは不変。partialな既存明細は停止、全件一致はno-op、別hashは既存訂正経路を維持する。匿名テストで選択／キャンセル非破壊、再取込、曖昧照合、失敗rollback、訂正原値維持、v9 roundtripを検証する。PWA v284、GMO save／preview queryは20261012-7。

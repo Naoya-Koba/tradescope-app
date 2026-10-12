@@ -1,5 +1,13 @@
 # Legacy, Experimental, and Known Issues
 
+## SBI VC月次PDF Preview
+
+**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をread-only Previewする。帳票資産合計を完全純資産にしない。共通原本Viewerを使い、Storage・Backup v9・legacy履歴・Risk・月次consumerへ接続しない。
+
+**Known limitation**：確認済み実PDFの売買・建玉・貸出表は該当なし。実行行は未検証、ヘッダーmappingと空／未検証状態を返す。月次canonical P/L、現物原価・実現／評価P/Lは生成不可。非空表・未知入出庫区分は短い警告で示す。実iPhone Safari／Home Screen PWAの今回のPreview操作は未確認。
+
+**Planned**：実取引行検証、安全な永続mapping、crypto partial projection。ZIP／CSV対応・永続archiveは今回追加しない。
+
 ## Current / Known issue — 共通取引source
 
 **Current / Known issue — 履歴の数量表示**：一覧をコンパクト化し、監査情報はタップ後の1件詳細へ移動する。明示数量単位と公式brokerルールが揃う場合だけ表示用Lotを計算する。GMO帳票の約定数は通貨数量とユーザー確認済み（2026-10-12、約定数×約定単価＝約定金額の整合）で、GMO PDF取引sourceの表示時だけLotへ換算する。既存数量やresolver／dedupe単位は変更しない。投信の単価当たり口数は推測せず、外貨を自動円換算しない。persistent schema／Backup v9／月次consumerは不変。

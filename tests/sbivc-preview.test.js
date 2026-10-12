@@ -1,0 +1,35 @@
+const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs');
+const { createUI } = require('../import/sbivc-preview.js'), parser = require('../import/sbivc-parser.js'), { fixture } = require('./sbivc-pdf-fixture.js');
+class Element {
+  constructor(tag = 'div') { this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.hidden = false; this.open = true; this.textContent = ''; }
+  append(...items) { this.children.push(...items); } replaceChildren(...items) { this.children = items; }
+  addEventListener(key, fn) { this.listeners[key] = fn; }
+}
+function setup(options = {}) {
+  const elements = {}, sources = new Map(), events = {}, document = { getElementById: id => elements[id] ||= new Element(), createElement: tag => new Element(tag) };
+  const ui = createUI({ document, window: { addEventListener: (key, fn) => events[key] = fn }, parser,
+    extract: options.extract || (async () => fixture(options)), viewer: () => ({ setSource: (key, file) => file ? sources.set(key, file) : sources.delete(key) }) });
+  return { ui, elements, sources, events, file: new Blob(['%PDF-1.7 synthetic']) };
+}
+function text(element) { return [element.textContent, ...element.children.map(text)].join(' '); }
+test('Preview renders compact observations/holdings; no save UI or monthly P/L', async () => {
+  const h = setup(); await h.ui.select(h.file); const t = text(h.elements['sbivc-summary']);
+  assert.match(t, /JPY残高/); assert.match(t, /帳票上の資産合計/); assert.doesNotMatch(t, /取得原価|実現損益|月次損益|評価損益|Account|Snapshot/);
+  assert.match(text(h.elements['sbivc-holdings']), /USDC/); assert.equal(h.sources.get('sbivc'), h.file);
+});
+test('display groups integer only and preserves every decimal digit', async () => { const h = setup(); await h.ui.select(h.file); const t = text(h.elements['sbivc-holdings']); assert.match(t, /0\.1234567890123456789/); assert.match(t, /321\.123456789円/); assert.doesNotMatch(t, /\.123,/); });
+test('Preview source belongs to shared Viewer and is released on close', async () => { const h = setup(); await h.ui.select(h.file); h.ui.clear(); assert.equal(h.sources.size, 0); assert.equal(h.elements['sbivc-preview'].hidden, true); assert.equal(h.elements['sbivc-holdings'].children.length, 0); });
+test('pagehide and provider close release source/read-only preview', async () => { const h = setup(); await h.ui.select(h.file); h.elements['sbivc-provider'].open = false; h.elements['sbivc-provider'].listeners.toggle(); assert.equal(h.sources.size, 0); await h.ui.select(h.file); h.events.pagehide(); assert.equal(h.sources.size, 0); });
+test('malformed engine error displays controlled code only', async () => { const h = setup({ extract: async () => { throw Object.assign(new Error('PRIVATE_PERSON FULL_TEXT'), { code: 'PDF_DOCUMENT_LOAD_FAILED' }); } }); await h.ui.select(h.file); assert.equal(h.sources.size, 0); assert.equal(h.elements['sbivc-read-status'].dataset.errorCode, 'PDF_DOCUMENT_LOAD_FAILED'); assert.doesNotMatch(text(h.elements['sbivc-issues']), /PRIVATE|FULL_TEXT/); });
+test('wrong provider gives no asset preview', async () => { const h = setup({ extract: async () => ({ pages: [] }) }); await h.ui.select(h.file); assert.equal(h.elements['sbivc-read-status'].dataset.errorCode, 'SBIVC_DOCUMENT_NOT_RECOGNIZED'); assert.equal(h.elements['sbivc-summary'].children.length, 0); });
+test('missing values prevent normal preview, no inferred zero', async () => { const f = fixture(); f.pages[0].items.find(i => i.text === '42.125').text = 'invalid'; const h = setup({ extract: async () => f }); await h.ui.select(h.file); assert.equal(h.elements['sbivc-summary'].children.length, 0); assert.ok(h.elements['sbivc-issues'].children.length); });
+test('replacement/cancel cannot revive stale preview', async () => { let finish; const h = setup({ extract: () => new Promise(resolve => { finish = resolve; }) }); const selection = h.ui.select(h.file); await new Promise(r => setImmediate(r)); h.ui.clear(); finish(fixture()); await selection; assert.equal(h.sources.size, 0); assert.equal(h.elements['sbivc-preview'].hidden, true); });
+test('zero balances folded but not discarded; missing rate is dash', async () => { const h = setup({ zero: true, blankRate: true }); await h.ui.select(h.file); assert.match(text(h.elements['sbivc-holdings']), /残高0の銘柄（3件）/); assert.match(text(h.elements['sbivc-holdings']), /—/); });
+test('synthetic HTML-shaped cashflow type is not echoed', async () => { const h = setup({ type: '<img src=x onerror=alert(1)>' }); await h.ui.select(h.file); assert.doesNotMatch(text(h.elements['sbivc-events']), /<img|onerror/); assert.equal(h.elements['sbivc-read-status'].dataset.stage, 'preview'); });
+test('scripts operate without storage API; SBI VC has PDF-only picker and no save action', async () => {
+  const storage = Object.freeze({ tradingData: '{"2031":{"2":{"__saved":false}}}', tradeScopeTopSummarySnapshotV1: 'anonymous-cache', tradeScopeAccountsV1: null });
+  const before = JSON.stringify(storage), h = setup(); await h.ui.select(h.file); h.ui.clear(); assert.equal(JSON.stringify(storage), before);
+  const html = fs.readFileSync('import.html', 'utf8'), slot = html.slice(html.indexOf('<details id="sbivc-provider"'), html.indexOf('  <dialog id="pdf-viewer-dialog"'));
+  assert.doesNotMatch(slot, /id="sbivc-save|保存|\.csv|\.zip/); assert.match(slot, /\.pdf,application\/pdf/);
+  assert.match(fs.readFileSync('import/pdf-viewer-ui.js', 'utf8'), /'minano', 'sbivc'/);
+});

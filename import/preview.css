@@ -70,6 +70,15 @@ body:has(dialog[open]) { overflow: hidden; }
 .calendar-swap .muted { overflow-wrap: anywhere; }
 dl > * { min-width: 0; overflow-wrap: anywhere; }
 [hidden] { display: none !important; }
+.sbivc-holding { min-width: 0; padding: 12px 0; border-bottom: 1px solid #ffffff12; }
+.sbivc-holding strong { overflow-wrap: anywhere; }
+.sbivc-holding dl { font-size: 13px; margin: 8px 0 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+#sbivc-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+#sbivc-preview details { margin-top: 12px; }
+@media (min-width: 700px) {
+  #sbivc-holdings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  #sbivc-holdings > details { grid-column: 1 / -1; }
+}
 @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .provider[open] .provider-content { animation: none; } .disclosure { transition: none; } }
 @media (max-width: 600px) {

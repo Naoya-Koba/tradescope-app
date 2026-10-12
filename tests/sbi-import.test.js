@@ -485,9 +485,7 @@ test('SBI-format UTF-8 fixtures preview with no noise and display search/actual 
 test('provider starts closed; open/close clears preview and remains reusable without persistence', async () => {
   const html = fs.readFileSync(path.join(root, 'import.html'), 'utf8');
   assert.match(html, /<details id="sbi-provider" class="provider">/);
-  for (const provider of ['SBI VC']) {
-    assert.match(html, new RegExp(`<button class="provider-pending" disabled><span(?: data-account-label="[a-z]+")?>${provider}</span>`));
-  }
+  assert.match(html, /<details id="sbivc-provider" class="provider">/);
   const h = harness();
   h.elements['sbi-provider'].open = true; await h.elements['sbi-provider'].fire('toggle');
   await h.upload('holdings', sbiHoldings); assert.equal(h.elements.preview.hidden, false);

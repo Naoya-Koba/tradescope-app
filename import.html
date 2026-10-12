@@ -8,11 +8,13 @@
   <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
-  <link rel="stylesheet" href="import/preview.css?v=20261012-1">
+  <link rel="stylesheet" href="import/preview.css?v=20261012-11">
   <link rel="stylesheet" href="import/pdf-viewer.css?v=20261012-10">
-  <script defer src="import/pdf-viewer-ui.js?v=20261012-10"></script>
+  <script defer src="import/pdf-viewer-ui.js?v=20261012-11"></script>
   <script defer src="assets/account-ui.js?v=20261011-1"></script>
   <script defer src="import/csv-core.js?v=20261005-1"></script>
+  <script defer src="import/sbivc-parser.js?v=20261012-11"></script>
+  <script defer src="import/sbivc-preview.js?v=20261012-11"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
   <script defer src="assets/storage-transaction.js?v=20261012-3"></script>
   <script defer src="assets/data-model-storage.js?v=20261012-4"></script>
@@ -121,7 +123,21 @@
           </section>
         </div>
       </details>
-      <button class="provider-pending" disabled><span data-account-label="sbivc">SBI VC</span><span class="muted">準備中</span></button>
+      <details id="sbivc-provider" class="provider">
+        <summary><span data-account-label="sbivc">SBI VC</span><span class="disclosure" aria-hidden="true">⌄</span></summary>
+        <div class="provider-content">
+          <div class="file-row"><h3>月次報告書PDF</h3><label class="file-button">ファイルを選択<input id="sbivc-file" type="file" accept=".pdf,application/pdf" aria-label="SBI VC月次PDFを選択"></label></div>
+          <button id="sbivc-view-pdf" type="button" class="help" hidden>PDF原本を確認</button>
+          <div class="save-actions"><p id="sbivc-read-status" class="muted" role="status" aria-live="polite"></p><button id="sbivc-cancel-read" class="secondary" hidden>中止</button></div>
+          <section id="sbivc-preview" hidden aria-label="SBI VC資産・保有情報">
+            <div class="preview-heading"><h2>確認</h2><button id="sbivc-close" class="secondary">閉じる</button></div>
+            <dl id="sbivc-summary"></dl>
+            <h3>現物暗号資産</h3><div id="sbivc-holdings"></div>
+            <div id="sbivc-leverage"></div><div id="sbivc-events"></div>
+            <div id="sbivc-issues" aria-live="polite"></div>
+          </section>
+        </div>
+      </details>
     </div>
   </main>
   <dialog id="pdf-viewer-dialog" aria-labelledby="pdf-viewer-title">

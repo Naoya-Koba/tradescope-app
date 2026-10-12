@@ -41,7 +41,7 @@
     if (source instanceof Blob) sources.set(key, source); else sources.delete(key);
     const button = document.getElementById(key + '-view-pdf'); if (button) button.hidden = !sources.has(key);
   }
-  for (const key of ['gmo', 'lightfx', 'minano']) document.getElementById(key + '-view-pdf').addEventListener('click', () => {
+  for (const key of ['gmo', 'lightfx', 'minano', 'sbivc']) document.getElementById(key + '-view-pdf')?.addEventListener('click', () => {
     const source = sources.get(key); if (source) void openPdfViewer({ source, key });
   });
   $('close').addEventListener('click', close);
@@ -59,6 +59,6 @@
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); void viewer?.showPage(viewer.getState().page + (event.key === 'ArrowLeft' ? -1 : 1)); }
   });
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); if ($('dialog').open) resizeTimer = setTimeout(() => void viewer?.resize(), 150); });
-  window.addEventListener('pagehide', () => { close(); sources.clear(); for (const key of ['gmo', 'lightfx', 'minano']) setSource(key, null); });
+  window.addEventListener('pagehide', () => { close(); sources.clear(); for (const key of ['gmo', 'lightfx', 'minano', 'sbivc']) setSource(key, null); });
   root.TradeScopePdfViewer = Object.freeze({ setSource, openPdfViewer, closePdfViewer: close });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

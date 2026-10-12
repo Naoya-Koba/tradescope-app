@@ -1,5 +1,15 @@
 # Data Model
 
+## SBI VC read-only parser result（Current / Decided）
+
+`import/sbivc-parser.js`の結果は永続modelではない。report（provider／reportType／periodStart／periodEnd／targetMonth／snapshotAsOf）、accountObservations、spotHoldings、leverageSummary、leveragePositions、transactions、cashflows、rewards、lending、sections、errors／warningsをメモリ上だけで扱う。完全な月初〜月末期間と正式基準日の一致を検証し、EOD基準日はdate-onlyで保持する。架空timestampを作らない。
+
+JPY残高とassetTotalObservation（帳票「総資産円換算額」）は区別し、後者をnetAssetValueにしない。現物の数量・評価レート・officialJPYValueはdecimal文字列で保持する。JPY評価表の明示tickerだけをCryptoの`ASSET/JPY`候補にし、USDC等を3文字へ切らず、baseAssetは一時候補属性で既存baseCurrencyへ保存しない。Instrument照合／作成・legacy ETH/JPYの変更はまだ行わない。
+
+現物とレバレッジは別collection。列の空欄はnull／missing、`-`等はnull／notApplicable、明示0は数値文字列、該当なしtableはemptyであり0イベントを生成しない。現物原価・実現／評価P/Lを推定しない。JPY入出金・暗号資産入出庫・報酬は分離し、暗号資産移動をJPY deposit／withdrawalへ変換しない。報酬はrecordedAtと明示された対象月を分離しswapにしない。自由な備考・PIIを出口へ含めない。
+
+**Known limitation**：売買／建玉／貸出の実行行は未検証。sectionsの列mapping・empty／unverified状態のみ返し、取引をFX open／closeへ変換しない。永続schema・Backup v9を変更せず、monthly partial modelやtransaction persistenceは別工程。
+
 ## Current / Decided — Transaction derived presentation
 
 FXは一覧・詳細とも「約定レート」と表示し、canonical InstrumentのquoteCurrency（未設定なら安全に識別できる通貨ペア）を単位とする。損益通貨からJPYを推測せず、原source価格の小数桁・末尾0を保持する。日時sourceが日付のみなら時刻を生成しない。表示のために保存値・並び順を変更しない。
@@ -535,7 +545,7 @@ ImportBatch {
 | みんなのFX | 月次PDF | 同上 |
 | SBI証券 国内株・投資信託 | 約定履歴CSV、保有証券一覧CSV | 取引事実と時点保有を別モデルへ保存 |
 | SBI証券 外国株 | 当面手入力 | 将来Importerを追加可能にする |
-| SBI VCトレード | 月次PDF | Parser仕様は実ファイル確認後に決定 |
+| SBI VCトレード | 月次PDF | 資産／保有のread-only Parser・Validation・Previewを実装。永続保存と月次P/Lは未接続 |
 | 入出金・資料にない不足値 | 手入力を維持 | 推測補完しない |
 
 **Decided**：手入力機能を削除しない。自動取込値と手入力値は出所を保持し、算出値は派生データとして区別する。
