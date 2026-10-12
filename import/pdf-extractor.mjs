@@ -1,4 +1,4 @@
-// Local, text-only extraction. Never accepts a remote URL, renders pages or persists source data.
+// Local PDF loading/extraction. Never accepts a remote URL or persists source data.
 import * as pdfjs from '../vendor/pdfjs-6.4.299/pdf.mjs';
 const assetRoot = new URL('../vendor/pdfjs-6.4.299/', import.meta.url);
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdf.worker.mjs', assetRoot).href;
@@ -25,16 +25,21 @@ const safeFailure = stage => Object.assign(new Error('PDFの読み取り処理�
   stage, code: ({ file: 'PDF_INVALID_FILE', worker: 'PDF_WORKER_INIT_FAILED',
     document: 'PDF_DOCUMENT_LOAD_FAILED', text: 'PDF_TEXT_EXTRACTION_FAILED' })[stage]
 });
-export function createExtractor(engine) {
- return async function extract(bytes, { signal, onProgress, onDiagnostic } = {}) {
+export function createDocumentLoader(engine) {
+ return async function loadDocument(bytes, { signal, onDiagnostic } = {}) {
   if (signal?.aborted) throw abort();
   if (!(bytes instanceof Uint8Array) || bytes.length > 20 * 1024 * 1024 || bytes.length < 8
     || !new TextDecoder('ascii').decode(bytes.subarray(0, 5)).startsWith('%PDF-')) throw safeFailure('file');
-  let task, worker, stage = 'worker', rejectAbort;
+  let task, worker, disposing, stage = 'worker', rejectAbort;
   const aborted = new Promise((_, reject) => { rejectAbort = reject; });
   const wait = promise => Promise.race([promise, aborted]);
   const diagnostic = (stage, code) => { onDiagnostic?.({ stage, code }); };
-  const cancel = () => { rejectAbort(abort()); if (task) void task.destroy().catch(() => {}); worker?.destroy(); };
+  // Keep the worker alive for the document destroy acknowledgement, and dispose once.
+  const dispose = () => disposing ||= (async () => {
+    if (task) await task.destroy().catch(() => {});
+    worker?.destroy();
+  })();
+  const cancel = () => { rejectAbort(abort()); void dispose(); };
   signal?.addEventListener('abort', cancel, { once: true });
   try {
     // PDF.js itself provides its official fake-worker fallback if local worker startup fails.
@@ -46,7 +51,38 @@ export function createExtractor(engine) {
       disableFontFace: true, useSystemFonts: false, cMapUrl: new URL('cmaps/', assetRoot).href, cMapPacked: true });
     const document = await wait(task.promise);
     diagnostic('document', 'PDF_DOCUMENT_READY');
-    if (document.numPages > 100) throw new Error('ページ数が多すぎます');
+    if (document.numPages > 100) throw new Error();
+    let closed = false;
+    const close = async () => {
+      if (closed) return;
+      closed = true; signal?.removeEventListener('abort', cancel);
+      await dispose();
+    };
+    return { document, close };
+  } catch (_) {
+    signal?.removeEventListener('abort', cancel);
+    await dispose();
+    if (signal?.aborted) throw abort();
+    throw safeFailure(stage);
+  }
+ };
+}
+export const loadDocument = createDocumentLoader(pdfjs);
+export function createExtractor(engine) {
+ const load = createDocumentLoader(engine);
+ return async function extract(bytes, { signal, onProgress, onDiagnostic } = {}) {
+  let session, stage = 'document';
+  // The loader owns worker/document cancellation; page operations race the same signal.
+  let rejectAbort;
+  const pageAbort = new Promise((_, reject) => { rejectAbort = reject; });
+  pageAbort.catch(() => {});
+  const cancel = () => rejectAbort(abort());
+  signal?.addEventListener('abort', cancel, { once: true });
+  const wait = promise => Promise.race([promise, pageAbort]);
+  try {
+    // Loader validates bytes and preserves its safe stage/code.
+    session = await load(bytes, { signal, onDiagnostic });
+    const document = session.document;
     const pages = []; let itemCount = 0;
     for (let number = 1; number <= document.numPages; number++) {
       if (signal?.aborted) throw abort();
@@ -66,16 +102,15 @@ export function createExtractor(engine) {
       onProgress?.(number, document.numPages);
     }
     if (signal?.aborted) throw abort();
-    diagnostic('text', 'PDF_TEXT_READY');
+    onDiagnostic?.({ stage: 'text', code: 'PDF_TEXT_READY' });
     return { pages, extractorVersion: version };
-  } catch (_) {
+  } catch (failure) {
     if (signal?.aborted) throw abort();
     // Library errors can contain source fragments/URLs. Do not expose them or log them.
-    throw safeFailure(stage);
+    throw session ? safeFailure(stage) : failure;
   } finally {
     signal?.removeEventListener('abort', cancel);
-    if (task) await task.destroy().catch(() => {});
-    worker?.destroy();
+    if (session) await session.close();
   }
  };
 }

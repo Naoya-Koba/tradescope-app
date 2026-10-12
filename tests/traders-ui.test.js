@@ -26,14 +26,27 @@ test('Input missing state/blank calendar does not create a complete state',async
 function preview(adapter=new MemoryStorage()){
  const ids=['provider','file','read-status','cancel-read','preview','close','summary','issues','swap-group','swap','save-status','save','dialog','confirm-summary','confirm-save','cancel-save'];
  const elements=Object.fromEntries(['lightfx','minano'].flatMap(b=>ids.map(id=>[`${b}-${id}`,new Element('div')])));
- const context=vm.createContext({window:{addEventListener(){}},document:{getElementById:id=>elements[id],createElement:t=>new Element(t)},TradeScopeTradersParser:parser,TradeScopeTradersSave:save,TradeScopeDataStorage:{...storage,localStorageAdapter:()=>adapter},localStorage:adapter,AbortController,Uint8Array,crypto,extractor:{extract:async()=>report(context.selected)}});
- const source=fs.readFileSync(require.resolve('../import/traders-preview.js'),'utf8').replace("await import('./pdf-extractor.mjs?v=20261012-1')","globalThis.extractor");vm.runInContext(source,context);
+ const viewerSources=new Map();
+ const context=vm.createContext({TradeScopePdfViewer:{setSource:(key,file)=>file?viewerSources.set(key,file):viewerSources.delete(key)},window:{addEventListener(){}},document:{getElementById:id=>elements[id],createElement:t=>new Element(t)},TradeScopeTradersParser:parser,TradeScopeTradersSave:save,TradeScopeDataStorage:{...storage,localStorageAdapter:()=>adapter},localStorage:adapter,AbortController,Uint8Array,crypto,extractor:{extract:async()=>report(context.selected)}});
+ const source=fs.readFileSync(require.resolve('../import/traders-preview.js'),'utf8').replace(/await import\('\.\/pdf-extractor\.mjs\?v=[^']+'\)/,'globalThis.extractor');vm.runInContext(source,context);
  const el=(id,b='lightfx')=>elements[`${b}-${id}`];
  async function upload(b='lightfx',product=b,bytes=[37,80,68,70,45,49,46,55]){context.selected=product;el('file',b).files=[{size:bytes.length,arrayBuffer:async()=>new Uint8Array(bytes).buffer}];await el('file',b).fire('change');}
  async function swap(v,b='lightfx'){el('swap',b).value=v;await el('swap',b).fire('input');await new Promise(resolve=>setImmediate(resolve));}
- return {adapter,el,upload,swap,context};
+ return {adapter,el,upload,swap,context,viewerSources};
 }
 test('PDF Preview only: blank swap permits partial save but display leaves Storage unchanged',async()=>{const h=preview();await h.upload();assert.equal(h.el('preview').hidden,false);assert.equal(h.el('save').hidden,false);assert.equal(h.adapter.writes,0);assert.equal(h.el('issues').children.length,0);});
+
+for(const broker of ['lightfx','minano'])test(`${broker} original File retention never fills missing swap or changes confirmation/Storage`,async()=>{
+ const h=preview(),before=h.adapter.snapshot();await h.upload(broker);const file=h.viewerSources.get(broker);assert.ok(file);assert.equal(h.el('swap',broker).value,'');
+ await h.el('save',broker).fire('click');assert.equal(h.el('dialog',broker).open,true);await h.el('cancel-save',broker).fire('click');
+ assert.equal(h.viewerSources.get(broker),file);assert.equal(h.el('swap',broker).value,'');assert.deepEqual(h.adapter.snapshot(),before);
+ await h.el('close',broker).fire('click');assert.equal(h.viewerSources.size,0);
+});
+test('Traders source references stay independent; wrong-broker Viewer does not enable import',async()=>{
+ const h=preview();await h.upload('lightfx');await h.upload('minano');assert.equal(h.viewerSources.size,2);
+ await h.el('close','lightfx').fire('click');assert.ok(h.viewerSources.get('minano'));
+ await h.upload('lightfx','minano');assert.ok(h.viewerSources.get('lightfx'));assert.equal(h.el('save','lightfx').hidden,true);assert.equal(h.adapter.writes,0);
+});
 test('Preview signed zero -> confirm -> verified save -> saved, exact reimport/reload no duplicate',async()=>{const h=preview();await h.upload();await h.swap('0');assert.equal(h.el('save').hidden,false);await h.el('save').fire('click');assert.equal(h.el('dialog').open,true);
  await Promise.all([h.el('confirm-save').fire('click'),h.el('confirm-save').fire('click')]);assert.equal(h.el('save-status').textContent,'保存済み');assert.equal(h.el('save').hidden,true);assert.equal(storage.readModels(h.adapter).importBatches.records.length,1);
  const n=preview(h.adapter),before=h.adapter.snapshot();await n.upload();assert.equal(n.el('save-status').textContent,'保存済み');assert.deepEqual(n.adapter.snapshot(),before);

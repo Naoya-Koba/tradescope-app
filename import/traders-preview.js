@@ -14,15 +14,15 @@
    for(const id of ['file','close','swap','confirm-save','cancel-save'])$(id).disabled=busy;
    $('swap').disabled=busy||['saved','already-imported'].includes(outcome?.status)||(correction&&outcome.calendarSwap!==null);
   }
-  function clear(){if(busy)return;token++;controller?.abort();controller=null;source=null;outcome=null;confirmation=null;if($('dialog').open)$('dialog').close();$('preview').hidden=true;$('summary').replaceChildren();$('issues').replaceChildren();$('file').value='';$('swap').value='';$('read-status').textContent='';$('cancel-read').hidden=true;delete $('read-status').dataset.stage;delete $('read-status').dataset.errorCode;renderSave();}
+  function clear(){if(busy)return;globalThis.TradeScopePdfViewer?.setSource(broker,null);token++;controller?.abort();controller=null;source=null;outcome=null;confirmation=null;if($('dialog').open)$('dialog').close();$('preview').hidden=true;$('summary').replaceChildren();$('issues').replaceChildren();$('file').value='';$('swap').value='';$('read-status').textContent='';$('cancel-read').hidden=true;delete $('read-status').dataset.stage;delete $('read-status').dataset.errorCode;renderSave();}
   async function inspect(){if(!source)return;source={...source,calendarSwap:$('swap').value};const selected=source;try{const next=await api().inspect(selected);if(source===selected){outcome=next;renderSave();}}catch(_){if(source===selected){outcome=null;$('issues').replaceChildren(node('p','入力値と保存データを確認してください','issue error'));renderSave();}}}
   $('swap').addEventListener('input',()=>{if(busy)return;confirmation=null;$('issues').replaceChildren();void inspect();});
   $('file').addEventListener('change',async event=>{
    const file=event.target.files[0];if(!file)return;clear();const current=token;controller=new AbortController();const signal=controller.signal;$('read-status').textContent='解析中…';$('cancel-read').hidden=false;let stage='file',code='PDF_FILE_READ_FAILED';
    try{if(file.size>20*1024*1024){code='PDF_INVALID_FILE';throw Error();}const bytes=new Uint8Array(await file.arrayBuffer());code='PDF_FILE_HASH_FAILED';const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
-    stage='engine';code='PDF_ENGINE_LOAD_FAILED';const extractor=await import('./pdf-extractor.mjs?v=20261012-1');stage='document';code='PDF_DOCUMENT_LOAD_FAILED';
+    stage='engine';code='PDF_ENGINE_LOAD_FAILED';const extractor=await import('./pdf-extractor.mjs?v=20261012-10');stage='document';code='PDF_DOCUMENT_LOAD_FAILED';
     const extracted=await extractor.extract(bytes,{signal,onProgress:(page,total)=>{if(token===current)$('read-status').textContent=`解析中… ${page}/${total}`;},onDiagnostic:d=>{if(token===current){$('read-status').dataset.stage=d.stage;$('read-status').dataset.errorCode=d.code;}}});
-    if(current!==token)return;stage='parser';code='TRADERS_PARSE_FAILED';const p=parser.parse(extracted,broker);$('preview').hidden=false;
+    if(current!==token)return;globalThis.TradeScopePdfViewer?.setSource(broker,file);stage='parser';code='TRADERS_PARSE_FAILED';const p=parser.parse(extracted,broker);$('preview').hidden=false;
     const metrics=[['対象月',p.targetMonth?.replace('-','/')??'—'],['月末日',p.snapshotAsOf?.replaceAll('-','/')??'—'],['決済損益',amount(p.values.realizedPnl)],['評価損益',amount(p.values.unrealizedPnl)],['入金',amount(p.values.deposit)],['出金',amount(p.values.withdrawal)],['預託証拠金残高',amount(p.values.cashBalance)],['純資産額',amount(p.values.netAssetValue)],['必要証拠金',amount(p.values.requiredMargin)]];
     for(const[label,value]of metrics)$('summary').append(node('dt',label),node('dd',value));
     for(const issue of p.errors){const product=issue==='TRADERS_WRONG_PRODUCT'?parser.products[p.broker]?.name:null;

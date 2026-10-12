@@ -742,6 +742,10 @@ TransactionAnnotation {
 
 ## 17. 移行原則
 
+**Current / Decided — PDF原本のセッション参照**：取込中のGMO／LIGHT FX／みんなのFXの選択Fileは画面内メモリだけで共有Viewerへ渡す。reload／pagehide後に復元しない。PDF binary、Blob、ArrayBuffer、base64、object URLをStorage／Backupへ追加しない。ImportBatchや永続schemaは変更せず、完全Backup v9を維持する。共通extractorの`pages.number`、保存された`sourcePage`、Viewerの`initialPage`はPDF.jsの物理ページ番号（1始まり）であり、帳票内の印字ページ番号とは別である。
+
+**Under consideration**：永続PDF archiveとTransaction Historyから原本ページへの移動は別仕様・別工程。現時点で履歴から開ける原本参照は追加しない。
+
 - 旧キーを即時削除しない。
 - 新形式を導入する場合は旧形式読込→正規化→新形式利用を可能にする。
 - 移行前のデータを退避する。

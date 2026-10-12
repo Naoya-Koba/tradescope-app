@@ -121,3 +121,11 @@ test('worker-init cancellation destroys worker and never starts document process
   const pending=e.createExtractor(engine)(samplePdf(),{signal:c.signal});c.abort();
   await assert.rejects(pending,{name:'AbortError'});assert.ok(destroyed>=1);assert.equal(started,0);
 });
+test('document abort and repeated close share one teardown; worker outlives destroy acknowledgement', async () => {
+ const e=await extractor(),c=new AbortController();let acknowledge,taskDestroyed=0,workerDestroyed=0;
+ const engine={PDFWorker:class {constructor(){this.promise=Promise.resolve();}destroy(){workerDestroyed++;}},
+  getDocument:()=>({promise:Promise.resolve({numPages:39}),destroy:()=>{taskDestroyed++;return new Promise(resolve=>{acknowledge=resolve;});}})};
+ const session=await e.createDocumentLoader(engine)(samplePdf(),{signal:c.signal});c.abort();const close=session.close();
+ assert.equal(taskDestroyed,1);assert.equal(workerDestroyed,0);acknowledge();await close;await session.close();
+ assert.equal(taskDestroyed,1);assert.equal(workerDestroyed,1);
+});

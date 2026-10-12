@@ -177,6 +177,10 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 ## 4. 判断不能事項
 
+**Current / PDF原本確認**：GMO／LIGHT FX／みんなのFXで共通のセッション内Viewerを使用する。原本は永続化せず、Backup v9・月次計算・Transaction Historyは変更しない。現在ページだけ描画し、終了時はdocumentの解放完了後にworkerを止める。匿名localhostのPC1280／mobile390と実PDFのローカルread-only描画を確認する。実iPhone Safari／Home Screen PWAでの原本Viewer操作・メモリ負荷は未確認。
+
+**Under consideration**：PDF永続archive、履歴からの原本ページnavigation、検索／text selection／thumbnail。現時点ではreload後の原本復元や履歴の原本リンクは提供しない。
+
 - 利用中の正確なSafari / WebKitバージョン
 - iPhoneのホーム画面Web Appと通常Safariにおける、現在の実データの保存先・分離状況
 - `tradeInfo`に過去データが残っているか

@@ -9,6 +9,8 @@
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
   <link rel="stylesheet" href="import/preview.css?v=20261012-1">
+  <link rel="stylesheet" href="import/pdf-viewer.css?v=20261012-10">
+  <script defer src="import/pdf-viewer-ui.js?v=20261012-10"></script>
   <script defer src="assets/account-ui.js?v=20261011-1"></script>
   <script defer src="import/csv-core.js?v=20261005-1"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
@@ -22,10 +24,10 @@
   <script defer src="import/gmo-parser.js?v=20261012-4"></script>
   <script defer src="assets/monthly-account-resolver.js?v=20261012-1"></script>
   <script defer src="import/gmo-save.js?v=20261012-7"></script>
-  <script defer src="import/gmo-preview.js?v=20261012-7"></script>
+  <script defer src="import/gmo-preview.js?v=20261012-10"></script>
   <script defer src="import/traders-parser.js?v=20261012-1"></script>
   <script defer src="import/traders-save.js?v=20261012-2"></script>
-  <script defer src="import/traders-preview.js?v=20261012-2"></script>
+  <script defer src="import/traders-preview.js?v=20261012-10"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
@@ -81,6 +83,7 @@
             <h3>月次取引残高報告書PDF</h3>
             <label class="file-button">ファイルを選択<input id="gmo-file" type="file" accept=".pdf,application/pdf" aria-label="GMO月次PDFを選択"></label>
           </div>
+          <button id="gmo-view-pdf" type="button" class="help" hidden>PDF原本を確認</button>
           <div class="save-actions"><p id="gmo-read-status" class="muted" role="status" aria-live="polite"></p><button id="gmo-cancel-read" class="secondary" hidden>中止</button></div>
           <section id="gmo-preview" hidden aria-label="GMO月次データ">
             <div class="preview-heading"><h2>確認</h2><button id="gmo-close" class="secondary">閉じる</button></div>
@@ -94,6 +97,7 @@
         <summary>LIGHT FX<span class="disclosure" aria-hidden="true">⌄</span></summary>
         <div class="provider-content">
           <div class="file-row"><h3>月次取引報告書PDF</h3><label class="file-button">ファイルを選択<input id="lightfx-file" type="file" accept=".pdf,application/pdf" aria-label="LIGHT FX月次PDFを選択"></label></div>
+          <button id="lightfx-view-pdf" type="button" class="help" hidden>PDF原本を確認</button>
           <div class="save-actions"><p id="lightfx-read-status" class="muted" role="status" aria-live="polite"></p><button id="lightfx-cancel-read" class="secondary" hidden>中止</button></div>
           <section id="lightfx-preview" hidden aria-label="LIGHT FX月次データ">
             <div class="preview-heading"><h2>確認</h2><button id="lightfx-close" class="secondary">閉じる</button></div>
@@ -107,6 +111,7 @@
         <summary>みんなのFX<span class="disclosure" aria-hidden="true">⌄</span></summary>
         <div class="provider-content">
           <div class="file-row"><h3>月次取引報告書PDF</h3><label class="file-button">ファイルを選択<input id="minano-file" type="file" accept=".pdf,application/pdf" aria-label="みんなのFX月次PDFを選択"></label></div>
+          <button id="minano-view-pdf" type="button" class="help" hidden>PDF原本を確認</button>
           <div class="save-actions"><p id="minano-read-status" class="muted" role="status" aria-live="polite"></p><button id="minano-cancel-read" class="secondary" hidden>中止</button></div>
           <section id="minano-preview" hidden aria-label="みんなのFX月次データ">
             <div class="preview-heading"><h2>確認</h2><button id="minano-close" class="secondary">閉じる</button></div>
@@ -119,6 +124,17 @@
       <button class="provider-pending" disabled><span data-account-label="sbivc">SBI VC</span><span class="muted">準備中</span></button>
     </div>
   </main>
+  <dialog id="pdf-viewer-dialog" aria-labelledby="pdf-viewer-title">
+    <div class="pdf-viewer-shell">
+      <div class="pdf-viewer-header"><h2 id="pdf-viewer-title">PDF原本</h2><button id="pdf-viewer-close" type="button" class="secondary" autofocus>閉じる</button></div>
+      <div class="pdf-viewer-controls">
+        <div class="pdf-viewer-navigation"><button id="pdf-viewer-previous" type="button" class="secondary" aria-label="前のページ">‹</button><input id="pdf-viewer-page" type="number" min="1" step="1" inputmode="numeric" aria-label="ページ番号"><span id="pdf-viewer-total">/ —</span><button id="pdf-viewer-next" type="button" class="secondary" aria-label="次のページ">›</button></div>
+        <div class="pdf-viewer-zoom"><button id="pdf-viewer-zoom-out" type="button" class="secondary" aria-label="縮小">−</button><span id="pdf-viewer-zoom">100%</span><button id="pdf-viewer-zoom-in" type="button" class="secondary" aria-label="拡大">＋</button></div>
+      </div>
+      <p id="pdf-viewer-status" role="status" aria-live="polite"></p>
+      <div id="pdf-viewer-pages" aria-label="PDFページ"></div>
+    </div>
+  </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title">
     <h2 id="help-title"></h2>
     <ol id="help-steps"></ol>

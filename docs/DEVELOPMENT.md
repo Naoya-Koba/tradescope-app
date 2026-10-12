@@ -44,7 +44,7 @@ PDFの読み取り検証とlocalhost／匿名操作を用い、実PDFはparser-o
 
 共通extractorの位置付きtext itemsをGMO固有parserで読む。ページ番号に依存せず帳票・見出し・ヘッダー位置を確認する。parserの出口は金融値と対象月・月末日だけのallowlistであり、入出金明細末尾の日付／両替レートなしの区分別小計は明細との検算に使い、二重加算しない。実PDFはローカル読み取り検証だけに使用し、テストは架空の金額と構造で実施する。GMO保存は専用serviceで明示確認後に行う。
 
-**Current / 共通PDF基盤**：PDF.js 6.4.299 legacyのmain／local workerと実帳票で必要だった日本語CMap二つを固定vendorし、公式SHA-256を照合した。LICENSEを保持する。`import/pdf-extractor.mjs`はページ番号・文字列・位置だけを一時メモリへ返し、broker解釈・描画・保存・外部送信をしない。20MB／100ページ／150000 item上限と中止・worker cleanupを持つ。CSPは同一origin静的資産とworkerのみ許可し、unsafe-eval／CDN／WASMを使わない。オフラインnavigationは要求されたキャッシュ済みページを先に返す。実iPhone未確認。
+**Current / 共通PDF基盤**：PDF.js 6.4.299 legacyのmain／local workerと実帳票で必要だった日本語CMap三つを固定vendorし、公式SHA-256を照合した。LICENSEを保持する。`import/pdf-extractor.mjs`の共通document loaderを抽出と原本Viewerで共有し、同一worker／CMap設定を使用する。抽出はページ番号・文字列・位置だけを一時メモリへ返し、broker解釈・描画・保存・外部送信をしない。20MB／100ページ／150000 item上限と中止・worker cleanupを持つ。CSPは同一origin静的資産とworkerのみ許可し、unsafe-eval／CDN／WASMを使わない。オフラインnavigationは要求されたキャッシュ済みページを先に返す。実iPhone未確認。
 
 **Current / Safari互換修正**：`getTextContent()`内部のStream非同期反復を使わず、同じ公開`streamTextContent()`を`getReader().read()`で読み取る（[PDF.js公式issue #20973](https://github.com/mozilla/pdf.js/issues/20973)）。通常のmodule workerとPDF.js公式fake-worker fallbackは維持し、UA分岐・global polyfill・vendor改変を行わない。worker readiness・document load・text extractionを分離し、中止／終了時にreader・page・task・workerを解放する。
 
@@ -292,6 +292,12 @@ fixtureは匿名の最小データを新規作成し、実ユーザーデータ�
 外部APIが失敗した場合、取得失敗を明示し、金融数値のダミー値へ置き換えない。
 
 ## 12. PWA
+
+**Current / PDF原本Viewer**：PWA v287。`pdf-viewer.mjs`／`pdf-viewer-ui.js`／`pdf-viewer.css`、共通extractor、GMO／Traders Previewはquery `20261012-10`でHTML・dynamic import・precacheを同期する。PDF.js main／worker／CMapは既存の固定資産を再利用し、依存・CSPを追加しない。
+
+**Current / Viewer lifecycle**：選択Fileの参照を画面内メモリだけに保持する。workerへ転送済みの抽出bufferを再利用せず、原本を開く時だけFileから読み直す。現在ページのcanvasだけを描画し、ページ移動／閉じる時にcancel・sequence guard・page cleanup・canvas寸法0化を行う。document destroyの完了を待ってworkerを解放し、abortとcloseが同じ一回の終了処理を共有する。DPR上限2、canvas上限4百万pixel／各辺4096。100%は幅合わせ、拡大は200%まで。閉じる／ESCで背面scrollとfocusを戻す。ページ番号はEnterまたはchangeで確定する。失敗は固定codeと短い文言だけを表示し、元例外・本文を出さない。
+
+**Decided / 検証境界**：原本確認のブラウザ検証は匿名localhostを使用し、実PDFはローカルread-only確認だけに使う。実PDFの画面・本文・金融値を証跡へ残さず保存操作をしない。iPhone実機確認とPCの390px表示確認は区別する。
 
 - precache対象は存在確認する。
 - HTMLが実際に参照する資産とService Worker一覧を同期する。

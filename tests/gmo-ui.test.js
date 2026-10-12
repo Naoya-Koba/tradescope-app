@@ -14,13 +14,14 @@ class Element {
 }
 function harness(storage=new MemoryStorage(),extracted=report(),overrides={}) {
   const elements={},document={getElementById:id=>elements[id] ||= new Element(),createElement:()=>new Element()};
-  let saves=0;
+  let saves=0; const viewerSources=new Map();
   const context={document,localStorage:storage,crypto,Uint8Array,AbortController,TradeScopeDataStorage:model,TradeScopeGMOParser:parser,
+    TradeScopePdfViewer:{setSource:(key,file)=>file?viewerSources.set(key,file):viewerSources.delete(key)},
     fakeExtractor:{extract:async()=>extracted},TradeScopeGMOSave:{createService:adapter=>{const s=engine.createService(adapter);return{inspect:s.inspect,save:async(...args)=>{saves++;return s.save(...args);}}}}};
   Object.defineProperties(context,Object.getOwnPropertyDescriptors(overrides));
   const code=fs.readFileSync(require.resolve('../import/gmo-preview.js'),'utf8').replace(/await import\('\.\/pdf-extractor\.mjs\?v=[^']+'\)/,'fakeExtractor');
   vm.runInNewContext(code,context);
-  return {elements,storage,saves:()=>saves,upload:async(char='a',fileOverride={})=>{
+  return {elements,storage,viewerSources,saves:()=>saves,upload:async(char='a',fileOverride={})=>{
     const bytes=Buffer.from('%PDF-1.7 anonymous '+char);await elements['gmo-file'].fire('change',{target:{files:[{size:bytes.length,arrayBuffer:async()=>new Uint8Array(bytes).buffer,...fileOverride}]}});
   }};
 }
@@ -29,6 +30,16 @@ test('GMO Preview, cancellation and close are read-only; errors do not expose sa
   await h.elements['gmo-save'].fire('click');assert.equal(h.elements['gmo-save-dialog'].open,true);
   await h.elements['gmo-cancel-save'].fire('click');assert.deepEqual(h.storage.snapshot(),before);
   await h.elements['gmo-close'].fire('click');assert.equal(h.elements['gmo-preview'].hidden,true);assert.deepEqual(h.storage.snapshot(),before);
+});
+
+test('GMO Viewer retains current File through save confirmation/cancel and releases on Preview close',async()=>{
+  const h=harness(),before=h.storage.snapshot();await h.upload();const file=h.viewerSources.get('gmo');assert.ok(file);
+  await h.elements['gmo-save'].fire('click');await h.elements['gmo-cancel-save'].fire('click');assert.equal(h.viewerSources.get('gmo'),file);
+  assert.deepEqual(h.storage.snapshot(),before);await h.elements['gmo-close'].fire('click');assert.equal(h.viewerSources.size,0);
+});
+test('GMO wrong-report remains rejected although successfully decoded original is viewable',async()=>{
+  const document=report();document.pages[0].items[0].text='別帳票';const h=harness(new MemoryStorage(),document);await h.upload();
+  assert.ok(h.viewerSources.get('gmo'));assert.equal(h.elements['gmo-save'].hidden,true);assert.equal(h.saves(),0);assert.deepEqual(h.storage.snapshot(),{});
 });
 test('unsupported report displays a concrete error, no save action, no source/PII text', async()=>{
   const document=report();document.pages[0].items[0].text='匿名の別帳票';
