@@ -12,7 +12,8 @@
     6: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
     7: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
     8: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
-    9: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
+    9: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
+    10: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -164,6 +165,10 @@
   };
   function validateRecord(entity, record) {
     let definition = definitions[entity]; if (!definition) fail();
+    if(entity==='monthlyAccountInputs'&&record?.schemaVersion===3)definition={
+      required:['schemaVersion','id','accountId','targetMonth','adoptedAccountSnapshotId','adoptedAt','sourceHistory'],
+      types:{schemaVersion:v=>v===3,id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,adoptedAt:timestamp,
+        sourceHistory:v=>Array.isArray(v)&&v.every(r=>{fields(r,['adoptedAccountSnapshotId','adoptedAt'],['adoptedAccountSnapshotId','adoptedAt']);return id(r.adoptedAccountSnapshotId)&&timestamp(r.adoptedAt);})}};
     if(entity==='monthlyAccountInputs'&&record?.schemaVersion===2)definition={
       required:['schemaVersion','id','accountId','targetMonth','adoptedAccountSnapshotId','sourceValues','adoptedValues','fieldSources','overrideFields','overrideUpdatedAt','sourceHistory','pdfObservations'],
       types:{schemaVersion:v=>v===2,id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,
@@ -309,6 +314,12 @@
     }
     const inputMonths = new Set();
     for (const input of records('monthlyAccountInputs')) {
+      if(input.schemaVersion===3){
+        const pair=JSON.stringify([input.accountId,input.targetMonth]);if(inputMonths.has(pair))fail();inputMonths.add(pair);
+        validateObservationInput(input, accounts, snapshots, batches, records('holdingSnapshots'), records('instruments'));
+        if(records('monthlyAccountStates').some(r=>r.accountId===input.accountId&&r.targetMonth===input.targetMonth))fail();
+        continue;
+      }
       if(input.schemaVersion===2){
         const pair=JSON.stringify([input.accountId,input.targetMonth]);if(inputMonths.has(pair))fail();inputMonths.add(pair);
         const account=accounts.get(input.accountId),snapshot=snapshots.get(input.adoptedAccountSnapshotId);
@@ -356,6 +367,31 @@
     fields(value, ['marketValue', 'unrealizedPnl'], ['marketValue', 'unrealizedPnl']);
     if (!decimal(value.marketValue) || !decimal(value.unrealizedPnl)) fail();
     return true;
+  }
+  // Observation-only adoption: no ledger inputs, invented P/L or broker-specific cashflow.
+  const observationPolicies=Object.freeze({sbivc:Object.freeze({accountId:'acc_sbivc_crypto',accountType:'crypto',sourceScope:'sbivc-monthly-assets',importerId:'sbivc-monthly'})});
+  function validateObservationInput(input,accounts,snapshots,batches,holdings,instruments){
+    const account=accounts.get(input.accountId),policy=observationPolicies[account?.providerCode];
+    if(!policy||account.id!==policy.accountId||account.accountType!==policy.accountType)fail();
+    for(const ref of [...input.sourceHistory,{adoptedAccountSnapshotId:input.adoptedAccountSnapshotId,adoptedAt:input.adoptedAt}]){
+      const snapshot=snapshots.get(ref.adoptedAccountSnapshotId),batch=batches.get(snapshot?.importBatchId);
+      if(!snapshot||snapshot.accountId!==input.accountId||snapshot.targetMonth!==input.targetMonth||snapshot.sourceScope!==policy.sourceScope
+        ||snapshot.sourceMode!=='imported'||snapshot.observationType!=='officialMonthEnd'||snapshot.valuationCurrency!=='JPY'
+        ||snapshot.schemaVersion!==1||!decimal(snapshot.cashBalance)||!decimal(snapshot.assetValue)||snapshot.cashBalance.startsWith('-')||snapshot.assetValue.startsWith('-')
+        ||snapshot.netAssetValue!=null||snapshot.unrealizedPnl!=null||snapshot.reportedMonthlyRealizedPnl!=null||snapshot.accountSpecific!=null
+        ||batch?.sourceType!=='pdf'||batch.sourceProvider!==account.providerCode||batch.importerId!==policy.importerId
+        ||!batch.importerVersion||!batch.sourceFileMetadata?.hash)fail();
+      const end=new Date(Date.UTC(+input.targetMonth.slice(0,4),+input.targetMonth.slice(5),0)).toISOString().slice(0,10);
+      if(snapshot.snapshotAsOf!==end)fail();
+      const seen=new Set();
+      for(const row of holdings.filter(h=>h.accountSnapshotId===snapshot.id)){
+        const instrument=instruments.find(i=>i.id===row.instrumentId);
+        if(row.schemaVersion!==1||instrument?.assetType!=='Crypto'||!/^[A-Z][A-Z0-9]{1,19}\/JPY$/.test(instrument.symbol)||instrument.quoteCurrency!=null&&instrument.quoteCurrency!=='JPY'
+          ||seen.has(row.instrumentId)||row.currency!=='JPY'||!decimal(row.quantity)||!decimal(row.marketValue)||row.quantity.startsWith('-')||row.marketValue.startsWith('-')
+          ||row.acquisitionPrice!=null||row.unrealizedPnl!=null||row.rawFields!=null||row.marketPrice!=null&&(!decimal(row.marketPrice)||row.marketPrice.startsWith('-')))fail();
+        seen.add(row.instrumentId);
+      }
+    }
   }
   function equalNullable(a,b){return a===null||b===null?a===b:decimal(a)&&decimal(b)&&equalDecimal(a,b);}
   function partialValues(value){fields(value,adoptionFields,adoptionFields);return adoptionFields.every(f=>f==='swapPnl'&&value[f]===null||decimal(value[f])&&(f!=='swapPnl'||/^-?(?:0|[1-9]\d*)$/.test(value[f])));}
@@ -442,6 +478,7 @@
     if(version<7&&(['accountSnapshots','holdingSnapshots'].some(entity=>(models?.[entity]?.records||[]).some(record=>record.schemaVersion===2))
       ||(models?.monthlyAccountStates?.records||[]).some(record=>record.schemaVersion===4)))fail();
     if(version<8&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===2))fail();
+    if(version<10&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===3))fail();
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -480,6 +517,13 @@
           || (item.id === record.id && (item.accountId !== record.accountId || item.targetMonth !== record.targetMonth))))) fail();
         if (entity === 'monthlyAccountInputs') for (const old of models[entity]?.records || []) {
           const next = value.records.find(item => item.id === old.id);
+          if(old.schemaVersion===3){
+            if(!next||next.schemaVersion!==3||JSON.stringify(next.sourceHistory.slice(0,old.sourceHistory.length))!==JSON.stringify(old.sourceHistory))fail();
+            const changed=next.adoptedAccountSnapshotId!==old.adoptedAccountSnapshotId;
+            if(changed&&(next.sourceHistory.length!==old.sourceHistory.length+1||JSON.stringify(next.sourceHistory.at(-1))!==JSON.stringify({adoptedAccountSnapshotId:old.adoptedAccountSnapshotId,adoptedAt:old.adoptedAt})))fail();
+            if(!changed&&(next.adoptedAt!==old.adoptedAt||next.sourceHistory.length!==old.sourceHistory.length))fail();
+            continue;
+          }
           if(old.schemaVersion===2){
             if(!next||next.schemaVersion!==2||JSON.stringify(next.sourceHistory.slice(0,old.sourceHistory.length))!==JSON.stringify(old.sourceHistory))fail();
             if(old.sourceValues.swapPnl!==null&&!equalNullable(old.sourceValues.swapPnl,next.sourceValues.swapPnl))fail();

@@ -1,14 +1,22 @@
 # Backup and Restore Specification
 
-## Current / Decided — Backup v9
+## Current / Decided — Backup v10
+
+最新exportはv10。9モデル／既存キー／envelope v1は維持し、MonthlyAccountInput record v3（資産観測の明示採用参照・訂正履歴）を正式追加する。v9以下は公開済み旧record範囲に固定して新Inputを拒否する。新fieldを削って旧version exportしない。v10は旧全recordも受理し、未保存null collection・明示0・欠損nullを保持する。
+
+Restore：v1／Legacyは従来対象のみで新9キーを維持。v2〜v8は従来の置換／未収録key clear規則を維持。v9は旧9モデルを置換、v10は新Inputを含む9モデルを置換する。nullはキー不在。旧BackupのRestoreは明示置換であり新観測Inputを自動維持・合成しない。tradeInfo保護、事前Validation、共通journal、全キー再読込、rollback、不能時journal保持、派生cache無効化は不変。自動Migrationなし。
+
+SBI VCのAccount・必要Instrument・Batch・AccountSnapshot・全現物Holding・Input採用参照は一回のRepository commitで保護する。訂正前sourceもBackupへ含む。PDF binary／本文／filename／絶対パス／PIIを含めない。月次損益State、報酬・cashflow・取引を生成しない。
+
+## Decided — 公開済みBackup v9契約
 
 **Current**：旧GMO Batchの明細0件時の明示補完もv9の既存record契約で保護する。必要なFX InstrumentとImportedTransactionsだけを同一Repository journalへ書き、全キー再読込検証後に成功、途中失敗は両方を元の生文字列／キー不在へrollbackする。Batchと月次正本は変更せず、取引`importedAt`は既存Batchの原取込日時、envelope `updatedAt`は補完日時。Backup schema／Restore semantics／versionは変更しない。
 
-最新exportはv9。新しいImportedTransactionsを含む9モデルを保護するためv8契約を固定する。v9だけが新collectionを受理し、v1は9モデル維持、v2〜v8は各公開済み旧範囲を復元する際に未収録ImportedTransactionsを同じjournalでクリアする（事前確認へ表示）。旧Batch／Account置換後に参照切れsourceを残さないためである。v9は9モデル完全復元。legacy部分復元は新モデルを維持。null＝キー不在、tradeInfo保護、再読込検証、rollback、派生cache無効化は維持する。filename／PDF原本／全文／PIIは保存しない。
+最新exportはv10。新しいImportedTransactionsを含む9モデルを保護するためv8契約を固定する。v9だけが新collectionを受理し、v1は9モデル維持、v2〜v8は各公開済み旧範囲を復元する際に未収録ImportedTransactionsを同じjournalでクリアする（事前確認へ表示）。旧Batch／Account置換後に参照切れsourceを残さないためである。v9は9モデル完全復元。legacy部分復元は新モデルを維持。null＝キー不在、tradeInfo保護、再読込検証、rollback、派生cache無効化は維持する。filename／PDF原本／全文／PIIは保存しない。
 
 ## Current — 固定Backup v8互換
 
-旧v8はTradersのPDF-only partial source／calendar missing／明示採用参照／訂正履歴をMonthlyAccountInput record v2で保護する公開済み契約。8モデルを受理し、v7は新Inputを拒否する。null swapを0へ変換せず、partialではState不在を保つ。最新v9では明示GMO取引sourceとFX Instrumentも同一Repository journal・rollback・再読込検証で保護する。旧v1〜v8の検証範囲は拡張しない。
+旧v8はTradersのPDF-only partial source／calendar missing／明示採用参照／訂正履歴をMonthlyAccountInput record v2で保護する公開済み契約。8モデルを受理し、v7は新Inputを拒否する。null swapを0へ変換せず、partialではState不在を保つ。最新v10では明示GMO取引sourceとFX Instrumentも同一Repository journal・rollback・再読込検証で保護する。旧v1〜v8の検証範囲は拡張しない。
 
 ## Traders Storage / Backup v7
 
@@ -16,11 +24,11 @@
 
 ## Current — GMO保存・訂正の保護
 
-GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2／v3と明示取引sourceを最新v9で保護する。取込・訂正・Input手修正は各専用serviceから一回のRepository commitで行い、Top派生cache削除も同じjournalに含める。新規FX Instrument／ImportedTransactionsも同一操作に含む。保存前Validation・expectedModels・全キー再読込一致後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、不能時はjournal保持で次の保存を停止する。匿名保存→Export→空Storage相当→Restore→resolver／再Export一致を検証する。原本・PIIは含めない。
+GMOのPDF ImportBatch・AccountSnapshot・MonthlyAccountState record v2／v3と明示取引sourceを最新v10で保護する。取込・訂正・Input手修正は各専用serviceから一回のRepository commitで行い、Top派生cache削除も同じjournalに含める。新規FX Instrument／ImportedTransactionsも同一操作に含む。保存前Validation・expectedModels・全キー再読込一致後だけ成功とする。失敗は旧生文字列とキー不在へrollbackし、不能時はjournal保持で次の保存を停止する。匿名保存→Export→空Storage相当→Restore→resolver／再Export一致を検証する。原本・PIIは含めない。
 
 ## 完全バックアップv6（固定された読込互換仕様）
 
-最新Exportはv9。v6は既存7モデルと8番目のMonthlyAccountInputの原値・採用値・部分入力を保護する公開済み範囲に固定する。v5の受理範囲も公開済み7モデルとState v3までに固定する。v3は旧State field／省略またはv1、v4は旧record＋State v2に受理範囲を固定する。新fieldを旧versionとして出力・切捨てしない。
+最新Exportはv10。v6は既存7モデルと8番目のMonthlyAccountInputの原値・採用値・部分入力を保護する公開済み範囲に固定する。v5の受理範囲も公開済み7モデルとState v3までに固定する。v3は旧State field／省略またはv1、v4は旧record＋State v2に受理範囲を固定する。新fieldを旧versionとして出力・切捨てしない。
 
 | version | Restore |
 |---|---|
@@ -60,7 +68,7 @@ null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証�
 
 ### トップの完全バックアップ
 
-**Current**：`backupVersion: 9`を持つ完全バックアップとして、従来v1の次のデータと新Storageの9collection（既存8＋ImportedTransactions）を一つのJSONへ出力する。
+**Current**：`backupVersion: 10`を持つ完全バックアップとして、従来v1の次のデータと新Storageの9collection（既存8＋ImportedTransactions）を一つのJSONへ出力する。
 
 - `tradingData`
 - `yearInitialFunds`
@@ -72,9 +80,9 @@ null collectionはキー不在へ戻す。未収録tradeInfo保護、全検証�
 
 **Current**：新形式はAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountState、MonthlyAccountInput、ImportedTransactionsも保護する。AccountInstrumentSetting、Risk設定、TransactionAnnotation等は未実装で、空項目として新設しない。SBIの確認後保存UIは既存保存エンジンへ接続し、MonthlyAccountStateのInput接続・manual保存UIも実装済み。
 
-**Current**：SBIの確認後保存内容は最新v9 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
+**Current**：SBIの確認後保存内容は最新v10 export／restoreで保護する。AccountSnapshotやMonthlyAccountStateをCSV保存だけで生成せず、v1復元では新モデルを維持する。UI接続の検証は匿名CSVだけで行った。実CSVの本番正本保存はユーザー実施済みと確認されている。通常のCSV保存ごとにバックアップ案内を追加しない。
 
-**Current**：v9、v8、v7、v6、v5、v4、v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v6〜v8は各record受理範囲を固定した8モデル、v3〜v5は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v2〜v5は新Inputをクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
+**Current**：v10、v9、v8、v7、v6、v5、v4、v3、v2、v1、旧統合、旧損益、旧履歴の形式判定・検証・正規化・Restore plan生成基盤がある。v6〜v8は各record受理範囲を固定した8モデル、v3〜v5は7モデル、v2は既存6モデルを完全復元し月次状態をクリアする。v2〜v5は新Inputをクリアする。v1は従来対象だけを復元して新モデルの現在値を維持する。旧形式は収録項目だけを復元するLegacy部分復元で、未収録項目を維持する。
 
 **Current**：復元前に形式、バージョン、必須項目、型を検証し、復元内容、維持内容、警告を確認画面へ表示する。ユーザーがキャンセルした場合はlocalStorageを変更しない。
 
@@ -178,7 +186,7 @@ UI状態を利便性のため含める場合は、ユーザーデータと分離
 
 ### 実装済みv2拡張
 
-**Current**：既存`backupVersion: 2`はv1の`data`へ`models`を追加した6モデル形式。`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。読込互換を維持し、最新exportはv9とする。
+**Current**：既存`backupVersion: 2`はv1の`data`へ`models`を追加した6モデル形式。`accounts`、`instruments`、`importBatches`、`rawTransactions`、`holdingSnapshots`、`accountSnapshots`をすべて必須とする。各値はschemaVersion 1のenvelope、または「保存キー不在」を表す`null`。読込互換を維持し、最新exportはv10とする。
 
 **Current**：v2復元は6モデルのenvelopeをそのまま保存し、`null`のcollectionはキー不在へ戻す完全復元。MonthlyAccountStateも同一transactionでクリアする。v1・旧形式では新モデルキーに触れない。Legacy `tradeInfo`はv2でも未収録なら維持する。
 

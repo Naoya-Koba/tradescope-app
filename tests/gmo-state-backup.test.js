@@ -35,7 +35,7 @@ test('v3 rejects new State; v4 accepts old and new States; decimal equality is n
 test('v1-v4 Restore semantics and new State v4 roundtrip', () => {
   const api = backupHarness(), target = new MemoryStorage(); model.createRepository(target).commit(Object.fromEntries(Object.entries(fixture()).filter(([, v]) => v !== null)));
   const exported = api.TradeScopeBackupExport.buildPayload(target, 'http://localhost', now);
-  assert.equal(exported.backupVersion, 9); const empty = new MemoryStorage();
+  assert.equal(exported.backupVersion, 10); const empty = new MemoryStorage();
   api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(exported).restorePlan, empty);
   assert.deepEqual(model.readModels(empty), fixture());
   assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty, 'http://localhost', now)), copy(exported));

@@ -1,14 +1,26 @@
 # Data Model
 
+## SBI VC資産観測保存（Current / Decided）
+
+既存9キーを維持し、MonthlyAccountInputに観測採用専用record v3を追加する。必須fieldはschemaVersion=3、id、accountId、targetMonth、adoptedAccountSnapshotId、adoptedAt、sourceHistory。履歴は旧adoptedAccountSnapshotId／adoptedAtのみ。損益入力・overrideを持たず、SBI input v1／Traders input v2へ未知値を補完しない。口座・月の一意性、参照先、provider policy、PDF Batch、officialMonthEnd・date-only月末日、JPYを検証する。今回はsbivc policyのみ有効。新しいpartial専用キーやMonthlyAccountStateは作らない。envelope v1、他record schemaは不変、Backup v10で正式に受理する。
+
+`sbivc-monthly` Batchはacc_sbivc_crypto／pdf／sbivc、Parser version、対象月、基準日、hash／size／importedAtのみ。report typeは月次専用importer IDで区別する。Accountは保存時だけ必要なら生成。Crypto Instrumentは明示tickerのASSET/JPY完全一致を再利用し、複数ID一致／無効銘柄は停止する。新InstrumentはquoteCurrency=JPY、baseCurrencyを保存せずUSDC等も切り詰めない。既存metadataを書き換えない。
+
+AccountSnapshot v1のcashBalanceはJPY現金、assetValueは帳票「総資産円換算額」という取得範囲内の資産観測値。sourceScope=sbivc-monthly-assets、sourceMode=imported、observationType=officialMonthEnd。netAssetValue／unrealizedPnl／reportedMonthlyRealizedPnlはnull。レバレッジ含み損益を含む完全純資産とは断定せずledgerへ加算しない。現物HoldingSnapshot v1は同じBatch／AccountSnapshot／月／基準日を共有し、quantity／marketPrice／marketValueへ公式数量／レート／JPY換算額を精度維持して保存する。acquisitionPrice／unrealizedPnlはnull、rawFieldsを保存しない。明示0・空欄nullを区別する。
+
+同一account・provider・PDF種別・importer/version・月・基準日・hashの一意一致に加えsize／観測／全holding／採用履歴参照を照合し、完全保存済みだけno-op。不完全集合は停止する。同月別hashは明示確認と最新採用参照guard一致後に新Batch／Snapshot／Holdingを追記し、Input ID維持＋履歴追記＋参照切替を同一journalで保存する。旧sourceを削除せず、Input表示は明示採用先のholdingだけを読む。表示／reloadだけでは書かない。
+
+**Known limitation / Planned**：取引・レバレッジ建玉・報酬・入出庫は永続化しない。MonthlyAccountState・損益・原価を推定せず、Top／Allocation／Portfolio／Riskへ接続しない。将来のcrypto transaction／cashflow／月次P/L／partial projectionは別契約として検証する。
+
 ## SBI VC read-only parser result（Current / Decided）
 
 `import/sbivc-parser.js`の結果は永続modelではない。report（provider／reportType／periodStart／periodEnd／targetMonth／snapshotAsOf）、accountObservations、spotHoldings、leverageSummary、leveragePositions、transactions、cashflows、rewards、lending、sections、errors／warningsをメモリ上だけで扱う。完全な月初〜月末期間と正式基準日の一致を検証し、EOD基準日はdate-onlyで保持する。架空timestampを作らない。
 
-JPY残高とassetTotalObservation（帳票「総資産円換算額」）は区別し、後者をnetAssetValueにしない。現物の数量・評価レート・officialJPYValueはdecimal文字列で保持する。JPY評価表の明示tickerだけをCryptoの`ASSET/JPY`候補にし、USDC等を3文字へ切らず、baseAssetは一時候補属性で既存baseCurrencyへ保存しない。Instrument照合／作成・legacy ETH/JPYの変更はまだ行わない。
+JPY残高とassetTotalObservation（帳票「総資産円換算額」）は区別し、後者をnetAssetValueにしない。現物の数量・評価レート・officialJPYValueはdecimal文字列で保持する。JPY評価表の明示tickerだけをCryptoの`ASSET/JPY`候補にし、USDC等を3文字へ切らず、baseAssetは一時候補属性で既存baseCurrencyへ保存しない。明示保存時のみ上記契約へ変換し、legacy ETH/JPY取引は変更しない。
 
 現物とレバレッジは別collection。列の空欄はnull／missing、`-`等はnull／notApplicable、明示0は数値文字列、該当なしtableはemptyであり0イベントを生成しない。現物原価・実現／評価P/Lを推定しない。JPY入出金・暗号資産入出庫・報酬は分離し、暗号資産移動をJPY deposit／withdrawalへ変換しない。報酬はrecordedAtと明示された対象月を分離しswapにしない。自由な備考・PIIを出口へ含めない。
 
-**Known limitation**：売買／建玉／貸出の実行行は未検証。sectionsの列mapping・empty／unverified状態のみ返し、取引をFX open／closeへ変換しない。永続schema・Backup v9を変更せず、monthly partial modelやtransaction persistenceは別工程。
+**Known limitation**：売買／建玉／貸出の実行行は未検証。sectionsの列mapping・empty／unverified状態のみ返し、取引をFX open／closeへ変換しない。Parser結果自体は永続化せず、資産・現物保有だけを上記の別保存serviceへ渡す。transaction persistenceは別工程。
 
 ## Current / Decided — Transaction derived presentation
 

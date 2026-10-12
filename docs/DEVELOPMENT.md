@@ -1,12 +1,14 @@
 # Development Guide
 
-## SBI VC月次PDF Preview（Current）
+## SBI VC月次PDF資産・保有保存（Current）
 
-`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDN・保存service接続を追加しない。PWA v288、追加／変更したPreview資産はquery 20261012-11。
+`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放・確認保存を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDNを追加しない。`import/sbivc-save.js`が保存直前再検証、Instrument解決、same-source検算、訂正guard、全レコードのatomic journal保存を担当する。Inputの`assets/observation-input-ui.js`はMonthlyAccountInput v3の採用先だけをread-only表示する。PWA v289、変更資産query 20261012-12、PDF.js資産は不変。
 
-匿名fixturesで複数ticker、長いdecimal、明示0／欠損／該当なし、報酬対象月、入出庫、レバレッジ観測、PII除外、wrong provider、破損表、中止／closeを検証する。実PDFはローカルread-only Parser検証のみ。取引・建玉・貸出の非空表はunverifiedとして警告し、実行行Parser完成と報告しない。既存655件の回帰とPC1280／mobile390を確認する。Storage・月次計算・Backup・履歴・Riskは変更しない。
+匿名fixturesで複数ticker、長いdecimal、明示0／欠損／該当なし、報酬対象月、入出庫、レバレッジ観測、PII除外、wrong provider、破損表、中止／closeを検証する。保存は匿名localhostだけで検証し、実PDFはローカルread-only Parser／保存plan確認のみ。既存699件にsave／correction／rollback／Backup v1〜v10／reloadテストを追加しPC1280／mobile390を確認する。取引・建玉・貸出の実行行Parser完成と報告せず、月次計算・legacy履歴・Riskに接続しない。
 
-**Planned**：安全な永続mapping、実売買行のsource validation、暗号資産partial projection。原PDF／全文／PIIの保存は行わない。
+**Planned**：実売買行のsource validation、共通crypto transaction／cashflow／月次P/L、暗号資産partial projection。原PDF／全文／PIIの保存は行わない。最新Backup v10は観測採用Input v3を正式受理し、旧v9検証意味を固定する。
+
+**Current / 検証**：既存699件を含む746 tests Pass。匿名localhostでPDF選択・確認保存・reload・same-source・訂正キャンセル／採用・rollback・Backup収録・Input表示・cleanupを確認。PC1280／mobile390は横overflowなし、Console Error／Warningなし。PDF.jsへbufferを転送する前にhashを計算する回帰を追加。実PDFはread-only Parser／保存前Validationのみ成功し、実値の保存・fixture化を行わない。実iPhoneの保存操作は未確認。
 
 ## Current — 共通取引source基盤
 
@@ -151,7 +153,7 @@ TradeScope/
 
 **Current**：`assets/data-model-storage.js`がAccount、Instrument、ImportBatch、RawTransaction、HoldingSnapshot、AccountSnapshot、MonthlyAccountState、MonthlyAccountInputのschema検証・Repository・注入式localStorage Adapterを提供する。module読込・Repository生成・readでseedやMigrationはしない。具体的なallowlist・参照制約はコードと`DATA_MODEL.md`のCurrentを参照する。
 
-**Current**：`assets/storage-transaction.js`は複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあれば保存を拒否する。最新完全バックアップv9は9collectionを保護する。v1は9キー維持、v2は6collection復元＋Stateと新Inputクリア、v3〜v5は公開済み7collection復元＋新Inputクリア。各versionの受理範囲を固定する。
+**Current**：`assets/storage-transaction.js`は複数キー保存、再読込一致確認、生文字列rollbackを共通化する。中断journalがあれば保存を拒否する。最新完全バックアップv10は9collectionを保護する。v1は9キー維持、v2は6collection復元＋Stateと新Inputクリア、v3〜v5は公開済み7collection復元＋新Inputクリア。各versionの受理範囲を固定する。
 
 **Current**：SBI Previewと保存可否判定は新Storageを読み取り専用で参照する。確認後保存だけを既存保存serviceへ接続する。UI独自のRepository commitやStorage writeは設けない。Summary / Asset Trend / Risk / 月次入力判定のデータ源も変更しない。
 
@@ -218,7 +220,7 @@ TradeScope/
 
 **Current / Storage・復元検証**：`node --test tests/*.test.js`で匿名Storageの往復、decimal、quota／journal／rollback、v1〜v8互換、未知field／version、PII拒否を確認する。gmo-monthly-override／gmo-monthly-ui／account-monthly-save testsで原値保護、未編集v2不変、初回昇格、採用値反映、口座単位保存と他Draft非混入を確認する。実Storage・実CSV・実Backup・本番PWAに接続しない。
 
-**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v9 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
+**Current / 保存エンジン・UI検証**：`node --test tests/*.test.js`は`tests/sbi-save.test.js`も含む。匿名Adapterで遅延追加・再利用、file単位保存、重複停止、quota／journal失敗、再読込検証、rollback、最新v10 export／restore、v1互換、旧月次非変更を確認する。DOM harnessで保存表示条件、確認・キャンセル、検証完了後の保存済み表示、連打防止、再読込後の判定と導線を確認する。UI接続の実ブラウザ検証には隔離localhostと架空CSVだけを使用し、実CSVを保存しない。
 
 **Current / 実形式検証**：ローカルに残っていた保有証券一覧・約定履歴の2ファイルをリポジトリへコピーせずread-onlyで解析し、Shift_JIS系デコード、日本語ヘッダー、セクション別合計と明細件数の一致を確認した。両ファイルはError / Warningなしで解析できた。実データはfixture・ログ・storageへ複製していない。テストには公開ヘッダー構造だけを用い、全明細値を独立した架空値で作成する。
 

@@ -312,7 +312,7 @@ test('Backup v3 exports saved models exactly and round-trips; v1 keeps new data'
   const storage = new Storage(), save = service(storage);
   await save.save(source()); await save.save(source('transactions', trades, 'b'.repeat(64)));
   const h = backupHarness(storage), payload = h.build(storage, 'http://localhost', now);
-  assert.equal(payload.backupVersion, 9); assert.deepEqual(copy(payload.data.models), save.read());
+  assert.equal(payload.backupVersion, 10); assert.deepEqual(copy(payload.data.models), save.read());
   assert.equal(payload.data.models.accountSnapshots, null);
   const target = new Storage(), other = backupHarness(target); other.restore.execute(other.format.inspectValue(payload).restorePlan, target);
   assert.deepEqual(model.readModels(target), save.read());

@@ -1,0 +1,95 @@
+// Synthetic source only; no private PDF, real balances or production storage.
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const crypto=require('node:crypto').webcrypto,model=require('../assets/data-model-storage.js'),tx=require('../assets/storage-transaction.js');
+const save=require('../import/sbivc-save.js'),parser=require('../import/sbivc-parser.js'),{fixture}=require('./sbivc-pdf-fixture.js');
+const inputUI=require('../assets/observation-input-ui.js');
+const now='2031-03-01T12:34:56.000Z',copy=x=>JSON.parse(JSON.stringify(x));
+class Memory{
+ constructor(){this.data=new Map([['tradingData','{"2031":{"2":{"sbivc":{"realizedPnL":17}}}}'],['tradeScopeTradeHistoryV1','[{"id":"manual_crypto","symbol":"ETH/JPY"}]']]);this.failKey=null;this.persistentFail=false;this.writes=0;}
+ getItem(k){return this.data.get(k)??null;}
+ setItem(k,v){if(k===this.failKey){if(!this.persistentFail)this.failKey=null;throw Error('quota');}this.writes++;this.data.set(k,v);}
+ removeItem(k){if(k===this.failKey&&this.persistentFail)throw Error('quota');this.data.delete(k);}
+ snapshot(){return JSON.stringify([...this.data]);}
+}
+function source(hash='a',options={}){return{preview:parser.parse(fixture(options)),fileHash:hash.repeat(64),fileSize:128};}
+const service=s=>save.createService(s,{cryptoApi:crypto,clock:()=>now});
+const records=(s,k)=>model.readModels(s)[k]?.records||[];
+async function saved(){const s=new Memory();assert.equal((await service(s).save(source())).status,'saved');return s;}
+function backup(s){
+ const code=fs.readFileSync('top/script.js','utf8'),context=vm.createContext({window:{location:{origin:'http://127.0.0.1:57680'},TradeScopeDataStorage:model,TradeScopeStorageTransaction:tx},localStorage:s,
+ document:{getElementById:()=>null,addEventListener(){}},isEmptyPlainRecord:v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===0,
+ PROFIT_STORAGE_KEY_TRADING:'tradingData',PROFIT_STORAGE_KEY_INITIAL:'yearInitialFunds',PROFIT_STORAGE_KEY_INITIAL_UNREALIZED:'yearInitialUnrealized',PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT:'tradeScopeTopSummarySnapshotV1',console:{log(){throw Error('log forbidden');},error(){throw Error('log forbidden');}}});
+ vm.runInContext(code.slice(code.indexOf('// ===== Backup Format Core'),code.indexOf('function exportAllData()')),context);
+ return{build:()=>context.window.TradeScopeBackupExport.buildPayload(s,'http://127.0.0.1:57680',now),format:context.window.TradeScopeBackupFormat,restore:context.window.TradeScopeBackupRestore};
+}
+test('inspect/read/initialization never seeds; anonymous normal save uses one verified journal',async()=>{
+ const s=new Memory(),svc=service(s),before=s.snapshot();assert.equal((await svc.inspect(source())).status,'ready');assert.equal(svc.read('2031-02'),null);assert.equal(s.snapshot(),before);
+ assert.equal((await svc.save(source())).status,'saved');assert.equal(records(s,'accounts').length,1);assert.equal(records(s,'instruments').length,3);
+ assert.equal(records(s,'importBatches').length,1);assert.equal(records(s,'accountSnapshots').length,1);assert.equal(records(s,'holdingSnapshots').length,3);assert.equal(s.getItem(tx.journalKey),null);
+ const p=svc.read('2031-02');assert.equal(p.input.schemaVersion,3);assert.equal(p.complete,false);assert.equal(p.realizedPnl,null);assert.equal(p.unrealizedPnl,null);
+});
+test('official decimal quantity/rate/valuation retained; cost and P/L null',async()=>{
+ const s=await saved(),h=records(s,'holdingSnapshots')[0],a=records(s,'accountSnapshots')[0];
+ assert.equal(h.quantity,'0.1234567890123456789');assert.equal(h.marketPrice,'321.123456789');assert.equal(h.marketValue,'42.125');
+ assert.equal(h.acquisitionPrice,null);assert.equal(h.unrealizedPnl,null);assert.equal(a.netAssetValue,null);assert.equal(a.unrealizedPnl,null);assert.equal(a.reportedMonthlyRealizedPnl,null);
+ assert.equal(a.assetValue,'1234567');assert.equal(a.cashBalance,'20000');assert.equal(a.importedAt,now);assert.equal(a.snapshotAsOf,'2031-02-28');
+});
+test('multiple/4+ character assets use exact Crypto symbol without 3-letter coercion',async()=>{const s=await saved(),i=records(s,'instruments').find(i=>i.symbol==='USDC/JPY');assert.equal(i.quoteCurrency,'JPY');assert.equal(i.baseCurrency,undefined);});
+test('existing Crypto Instrument metadata and legacy manual ETH/JPY retained',async()=>{
+ const s=new Memory(),repo=model.createRepository(s);repo.save('instruments',[{id:'old_eth',assetType:'Crypto',symbol:'ETH/JPY',displayName:'Existing anonymous label',enabled:true,aliases:['old label']}]);
+ const before=s.getItem(model.keys.instruments),legacy=s.getItem('tradeScopeTradeHistoryV1');await service(s).save(source());
+ assert.deepEqual(records(s,'instruments').find(i=>i.id==='old_eth'),JSON.parse(before).records[0]);assert.equal(records(s,'instruments').length,3);
+ assert.equal(records(s,'holdingSnapshots').find(h=>h.instrumentId==='old_eth').quantity,'0.1234567890123456789');assert.equal(s.getItem('tradeScopeTradeHistoryV1'),legacy);
+});
+test('ambiguous Instrument mapping stops with no writes',async()=>{const s=new Memory();model.createRepository(s).save('instruments',['one','two'].map(id=>({id,assetType:'Crypto',symbol:'ETH/JPY',displayName:'ETH/JPY',enabled:true})));const before=s.snapshot();assert.equal((await service(s).save(source())).status,'conflict');assert.equal(s.snapshot(),before);});
+test('same full identity/hash is no-op after reload/service recreation',async()=>{const s=await saved(),before=s.snapshot();assert.equal((await service(s).inspect(source())).status,'already-imported');assert.equal((await service(s).save(source())).status,'already-imported');assert.equal(s.snapshot(),before);});
+test('hash alone cannot identify source; other month stays independent',async()=>{const s=await saved();const next=source('a',{period:'2031/03/01 ～ 2031/03/31',basis:'2031/03/31'});assert.equal((await service(s).save(next)).status,'saved');assert.equal(records(s,'importBatches').length,2);});
+test('same hash inconsistent size/content is blocked, not mistaken for complete save',async()=>{const s=await saved(),before=s.snapshot(),a=source();a.fileSize++;assert.equal((await service(s).save(a)).status,'conflict');const b=source();b.preview.spotHoldings[0].quantity='2';assert.equal((await service(s).save(b)).status,'conflict');assert.equal(s.snapshot(),before);});
+test('correction/cancel are non-mutating until explicit guarded confirmation; old sources retained',async()=>{
+ const s=await saved(),svc=service(s),before=s.snapshot(),next=source('b',{assets:['ETH','SOL']});
+ const inspection=await svc.inspect(next);assert.equal(inspection.status,'review-required');assert.equal((await svc.save(next)).status,'review-required');assert.equal(s.snapshot(),before);
+ const old=svc.read('2031-02');assert.equal((await svc.save(next,inspection)).status,'saved');const active=svc.read('2031-02');
+ assert.equal(active.input.id,old.input.id);assert.notEqual(active.snapshot.id,old.snapshot.id);assert.equal(active.holdings.length,2);
+ assert.equal(records(s,'holdingSnapshots').length,5);assert.equal(records(s,'accountSnapshots').length,2);assert.equal(active.input.sourceHistory[0].adoptedAccountSnapshotId,old.snapshot.id);
+ assert.equal((await svc.save(source())).status,'already-imported');assert.equal(svc.read('2031-02').snapshot.id,active.snapshot.id);
+});
+test('stale correction guard cannot overwrite newly adopted source',async()=>{const s=await saved(),svc=service(s),guard=await svc.inspect(source('b'));await svc.save(source('c'),await svc.inspect(source('c')));const before=s.snapshot();assert.equal((await svc.save(source('b'),guard)).status,'review-required');assert.equal(s.snapshot(),before);});
+for(const entity of ['instruments','importBatches','accountSnapshots','holdingSnapshots','monthlyAccountInputs'])test('atomic failure at '+entity+' rolls back new Account/Instrument/Batch/all snapshots',async()=>{const s=new Memory(),before=s.snapshot();s.failKey=model.keys[entity];await assert.rejects(()=>service(s).save(source()));assert.equal(s.snapshot(),before);assert.equal(s.getItem(tx.journalKey),null);});
+test('journal write failure leaves all data untouched',async()=>{const s=new Memory(),before=s.snapshot();s.failKey=tx.journalKey;await assert.rejects(()=>service(s).save(source()));assert.equal(s.snapshot(),before);});
+test('rollback inability retains journal and blocks following save',async()=>{const s=new Memory();s.setItem(model.keys.accounts,JSON.stringify({schemaVersion:1,updatedAt:now,records:model.initialAccounts()}));s.failKey=model.keys.accounts;s.persistentFail=true;const changed=source();
+ // Failure after an existing value was replaced, then an earlier written key cannot be rolled back.
+ const set=s.setItem.bind(s);s.failKey=null;let triggered=false;s.setItem=(k,v)=>{if(k===model.keys.holdingSnapshots&&!triggered){triggered=true;s.failKey=model.keys.importBatches;s.persistentFail=true;throw Error('quota');}set(k,v);};
+ await assert.rejects(()=>service(s).save(changed));assert.notEqual(s.getItem(tx.journalKey),null);await assert.rejects(()=>service(s).save(changed),/ジャーナル/);
+});
+test('null rate vs explicit zero retained, no fake cost/P/L or State',async()=>{const s=new Memory();await service(s).save(source('a',{zero:true,blankRate:true}));assert.ok(records(s,'holdingSnapshots').every(h=>h.marketPrice===null&&h.marketValue==='0'&&h.unrealizedPnl===null));assert.equal(s.getItem(model.keys.monthlyAccountStates),null);});
+test('empty spot portfolio can save explicit cash observation without invented holding',async()=>{const s=new Memory();await service(s).save(source('a',{assets:[]}));assert.equal(records(s,'holdingSnapshots').length,0);assert.equal(records(s,'instruments').length,0);assert.equal(records(s,'accountSnapshots').length,1);});
+test('leverage/source events never merge into spot or monthly canonical records',async()=>{const s=await saved();assert.ok(records(s,'holdingSnapshots').every(h=>h.schemaVersion===1&&h.rawFields===undefined));for(const e of ['rawTransactions','importedTransactions','monthlyAccountStates'])assert.equal(s.getItem(model.keys[e]),null);});
+test('PII, PDF body, path/name, cashflow and reward do not persist',async()=>{const s=await saved(),text=s.snapshot();assert.doesNotMatch(text,/PRIVATE_PERSON|PRIVATE_ADDRESS|PHONE_123|ACCOUNT_123|filename|fileName|absolutePath|baseAsset|ステーキング|fullText|pdfBinary/);});
+test('malformed source cannot write; invalid quantity/ticker/provider/month/zero-vs-null reject',async()=>{
+ for(const mutate of [x=>x.preview.valid=false,x=>x.preview.report.provider='gmo',x=>x.preview.report.snapshotAsOf='2031-02-27',x=>x.preview.spotHoldings[0].quantity=null,x=>x.preview.spotHoldings[0].asset='PRIVATE NAME',x=>x.filename='private.pdf']){const s=new Memory(),before=s.snapshot(),a=source();mutate(a);await assert.rejects(()=>service(s).save(a));assert.equal(s.snapshot(),before);}
+});
+test('v10 export/empty restore/re-export exactly protects active and old sources',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b'),await svc.inspect(source('b')));const h=backup(s),payload=h.build();assert.equal(payload.backupVersion,10);const target=new Memory(),r=backup(target),p=r.format.inspectValue(payload);assert.equal(p.ok,true);r.restore.execute(p.restorePlan,target);assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(service(target).read('2031-02').holdings.length,3);});
+test('v9 rejects new observation-only Input, v10 accepts; fields are not silently stripped',async()=>{const s=await saved(),payload=backup(s).build();assert.throws(()=>model.validateBackupModels(9,payload.data.models));assert.equal(model.validateBackupModels(10,payload.data.models),true);});
+for(let version=1;version<=9;version++)test('old v'+version+' restore preserves published semantics',async()=>{const sourceStorage=new Memory(),h=backup(sourceStorage),payload=copy(h.build());payload.backupVersion=version;
+ if(version===1)delete payload.data.models;else{const keys=model.backupModelEntities[version];payload.data.models=Object.fromEntries(keys.map(k=>[k,null]));}
+ const target=await saved(),r=backup(target),before=target.getItem(model.keys.monthlyAccountInputs),inspection=r.format.inspectValue(payload);assert.equal(inspection.ok,true);r.restore.execute(inspection.restorePlan,target);
+ assert.equal(target.getItem(model.keys.monthlyAccountInputs),version===1?before:null);
+});
+test('v10 absent optional data and explicit null model roundtrip',()=>{const s=new Memory(),h=backup(s),p=h.build(),target=new Memory(),r=backup(target);r.restore.execute(r.format.inspectValue(p).restorePlan,target);assert.deepEqual(copy(r.build().data),copy(p.data));assert.ok(Object.values(p.data.models).every(v=>v===null));});
+test('unknown observation field/version/missing reference/month mismatch reject before restore writes',async()=>{const s=await saved(),payload=backup(s).build();for(const mutate of [p=>p.data.models.monthlyAccountInputs.records[0].unknown=true,p=>p.data.models.monthlyAccountInputs.records[0].schemaVersion=77,p=>p.data.models.monthlyAccountInputs.records[0].adoptedAccountSnapshotId='missing',p=>p.data.models.monthlyAccountInputs.records[0].targetMonth='2031-03',p=>p.data.models.accountSnapshots.records[0].netAssetValue='123']){const p=copy(payload);mutate(p);const target=new Memory(),r=backup(target),before=target.snapshot();assert.equal(r.format.inspectValue(p).ok,false);assert.equal(target.snapshot(),before);}});
+test('v10 restore partial failure rolls back old legacy and every new-model key',async()=>{const s=await saved(),payload=backup(s).build(),target=new Memory(),before=target.snapshot(),r=backup(target);target.failKey=model.keys.monthlyAccountInputs;assert.throws(()=>r.restore.execute(r.format.inspectValue(payload).restorePlan,target));assert.equal(target.snapshot(),before);});
+class Element{constructor(){this.children=[];this.textContent='';}append(...v){this.children.push(...v);}}
+const text=e=>[e.textContent,...e.children.map(text)].join(' ');
+test('asset observations do not alter shared Top, allocation, Summary or trend amounts',async()=>{
+ const s=new Memory(),context={window:{}};vm.runInNewContext(fs.readFileSync('assets/profit-metrics.js','utf8'),context);
+ const display=require('../assets/monthly-display-view.js'),f=require('./monthly-display-fixture.js').fixture();
+ const view=models=>display.create(context.window.TradeScopeProfitMetrics,f.tradingData,f.initialFunds,f.initialUnrealized,models,f.accounts);
+ const before=view(f.models);await service(s).save(source('a',{period:'2026/09/01 ～ 2026/09/30',basis:'2026/09/30'}));
+ const added=model.readModels(s),merged=copy(f.models);for(const entity of Object.keys(model.keys))if(added[entity])merged[entity]={...added[entity],records:[...(merged[entity]?.records||[]),...added[entity].records]};
+ const after=view(merged),amounts=d=>({month:d.month,net:d.net,confirmed:d.confirmed,netPnl:d.netPnl,accountData:d.accountData});
+ assert.deepEqual(amounts(after.dashboard(2026)),amounts(before.dashboard(2026)));assert.deepEqual(after.month(2026,9),before.month(2026,9));
+ assert.deepEqual(after.yearlyTotals(2026),before.yearlyTotals(2026));assert.deepEqual(after.series(2026).total,before.series(2026).total);
+ assert.deepEqual(after.series(2026).performanceTotalSeries,before.series(2026).performanceTotalSeries);
+});
+test('Input read-only uses only adopted holdings; no hidden identifiers/fake P/L/storage writes',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b',{assets:['SOL']}),await svc.inspect(source('b',{assets:['SOL']})));const before=s.snapshot(),d={createElement:()=>new Element()},card=inputUI.render({document:d,adapter:s,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC'}),t=text(card);assert.match(t,/資産・保有情報を保存済み|SOL\/JPY/);assert.doesNotMatch(t,/ETH\/JPY|月次損益|取得原価|as_|batch_|ins_/);assert.equal(s.snapshot(),before);assert.equal(inputUI.render({document:d,adapter:s,accountId:'acc_sbivc_crypto',targetMonth:'2031-01',displayName:'SBI VC'}),null);});
+test('legacy, monthly metrics, Top and Risk are not changed or connected',async()=>{const s=new Memory(),legacy=s.getItem('tradingData'),history=s.getItem('tradeScopeTradeHistoryV1');s.setItem('tradeScopeTopSummarySnapshotV1','{"anonymousCache":true}');const cache=s.getItem('tradeScopeTopSummarySnapshotV1');await service(s).save(source());assert.equal(s.getItem('tradingData'),legacy);assert.equal(s.getItem('tradeScopeTradeHistoryV1'),history);assert.equal(s.getItem('tradeScopeTopSummarySnapshotV1'),cache);assert.ok(!fs.readFileSync('assets/monthly-account-resolver.js','utf8').includes('sbivc-monthly-assets'));});

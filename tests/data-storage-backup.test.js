@@ -109,7 +109,7 @@ test('download filename change preserves latest v3 JSON, ISO exportedAt and all 
   assert.equal(blob.type, 'application/json');
   const value = JSON.parse(await blob.text());
   assert.deepEqual(value, copy(h.build(storage, 'http://127.0.0.1:54321', date.toISOString())));
-  assert.equal(value.backupVersion, 9); assert.equal(value.exportedAt, date.toISOString());
+  assert.equal(value.backupVersion, 10); assert.equal(value.exportedAt, date.toISOString());
   assert.deepEqual(storage.snapshot(), before); assert.equal(storage.writes, writes);
 });
 
@@ -263,7 +263,7 @@ test('v1 restore does not parse, reset or migrate even an unreadable/future new-
 test('F: v3 export -> cleared anonymous fixture -> restore -> re-export exact data equality', () => {
   const source = seeded(), h = backupHarness(source), before = source.snapshot();
   const payload = h.build(source, 'http://127.0.0.1:54321', now);
-  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 9);
+  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 10);
   assert.equal(payload.source.origin, 'http://127.0.0.1:54321');
   const target = new MemoryStorage(), targetHarness = backupHarness(target);
   const inspection = targetHarness.format.inspectJson(JSON.stringify(payload)); assert.equal(inspection.ok, true);

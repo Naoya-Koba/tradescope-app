@@ -6,10 +6,10 @@
     SBIVC_DOCUMENT_NOT_RECOGNIZED: 'SBI VCの月次報告書として認識できませんでした', SBIVC_PARSE_FAILED: '必要な帳票項目を読み取れませんでした',
     SBIVC_PERIOD_INVALID: '対象期間・基準日を確認できませんでした', SBIVC_CASHFLOW_TYPE_UNVERIFIED: '入出庫の区分を確認できない行があります',
     SBIVC_TRADES_ROWS_UNVERIFIED: '売買明細のある帳票は未検証です', SBIVC_POSITIONS_ROWS_UNVERIFIED: '建玉明細のある帳票は未検証です',
-    SBIVC_LENDING_ROWS_UNVERIFIED: '貸出明細のある帳票は未検証です' });
-  function createUI({ document, parser, extract, viewer, window }) {
+    SBIVC_LENDING_ROWS_UNVERIFIED: '貸出明細のある帳票は未検証です', SBIVC_SAVE_INSPECTION_FAILED: '保存済みの情報を確認できませんでした' });
+  function createUI({ document, parser, extract, viewer, window, service, hashBytes }) {
     const $ = id => document.getElementById('sbivc-' + id);
-    let controller = null, sequence = 0;
+    let controller = null, sequence = 0, source = null, inspected = null, saving = false;
     const node = (tag, text, className) => { const n = document.createElement(tag); n.textContent = text; if (className) n.className = className; return n; };
     const amount = (value, currency = false) => {
       if (value === null || value === undefined) return '—';
@@ -18,10 +18,19 @@
     };
     const metric = (container, label, value) => container.append(node('dt', label), node('dd', value));
     function clear() {
+      if(saving)return;
       ++sequence; controller?.abort(); controller = null; viewer()?.setSource('sbivc', null);
+      source=null;inspected=null;$('save').hidden=true;$('save-status').textContent='';
+      if($('dialog').open)$('dialog').close?.();
       $('preview').hidden = true; $('cancel-read').hidden = true; $('file').value = '';
       for (const id of ['summary', 'holdings', 'leverage', 'events', 'issues']) $(id).replaceChildren();
       $('read-status').textContent = ''; delete $('read-status').dataset.errorCode; delete $('read-status').dataset.stage;
+    }
+    function saveStatus(result){
+      inspected=result;$('save').hidden=!['ready','review-required'].includes(result.status);
+      $('save').textContent='保存';
+      $('save-status').textContent=['saved','already-imported'].includes(result.status)?'資産・保有情報を保存済み'
+        :result.status==='review-required'?'同じ月の保存内容を訂正します':result.status==='conflict'?'保存済みの情報と照合できませんでした':'';
     }
     function render(result) {
       $('preview').hidden = false;
@@ -66,7 +75,7 @@
       for (const code of result.warnings) $('issues').append(node('p', messages[code] || '未検証の項目があります', 'issue'));
     }
     async function select(file) {
-      if (!file) return;
+      if (!file||saving) return;
       clear(); const current = sequence; controller = new AbortController(); const signal = controller.signal;
       $('read-status').textContent = '解析中…'; $('cancel-read').hidden = false;
       let stage = 'file', code = 'PDF_FILE_READ_FAILED';
@@ -74,6 +83,9 @@
         if (file.size > 20 * 1024 * 1024) { code = 'PDF_INVALID_FILE'; throw new Error(); }
         const bytes = new Uint8Array(await file.arrayBuffer());
         if (signal.aborted) return;
+        // PDF.js transfers the buffer to its worker. Hash the original bytes before extraction.
+        const fileHash=service?await hashBytes(bytes):null;
+        if(current!==sequence||signal.aborted)return;
         stage = 'engine'; code = 'PDF_ENGINE_LOAD_FAILED';
         const extracted = await extract(bytes, { signal, onProgress: (page, total) => { if (current === sequence) $('read-status').textContent = `解析中… ${page}/${total}`; } });
         if (current !== sequence) return;
@@ -81,18 +93,42 @@
         stage = 'parser'; code = 'SBIVC_PARSE_FAILED'; const result = parser.parse(extracted);
         render(result); $('read-status').dataset.stage = result.valid ? 'preview' : 'validation';
         $('read-status').dataset.errorCode = result.valid ? '' : result.errors[0];
-        // File is passed only to the existing in-memory Viewer, never to a repository or save service.
         viewer()?.setSource('sbivc', file);
+        if(result.valid&&service){
+          stage='storage';code='SBIVC_SAVE_INSPECTION_FAILED';
+          source={preview:result,fileHash,fileSize:file.size};const status=await service.inspect(source);if(current===sequence)saveStatus(status);
+        }
       } catch (failure) {
         if (current !== sequence || signal.aborted) return;
         if (Object.hasOwn(messages, failure?.code)) code = failure.code;
         stage = ({ PDF_INVALID_FILE: 'file', PDF_WORKER_INIT_FAILED: 'worker', PDF_DOCUMENT_LOAD_FAILED: 'document', PDF_TEXT_EXTRACTION_FAILED: 'text' })[code] || stage;
         $('preview').hidden = false; $('read-status').dataset.stage = stage; $('read-status').dataset.errorCode = code;
         $('issues').replaceChildren(node('p', `${messages[code]}（${code}）`, 'issue error'));
+        source=null;$('save').hidden=true;
       } finally {
         if (current === sequence) { controller = null; $('cancel-read').hidden = true; $('read-status').textContent = ''; }
       }
     }
+    $('save').hidden=true;
+    $('save').addEventListener('click',()=>{
+      if(saving||!source||!['ready','review-required'].includes(inspected?.status))return;
+      $('confirm-summary').replaceChildren();
+      metric($('confirm-summary'),'対象月',source.preview.report.targetMonth.replace('-','/'));
+      metric($('confirm-summary'),'基準日',source.preview.report.snapshotAsOf.replaceAll('-','/'));
+      metric($('confirm-summary'),'現物保有銘柄',`${source.preview.spotHoldings.length}件`);
+      if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する資産・保有情報を切り替えます');
+      $('dialog').showModal();
+    });
+    $('cancel-save').addEventListener('click',()=>{if(!saving)$('dialog').close();});
+    $('dialog').addEventListener('cancel',event=>{if(saving)event.preventDefault();});
+    $('confirm-save').addEventListener('click',async()=>{
+      if(saving||!source||!inspected)return;
+      saving=true;$('confirm-save').disabled=true;$('cancel-save').disabled=true;$('file').disabled=true;$('close').disabled=true;$('save').disabled=true;
+      $('save-status').textContent='保存中…';
+      try{saveStatus(await service.save(source,inspected));}
+      catch(_){$('save-status').textContent='保存できませんでした。保存内容を確認して再度お試しください';}
+      finally{saving=false;$('confirm-save').disabled=false;$('cancel-save').disabled=false;$('file').disabled=false;$('close').disabled=false;$('save').disabled=false;$('dialog').close();}
+    });
     $('file').addEventListener('change', event => { void select(event.target.files[0]); });
     $('cancel-read').addEventListener('click', clear); $('close').addEventListener('click', clear);
     $('provider').addEventListener('toggle', () => { if (!$('provider').open) clear(); });
@@ -101,5 +137,6 @@
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = { createUI };
   else createUI({ document, window, parser: root.TradeScopeSBIVCParser, viewer: () => root.TradeScopePdfViewer,
+    service:root.TradeScopeSBIVCSave.createService(root.TradeScopeDataStorage.localStorageAdapter(localStorage)),hashBytes:bytes=>root.TradeScopeDataStorage.hashBytes(bytes),
     extract: async (bytes, options) => (await import('./pdf-extractor.mjs?v=20261012-10')).extract(bytes, options) });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

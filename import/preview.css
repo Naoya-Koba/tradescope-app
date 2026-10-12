@@ -64,6 +64,8 @@ dialog::backdrop { background: #0008; } dialog ol { padding-left: 22px; font-siz
 button:disabled { opacity: .55; cursor: default; }
 .dialog-actions { display: flex; gap: 12px; margin-top: 24px; }
 .dialog-actions button { flex: 1; margin: 0; min-height: 48px; }
+#sbivc-confirm-summary { grid-template-columns: minmax(96px, 1fr) minmax(0, 2fr); }
+#sbivc-confirm-summary dd { overflow-wrap: anywhere; }
 body:has(dialog[open]) { overflow: hidden; }
 .calendar-swap { display: grid; gap: 6px; margin-top: 20px; }
 .calendar-swap input { width: min(100%, 320px); min-height: 44px; border: 1px solid #ffffff24; border-radius: 8px; padding: 8px; background: #0c1328; color: var(--text); }

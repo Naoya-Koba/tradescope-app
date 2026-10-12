@@ -2230,3 +2230,7 @@ body.drawer-open {
 .sbi-asset-breakdown > summary { padding: 10px 0; cursor: pointer; color: var(--muted); font-size: 13px; }
 .sbi-asset-breakdown .sbi-domestic-input { margin: 12px 0; }
 .input-gmo-draft { min-width: 0; width: 100%; box-sizing: border-box; }
+.observation-values { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; font-size: 13px; }
+.observation-values dt { color: var(--muted); }
+.observation-values dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.observation-holding { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; font-size: 13px; }

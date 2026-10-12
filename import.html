@@ -8,16 +8,17 @@
   <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
-  <link rel="stylesheet" href="import/preview.css?v=20261012-11">
+  <link rel="stylesheet" href="import/preview.css?v=20261012-12">
   <link rel="stylesheet" href="import/pdf-viewer.css?v=20261012-10">
   <script defer src="import/pdf-viewer-ui.js?v=20261012-11"></script>
   <script defer src="assets/account-ui.js?v=20261011-1"></script>
   <script defer src="import/csv-core.js?v=20261005-1"></script>
   <script defer src="import/sbivc-parser.js?v=20261012-11"></script>
-  <script defer src="import/sbivc-preview.js?v=20261012-11"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
   <script defer src="assets/storage-transaction.js?v=20261012-3"></script>
-  <script defer src="assets/data-model-storage.js?v=20261012-4"></script>
+  <script defer src="assets/data-model-storage.js?v=20261012-12"></script>
+  <script defer src="import/sbivc-save.js?v=20261012-12"></script>
+  <script defer src="import/sbivc-preview.js?v=20261012-12"></script>
   <script defer src="assets/transaction-view.js?v=20261012-6"></script>
   <script defer src="import/model-preview.js?v=20261010-1"></script>
   <script defer src="import/sbi-save.js?v=20261010-1"></script>
@@ -135,6 +136,7 @@
             <h3>現物暗号資産</h3><div id="sbivc-holdings"></div>
             <div id="sbivc-leverage"></div><div id="sbivc-events"></div>
             <div id="sbivc-issues" aria-live="polite"></div>
+            <div class="save-actions"><p id="sbivc-save-status" class="muted" role="status"></p><button id="sbivc-save" class="primary" hidden>保存</button></div>
           </section>
         </div>
       </details>
@@ -180,6 +182,10 @@
   <dialog id="minano-dialog" aria-labelledby="minano-confirm-title">
     <h2 id="minano-confirm-title">みんなのFX</h2><dl id="minano-confirm-summary"></dl>
     <div class="dialog-actions"><button id="minano-cancel-save" class="secondary" autofocus>キャンセル</button><button id="minano-confirm-save" class="primary">保存</button></div>
+  </dialog>
+  <dialog id="sbivc-dialog" aria-labelledby="sbivc-confirm-title">
+    <h2 id="sbivc-confirm-title">SBI VC</h2><dl id="sbivc-confirm-summary"></dl>
+    <div class="dialog-actions"><button id="sbivc-cancel-save" class="secondary" autofocus>キャンセル</button><button id="sbivc-confirm-save" class="primary">保存</button></div>
   </dialog>
 </body>
 </html>

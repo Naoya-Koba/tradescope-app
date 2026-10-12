@@ -1,12 +1,12 @@
 # Legacy, Experimental, and Known Issues
 
-## SBI VC月次PDF Preview
+## SBI VC月次PDF資産・保有保存
 
-**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をread-only Previewする。帳票資産合計を完全純資産にしない。共通原本Viewerを使い、Storage・Backup v9・legacy履歴・Risk・月次consumerへ接続しない。
+**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有だけで、Backup v10の観測採用Input v3からInputへread-only表示する。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴・Risk・Top／月次consumerへ接続しない。
 
 **Known limitation**：確認済み実PDFの売買・建玉・貸出表は該当なし。実行行は未検証、ヘッダーmappingと空／未検証状態を返す。月次canonical P/L、現物原価・実現／評価P/Lは生成不可。非空表・未知入出庫区分は短い警告で示す。実iPhone Safari／Home Screen PWAの今回のPreview操作は未確認。
 
-**Planned**：実取引行検証、安全な永続mapping、crypto partial projection。ZIP／CSV対応・永続archiveは今回追加しない。
+**Planned**：実取引行検証、共通crypto transaction／cashflow／月次P/L、crypto partial projection。レバレッジ建玉・報酬・cashflowは今回は永続化しない。ZIP／CSV対応・永続archiveは今回追加しない。
 
 ## Current / Known issue — 共通取引source
 
@@ -40,7 +40,7 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 非ゼロ手数料・締後移動・未対応外貨・未知入出金区分・合計不一致は推定補完せず停止する。複数タブの完全排他、quota・中断・実機PWAは引き続きリスクとして扱う。未対応の他brokerへ自動拡張しない。
 
-**Current / v1〜v9互換**：最新Exportはv9。SBI部分入力も9collectionで保護し、v6の旧8collection・v5の7collection範囲は固定する。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
+**Current / v1〜v9互換**：最新Exportはv10。SBI部分入力も9collectionで保護し、v6の旧8collection・v5の7collection範囲は固定する。原値・採用値・override metadataを保護し、v4は旧record＋State v2に固定、v3は旧record限定、v2はStateクリア、v1は新モデル維持。自動Migration・PII・原本保存は行わない。
 
 この文書は、2026-09-26時点のコード読取結果と、その後のCurrent更新を記録する。ここへの記載は修正済みを意味しない。
 

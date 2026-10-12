@@ -4,9 +4,9 @@
 
 **Current / Decided**：標準入口は月次報告書PDF一つ。SBI VCカードでローカル解析し、対象月・date-only基準日・JPY残高・帳票上の資産合計・現物数量／評価レート／公式円換算額を確認する。残高0の銘柄とレバレッジ口座・入出庫／報酬は折りたたむ。共通「PDF原本を確認」を使用する。資産合計を完全な純資産と呼ばず、現物取得原価・月次損益を推定／0表示しない。
 
-**Current**：Previewのみ、保存ボタンなし。Storage mutationなし、Backup v9・legacy・履歴・Risk・Top／月次consumerは不変。ZIP／CSVを標準フローへ追加しない。
+**Current**：Previewで確認後「保存」から資産・現物保有だけを保存する。成功後は「資産・保有情報を保存済み」。同一PDFは全保存内容照合後no-op、訂正版は確認後に採用sourceを切り替えて旧sourceを残す。Inputでは対象月・基準日・JPY残高・帳票資産合計と採用sourceの現物をread-only表示する。損益未確定でありMonthlyAccountStateは作らない。Backup v10で保護し、legacy・履歴・Risk・Top／月次consumerは不変。ZIP／CSVを標準フローへ追加しない。
 
-**Known limitation / Planned**：実売買・建玉・貸出行は未検証で、見出し／列名／明示該当なしの認識に限定する。安全な永続mapping、実取引行の検証、暗号資産partial projectionは別工程。
+**Known limitation / Planned**：実売買・建玉・貸出行は未検証で、見出し／列名／明示該当なしの認識に限定する。現物原価・実現／評価損益、報酬・cashflowのcanonical化、実取引保存、暗号資産partial projectionは別工程。帳票資産合計をレバレッジ込み完全純資産として扱わない。
 
 ## Current / Decided — 共通取引履歴
 
@@ -42,7 +42,7 @@ GMO FXneoの月次PDFはPreviewだけでは保存せず、確認後に月次採�
 
 GMO FXneoは月次の取引残高報告書PDFだけをローカル解析する。Previewは対象月、月末日、決済損益、スワップ、入出金、評価損益、現金残高、純資産、必要証拠金を表示し、個人情報を表示しない。明示確認後にPDF Batch・口座Snapshot・月次Stateを同時保存する。正式合計と取得できた明細・区分別小計・残高式を照合し、不一致、必須値不足、未知区分、非ゼロ手数料、締後移動、未対応の外貨残高は保存不可とする。
 
-**Current**：完全バックアップの最新出力はv9。旧record、State v2、手修正State v3の原値・採用値・変更metadataとSBI部分入力を保護し、v1〜v7互換を維持する。GMO PDF取込UI・月次保存は接続済み。手修正は原Snapshotを保持し、明示編集保存だけでv3化するserviceを用意し、表示だけでは旧v2を変更しない。
+**Current**：完全バックアップの最新出力はv10。旧record、State v2、手修正State v3の原値・採用値・変更metadataとSBI部分入力を保護し、v1〜v7互換を維持する。GMO PDF取込UI・月次保存は接続済み。手修正は原Snapshotを保持し、明示編集保存だけでv3化するserviceを用意し、表示だけでは旧v2を変更しない。
 
 ## 1. 製品定義
 
