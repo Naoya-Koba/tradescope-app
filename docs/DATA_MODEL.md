@@ -1,5 +1,15 @@
 # Data Model
 
+## ImportedTransaction record v2 / Backup v12（Current / Decided）
+
+既存`tradeScopeImportedTransactionsV1`とenvelope v1を維持し、record v1のGMO FX契約は変更しない。record v2は既存必須fieldに`marketType`と`feeSemantics`を追加する。現物はmarketType=spot、normalizedTransactionType=spot-buy／spot-sell、quantityUnit=baseAssetUnitsで、FX open／closeへ変換しない。公式execution／order IDは非空文字列を受理し、provider・account・Batch contextの内側で識別する。同じ公式IDを訂正前後の別Batchに保持可能。decimal文字列と日時の原精度を維持する。
+
+現在のv2保存policyはacc_sbivc_crypto／sbivc／PDF／sbivc-spot-trades／sbivc-monthly Batch／Crypto ASSET/JPYのみ。`feeSemantics=receipt-positive-payment-negative`で、手数料は受取り正・支払い負の原符号を維持する。realizedPnlはnull、P/L・原価・MonthlyAccountStateを生成しない。policy helperと共通record検証を分ける。v12がv1／v2を受理し、公開済みv1〜v11の受理範囲は固定する。
+
+`import/sbivc-transactions-parser.js`は共通extractorの位置付き行と帳票見出しから2行構成の現物買いを読む。実帳票検証済みはspot buyのみ。spot sell／レバレッジ新規・決済／建玉／貸出は未検証で推測保存しない。物理PDFページはsourcePage、sourceRowは認識順で物理行ではない。手数料符号の帳票説明も確認し、取得できた入出金明細のJPY／crypto／fee legsは公式IDで照合する。legsとクイック入金を売買イベントや月次flowとして保存しない。
+
+保存は必要Instrument・Batch・資産観測・採用Input・全約定を一回のexpectedModels／journal保護commitに含める。same-sourceは原値・取引集合まで一致する場合だけno-op。不完全な旧資産のみBatchへ自動backfillしない。訂正前source・取引を残し、履歴はMonthlyAccountInput v3／v4 → 採用AccountSnapshot → Batchの明示参照だけを使用する。補正値は取引原値へ反映しない。legacy aggregate 1行と公式複数fillsをmany-to-one統合／削除しない。Top／Portfolio／Allocation／Risk、月次P/Lへは接続しない。
+
 ## SBI VC観測採用の手動補正（Current / Decided）
 
 明示的な補正保存時のみMonthlyAccountInput record v4を使用し、旧v3は表示・再読込だけで更新しない。v4はv3の全fieldにobservationOverrides／overrideUpdatedAt／overrideHistoryを追加する。既存9キー・envelope v1・Snapshot／Holding schemaは維持し、Backup v11で正式受理する。新しいpartialキーやMonthlyAccountStateは作らない。
@@ -22,7 +32,7 @@ AccountSnapshot v1のcashBalanceはJPY現金、assetValueは帳票「総資産�
 
 同一account・provider・PDF種別・importer/version・月・基準日・hashの一意一致に加えsize／観測／保存対象holding／採用履歴参照を照合し、完全保存済みだけno-op。省略した無関係な0行は欠損ではない。再取込では同月の採用履歴の直前sourceと、保存時点で採用されていた過去月sourceから選別根拠を再現し、その後の訂正を混ぜない。不完全集合は停止する。同月別hashは明示確認と最新採用参照guard一致後に新Batch／Snapshot／Holdingを追記し、Input ID維持＋履歴追記＋参照切替を同一journalで保存する。旧sourceを削除せず、Input表示は明示採用先のholdingだけを読む。表示／reloadだけでは書かない。MonthlyAccountInput v3／Backup v10／永続schemaは不変。
 
-**Known limitation / Planned**：取引・レバレッジ建玉・報酬・入出庫は永続化しない。MonthlyAccountState・損益・原価を推定せず、Top／Allocation／Portfolio／Riskへ接続しない。将来のcrypto transaction／cashflow／月次P/L／partial projectionは別契約として検証する。
+**Known limitation / Planned**：レバレッジ建玉・報酬・入出庫は永続化しない。現物買いは上記v2契約で保存する。MonthlyAccountState・損益・原価を推定せず、Top／Allocation／Portfolio／Riskへ接続しない。未検証取引／cashflow／月次P/L／partial projectionは別工程で検証する。
 
 ## SBI VC read-only parser result（Current / Decided）
 
@@ -32,7 +42,7 @@ JPY残高とassetTotalObservation（帳票「総資産円換算額」）は区�
 
 現物とレバレッジは別collection。列の空欄はnull／missing、`-`等はnull／notApplicable、明示0は数値文字列、該当なしtableはemptyであり0イベントを生成しない。現物原価・実現／評価P/Lを推定しない。JPY入出金・暗号資産入出庫・報酬は分離し、暗号資産移動をJPY deposit／withdrawalへ変換しない。報酬はrecordedAtと明示された対象月を分離しswapにしない。自由な備考・PIIを出口へ含めない。
 
-**Known limitation**：売買／建玉／貸出の実行行は未検証。sectionsの列mapping・empty／unverified状態のみ返し、取引をFX open／closeへ変換しない。Parser結果自体は永続化せず、資産・現物保有だけを上記の別保存serviceへ渡す。transaction persistenceは別工程。
+**Current / Known limitation**：現物買い実行行は上記Parserで検証済み。現物売り／レバレッジ／建玉／貸出行は未検証。emptyはイベントを生成せず、未対応の取引行は保存前停止する。取引をFX open／closeへ変換しない。Parser結果全体は永続化せず、allowlistの資産・現物保有・明示約定だけを別保存serviceへ渡す。
 
 ## Current / Decided — Transaction derived presentation
 
@@ -569,7 +579,7 @@ ImportBatch {
 | みんなのFX | 月次PDF | 同上 |
 | SBI証券 国内株・投資信託 | 約定履歴CSV、保有証券一覧CSV | 取引事実と時点保有を別モデルへ保存 |
 | SBI証券 外国株 | 当面手入力 | 将来Importerを追加可能にする |
-| SBI VCトレード | 月次PDF | 資産／保有のread-only Parser・Validation・Previewを実装。永続保存と月次P/Lは未接続 |
+| SBI VCトレード | 月次PDF | 資産／現物保有・現物買いのParser／確認保存／採用取引履歴を実装。月次P/Lは未接続 |
 | 入出金・資料にない不足値 | 手入力を維持 | 推測補完しない |
 
 **Decided**：手入力機能を削除しない。自動取込値と手入力値は出所を保持し、算出値は派生データとして区別する。

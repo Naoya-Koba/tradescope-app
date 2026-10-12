@@ -54,7 +54,7 @@
   }
   function facts(record, context) {
     const source = record.sources.find(s => s.kind !== 'manual') || record.sources[0];
-    const original = context?.[source?.kind === 'sbi' ? 'raw' : source?.kind === 'gmo' ? 'imported' : 'manual']?.get(source?.id) || {};
+    const original = context?.[source?.kind === 'sbi' ? 'raw' : ['gmo','sbivc'].includes(source?.kind) ? 'imported' : 'manual']?.get(source?.id) || {};
     const raw = original.rawFields || {}, master = context?.instruments.get(record.instrumentId), batch = context?.batches.get(original.importBatchId);
     const domestic = original.sourceProvider === 'sbi' && original.sourceType === 'csv'
       && (batch?.importerId === 'sbi-domestic-csv' || ['国内株式', '国内ETF'].includes(raw.product) || /^(東証|名証|福証|札証)(?:PR|ST|GR|P|S|G)?$/.test(raw.market || ''));
@@ -83,7 +83,7 @@
     const fact = facts(record, context), { raw, original, currency } = fact;
     const quantity = decimal(record.quantity), price = decimal(record.price);
     const shareQuantity = ['shares', '株'].includes(record.quantityUnit) || record.quantityUnit == null && fact.domestic && ['Stock', 'ETF'].includes(record.assetType);
-    const unit = shareQuantity ? '株' : ({ fundUnits: '口' })[record.quantityUnit] || record.quantityUnit || '';
+    const unit = shareQuantity ? '株' : record.quantityUnit==='baseAssetUnits'? ' '+record.symbol.split('/')[0] : ({ fundUnits: '口' })[record.quantityUnit] || record.quantityUnit || '';
     let info = { quantity: quantity === null ? null : number(quantity) + unit, price: amount(price, currency), amount: null, amountLabel: '約定金額', lots: null, units: null };
     if (record.assetType === 'FX') info = { ...info, ...fx(record, fact) };
     else {
@@ -100,8 +100,11 @@
     const signedPnl = pnl !== null && !pnl.startsWith('-') && decimal(record.realizedPnl) !== '0' ? '+' + pnl : pnl;
     const hasTime = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(record.executedAt || '');
     const fullDate = (hasTime ? record.executedAt : record.date).replace('T', ' '), shortDate = record.date.slice(5).replace('-', '/') + (hasTime ? ' ' + record.executedAt.slice(11, 16) : '');
-    const priceLabel = record.assetType === 'FX' ? '約定レート' : record.assetType === 'MutualFund' ? '基準価額' : '約定価格';
-    return { ...info, shortDate, fullDate, dateLabel: hasTime ? '日時' : '日付', priceLabel, settlementObservation: amount(raw.settlementOrPnl, currency), pnl: signedPnl, pnlSign: decimal(record.realizedPnl)?.startsWith('-') ? 'negative' : decimal(record.realizedPnl) === '0' ? 'neutral' : 'positive',
+    const priceLabel = record.assetType === 'FX'||record.marketType==='spot' ? '約定レート' : record.assetType === 'MutualFund' ? '基準価額' : '約定価格';
+    if(record.marketType==='spot')info.price=amount(original.price??record.price,currency,true);
+    const receiptFee=original.feeSemantics==='receipt-positive-payment-negative';
+    const feeText=amount(original.fee,original.feeCurrency,receiptFee),fee=receiptFee&&feeText!==null&&!feeText.startsWith('-')&&decimal(original.fee)!=='0'?'+'+feeText:feeText;
+    return { ...info, fee, feeLabel:receiptFee?'手数料（受取＋／支払−）':'手数料',shortDate, fullDate, dateLabel: hasTime ? '日時' : '日付', priceLabel, settlementObservation: amount(raw.settlementOrPnl, currency), pnl: signedPnl, pnlSign: decimal(record.realizedPnl)?.startsWith('-') ? 'negative' : decimal(record.realizedPnl) === '0' ? 'neutral' : 'positive',
       summary: [info.amount || info.quantity, info.amount || !info.price ? null : record.assetType === 'FX' ? priceLabel + ' ' + info.price : info.price].filter(Boolean).join('　'), facts: fact };
   }
   const api = Object.freeze({ getFxLotSize, number, multiply, createContext, present });

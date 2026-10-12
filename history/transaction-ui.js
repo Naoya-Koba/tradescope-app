@@ -4,7 +4,7 @@
   const view = nodeModule ? require('../assets/transaction-view.js') : root.TradeScopeTransactionView;
   const display = nodeModule ? require('../assets/transaction-display.js') : root.TradeScopeTransactionDisplay;
   const asset = value => ({ Stock: '証券', ETF: 'ETF', MutualFund: '投資信託', Crypto: '暗号資産' })[value] || value;
-  const category = r => ({ new: '新規', add: '追加', partial_close: '一部決済', full_close: '全決済' })[r.category] || (r.type === 'open' ? '新規' : r.type === 'close' ? '決済' : r.category || 'その他');
+  const category = r => r.marketType==='spot'?'現物':({ new: '新規', add: '追加', partial_close: '一部決済', full_close: '全決済' })[r.category] || (r.type === 'open' ? '新規' : r.type === 'close' ? '決済' : r.category || 'その他');
   const side = r => r.side === 'buy' ? '買' : r.side === 'sell' ? '売' : null;
   function create(document) {
     const $ = id => document.getElementById(id);
@@ -19,12 +19,12 @@
       add(p.dateLabel, p.fullDate); add('口座', r.account); if (r.assetType !== 'FX') add('資産', asset(r.assetType)); add('銘柄', r.symbol); add('売買', side(r)); add('区分', category(r));
       add('数量', p.quantity === null ? null : p.quantity + (p.lots !== null && p.units !== null ? `（${display.number(p.units)}通貨）` : '')); add(p.priceLabel, p.price); add(p.amountLabel, p.amount); add('個別損益', p.pnl);
       if (p.amountLabel !== '受渡金額 / 決済損益' || p.amount === null) add('受渡金額 / 決済損益', p.settlementObservation);
-      add('手数料', p.facts.original.fee == null ? null : display.number(p.facts.original.fee) + (p.facts.original.feeCurrency === 'JPY' ? '円' : p.facts.original.feeCurrency ? ' ' + p.facts.original.feeCurrency : ''));
+      add(p.feeLabel, p.fee);
       add('戦略', r.strategy); add('メモ', r.memo);
       addAudit('出典', r.sourceLabel);
       const locations = r.sources.map(s => {
         // GMO sourceRow counts recognized table records, not a printed PDF line.
-        if (s.kind === 'gmo') return Number.isSafeInteger(s.page) && s.page > 0 ? `PDF ${s.page}ページ` : null;
+        if (['gmo','sbivc'].includes(s.kind)) return Number.isSafeInteger(s.page) && s.page > 0 ? `PDF ${s.page}ページ` : null;
         const source = s.kind === 'sbi' ? context?.raw.get(s.id) : null;
         return Number.isSafeInteger(source?.sourceRowNumber) && source.sourceRowNumber > 0 ? `CSV ${source.sourceRowNumber}行` : null;
       }).filter(Boolean);
@@ -68,8 +68,8 @@
       if (!$('filterMonth').value) $('filterMonth').value = records[0]?.date.slice(0, 7) || new Date().toISOString().slice(0, 7);
       options('filterAccount', [['', 'すべて'], ...[...new Map(records.filter(r => r.accountId).map(r => [r.accountId, r.account])).entries()]]);
       options('filterSymbol', [['', 'すべて'], ...[...new Map(records.map(r => [r.instrumentKey || r.symbol, r.symbol])).entries()]]);
-      options('filterStrategy', [['', 'すべて'], ...pairs('strategy')]); options('filterCategory', [['', 'すべて'], ['open', '新規'], ['close', '決済'], ['other', 'その他']]);
-      options('filterSource', [['', 'すべて'], ['manual', '手入力'], ['sbi', 'SBI CSV'], ['gmo', 'GMO PDF']]); return render();
+      options('filterStrategy', [['', 'すべて'], ...pairs('strategy')]); options('filterCategory', [['', 'すべて'], ['open', '新規'], ['close', '決済'], ['spot-buy','現物 買'], ['spot-sell','現物 売'], ['other', 'その他']]);
+      options('filterSource', [['', 'すべて'], ['manual', '手入力'], ['sbi', 'SBI CSV'], ['gmo', 'GMO PDF'], ['sbivc','SBI VC PDF']]); return render();
     }
     function fail() { failed = true; records = []; render(); }
     $('historyMore').addEventListener('click', () => { limit += 50; render(false); }); return Object.freeze({ refresh, render, fail });

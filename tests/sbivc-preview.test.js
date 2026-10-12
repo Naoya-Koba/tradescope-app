@@ -14,6 +14,14 @@ function setup(options = {}) {
   return { ui, elements, sources, events, file: new Blob(['%PDF-1.7 synthetic']) };
 }
 function text(element) { return [element.textContent, ...element.children.map(text)].join(' '); }
+test('official spot Preview shows four fills and signed receipt fees; confirms count before explicit save',async()=>{
+ const {tradesFixture}=require('./sbivc-trades-fixture.js');let calls=0;
+ const h=setup({extract:async()=>tradesFixture(),service:{inspect:async()=>({status:'ready',holdingCount:1,transactionCount:4}),save:async()=>{calls++;return{status:'saved'};}}});
+ await h.ui.select(h.file);assert.equal(calls,0);assert.match(text(h.elements['sbivc-events']),/現物取引（4件）/);assert.match(text(h.elements['sbivc-events']),/手数料（受取＋／支払−） \+11円/);
+ h.elements['sbivc-save'].listeners.click();assert.match(text(h.elements['sbivc-confirm-summary']),/現物取引 4件/);
+ await h.elements['sbivc-confirm-save'].listeners.click();assert.equal(calls,1);assert.equal(h.elements['sbivc-save'].hidden,true);assert.equal(h.elements['sbivc-save-status'].textContent,'資産・保有・取引情報を保存済み');
+});
+test('unsupported spot sell Preview never offers save or mislabels it as new/open',async()=>{const {tradesFixture}=require('./sbivc-trades-fixture.js');const h=setup({extract:async()=>tradesFixture({side:'売'}),service:{inspect:async()=>{throw Error('should not inspect invalid source');}}});await h.ui.select(h.file);assert.equal(h.elements['sbivc-save'].hidden,true);assert.match(text(h.elements['sbivc-issues']),/まだ対応していません/);});
 test('source hash precedes PDF worker buffer transfer',async()=>{
  let originalHash;const crypto=require('node:crypto');
  const h=setup({hashBytes:async bytes=>crypto.createHash('sha256').update(bytes).digest('hex'),

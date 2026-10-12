@@ -6,7 +6,10 @@
     SBIVC_DOCUMENT_NOT_RECOGNIZED: 'SBI VCの月次報告書として認識できませんでした', SBIVC_PARSE_FAILED: '必要な帳票項目を読み取れませんでした',
     SBIVC_PERIOD_INVALID: '対象期間・基準日を確認できませんでした', SBIVC_CASHFLOW_TYPE_UNVERIFIED: '入出庫の区分を確認できない行があります',
     SBIVC_TRADES_ROWS_UNVERIFIED: '売買明細のある帳票は未検証です', SBIVC_POSITIONS_ROWS_UNVERIFIED: '建玉明細のある帳票は未検証です',
-    SBIVC_LENDING_ROWS_UNVERIFIED: '貸出明細のある帳票は未検証です', SBIVC_SAVE_INSPECTION_FAILED: '保存済みの情報を確認できませんでした' });
+    SBIVC_LENDING_ROWS_UNVERIFIED: '貸出明細のある帳票は未検証です', SBIVC_SAVE_INSPECTION_FAILED: '保存済みの情報を確認できませんでした',
+    SBIVC_TRADE_HEADER_INVALID:'取引明細の形式を確認できませんでした',SBIVC_TRADE_ROW_INVALID:'取引明細を読み取れませんでした',
+    SBIVC_TRADE_SEMANTICS_UNVERIFIED:'この取引区分にはまだ対応していません',SBIVC_TRADE_ID_DUPLICATE:'取引番号を一意に確認できませんでした',
+    SBIVC_FEE_SEMANTICS_UNVERIFIED:'手数料の符号を確認できませんでした',SBIVC_TRADE_SETTLEMENT_MISMATCH:'取引明細と受渡明細が一致しませんでした' });
   function createUI({ document, parser, extract, viewer, window, service, hashBytes }) {
     const $ = id => document.getElementById('sbivc-' + id);
     let controller = null, sequence = 0, source = null, inspected = null, saving = false;
@@ -29,7 +32,7 @@
     function saveStatus(result){
       inspected=result;$('save').hidden=!['ready','review-required'].includes(result.status);
       $('save').textContent='保存';
-      $('save-status').textContent=['saved','already-imported'].includes(result.status)?'資産・保有情報を保存済み'
+      $('save-status').textContent=['saved','already-imported'].includes(result.status)?(source?.preview.transactions.length?'資産・保有・取引情報を保存済み':'資産・保有情報を保存済み')
         :result.status==='review-required'?'同じ月の保存内容を訂正します':result.status==='conflict'?'保存済みの情報と照合できませんでした':'';
     }
     function render(result) {
@@ -58,9 +61,18 @@
             metric(dl, label, amount(result.leverageSummary[field], field !== 'maintenanceRate') + (field === 'maintenanceRate' && result.leverageSummary[field] !== null ? '%' : ''));
           detail.append(dl); $('leverage').append(detail);
         }
+        if (result.transactions.length) {
+          const detail=node('details','');detail.append(node('summary',`現物取引（${result.transactions.length}件）`));
+          for(const t of result.transactions){
+            const card=node('div','','sbivc-holding');card.append(node('strong',`${t.symbol}　現物 買`));const dl=node('dl','');
+            metric(dl,'約定日時',t.executedAt.replace('T',' '));metric(dl,'数量',amount(t.quantity));metric(dl,'約定レート',amount(t.price,true));
+            metric(dl,'手数料（受取＋／支払−）',(!t.fee.startsWith('-')&&!/^0(?:\.0+)?$/.test(t.fee)?'+':'')+amount(t.fee,true));
+            card.append(dl);detail.append(card);
+          }$('events').append(detail);
+        }
         if (result.cashflows.length) {
           const detail = node('details', ''); detail.append(node('summary', `入出庫・報酬（${result.cashflows.length}件）`));
-          const labels = { jpyDeposit: 'JPY入金', jpyWithdrawal: 'JPY出金', cryptoInbound: '暗号資産入庫', cryptoOutbound: '暗号資産出庫', stakingReward: 'ステーキング報酬', other: 'その他' };
+          const labels = { jpyDeposit: 'JPY入金', jpyWithdrawal: 'JPY出金', cryptoInbound: '暗号資産入庫', cryptoOutbound: '暗号資産出庫', stakingReward: 'ステーキング報酬', tradeSettlement:'現物取引の受渡',tradeFee:'取引手数料',other: 'その他' };
           for (const flow of result.cashflows) {
             const card = node('div', '', 'sbivc-holding'); card.append(node('strong', labels[flow.kind])); const dl = node('dl', '');
             metric(dl, '記載日時', flow.recordedAt?.replace('T', ' ') || '—'); metric(dl, '暗号資産・通貨', flow.asset); metric(dl, '数量', amount(flow.quantity));
@@ -116,7 +128,8 @@
       metric($('confirm-summary'),'対象月',source.preview.report.targetMonth.replace('-','/'));
       metric($('confirm-summary'),'基準日',source.preview.report.snapshotAsOf.replaceAll('-','/'));
       metric($('confirm-summary'),'現物保有銘柄',`${inspected.holdingCount??source.preview.spotHoldings.length}件`);
-      if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する資産・保有情報を切り替えます');
+      if(source.preview.transactions.length)metric($('confirm-summary'),'現物取引',`${source.preview.transactions.length}件`);
+      if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する原本情報を切り替えます');
       $('dialog').showModal();
     });
     $('cancel-save').addEventListener('click',()=>{if(!saving)$('dialog').close();});

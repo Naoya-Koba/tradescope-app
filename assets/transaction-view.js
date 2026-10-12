@@ -1,7 +1,7 @@
 (function(root){
  'use strict';
  const node=typeof module!=='undefined'&&module.exports,storage=node?require('./data-model-storage.js'):root.TradeScopeDataStorage;
- const version='transactions-view-v1',rows=(m,e)=>m?.[e]?.records||[];
+ const version='transactions-view-v2',rows=(m,e)=>m?.[e]?.records||[];
  const aliases=Object.freeze({gmo:'acc_gmo_fx','gmofxneo':'acc_gmo_fx','gmoクリック証券':'acc_gmo_fx',lightfx:'acc_lightfx_fx','みんなのfx':'acc_minna_fx',minna:'acc_minna_fx',minano:'acc_minna_fx',sbi:'acc_sbi_sec','sbi証券':'acc_sbi_sec','sbivc':'acc_sbivc_crypto','sbivcトレード':'acc_sbivc_crypto','三井住友銀行':'acc_smbc_bank'});
  const labels=Object.freeze({acc_gmo_fx:'GMO FXneo',acc_lightfx_fx:'LIGHT FX',acc_minna_fx:'みんなのFX',acc_sbi_sec:'SBI証券',acc_sbivc_crypto:'SBI VC',acc_smbc_bank:'三井住友銀行'});
  const accountKey=v=>String(v??'').trim().replace(/\s/g,'').toLowerCase();
@@ -22,7 +22,14 @@
   if(pair)return{instrumentId:id||null,instrumentKey:'FX:'+pair,symbol:pair,assetType:'FX'};
   const exact=rows(models,'instruments').filter(r=>r.symbol===symbol||r.displayName===symbol);
   const chosen=master||(!id&&exact.length===1?exact[0]:null);return{instrumentId:chosen?.id||null,instrumentKey:chosen?'ID:'+chosen.id:null,symbol:symbol||chosen?.symbol||'—',assetType:type||'その他'};}
- function activeBatches(models){const ids=new Set();for(const state of rows(models,'monthlyAccountStates')){const snap=rows(models,'accountSnapshots').find(s=>s.id===state.adoptedAccountSnapshotId);if(snap)ids.add(snap.importBatchId);}return ids;}
+ function activeBatches(models){const ids=new Set();for(const state of rows(models,'monthlyAccountStates')){const snap=rows(models,'accountSnapshots').find(s=>s.id===state.adoptedAccountSnapshotId);if(snap)ids.add(snap.importBatchId);}
+  for(const input of rows(models,'monthlyAccountInputs')){
+   if(input.accountId!=='acc_sbivc_crypto'||![3,4].includes(input.schemaVersion))continue;
+   const matches=rows(models,'monthlyAccountInputs').filter(i=>i.accountId===input.accountId&&i.targetMonth===input.targetMonth);
+   const snap=rows(models,'accountSnapshots').find(s=>s.id===input.adoptedAccountSnapshotId),batch=rows(models,'importBatches').find(b=>b.id===snap?.importBatchId);
+   if(matches.length===1&&snap?.accountId===input.accountId&&snap.targetMonth===input.targetMonth&&snap.sourceScope==='sbivc-monthly-assets'
+     &&snap.sourceMode==='imported'&&batch?.accountId===input.accountId&&batch.targetMonth===input.targetMonth&&batch.sourceProvider==='sbivc'&&batch.sourceType==='pdf'&&batch.importerId==='sbivc-monthly')ids.add(batch.id);
+  }return ids;}
  function normalize(manual,models){
   const normalized=[];
   for(const e of manual||[]){if(!e||typeof e!=='object')continue;const account=accountId(e.account,models),date=String(e.date||''),quantity=decimal(e.quantity),price=decimal(e.rate);
@@ -40,14 +47,15 @@
   const active=activeBatches(models);
   for(const r of rows(models,'importedTransactions')){if(!active.has(r.importBatchId))continue;const ins=rows(models,'instruments').find(i=>i.id===r.instrumentId);
    normalized.push({id:'imported:'+r.id,manualId:null,date:r.tradeDate,executedAt:r.executedAt,accountId:r.accountId,account:labels[r.accountId]||r.accountId,...instrument(ins?.symbol,ins?.assetType,r.instrumentId,models),
-    side:r.side,type:r.normalizedTransactionType,category:r.rawTransactionType,quantity:r.quantity,quantityUnit:'約定数',unitKey:null,price:r.price,realizedPnl:r.realizedPnl,currency:r.currency,strategy:'',memo:'',
-    sources:[{kind:'gmo',id:r.id,importBatchId:r.importBatchId,page:r.sourcePage,row:r.sourceRow}],sourceLabel:'GMO PDF',sourceProvider:r.sourceProvider,executionId:r.providerExecutionId,orderId:r.providerOrderId});
+    side:r.side,type:r.normalizedTransactionType,category:r.rawTransactionType,marketType:r.marketType||null,quantity:r.quantity,quantityUnit:r.schemaVersion===2?r.quantityUnit:'約定数',unitKey:null,price:r.price,realizedPnl:r.realizedPnl,fee:r.fee,feeSemantics:r.feeSemantics||null,currency:r.currency,strategy:'',memo:'',
+    sources:[{kind:r.schemaVersion===2?'sbivc':'gmo',id:r.id,importBatchId:r.importBatchId,page:r.sourcePage,row:r.sourceRow}],sourceLabel:r.schemaVersion===2?'SBI VC PDF':'GMO PDF',sourceProvider:r.sourceProvider,executionId:r.providerExecutionId,orderId:r.providerOrderId});
   }
   return normalized;
  }
  const signature=r=>r.accountId&&r.instrumentKey&&r.side&&r.quantity!==null&&r.price!==null&&r.type!=='other'
   ?JSON.stringify([r.accountId,r.instrumentKey,r.side,r.date,r.type,r.unitKey,decimal(r.quantity),decimal(r.price)]):null;
- const compatible=(a,b)=>['realizedPnl','currency'].every(k=>a[k]===null||b[k]===null||a[k]===b[k]);
+ const compatible=(a,b)=>['realizedPnl','currency'].every(k=>a[k]===null||b[k]===null||a[k]===b[k])
+  &&(!(a.sourceProvider==='sbivc'||b.sourceProvider==='sbivc')||a.fee===b.fee&&a.feeSemantics===b.feeSemantics);
  function resolve(manual,models){const records=normalize(manual,models),hidden=new Set(),groups=new Map();
   for(const r of records.filter(r=>r.sources[0].kind!=='manual')){let key;
    if(r.executionId||r.orderId&&r.executedAt)key=JSON.stringify([r.accountId,r.sourceProvider,r.executionId?'execution':'order',r.executionId||r.orderId]);

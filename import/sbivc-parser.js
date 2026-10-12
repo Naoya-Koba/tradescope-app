@@ -1,7 +1,8 @@
 (function (root) {
   'use strict';
   const csv = typeof module !== 'undefined' && module.exports ? require('./csv-core.js') : root.TradeScopeCSV;
-  const version = 'sbivc-monthly-preview-v1';
+  const tradesParser = typeof module !== 'undefined' && module.exports ? require('./sbivc-transactions-parser.js') : root.TradeScopeSBIVCTransactionsParser;
+  const version = 'sbivc-monthly-preview-v2';
   const clean = value => String(value ?? '').replace(/\s+/g, ' ').trim();
   const compact = value => clean(value).replace(/\s/g, '');
   const sectionNames = Object.freeze({ '口座残高（現物）': 'spot', '口座残高（レバレッジ）': 'leverage',
@@ -51,10 +52,10 @@
     const error = code => issue(errors, code), warning = code => issue(warnings, code);
     const report = { provider: 'sbivc', reportType: 'monthly', periodStart: null, periodEnd: null, targetMonth: null, snapshotAsOf: null };
     const accountObservations = { jpyCash: null, assetTotalObservation: null, valuationCurrency: 'JPY' };
-    const spotHoldings = [], leverageSummary = {}, cashflows = [], rewards = [];
+    const spotHoldings = [], leverageSummary = {}, cashflows = [], rewards = [];let transactions=[];
     const sections = Object.fromEntries(['spot', 'leverage', 'positions', 'trades', 'cashflows', 'lending'].map(k => [k, { status: 'missing', sourcePages: [], headerFields: [] }]));
     const result = () => ({ valid: errors.length === 0, version, report, accountObservations, spotHoldings, leverageSummary,
-      leveragePositions: [], transactions: [], cashflows, rewards, lending: [], sections, errors, warnings });
+      leveragePositions: [], transactions, cashflows, rewards, lending: [], sections, errors, warnings });
     if (!detect(extracted)) { error('SBIVC_DOCUMENT_NOT_RECOGNIZED'); return result(); }
     const pages = extracted.pages.map(p => ({ number: p.number, rows: rows(p) }));
     let section = null, spotHeader = null, cashHeader = null, lastFlow = null;
@@ -148,6 +149,9 @@
           }
           if (text.startsWith('※')) continue;
           if (text.startsWith('備考：')) {
+            const execution = /^備考：現物取引番号\(([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\)$/.exec(text);
+            if(lastFlow&&execution)lastFlow.providerExecutionId=execution[1];
+            if(lastFlow&&text==='備考：クイック入金')lastFlow.externalSource='quickDeposit';
             // Parse only explicitly named reward type/month; never return arbitrary remarks or PII.
             if (lastFlow && /ステーキング報酬/.test(text)) {
               const m = /（(\d{4})年(\d{1,2})月分）/.exec(text);
@@ -167,10 +171,11 @@
           try { recordedAt = csv.observation(cells[0]); } catch (_) { error('SBIVC_CASHFLOW_ROW_INVALID'); }
           const asset = cells[2];
           if (!/^[A-Z][A-Z0-9]{1,19}$/.test(asset)) { error('SBIVC_CASHFLOW_ROW_INVALID'); lastFlow = null; continue; }
-          const knownTypes = ['入金', '出金', '入庫', '出庫', 'ステーキング', '現物買', '現物売', 'その他'];
+          const knownTypes = ['入金', '出金', '入庫', '出庫', '入金・入庫', '出金・出庫', '現物取引', '取引手数料', 'ステーキング', '現物買', '現物売', 'その他'];
           const sourceType = knownTypes.includes(compact(cells[1])) ? compact(cells[1]) : null;
-          const kind = sourceType === 'ステーキング' ? 'stakingReward' : ['入金', '入庫'].includes(sourceType) ? asset === 'JPY' ? 'jpyDeposit' : 'cryptoInbound'
-            : ['出金', '出庫'].includes(sourceType) ? asset === 'JPY' ? 'jpyWithdrawal' : 'cryptoOutbound' : 'other';
+          const kind = sourceType === 'ステーキング' ? 'stakingReward' : ['入金', '入庫','入金・入庫'].includes(sourceType) ? asset === 'JPY' ? 'jpyDeposit' : 'cryptoInbound'
+            : ['出金', '出庫','出金・出庫'].includes(sourceType) ? asset === 'JPY' ? 'jpyWithdrawal' : 'cryptoOutbound'
+            : sourceType==='現物取引'?'tradeSettlement':sourceType==='取引手数料'?'tradeFee':'other';
           lastFlow = { recordedAt, sourceType, kind, asset, quantity: number(cells[3]), valuationRate: number(cells[4]),
             reportedJPYAmount: number(cells[5]), sourcePage: page.number };
           if (lastFlow.quantity === null || !recordedAt) error('SBIVC_CASHFLOW_ROW_INVALID');
@@ -195,7 +200,29 @@
       const values = [accountObservations.jpyCash, ...spotHoldings.map(h => h.officialJPYValue)];
       if (values.some(v => v === null) || !zero(csv.sum([...values, '-' + spotSubtotal]))) error('SBIVC_SPOT_TOTAL_MISMATCH');
     }
-    for (const key of ['trades', 'positions', 'lending']) {
+    const parsedTrades=tradesParser.parse(pages,report.targetMonth);
+    transactions=parsedTrades.transactions;sections.trades.status=parsedTrades.status;
+    for(const code of parsedTrades.errors)error(code);
+    for(const code of parsedTrades.warnings)warning(code);
+    if(transactions.length){
+      const notes=compact(pages.flatMap(p=>p.rows.map(r=>r.text)).join(''));
+      if(!notes.includes('受取り手数料をプラス')||!notes.includes('支払い手数料をマイナス'))error('SBIVC_FEE_SEMANTICS_UNVERIFIED');
+      for(const t of transactions){
+        const legs=cashflows.filter(f=>f.providerExecutionId===t.providerExecutionId);
+        if(!legs.length)continue;
+        const crypto=legs.filter(f=>f.kind==='tradeSettlement'&&f.asset===t.symbol.split('/')[0]);
+        const jpy=legs.filter(f=>f.kind==='tradeSettlement'&&f.asset==='JPY');
+        const fees=legs.filter(f=>f.kind==='tradeFee'&&f.asset==='JPY');
+        if(legs.length!==3||crypto.length!==1||jpy.length!==1||fees.length!==1
+          ||[crypto[0].quantity,jpy[0].quantity,fees[0].quantity].some(v=>v===null)
+          ||!zero(csv.sum([crypto[0].quantity,'-'+t.quantity]))||!jpy[0].quantity.startsWith('-')
+          ||!zero(csv.sum([jpy[0].quantity,tradesParser.product(t.quantity,t.price)]))
+          ||!zero(csv.sum([fees[0].quantity,t.fee.startsWith('-')?t.fee.slice(1):'-'+t.fee])))error('SBIVC_TRADE_SETTLEMENT_MISMATCH');
+      }
+      if(cashflows.some(f=>f.providerExecutionId&&!transactions.some(t=>t.providerExecutionId===f.providerExecutionId)
+        ||['tradeSettlement','tradeFee'].includes(f.kind)&&!f.providerExecutionId))error('SBIVC_TRADE_SETTLEMENT_MISMATCH');
+    }
+    for (const key of ['positions', 'lending']) {
       if (sections[key].status === 'present') sections[key].status = 'unverified';
       if (sections[key].status === 'unverified') warning('SBIVC_' + key.toUpperCase() + '_ROWS_UNVERIFIED');
     }

@@ -1,12 +1,18 @@
 # Legacy, Experimental, and Known Issues
 
+## SBI VC現物買い取引（Current / Known limitation）
+
+現物買いの実帳票行をread-only検証済み。明示された約定をImportedTransaction v2／Backup v12で保存・採用履歴へ表示する。現物売り・レバレッジ新規／決済・実建玉・貸出は未検証で保存停止する。月次P/L・取得原価・評価P/Lを推定しない。入出金明細のsettlement／fee legsとクイック入金は売買イベントでもcanonical月次flowでもない。
+
+訂正旧sourceは保持し、採用Input参照だけでactive取引を選ぶ。legacy aggregate 1行＋公式複数fillsは共存し、many-to-one統合／削除は未実装。旧資産のみBatchに明細が欠ける場合は自動backfillせず停止する。原本PDF／PIIは保存せず、本番Storageは操作しない。実iPhone操作は未確認。Top／Portfolio／Allocation／Riskは不変。
+
 ## SBI VC月次PDF資産・保有保存
 
-**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有だけ。Inputは旧観測採用v3／補正v4を読み、通常read-only、明示「修正」時だけ採用値を編集する。原本Snapshotは不変、active補正と訂正履歴はBackup v11で保護し、v1〜v10も復元可能。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴・Risk・Top／月次consumerへ接続しない。
+**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有と検証済み現物買い。Inputは旧観測採用v3／補正v4を読み、通常read-only、明示「修正」時だけ採用値を編集する。原本Snapshotは不変、active補正と訂正履歴はBackup v12で保護し、v1〜v11も復元可能。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴を変更せずRisk・Top／月次consumerへ接続しない。
 
-**Known limitation**：確認済み実PDFの売買・建玉・貸出表は該当なし。実行行は未検証、ヘッダーmappingと空／未検証状態を返す。月次canonical P/L、現物原価・実現／評価P/Lは生成不可。非空表・未知入出庫区分は短い警告で示す。実iPhone Safari／Home Screen PWAの今回のPreview操作は未確認。
+**Known limitation**：前工程の該当なし帳票に加え現物買い実行行を検証済み。現物売り／レバレッジ／建玉／貸出の実行行は未検証。月次canonical P/L、現物原価・実現／評価P/Lは生成不可。未知取引区分・不整合は保存前停止する。実iPhone Safari／Home Screen PWAの今回の操作は未確認。
 
-**Planned**：実取引行検証、共通crypto transaction／cashflow／月次P/L、crypto partial projection。レバレッジ建玉・報酬・cashflowは今回は永続化しない。ZIP／CSV対応・永続archiveは今回追加しない。
+**Planned**：未検証取引行の確認、共通crypto cashflow／月次P/L、crypto partial projection。レバレッジ建玉・報酬・cashflowは今回は永続化しない。ZIP／CSV対応・永続archiveは今回追加しない。
 
 ## Current / Known issue — 共通取引source
 

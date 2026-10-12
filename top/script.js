@@ -2481,7 +2481,7 @@ function updateDataByYear(inputYear = null) {
 
 // ===== Backup Format Core (pure functions; no storage writes) =====
 const COMPLETE_BACKUP_PRODUCT = 'TradeScope';
-const COMPLETE_BACKUP_VERSION = 11;
+const COMPLETE_BACKUP_VERSION = 12;
 const backupDataStorage = window.TradeScopeDataStorage;
 const backupStorageTransaction = window.TradeScopeStorageTransaction;
 const COMPLETE_BACKUP_RESTORE_JOURNAL_KEY = 'tradeScopeRestoreJournalV1';
@@ -2520,7 +2520,7 @@ const COMPLETE_BACKUP_FORMATS = Object.freeze({
   V8: 'v8-complete',
   V9: 'v9-complete',
   V10: 'v10-complete',
-  V11: 'v11-complete',
+  V11: 'v11-complete', V12: 'v12-complete',
   LEGACY_ALL: 'legacy-all',
   LEGACY_PROFIT: 'legacy-profit',
   LEGACY_HISTORY: 'legacy-history',
@@ -2552,7 +2552,7 @@ function detectBackupFormat(value) {
 
   if (hasOwn(value, 'product') || hasOwn(value, 'backupVersion')) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) return COMPLETE_BACKUP_FORMATS.INVALID;
-    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
+    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(value.backupVersion)) return COMPLETE_BACKUP_FORMATS.UNSUPPORTED_VERSION;
     return COMPLETE_BACKUP_FORMATS['V' + value.backupVersion];
   }
 
@@ -2604,7 +2604,7 @@ function validateBackupValue(value, format = detectBackupFormat(value)) {
     return ['unsupported backupVersion'];
   }
 
-  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11].includes(format)) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11, COMPLETE_BACKUP_FORMATS.V12].includes(format)) {
     if (value.product !== COMPLETE_BACKUP_PRODUCT) errors.push('product must be TradeScope');
     const version = Number(format.match(/^v(\d+)/)[1]);
     if (value.backupVersion !== version) errors.push('backupVersion does not match format');
@@ -2688,13 +2688,13 @@ function normalizeBackupValue(value, format = detectBackupFormat(value)) {
   const normalized = {
     format,
     exportedAt: typeof value?.exportedAt === 'string' ? value.exportedAt : '',
-    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11].includes(format) ? 'complete' : 'legacy-partial',
+    restoreMode: [COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11, COMPLETE_BACKUP_FORMATS.V12].includes(format) ? 'complete' : 'legacy-partial',
     coverage: { ...emptyCoverage },
     data: {},
     warnings: []
   };
 
-  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11].includes(format)) {
+  if ([COMPLETE_BACKUP_FORMATS.V1, COMPLETE_BACKUP_FORMATS.V2, COMPLETE_BACKUP_FORMATS.V3, COMPLETE_BACKUP_FORMATS.V4, COMPLETE_BACKUP_FORMATS.V5, COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11, COMPLETE_BACKUP_FORMATS.V12].includes(format)) {
     const data = isPlainRecord(value.data) ? value.data : {};
     const legacy = isPlainRecord(data.legacy) ? data.legacy : {};
     normalized.coverage = {
@@ -2786,11 +2786,11 @@ function buildBackupRestorePlan(normalized) {
       const value = normalized.data.models[entity];
       operations.push(value === null ? { type: 'remove', storageKey } : { type: 'set', storageKey, value });
     });
-    if (![COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11].includes(normalized.format)) {
+    if (![COMPLETE_BACKUP_FORMATS.V6, COMPLETE_BACKUP_FORMATS.V7, COMPLETE_BACKUP_FORMATS.V8, COMPLETE_BACKUP_FORMATS.V9, COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11, COMPLETE_BACKUP_FORMATS.V12].includes(normalized.format)) {
       operations.push({ type: 'remove', storageKey: backupDataStorage.keys.monthlyAccountInputs });
       normalized.warnings.push('旧モデル復元と矛盾しないよう口座部分入力をクリアする');
     }
-    if(![COMPLETE_BACKUP_FORMATS.V9,COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11].includes(normalized.format)){
+    if(![COMPLETE_BACKUP_FORMATS.V9,COMPLETE_BACKUP_FORMATS.V10, COMPLETE_BACKUP_FORMATS.V11, COMPLETE_BACKUP_FORMATS.V12].includes(normalized.format)){
       operations.push({type:'remove',storageKey:backupDataStorage.keys.importedTransactions});
       normalized.warnings.push('旧モデル復元と矛盾しないよう新しいPDF取引sourceをクリアする');
     }
@@ -2862,7 +2862,7 @@ function getBackupFormatLabel(format) {
     [COMPLETE_BACKUP_FORMATS.V8]: '完全バックアップv8',
     [COMPLETE_BACKUP_FORMATS.V9]: '完全バックアップv9',
     [COMPLETE_BACKUP_FORMATS.V10]: '完全バックアップv10',
-    [COMPLETE_BACKUP_FORMATS.V11]: '完全バックアップv11',
+    [COMPLETE_BACKUP_FORMATS.V11]: '完全バックアップv11', [COMPLETE_BACKUP_FORMATS.V12]: '完全バックアップv12',
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: '旧統合バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: '旧損益バックアップ',
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: '旧履歴バックアップ'
@@ -3094,7 +3094,7 @@ function prepareBackupRestoreActions(restorePlan, storage) {
     [COMPLETE_BACKUP_FORMATS.V8]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.V9]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.V10]: [...legacyCompleteKeys, ...versionModelKeys],
-    [COMPLETE_BACKUP_FORMATS.V11]: [...legacyCompleteKeys, ...versionModelKeys],
+    [COMPLETE_BACKUP_FORMATS.V11]: [...legacyCompleteKeys, ...versionModelKeys], [COMPLETE_BACKUP_FORMATS.V12]: [...legacyCompleteKeys, ...versionModelKeys],
     [COMPLETE_BACKUP_FORMATS.LEGACY_ALL]: ['tradingData', 'yearInitialFunds', 'tradeScopeTradeHistoryV1'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_PROFIT]: ['tradingData', 'yearInitialFunds'],
     [COMPLETE_BACKUP_FORMATS.LEGACY_HISTORY]: ['tradeScopeTradeHistoryV1']

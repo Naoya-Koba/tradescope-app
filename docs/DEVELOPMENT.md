@@ -1,18 +1,26 @@
 # Development Guide
 
+## SBI VC現物買い取引 / Backup v12（Current）
+
+`import/sbivc-transactions-parser.js`は帳票見出しと列位置で現物買い2行を読む純粋Parser。共通PDF.js／Safari reader／Viewerは変更しない。手数料符号説明と公式IDに対応したsettlement legsを検証し、PIIや自由備考を結果へ渡さない。実帳票で検証済みはspot buyのみで、spot sell／レバレッジ／貸出の推測対応はしない。
+
+`sbivc-save.js`は資産保存と同じRepository操作に必要InstrumentとImportedTransaction v2を含め、expectedModels／journal／全キー再読込でatomic保存する。v1 GMOは維持。SBI VC active sourceはMonthlyAccountInput → AccountSnapshot → Batchで共通transaction resolverが解決し、訂正前recordは残す。manual aggregateと複数fillsの自動統合なし。UIは現物・買・暗号資産単位・精度保持の約定レート・受取＋／支払−の手数料と物理PDFページを表示する。sourceRowは内部認識順で原本行として表示しない。
+
+完全Backup v12は同じ9モデルのImportedTransaction v2を受理し、旧v1〜v11範囲は固定する。SBI VC Input補正v4／採用v3は不変。新取引は月次P/L・外部入出金・Top／Portfolio／Allocation／Riskへ接続しない。cashflow legsから追加取引を生成しない。匿名testsでsigned fee、精度、訂正採用、manual共存、same-source no-op、全依存rollback、旧Backup互換を検証する。実PDFはread-only解析のみ、本番Storage・実Restore・実PDF保存なし。PWA v293、変更資産query 20261012-16、PDF.js資産は不変。
+
 ## SBI VC月次PDF資産・保有保存（Current）
 
-**Current — 手動補正**：`assets/observation-adoption.js`がimmutable原本＋疎なoverrideを共通解決し、`assets/observation-override-save.js`がGMOと同じCSV decimal処理／Storage decimal同値比較／Repository expectedModels／journalを使用する。UIは独自Storage writeを持たず、修正・reset・キャンセルは画面内Draft、明示保存だけInput v4へ更新する。holding ID＋Instrument ID＋採用Snapshotで参照を検証し、補正履歴は原本参照＋旧差分を追記する。訂正版PDFではactive補正を空にして新公式値を採用し、旧補正は残す。MonthlyAccountState／取引／損益／下流consumerへ接続しない。Backup v11、旧v1〜v10の検証意味を維持。PWA v292、変更資産query 20261012-15。
+**Current — 手動補正**：`assets/observation-adoption.js`がimmutable原本＋疎なoverrideを共通解決し、`assets/observation-override-save.js`がGMOと同じCSV decimal処理／Storage decimal同値比較／Repository expectedModels／journalを使用する。UIは独自Storage writeを持たず、修正・reset・キャンセルは画面内Draft、明示保存だけInput v4へ更新する。holding ID＋Instrument ID＋採用Snapshotで参照を検証し、補正履歴は原本参照＋旧差分を追記する。訂正版PDFではactive補正を空にして新公式値を採用し、旧補正は残す。MonthlyAccountState／取引／損益／下流consumerへ接続しない。Backup v12、旧v1〜v11の検証意味を維持。PWA v293、手動補正資産query 20261012-15は変更なし。
 
 **Current — 補正検証**：既存766＋追加54の全820 testsを検証。匿名localhostの実ブラウザで補正保存／reload／reset／cancel／訂正版／容量不足相当rollbackを確認し、原本不変・State不在・旧補正履歴保持を確認する。PC1280／mobile390は横overflowなし、Console Error／Warningなし。本番Storage・実PDF・実Backupは使用しない。実iPhoneは未確認。
 
-`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放・確認保存を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDNを追加しない。`import/sbivc-save.js`が保存直前再検証、Instrument解決、same-source検算、訂正guard、全レコードのatomic journal保存を担当する。Inputの`assets/observation-input-ui.js`はMonthlyAccountInput v3／v4の採用先を通常read-only表示し、共通account cardの開閉処理を利用する。初期状態は閉じ、保存済みstatusと観測内容は展開内に置く。開閉状態は永続化しない。PWA v292、observation Input／soneki資産query 20261012-15、save資産query 20261012-15、preview資産query 20261012-13、その他資産／PDF.jsは不変。
+`import/sbivc-parser.js`は位置付きtext itemsの純粋Parser／Validation、`import/sbivc-preview.js`は安全なtextContent表示・選択中止・メモリ解放・確認保存を担当する。既存PDF.js extractor／Safari getReader経路／local workerと共通PDF Viewerを再利用し、新dependency・CDNを追加しない。`import/sbivc-save.js`が保存直前再検証、Instrument解決、same-source検算、訂正guard、全レコードのatomic journal保存を担当する。Inputの`assets/observation-input-ui.js`はMonthlyAccountInput v3／v4の採用先を通常read-only表示し、共通account cardの開閉処理を利用する。初期状態は閉じ、保存済みstatusと観測内容は展開内に置く。開閉状態は永続化しない。PWA v293、observation Input／soneki資産query 20261012-15、save／preview資産query 20261012-16、その他資産／PDF.jsは不変。
 
 保存層の`persistableHoldings`で正の保有と、同じ口座の採用済み正の保有履歴に根拠がある明示0だけを選ぶ。ParserはStorageを参照せず全行を保持する。訂正／same-hash照合も同じ選別を使用し、再取込時は採用履歴から保存当時の根拠を再現する。無関係な0についてInstrument／Holdingを作らず、旧データの削除・schema変更は行わない。匿名45行（正1／0が44）、全0、過去保有、訂正、口座分離、no-op、rollback、Backup v10を回帰検証する。
 
-匿名fixturesで複数ticker、長いdecimal、明示0／欠損／該当なし、報酬対象月、入出庫、レバレッジ観測、PII除外、wrong provider、破損表、中止／closeを検証する。保存は匿名localhostだけで検証し、実PDFはローカルread-only Parser／保存plan確認のみ。既存699件にsave／correction／rollback／Backup v1〜v10／reloadテストを追加しPC1280／mobile390を確認する。取引・建玉・貸出の実行行Parser完成と報告せず、月次計算・legacy履歴・Riskに接続しない。
+匿名fixturesで複数ticker、長いdecimal、明示0／欠損／該当なし、報酬対象月、入出庫、レバレッジ観測、PII除外、wrong provider、破損表、中止／closeを検証する。保存は匿名localhostだけで検証し、実PDFはローカルread-only Parser／保存plan確認のみ。現物買いだけ実帳票検証済みとし、未検証取引・建玉・貸出のParser完成と報告しない。月次計算・legacy履歴・Riskは不変。
 
-**Planned**：実売買行のsource validation、共通crypto transaction／cashflow／月次P/L、暗号資産partial projection。原PDF／全文／PIIの保存は行わない。最新Backup v10は観測採用Input v3を正式受理し、旧v9検証意味を固定する。
+**Planned**：現物売り等の未検証行のsource validation、共通crypto cashflow／月次P/L、暗号資産partial projection。原PDF／全文／PIIの保存は行わない。最新Backup v12は旧観測採用Input v3／補正v4と取引v2を正式受理し、旧versionの検証意味を固定する。
 
 **Current / 検証**：既存746件を含む761 tests Pass。匿名localhostでfixtureを注入した既存Preview／保存UIから、45行のうち1保有保存・reload・same-source・同月正→0訂正・再取込no-op・cleanupを確認。保存層のrollback／Backup v10 roundtripも回帰検証。PC1280／mobile390は横overflowなし、最終確認でConsole Error／Warningなし。実PDFはread-onlyで45行（正1／明示0が44）を維持し、空のregistryを想定したメモリ上の選別でInstrument 1／Holding 1となる。実値の保存・fixture化は行わない。実iPhoneの保存操作は未確認。
 

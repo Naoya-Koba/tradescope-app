@@ -14,7 +14,8 @@
     8: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
     9: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
     10: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
-    11: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
+    11: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
+    12: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -166,6 +167,12 @@
   };
   function validateRecord(entity, record) {
     let definition = definitions[entity]; if (!definition) fail();
+    if(entity==='importedTransactions'&&record?.schemaVersion===2)definition={...definition,
+      required:[...definition.required,'marketType','feeSemantics'],
+      types:{...definition.types,schemaVersion:v=>v===2,sourceProvider:text,sourceScope:text,
+        marketType:v=>v==='spot',normalizedTransactionType:v=>['spot-buy','spot-sell'].includes(v),
+        quantityUnit:v=>v==='baseAssetUnits',providerExecutionId:text,providerOrderId:text,
+        feeSemantics:v=>v==='receipt-positive-payment-negative'}};
     if(entity==='monthlyAccountInputs'&&[3,4].includes(record?.schemaVersion))definition={
       required:['schemaVersion','id','accountId','targetMonth','adoptedAccountSnapshotId','adoptedAt','sourceHistory'],
       types:{schemaVersion:v=>[3,4].includes(v),id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,adoptedAt:timestamp,
@@ -241,11 +248,13 @@
         }
         if(entity==='importedTransactions'){
           const batch=batches.get(record.importBatchId),account=accounts.get(record.accountId),instrument=records('instruments').find(i=>i.id===record.instrumentId);
-          if(account.id!=='acc_gmo_fx'||account.providerCode!=='gmo'||account.accountType!=='fx'||instrument?.assetType!=='FX'
-            ||batch.sourceType!=='pdf'||batch.sourceProvider!==record.sourceProvider||batch.targetMonth!==record.targetMonth
+          if(batch.sourceType!=='pdf'||batch.sourceProvider!==record.sourceProvider||batch.targetMonth!==record.targetMonth
             ||record.tradeDate.slice(0,7)!==record.targetMonth||record.executedAt!==null&&record.executedAt.slice(0,10)!==record.tradeDate
-            ||record.quantity.startsWith('-')||equalDecimal(record.quantity,'0')||record.price.startsWith('-')
-            ||record.fee!==null&&(record.fee.startsWith('-')||record.feeCurrency===null&&!/^(?:0)(?:\.0+)?$/.test(record.fee)))fail();
+            ||record.quantity.startsWith('-')||equalDecimal(record.quantity,'0')||record.price.startsWith('-'))fail();
+          if(record.schemaVersion===1){
+            if(account.id!=='acc_gmo_fx'||account.providerCode!=='gmo'||account.accountType!=='fx'||instrument?.assetType!=='FX'
+              ||record.fee!==null&&(record.fee.startsWith('-')||record.feeCurrency===null&&!/^(?:0)(?:\.0+)?$/.test(record.fee)))fail();
+          }else validateSpotTransaction(record,account,instrument,batch);
           const rowKey=JSON.stringify([record.importBatchId,record.sourcePage,record.sourceRow]);if(sourceRows.has(rowKey))fail();sourceRows.add(rowKey);
           if(record.providerExecutionId!==null){const key=JSON.stringify(['imported',record.importBatchId,record.providerExecutionId]);if(externalIds.has(key))fail();externalIds.add(key);}
         }
@@ -447,6 +456,16 @@
     if(changed.length!==input.overrideFields.length||changed.some(f=>!input.overrideFields.includes(f)))fail();
   }
   function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, importedTransactions:null, ...models}, Object.keys(keys)); }
+  // Source policy is separate from the common v2 record shape; unimplemented providers fail closed.
+  function validateSpotTransaction(record,account,instrument,batch){
+    if(account.id!=='acc_sbivc_crypto'||account.providerCode!=='sbivc'||account.accountType!=='crypto'
+      ||record.sourceProvider!=='sbivc'||record.sourceScope!=='sbivc-spot-trades'||batch.importerId!=='sbivc-monthly'
+      ||instrument?.assetType!=='Crypto'||!/^[A-Z][A-Z0-9]{1,19}\/JPY$/.test(instrument.symbol)
+      ||instrument.quoteCurrency!=null&&instrument.quoteCurrency!=='JPY'||record.marketType!=='spot'
+      ||record.normalizedTransactionType!==(record.side==='buy'?'spot-buy':'spot-sell')
+      ||record.executedAt===null||record.providerExecutionId===null||record.realizedPnl!==null
+      ||record.feeCurrency!=='JPY'||record.currency!=='JPY')fail();
+  }
   // Only implemented policies can adopt a whole-account observation. Future brokers are not implicitly enabled.
   const adoptionPolicies = Object.freeze({ gmo: Object.freeze({ accountType: 'fx', sourceScope: 'gmo-fx-monthly-report',
     sourceMode: 'imported', observationType: 'officialMonthEnd', valuationCurrency: 'JPY', sourceType: 'pdf' }),
@@ -515,6 +534,7 @@
     if(version<8&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===2))fail();
     if(version<10&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===3))fail();
     if(version<11&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===4))fail();
+    if(version<12&&(models?.importedTransactions?.records||[]).some(r=>r.schemaVersion===2))fail();
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }

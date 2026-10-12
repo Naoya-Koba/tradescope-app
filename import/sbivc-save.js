@@ -8,6 +8,11 @@
   const copy=v=>JSON.parse(JSON.stringify(v)),rows=(m,e)=>m[e]?.records||[];
   const accountId='acc_sbivc_crypto',scope='sbivc-monthly-assets',importerId='sbivc-monthly';
   const decimal=v=>typeof v==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(v)&&v.length<=128;
+  const tradeFields=['marketType','side','normalizedTransactionType','rawTransactionType','executedAt','tradeDate','providerExecutionId','providerOrderId','quantity','quantityUnit','price','fee','feeCurrency','feeSemantics','currency','realizedPnl','sourcePage','sourceRow'];
+  function tradeRecord(t,{id,instrumentId,importBatchId,importedAt,targetMonth}){
+    return{schemaVersion:2,id,accountId,instrumentId,importBatchId,importedAt,targetMonth,sourceProvider:'sbivc',sourceType:'pdf',sourceScope:'sbivc-spot-trades',
+      ...Object.fromEntries(tradeFields.map(k=>[k,t[k]]))};
+  }
   function invalid(){throw Error('SBI VCの資産・保有情報を確認してください');}
   function validate(source){
     model.assertJson(source);const p=source?.preview,r=p?.report,a=p?.accountObservations;
@@ -26,7 +31,21 @@
         ||h.valuationRate!==null&&!decimal(h.valuationRate))invalid();
       symbols.add(h.symbol);
     }
-    // Only verified observations are mapped. Trade, leverage, reward and cashflow candidates never persist.
+    if(!Array.isArray(p.transactions)||!['empty','verified'].includes(p.sections?.trades?.status)
+      ||(p.sections.trades.status==='empty')!==(p.transactions.length===0))invalid();
+    const executions=new Set();
+    for(const t of p.transactions){
+      if(Object.keys(t).some(k=>!['symbol',...tradeFields].includes(k))||!parser.instrument(t.symbol?.split('/')[0])
+        ||! /^[A-Z][A-Z0-9]{1,19}\/JPY$/.test(t.symbol)||t.marketType!=='spot'||t.side!=='buy'
+        ||t.normalizedTransactionType!=='spot-buy'||t.rawTransactionType!=='現物 買'||t.realizedPnl!==null
+        ||t.feeCurrency!=='JPY'||t.providerExecutionId===null||executions.has(t.providerExecutionId)
+        ||!decimal(t.quantity)||/^0(?:\.0+)?$/.test(t.quantity)||!decimal(t.price)
+        ||! /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(t.executedAt)||t.tradeDate!==t.executedAt.slice(0,10)
+        ||t.tradeDate.slice(0,7)!==r.targetMonth)invalid();
+      model.validateRecord('importedTransactions',tradeRecord(t,{id:'draft_trade',instrumentId:'draft_ins',importBatchId:'draft_batch',importedAt:'2030-01-01T00:00:00.000Z',targetMonth:r.targetMonth}));
+      executions.add(t.providerExecutionId);
+    }
+    // Only verified observations and explicit spot buys map. Cashflow legs/rewards/collateral never persist.
     return p;
   }
   function resolve(models,targetMonth){
@@ -69,7 +88,7 @@
       const p=validate(source),before=repo.read(),account=rows(before,'accounts').find(r=>r.id===accountId);
       if(account&&(!account.enabled||account.providerCode!=='sbivc'||account.accountType!=='crypto'))return{status:'conflict'};
       const existing=rows(before,'importBatches').filter(b=>b.accountId===accountId&&b.sourceType==='pdf'&&b.sourceProvider==='sbivc'
-        &&b.importerId===importerId&&b.importerVersion===p.version&&b.targetMonth===p.report.targetMonth&&b.snapshotAsOf===p.report.snapshotAsOf
+        &&b.importerId===importerId&&[p.version,'sbivc-monthly-preview-v1'].includes(b.importerVersion)&&b.targetMonth===p.report.targetMonth&&b.snapshotAsOf===p.report.snapshotAsOf
         &&b.sourceFileMetadata?.hash===source.fileHash);
       if(existing.length){
         const batch=existing[0],snapshots=rows(before,'accountSnapshots').filter(s=>s.importBatchId===batch.id&&s.sourceScope===scope);
@@ -78,22 +97,29 @@
         const selected=persistableHoldings(before,p,s);
         const adopted=resolve(before,p.report.targetMonth);
         const referenced=adopted&&(adopted.input.adoptedAccountSnapshotId===s.id||adopted.input.sourceHistory.some(r=>r.adoptedAccountSnapshotId===s.id));
-        const saved=referenced&&holdings.length===selected.length&&s.cashBalance===p.accountObservations.jpyCash&&s.assetValue===p.accountObservations.assetTotalObservation
+        const imported=rows(before,'importedTransactions').filter(t=>t.importBatchId===batch.id);
+        const tradesMatch=imported.length===p.transactions.length&&p.transactions.every(t=>{
+          const matches=imported.filter(r=>r.providerExecutionId===t.providerExecutionId);
+          const saved=matches[0];return matches.length===1&&saved.schemaVersion===2&&saved.sourceProvider==='sbivc'&&saved.sourceScope==='sbivc-spot-trades'
+            &&rows(before,'instruments').find(i=>i.id===saved.instrumentId)?.symbol===t.symbol&&tradeFields.every(k=>saved[k]===t[k]);
+        });
+        const saved=tradesMatch&&referenced&&holdings.length===selected.length&&s.cashBalance===p.accountObservations.jpyCash&&s.assetValue===p.accountObservations.assetTotalObservation
           &&selected.every(h=>{const matches=holdings.filter(row=>rows(before,'instruments').find(i=>i.id===row.instrumentId)?.symbol===h.symbol);
             return matches.length===1&&matches[0].accountSnapshotId===s.id&&matches[0].quantity===h.quantity&&matches[0].marketPrice===h.valuationRate&&matches[0].marketValue===h.officialJPYValue;});
-        return{status:saved?'already-imported':'conflict',holdingCount:selected.length};
+        return{status:saved?'already-imported':'conflict',holdingCount:selected.length,transactionCount:p.transactions.length};
       }
       const view=resolve(before,p.report.targetMonth);
       if(!view&&rows(before,'accountSnapshots').some(s=>s.accountId===accountId&&s.targetMonth===p.report.targetMonth))return{status:'conflict'};
       const selected=persistableHoldings(before,p),ids=new Map(),newSymbols=[];
-      for(const h of selected){
+      const dependencies=[...new Map([...selected,...p.transactions].map(h=>[h.symbol,h])).values()];
+      for(const h of dependencies){
         const matches=rows(before,'instruments').filter(i=>i.assetType==='Crypto'&&i.symbol===h.symbol);
         if(matches.length>1||matches.some(i=>!i.enabled||i.quoteCurrency!=null&&i.quoteCurrency!=='JPY'))return{status:'conflict'};
         if(matches.length)ids.set(h.symbol,matches[0].id);else newSymbols.push(h.symbol);
       }
-      return{status:view?'review-required':'ready',before,p,account,view,ids,newSymbols,selected,holdingCount:selected.length};
+      return{status:view?'review-required':'ready',before,p,account,view,ids,newSymbols,selected,holdingCount:selected.length,transactionCount:p.transactions.length};
     }
-    const result=p=>({status:p.status,...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt,...(p.view.input.schemaVersion===4?{overrideUpdatedAt:p.view.input.overrideUpdatedAt,overrideRevision:p.view.input.overrideHistory.length}:{})}:{})});
+    const result=p=>({status:p.status,...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.transactionCount!==undefined?{transactionCount:p.transactionCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt,...(p.view.input.schemaVersion===4?{overrideUpdatedAt:p.view.input.overrideUpdatedAt,overrideRevision:p.view.input.overrideHistory.length}:{})}:{})});
     async function inspect(source){return result(prepare(copy(source)));}
     async function save(source,confirmation={}){
       if(busy)return{status:'busy'};busy=true;
@@ -121,6 +147,8 @@
         changes.importBatches=envelope([...rows(before,'importBatches'),batch]);changes.accountSnapshots=envelope([...rows(before,'accountSnapshots'),snapshot]);
         changes.holdingSnapshots=envelope([...rows(before,'holdingSnapshots'),...holdings]);
         changes.monthlyAccountInputs=envelope([...rows(before,'monthlyAccountInputs').filter(r=>r.id!==monthly.id),monthly]);
+        if(p.transactions.length)changes.importedTransactions=envelope([...rows(before,'importedTransactions'),...p.transactions.map(t=>tradeRecord(t,
+          {id:model.newId('it',cryptoApi),instrumentId:ids.get(t.symbol),importBatchId:batchId,importedAt:now,targetMonth:p.report.targetMonth}))]);
         repo.commit(changes,{expectedModels:before});return{status:'saved',corrected:correction};
       }finally{busy=false;}
     }
