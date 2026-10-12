@@ -8,7 +8,9 @@
 
 AccountSnapshot v1のcashBalanceはJPY現金、assetValueは帳票「総資産円換算額」という取得範囲内の資産観測値。sourceScope=sbivc-monthly-assets、sourceMode=imported、observationType=officialMonthEnd。netAssetValue／unrealizedPnl／reportedMonthlyRealizedPnlはnull。レバレッジ含み損益を含む完全純資産とは断定せずledgerへ加算しない。現物HoldingSnapshot v1は同じBatch／AccountSnapshot／月／基準日を共有し、quantity／marketPrice／marketValueへ公式数量／レート／JPY換算額を精度維持して保存する。acquisitionPrice／unrealizedPnlはnull、rawFieldsを保存しない。明示0・空欄nullを区別する。
 
-同一account・provider・PDF種別・importer/version・月・基準日・hashの一意一致に加えsize／観測／全holding／採用履歴参照を照合し、完全保存済みだけno-op。不完全集合は停止する。同月別hashは明示確認と最新採用参照guard一致後に新Batch／Snapshot／Holdingを追記し、Input ID維持＋履歴追記＋参照切替を同一journalで保存する。旧sourceを削除せず、Input表示は明示採用先のholdingだけを読む。表示／reloadだけでは書かない。
+**Current / Decided — holding選別**：Parser／Previewは残高表の全行を保持する。保存層だけでquantity > 0を常に選び、明示0は同じSBI VC口座・canonical Crypto symbolについて対象月以前の採用中sourceに正のHoldingSnapshotがある場合だけ選ぶ。Instrument登録や他口座、legacy取引、未採用／訂正済み旧sourceだけでは根拠にしない。同月訂正の正→0は訂正前の採用sourceを根拠に保持する。以前の月の採用中sourceに正の保有があれば以降の明示0も保持可能。無関係な0はInstrument／Holdingを生成しない。公式cashBalance／assetValueは選別後のholding合計で再計算しない。既存0レコードの自動削除・migrationは行わない。
+
+同一account・provider・PDF種別・importer/version・月・基準日・hashの一意一致に加えsize／観測／保存対象holding／採用履歴参照を照合し、完全保存済みだけno-op。省略した無関係な0行は欠損ではない。再取込では同月の採用履歴の直前sourceと、保存時点で採用されていた過去月sourceから選別根拠を再現し、その後の訂正を混ぜない。不完全集合は停止する。同月別hashは明示確認と最新採用参照guard一致後に新Batch／Snapshot／Holdingを追記し、Input ID維持＋履歴追記＋参照切替を同一journalで保存する。旧sourceを削除せず、Input表示は明示採用先のholdingだけを読む。表示／reloadだけでは書かない。MonthlyAccountInput v3／Backup v10／永続schemaは不変。
 
 **Known limitation / Planned**：取引・レバレッジ建玉・報酬・入出庫は永続化しない。MonthlyAccountState・損益・原価を推定せず、Top／Allocation／Portfolio／Riskへ接続しない。将来のcrypto transaction／cashflow／月次P/L／partial projectionは別契約として検証する。
 

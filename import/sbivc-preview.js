@@ -115,7 +115,7 @@
       $('confirm-summary').replaceChildren();
       metric($('confirm-summary'),'対象月',source.preview.report.targetMonth.replace('-','/'));
       metric($('confirm-summary'),'基準日',source.preview.report.snapshotAsOf.replaceAll('-','/'));
-      metric($('confirm-summary'),'現物保有銘柄',`${source.preview.spotHoldings.length}件`);
+      metric($('confirm-summary'),'現物保有銘柄',`${inspected.holdingCount??source.preview.spotHoldings.length}件`);
       if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する資産・保有情報を切り替えます');
       $('dialog').showModal();
     });

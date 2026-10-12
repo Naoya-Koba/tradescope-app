@@ -61,7 +61,7 @@ test('rollback inability retains journal and blocks following save',async()=>{co
  const set=s.setItem.bind(s);s.failKey=null;let triggered=false;s.setItem=(k,v)=>{if(k===model.keys.holdingSnapshots&&!triggered){triggered=true;s.failKey=model.keys.importBatches;s.persistentFail=true;throw Error('quota');}set(k,v);};
  await assert.rejects(()=>service(s).save(changed));assert.notEqual(s.getItem(tx.journalKey),null);await assert.rejects(()=>service(s).save(changed),/ジャーナル/);
 });
-test('null rate vs explicit zero retained, no fake cost/P/L or State',async()=>{const s=new Memory();await service(s).save(source('a',{zero:true,blankRate:true}));assert.ok(records(s,'holdingSnapshots').every(h=>h.marketPrice===null&&h.marketValue==='0'&&h.unrealizedPnl===null));assert.equal(s.getItem(model.keys.monthlyAccountStates),null);});
+test('null rate vs relevant explicit zero retained, no fake cost/P/L or State',async()=>{const s=await saved(),svc=service(s),zero=source('b',{zero:true,blankRate:true});await svc.save(zero,await svc.inspect(zero));const holdings=svc.read('2031-02').holdings;assert.equal(holdings.length,3);assert.ok(holdings.every(h=>h.marketPrice===null&&h.marketValue==='0'&&h.unrealizedPnl===null));assert.equal(s.getItem(model.keys.monthlyAccountStates),null);});
 test('empty spot portfolio can save explicit cash observation without invented holding',async()=>{const s=new Memory();await service(s).save(source('a',{assets:[]}));assert.equal(records(s,'holdingSnapshots').length,0);assert.equal(records(s,'instruments').length,0);assert.equal(records(s,'accountSnapshots').length,1);});
 test('leverage/source events never merge into spot or monthly canonical records',async()=>{const s=await saved();assert.ok(records(s,'holdingSnapshots').every(h=>h.schemaVersion===1&&h.rawFields===undefined));for(const e of ['rawTransactions','importedTransactions','monthlyAccountStates'])assert.equal(s.getItem(model.keys[e]),null);});
 test('PII, PDF body, path/name, cashflow and reward do not persist',async()=>{const s=await saved(),text=s.snapshot();assert.doesNotMatch(text,/PRIVATE_PERSON|PRIVATE_ADDRESS|PHONE_123|ACCOUNT_123|filename|fileName|absolutePath|baseAsset|ステーキング|fullText|pdfBinary/);});
@@ -93,3 +93,88 @@ test('asset observations do not alter shared Top, allocation, Summary or trend a
 });
 test('Input read-only uses only adopted holdings; no hidden identifiers/fake P/L/storage writes',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b',{assets:['SOL']}),await svc.inspect(source('b',{assets:['SOL']})));const before=s.snapshot(),d={createElement:()=>new Element()},card=inputUI.render({document:d,adapter:s,accountId:'acc_sbivc_crypto',targetMonth:'2031-02',displayName:'SBI VC'}),t=text(card);assert.match(t,/資産・保有情報を保存済み|SOL\/JPY/);assert.doesNotMatch(t,/ETH\/JPY|月次損益|取得原価|as_|batch_|ins_/);assert.equal(s.snapshot(),before);assert.equal(inputUI.render({document:d,adapter:s,accountId:'acc_sbivc_crypto',targetMonth:'2031-01',displayName:'SBI VC'}),null);});
 test('legacy, monthly metrics, Top and Risk are not changed or connected',async()=>{const s=new Memory(),legacy=s.getItem('tradingData'),history=s.getItem('tradeScopeTradeHistoryV1');s.setItem('tradeScopeTopSummarySnapshotV1','{"anonymousCache":true}');const cache=s.getItem('tradeScopeTopSummarySnapshotV1');await service(s).save(source());assert.equal(s.getItem('tradingData'),legacy);assert.equal(s.getItem('tradeScopeTradeHistoryV1'),history);assert.equal(s.getItem('tradeScopeTopSummarySnapshotV1'),cache);assert.ok(!fs.readFileSync('assets/monthly-account-resolver.js','utf8').includes('sbivc-monthly-assets'));});
+
+function listedSource(hash='a',month='2031-02',positive=true){
+ const end=new Date(Date.UTC(+month.slice(0,4),+month.slice(5),0)).toISOString().slice(0,10);
+ const f=fixture({assets:Array.from({length:45},(_,n)=>'COIN'+(n+1)),zero:true,blankRate:true,
+  period:month.replace('-','/')+'/01 ～ '+end.replaceAll('-','/'),basis:end.replaceAll('-','/')});
+ if(positive){f.pages[0].items.find(i=>i.x===272&&i.y===560).text='0.1234567890123456789';
+  f.pages[0].items.find(i=>i.x===535&&i.y===560).text='42.125';f.pages[0].items.push({x:425,y:560,text:'321.123456789',width:80});}
+ return{preview:parser.parse(f),fileHash:hash.repeat(64),fileSize:128};
+}
+test('45 source rows remain intact; 1 positive and 44 irrelevant zeros create only 1 Instrument/holding',async()=>{
+ const s=new Memory(),svc=service(s),p=listedSource(),original=copy(p),before=s.snapshot();
+ assert.equal((await svc.inspect(p)).holdingCount,1);assert.equal(s.snapshot(),before);await svc.save(p);
+ assert.deepEqual(p,original);assert.equal(p.preview.spotHoldings.length,45);assert.equal(records(s,'instruments').length,1);assert.equal(records(s,'holdingSnapshots').length,1);
+ assert.equal(records(s,'accountSnapshots')[0].assetValue,p.preview.accountObservations.assetTotalObservation);
+});
+test('all zero new user saves official Batch/Snapshot/Input without Instruments or holdings',async()=>{
+ const s=new Memory(),p=listedSource('a','2031-02',false);assert.equal((await service(s).inspect(p)).holdingCount,0);
+ assert.equal((await service(s).save(p)).status,'saved');assert.equal(records(s,'instruments').length,0);assert.equal(records(s,'holdingSnapshots').length,0);
+ for(const e of ['importBatches','accountSnapshots','monthlyAccountInputs'])assert.equal(records(s,e).length,1);
+ assert.equal(records(s,'monthlyAccountInputs')[0].schemaVersion,3);assert.equal(s.getItem(model.keys.monthlyAccountStates),null);
+ assert.equal((await service(s).save(p)).status,'already-imported');
+});
+test('prior adopted positive -> current explicit zero and continuing zero persist without duplicate Instrument',async()=>{
+ const s=new Memory(),svc=service(s);await svc.save(listedSource());
+ for(const [hash,month] of [['b','2031-03'],['c','2031-04']]){const p=listedSource(hash,month,false);assert.equal((await svc.inspect(p)).holdingCount,1);await svc.save(p);assert.equal(svc.read(month).holdings[0].quantity,'0.00000000');assert.equal((await svc.save(p)).status,'already-imported');}
+ assert.equal(records(s,'instruments').length,1);assert.equal(records(s,'holdingSnapshots').length,3);
+});
+test('prior zero-only observation and registry existence do not establish SBI VC positive history',async()=>{
+ const s=new Memory();model.createRepository(s).save('instruments',[{id:'unused',assetType:'Crypto',symbol:'COIN1/JPY',displayName:'COIN1/JPY',enabled:true}]);
+ await service(s).save(listedSource('a','2031-02',false));await service(s).save(listedSource('b','2031-03',false));
+ assert.equal(records(s,'holdingSnapshots').length,0);assert.equal(records(s,'instruments').length,1);
+ // An older unfiltered zero record is not deleted and is still not positive evidence.
+ const snapshot=records(s,'accountSnapshots')[0],oldZero={id:'old_zero',schemaVersion:1,accountId:snapshot.accountId,importBatchId:snapshot.importBatchId,
+  sourceMode:snapshot.sourceMode,sourceScope:snapshot.sourceScope,targetMonth:snapshot.targetMonth,snapshotAsOf:snapshot.snapshotAsOf,
+  importedAt:snapshot.importedAt,observationType:snapshot.observationType,instrumentId:'unused',accountSnapshotId:snapshot.id,quantity:'0',marketPrice:null,marketValue:'0',currency:'JPY'};
+ model.createRepository(s).save('holdingSnapshots',[oldZero]);const p=listedSource('c','2031-04',false);
+ assert.equal((await service(s).inspect(p)).holdingCount,0);await service(s).save(p);assert.deepEqual(records(s,'holdingSnapshots'),[oldZero]);
+});
+test('other-account positive, orphan/non-adopted source and legacy manual buy are not evidence',async()=>{
+ const s=new Memory();s.setItem('tradeScopeTradeHistoryV1','[{"id":"legacy_buy","symbol":"COIN1/JPY","side":"buy"}]');
+ const legacy=s.snapshot();assert.equal(save.persistableHoldings(model.readModels(s),listedSource('a','2031-02',false).preview).length,0);
+ await service(s).save(listedSource());const models=model.readModels(s),zero=listedSource('b','2031-03',false).preview;
+ const other=copy(models);other.monthlyAccountInputs.records[0].accountId='other';other.holdingSnapshots.records[0].accountId='other';
+ assert.equal(save.persistableHoldings(other,zero).length,0);
+ const orphan=copy(models);orphan.monthlyAccountInputs.records=[];assert.equal(save.persistableHoldings(orphan,zero).length,0);
+ assert.ok(legacy.includes('legacy_buy'));assert.equal(s.getItem('tradeScopeTradeHistoryV1'),'[{"id":"legacy_buy","symbol":"COIN1/JPY","side":"buy"}]');
+});
+test('future adopted positive is not evidence for an earlier zero month',async()=>{
+ const s=new Memory();await service(s).save(listedSource('a','2031-03'));await service(s).save(listedSource('b','2031-02',false));assert.equal(service(s).read('2031-02').holdings.length,0);
+});
+test('same-month adopted positive -> corrected zero retains zero and old source, then no-op after reload',async()=>{
+ const s=new Memory(),svc=service(s);await svc.save(listedSource());const old=svc.read('2031-02'),p=listedSource('b','2031-02',false),guard=await svc.inspect(p);
+ assert.equal(guard.status,'review-required');assert.equal(guard.holdingCount,1);const before=s.snapshot();assert.equal((await svc.save(p)).status,'review-required');assert.equal(s.snapshot(),before);
+ await svc.save(p,guard);const active=svc.read('2031-02');assert.equal(active.holdings.length,1);assert.equal(active.holdings[0].quantity,'0.00000000');
+ assert.notEqual(active.snapshot.id,old.snapshot.id);assert.equal(records(s,'holdingSnapshots').length,2);assert.equal(records(s,'instruments').length,1);
+ assert.equal((await service(s).save(p)).status,'already-imported');assert.equal((await service(s).save(listedSource())).status,'already-imported');
+});
+test('stale corrected positive alone is not history evidence for later sources',async()=>{
+ const s=new Memory(),svc=service(s);await svc.save(listedSource());const zero=listedSource('b','2031-02',false);await svc.save(zero,await svc.inspect(zero));
+ const next=listedSource('c','2031-03',false);assert.equal((await svc.inspect(next)).holdingCount,0);await svc.save(next);assert.equal(svc.read('2031-03').holdings.length,0);
+});
+test('corrected zero -> positive persists necessary Instrument only',async()=>{
+ const s=new Memory(),svc=service(s);await svc.save(listedSource('a','2031-02',false));const p=listedSource('b');await svc.save(p,await svc.inspect(p));
+ assert.equal(records(s,'instruments').length,1);assert.equal(svc.read('2031-02').holdings.length,1);assert.equal(records(s,'accountSnapshots').length,2);
+});
+test('filtered exact reimport omits 44 zeros normally; missing selected positive still conflicts',async()=>{
+ const s=new Memory(),p=listedSource();await service(s).save(p);const before=s.snapshot();assert.equal((await service(s).inspect(p)).status,'already-imported');
+ assert.equal((await service(s).save(p)).status,'already-imported');assert.equal(s.snapshot(),before);
+ const missing=copy(p);missing.preview.spotHoldings[0].quantity='0';assert.equal((await service(s).inspect(missing)).status,'conflict');assert.equal(s.snapshot(),before);
+});
+test('same-hash historical selection survives subsequent earlier-month correction',async()=>{
+ const s=new Memory();let tick=0;const svc=save.createService(s,{cryptoApi:crypto,clock:()=>new Date(Date.UTC(2031,4,1,0,0,tick++)).toISOString()});
+ const first=listedSource(),zero=listedSource('b','2031-03',false);await svc.save(first);await svc.save(zero);
+ const corrected=listedSource('c','2031-02',false);await svc.save(corrected,await svc.inspect(corrected));
+ assert.equal((await svc.save(zero)).status,'already-imported');assert.equal((await svc.inspect(listedSource('d','2031-04',false))).holdingCount,0);
+});
+test('filtered Instrument creation rolls back atomically when holdings fail',async()=>{
+ const s=new Memory(),before=s.snapshot();s.failKey=model.keys.holdingSnapshots;await assert.rejects(()=>service(s).save(listedSource()));assert.equal(s.snapshot(),before);
+});
+test('Backup v10 roundtrip preserves filtered positive and adopted explicit zero observations',async()=>{
+ const s=new Memory(),svc=service(s);await svc.save(listedSource());const zero=listedSource('b','2031-03',false);await svc.save(zero);
+ const payload=backup(s).build(),target=new Memory(),r=backup(target);assert.equal(payload.backupVersion,10);r.restore.execute(r.format.inspectValue(payload).restorePlan,target);
+ assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(records(target,'instruments').length,1);assert.equal(records(target,'holdingSnapshots').length,2);
+ assert.equal((await service(target).save(zero)).status,'already-imported');
+});

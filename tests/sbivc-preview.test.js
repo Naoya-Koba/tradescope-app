@@ -57,3 +57,14 @@ test('correction requires modal confirmation; cancel does not save',async()=>{le
 test('conflict never offers save',async()=>{const h=setup({service:{inspect:async()=>({status:'conflict'})}});await h.ui.select(h.file);assert.equal(h.elements['sbivc-save'].hidden,true);assert.match(h.elements['sbivc-save-status'].textContent,/照合できません/);});
 test('double-click blocked; success only after service verification',async()=>{let finish,calls=0;const h=setup({service:{inspect:async()=>({status:'ready'}),save:()=>{calls++;return new Promise(r=>finish=r);}}});await h.ui.select(h.file);h.elements['sbivc-save'].listeners.click();const first=h.elements['sbivc-confirm-save'].listeners.click();await h.elements['sbivc-confirm-save'].listeners.click();assert.equal(calls,1);assert.equal(h.elements['sbivc-save-status'].textContent,'保存中…');assert.equal(h.elements['sbivc-file'].disabled,true);finish({status:'saved'});await first;assert.match(h.elements['sbivc-save-status'].textContent,/保存済み/);assert.equal(h.elements['sbivc-file'].disabled,false);});
 test('quota/save error never claims success or exposes private error',async()=>{const h=setup({service:{inspect:async()=>({status:'ready'}),save:async()=>{throw Error('PRIVATE_PERSON');}}});await h.ui.select(h.file);h.elements['sbivc-save'].listeners.click();await h.elements['sbivc-confirm-save'].listeners.click();assert.match(h.elements['sbivc-save-status'].textContent,/保存できません/);assert.doesNotMatch(h.elements['sbivc-save-status'].textContent,/PRIVATE_PERSON|保存済み/);assert.equal(h.elements['sbivc-save'].hidden,false);});
+
+test('confirmation uses persistence selection count, without hiding source zero rows or warning',async()=>{
+ const h=setup({zero:true,blankRate:true,service:{inspect:async()=>({status:'ready',holdingCount:1})}});await h.ui.select(h.file);
+ h.elements['sbivc-save'].listeners.click();assert.match(text(h.elements['sbivc-confirm-summary']),/現物保有銘柄 1件/);
+ assert.match(text(h.elements['sbivc-holdings']),/残高0の銘柄（3件）/);assert.equal(h.elements['sbivc-issues'].children.length,0);
+});
+test('all-zero observation can confirm zero selected holdings without becoming an error',async()=>{
+ const h=setup({zero:true,blankRate:true,service:{inspect:async()=>({status:'ready',holdingCount:0}),save:async()=>({status:'saved'})}});await h.ui.select(h.file);
+ h.elements['sbivc-save'].listeners.click();assert.match(text(h.elements['sbivc-confirm-summary']),/現物保有銘柄 0件/);
+ await h.elements['sbivc-confirm-save'].listeners.click();assert.match(h.elements['sbivc-save-status'].textContent,/保存済み/);assert.equal(h.elements['sbivc-issues'].children.length,0);
+});
