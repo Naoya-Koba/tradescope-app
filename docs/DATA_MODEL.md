@@ -10,6 +10,8 @@
 
 ## Traders PDF-only partial保存 / Backup v8
 
+**Current — GMO取引保存**：`gmo-fx-monthly-v2`は取引明細と決済取引明細を分離して読む。注文番号は保持するがexecution ID／一意な約定IDとは断定しない。日時は帳票の日時（タイムゾーン付加なし）、数量は約定数の原値。明示JPY取引損益または明示円換算額だけを個別P/Lとし、未取得はnull。スワップは加えない。手数料0は原値を保持し通貨不明はnull、非ゼロは現状保存停止。新規FX Instrumentのみ遅延生成し既存の表記差を照合、複数ID一致は停止する。Batch／Snapshot／State／Instrument／取引を同一journalで保存する。
+
 **Current / Decided**：1ファイルのPDF観測・全FX Holding・PDF月次原値の採用参照を同一保存操作で保護する。calendar swapは独立したmanual sourceで、空欄はnull。PDFだけのpartial保存ではStateを作らず、後入力または同時入力で全5項目が揃った時だけState v4を確定する。PDF訂正は新Batch／新Snapshot／新Holdingへ明示切替し、calendar原値・採用値・履歴と既存State IDを保持する。表示・月切替でseed／保存しない。
 
 **Current / Decided**：新キーを追加せず`tradeScopeMonthlyAccountInputsV1`のTraders専用record v2をBackup v8で導入する。必須fieldはschemaVersion、id、accountId、targetMonth、adoptedAccountSnapshotId、sourceValues、adoptedValues、fieldSources、overrideFields、overrideUpdatedAt、sourceHistory、pdfObservations。2つのValuesはrealizedPnl／swapPnl／unrealizedPnl／deposit／withdrawal、swapだけnull可。他4原値は採用Snapshotの報告値と一致必須。pdfObservationsはfee／otherの照合済み0だけを受理し、非ゼロはParser／保存で停止する。fieldSourcesはPDF由来4項目とmanual-income-calendar-swap-accrualを明示する。旧SBI input v1の意味は不変。

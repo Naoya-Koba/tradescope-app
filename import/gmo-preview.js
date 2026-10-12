@@ -32,7 +32,7 @@
     $('gmo-save').textContent = correction ? '訂正する' : '保存';
     $('gmo-save-status').textContent = busy ? '保存中…' : ['saved', 'already-imported'].includes(outcome?.status) ? '保存済み'
       : correction ? '同じ月の報告書が保存されています' : outcome?.reason === 'legacy' ? 'この月には従来のGMO入力が保存されています'
-      : outcome?.reason === 'account' ? 'GMO口座の設定を確認してください' : outcome?.reason === 'unadopted' ? '採用されていない月次データがあります' : '';
+      : outcome?.reason === 'account' ? 'GMO口座の設定を確認してください' : outcome?.reason === 'instrument' ? '通貨ペアの登録が重複しています' : outcome?.reason === 'unadopted' ? '採用されていない月次データがあります' : '';
     for (const id of ['gmo-file', 'gmo-close', 'gmo-confirm-save', 'gmo-cancel-save']) $(id).disabled = busy;
   }
   function node(tag, text, className) {
@@ -64,6 +64,10 @@
     for (const [label, value] of metrics) $('gmo-summary').append(node('dt', label), node('dd', value));
     for (const message of preview.errors) $('gmo-issues').append(node('p', message, 'issue error'));
     for (const message of preview.warnings) $('gmo-issues').append(node('p', message, 'issue'));
+    const detail=preview.tradeDetails;
+    if(detail?.coverage==='complete')$('gmo-summary').append(node('dt','取引'),node('dd',`${detail.rows.length}件`));
+    if(detail?.errors.length)$('gmo-issues').append(node('p','取引明細を読み取れませんでした。保存を停止しました', 'issue error'));
+    if(detail?.audit==='mismatch')$('gmo-issues').append(node('p','個別決済損益と月間合計が一致しません（月間合計は帳票値を保持）','issue'));
   }
   $('gmo-file').addEventListener('change', async event => {
     const file = event.target.files[0]; if (!file) return;
@@ -90,7 +94,7 @@
       const preview = TradeScopeGMOParser.parse(extracted);
       stage = 'validation'; code = 'GMO_VALIDATION_FAILED';
       render(preview);
-      if (!preview.valid) { diagnostic(stage, code); return; }
+      if (!preview.valid || preview.tradeDetails?.errors.length) { diagnostic(stage, code); return; }
       source = { preview, fileHash, fileSize: file.size };
       stage = 'storage-check'; code = 'GMO_STORAGE_CHECK_FAILED';
       outcome = preview.valid ? await saveService().inspect(source) : null;

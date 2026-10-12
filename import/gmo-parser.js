@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
   const csv = typeof module !== 'undefined' && module.exports ? require('./csv-core.js') : root.TradeScopeCSV;
-  const version = 'gmo-fx-monthly-v1';
+  const version = 'gmo-fx-monthly-v2';
   const clean = text => String(text || '').replace(/\s/g, '');
   const decimal = text => {
     const value = String(text ?? '').trim().replace(/,/g, '').replace(/^\+/, '');
@@ -127,7 +127,10 @@
       .filter(row => /^[A-Z]{3}\/[A-Z]{3}$/.test(clean(row.values['通貨ペア'])));
     if (margin.length && !equal(base.values.requiredMargin, csv.sum(margin.map(row => decimal(row.values['適用必要証拠金額']))))) error('必要証拠金の明細合計が一致しません');
     base.valid = errors.length === 0;
-    return base; // No source text, names, addresses, identifiers, rows or filename escape this boundary.
+    const trades=typeof module!=='undefined'&&module.exports?require('./gmo-transactions-parser.js'):root.TradeScopeGmoTransactions;
+    if(!trades)throw new Error('GMO_TRANSACTION_ENGINE_UNAVAILABLE');
+    base.tradeDetails=trades.parse(document,base.targetMonth,base.values.realizedPnl,{lines,clean,decimal,equal});
+    return base; // Only allowlisted monthly facts and execution facts; no PII, source text or filename.
   }
   const api = { version, detect, parse, decimal, equal };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

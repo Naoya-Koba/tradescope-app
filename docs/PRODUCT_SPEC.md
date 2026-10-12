@@ -2,7 +2,7 @@
 
 ## Current / Planned — 共通取引履歴
 
-**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9の保存基盤を追加。元資料・manual metadataを保持し、月次canonicalとは分離する。**Planned（次commit）**：GMO取引明細の保存接続、取引履歴UIの月・口座・銘柄・open/close・source絞込、50件単位の追加表示。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
+**Current**：manual legacy／SBI RawTransaction／GMO imported sourceを非破壊でnormalizeする共通resolverとBackup v9の保存基盤を追加。GMO PDF保存は明示された約定内訳を月次sourceと同じ操作で保護する。元資料・manual metadataを保持し、月次canonicalとは分離する。**Planned（次commit）**：取引履歴UIの月・口座・銘柄・open/close・source絞込、50件単位の追加表示。Top／Allocation／Portfolio UI、Risk、PDF Viewer、SBI VC追加実装は対象外。
 
 ## Traders PDF-only partial保存 / Backup v8
 

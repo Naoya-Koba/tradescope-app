@@ -6,6 +6,8 @@
 
 ## Traders Storage / Backup v8
 
+**Current — GMO内訳照合**：取引明細と決済詳細の一意照合で明示されたJPY損益のみを取得する。円換算「-」は0ではなく、元損益が明示JPYの時だけ換算不要の原値を使う。全件取得時のみ公式月間realizedと検算する。不完全coverageは合計比較しない。個別スワップ・月次入出金を売買履歴へ入れない。公式月次値／ledgerは内訳不一致でも変更しない。
+
 **Current / Decided — PDF-only partial**：PDF由来のrealized／deposit／withdrawalはMonthlyAccountInput v2の原値・採用値を共通表示層で読む。価格評価損益・純資産観測も当月partialとして表示し、Monthly P/L／年間内訳は既知値だけの暫定集計を行う。swap nullはcanonicalの0と同一視しない。Stateなしの厳密ledgerはmissingのまま、後からcalendar入力を保存すると共有表示とfingerprintを更新する。観測netAssetValueをledgerへ加算しない。
 
 **Decided**：calendar「スワップ付与」は月ごとに独立したsource。前月末未決済swap basis・前月PDF・8月legacyのswap認識根拠は、9月以降の保存／計算条件ではない。8月の一致確認はhistorical consistency checkに限定する。PDF settled＋当月未決済−前月未決済によるcanonical計算は行わない。

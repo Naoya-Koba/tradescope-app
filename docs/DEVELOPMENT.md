@@ -6,6 +6,8 @@
 
 ## Traders Storage / Backup v8
 
+**Current — GMO取引抽出**：`import/gmo-transactions-parser.js`は見出し／正式ヘッダー由来の列境界で明示約定だけを返し、`gmo-parser.js`の月次計算は変更しない。決済詳細は注文番号＋日時＋ペア＋売買＋数量＋価格が双方一意の時だけ結合する。全決済P/L coverageが揃う場合だけ公式月次と照合し、不一致はaudit警告、月次値の補正はしない。構造不明は取引保存を停止する。実PDFはread-only parser確認のみ。匿名fixturesとatomic失敗／訂正／旧同一hash no-opテストで検証する。
+
 **Current / UI**：`import/traders-preview.js`は口座別PDF Previewとcalendar入力を担当し、保存は`import/traders-save.js`だけを呼ぶ。blankでもPDF-only partial保存可能。`assets/traders-monthly-ui.js`は保存済みPDF源をread-onlyで表示し、非永続Draftのcalendar後入力・5項目訂正を同serviceへ渡す。成功はRepository再読込検証後のみ。legacy Inputへの混入・cutover後legacy保存は拒否する。PWA v280、今回変更資産のqueryは20261012-2。匿名localhostで1280／390幅・保存・reload・再取込・Backupを検証する。実iPhoneは別途必要。
 
 **Current**：`import/traders-save.js`は商品別口座を固定し保存直前に再検証する。一回のRepository commitでAccount遅延生成／FX Instrument再利用／Batch／観測／建玉群／MonthlyAccountInput v2／完全時だけState／cache無効化を保護する。blank swapはnull、exact hashはpartialでもno-op。後入力は保存済みInputのPDF採用先を利用し再選択不要。別hash訂正はInput／State／採用Snapshot／calendar採用値の確認一致後だけ新PDF sourceを追記する。calendar原入力・採用値はPDF訂正と独立し、complete後の手修正・reset・原値保護を維持する。Backup v8、旧v1〜v7受理範囲固定。Risk sourceは変更しない。

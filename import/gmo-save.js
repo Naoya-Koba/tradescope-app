@@ -5,6 +5,7 @@
   const resolver = typeof module !== 'undefined' && module.exports ? require('../assets/monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const parser = typeof module !== 'undefined' && module.exports ? require('./gmo-parser.js') : root.TradeScopeGMOParser;
   const csv = typeof module !== 'undefined' && module.exports ? require('./csv-core.js') : root.TradeScopeCSV;
+  const view = typeof module !== 'undefined' && module.exports ? require('../assets/transaction-view.js') : root.TradeScopeTransactionView;
   const policy = resolver.policies.gmo, accountId = policy.accountId;
   const valueNames = ['realizedPnl', 'swapPnl', 'deposit', 'withdrawal', 'unrealizedPnl', 'cashBalance', 'netAssetValue', 'requiredMargin'];
   const rows = (models, entity) => models[entity]?.records || [];
@@ -15,7 +16,7 @@
     const preview = source?.preview;
     if (!only(source, ['preview', 'fileHash', 'fileSize']) || !/^[a-f0-9]{64}$/.test(source.fileHash)
       || !Number.isSafeInteger(source.fileSize) || source.fileSize < 8 || source.fileSize > 20 * 1024 * 1024
-      || !only(preview, ['broker', 'importerVersion', 'targetMonth', 'snapshotAsOf', 'observationType', 'valuationCurrency', 'values', 'errors', 'warnings', 'valid'])
+      || !only(preview, ['broker', 'importerVersion', 'targetMonth', 'snapshotAsOf', 'observationType', 'valuationCurrency', 'values', 'errors', 'warnings', 'valid', 'tradeDetails'])
       || preview.broker !== 'gmo' || preview.importerVersion !== parser.version || preview.valid !== true
       || !Array.isArray(preview.errors) || preview.errors.length || !Array.isArray(preview.warnings) || preview.warnings.length
       || preview.observationType !== policy.observationType || preview.valuationCurrency !== policy.valuationCurrency
@@ -25,6 +26,13 @@
     const monthEnd = new Date(Date.UTC(Number(preview.targetMonth.slice(0, 4)), Number(preview.targetMonth.slice(5)), 0)).toISOString().slice(0, 10);
     if (preview.snapshotAsOf !== monthEnd || ['deposit', 'withdrawal', 'requiredMargin'].some(name => /^-/.test(preview.values[name]))) throw new Error('月末情報を再確認してください');
     if (!parser.equal(preview.values.netAssetValue, csv.sum([preview.values.cashBalance, preview.values.unrealizedPnl]))) throw new Error('純資産の照合が一致しません');
+    if(preview.tradeDetails){const d=preview.tradeDetails;
+      if(!only(d,['rows','coverage','pnlCoverage','audit','errors','warnings'])||!Array.isArray(d.rows)||!Array.isArray(d.errors)||d.errors.length
+        ||!Array.isArray(d.warnings)||d.warnings.some(w=>w!=='GMO_TRADE_PNL_MISMATCH')||!['complete','unavailable'].includes(d.coverage)
+        ||!['complete','incomplete'].includes(d.pnlCoverage)||!['matched','mismatch','not-comparable'].includes(d.audit)
+        ||d.coverage==='unavailable'&&d.rows.length)throw new Error('取引明細を確認できません');
+      for(const row of d.rows)if(!only(row,['sourcePage','sourceRow','tradeDate','executedAt','symbol','side','normalizedTransactionType','rawTransactionType','quantity','quantityUnit','price','realizedPnl','fee','feeCurrency','currency','providerExecutionId','providerOrderId'])||!view.fxPair(row.symbol))throw new Error('取引明細を確認できません');
+    }
     return preview;
   }
   function createService(adapter, options = {}) {
@@ -42,11 +50,17 @@
       const exact = rows(before, 'importBatches').find(row => row.accountId === accountId && row.sourceType === 'pdf'
         && row.sourceProvider === 'gmo' && row.sourceFileMetadata?.hash === source.fileHash);
       if (exact) return { status: 'already-imported' };
+      const ids=new Map(),newSymbols=[];
+      for(const symbol of new Set((preview.tradeDetails?.rows||[]).map(row=>view.fxPair(row.symbol)))){
+        const matches=rows(before,'instruments').filter(row=>row.assetType==='FX'&&view.fxPair(row.symbol)===symbol);
+        if(matches.length>1)return {status:'conflict',reason:'instrument'};
+        if(matches.length)ids.set(symbol,matches[0].id);else newSymbols.push(symbol);
+      }
       const state = rows(before, 'monthlyAccountStates').find(row => row.accountId === accountId && row.targetMonth === preview.targetMonth);
       const previous = rows(before, 'accountSnapshots').filter(row => row.accountId === accountId && row.targetMonth === preview.targetMonth && row.sourceScope === policy.sourceScope);
       if (previous.length && !state) return { status: 'conflict', reason: 'unadopted' };
       return { status: state ? 'review-required' : 'ready', reason: state ? 'different-report' : null,
-        source, preview, before, account, state };
+        source, preview, before, account, state, ids, newSymbols };
     }
     function publicResult(prepared) {
       return { status: prepared.status, reason: prepared.reason || null,
@@ -76,6 +90,10 @@
         const changes = {};
         const envelope = records => ({ schemaVersion: 1, records, updatedAt: importedAt });
         if (!account) changes.accounts = envelope([...copy(rows(before, 'accounts')), model.initialAccounts().find(row => row.id === accountId)]);
+        const instruments=prepared.newSymbols.map(symbol=>{const id=model.newId('ins',cryptoApi);prepared.ids.set(symbol,id);return {id,assetType:'FX',symbol,displayName:symbol,baseCurrency:symbol.slice(0,3),quoteCurrency:symbol.slice(4),enabled:true};});
+        if(instruments.length)changes.instruments=envelope([...copy(rows(before,'instruments')), ...instruments]);
+        const imported=(preview.tradeDetails?.rows||[]).map(row=>{const {symbol,...facts}=row;return {schemaVersion:1,id:model.newId('it',cryptoApi),accountId,instrumentId:prepared.ids.get(view.fxPair(symbol)),importBatchId:batchId,sourceProvider:'gmo',sourceType:'pdf',sourceScope:'gmo-fx-trades',targetMonth:preview.targetMonth,importedAt,...facts};});
+        if(imported.length)changes.importedTransactions=envelope([...copy(rows(before,'importedTransactions')), ...imported]);
         changes.importBatches = envelope([...copy(rows(before, 'importBatches')), batch]);
         changes.accountSnapshots = envelope([...copy(rows(before, 'accountSnapshots')), snapshot]);
         changes.monthlyAccountStates = envelope([...copy(rows(before, 'monthlyAccountStates')).filter(row => row.id !== monthly.id), monthly]);

@@ -235,7 +235,7 @@
             ||batch.sourceType!=='pdf'||batch.sourceProvider!==record.sourceProvider||batch.targetMonth!==record.targetMonth
             ||record.tradeDate.slice(0,7)!==record.targetMonth||record.executedAt!==null&&record.executedAt.slice(0,10)!==record.tradeDate
             ||record.quantity.startsWith('-')||equalDecimal(record.quantity,'0')||record.price.startsWith('-')
-            ||record.fee!==null&&(record.fee.startsWith('-')||record.feeCurrency===null))fail();
+            ||record.fee!==null&&(record.fee.startsWith('-')||record.feeCurrency===null&&!/^(?:0)(?:\.0+)?$/.test(record.fee)))fail();
           const rowKey=JSON.stringify([record.importBatchId,record.sourcePage,record.sourceRow]);if(sourceRows.has(rowKey))fail();sourceRows.add(rowKey);
           if(record.providerExecutionId!==null){const key=JSON.stringify(['imported',record.importBatchId,record.providerExecutionId]);if(externalIds.has(key))fail();externalIds.add(key);}
         }
