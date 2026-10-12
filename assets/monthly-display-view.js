@@ -3,7 +3,7 @@
   const node = typeof module !== 'undefined' && module.exports;
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
-  const version = 'monthly-display-v3';
+  const version = 'monthly-display-v4';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -54,8 +54,9 @@
           && records(models, 'importBatches').some(batch => batch.id === row.importBatchId && batch.accountId === policy.accountId
             && batch.sourceType === 'pdf' && batch.sourceProvider === (policy.provider||key) && batch.targetMonth === targetMonth
             && batch.snapshotAsOf === row.snapshotAsOf && batch.importedAt === row.importedAt));
-        const snapshot = resolved.state ? resolved.snapshot : snapshots.length === 1 ? snapshots[0] : null;
-        if (!resolved.state && snapshots.length > 1) return { components: [], conflict: true };
+        const input = records(models, 'monthlyAccountInputs').find(row => row.schemaVersion === 2 && row.accountId === policy.accountId && row.targetMonth === targetMonth);
+        const snapshot = resolved.state ? resolved.snapshot : input ? snapshots.find(row => row.id === input.adoptedAccountSnapshotId) : snapshots.length === 1 ? snapshots[0] : null;
+        if (!resolved.state && ((!input && snapshots.length > 1) || (input && !snapshot))) return { components: [], conflict: true };
         return { components: snapshot ? [{ name: '口座観測', asset: snapshot.netAssetValue ?? null,
           unrealized: snapshot.unrealizedPnl ?? null, snapshotAsOf: snapshot.snapshotAsOf, id: snapshot.id }] : [], conflict: false };
       }
@@ -68,9 +69,11 @@
       const observed = observation(key, targetMonth, resolved);
       const complete = isLegacy ? entered && Number.isFinite(calculator.net(year, month, key)) : resolved.completeness?.complete === true;
       const row = calculator.row(year, month, key);
-      const input = key === 'sbi' ? records(models, 'monthlyAccountInputs').find(item => item.accountId === resolver.accountId && item.targetMonth === targetMonth) : null;
-      const adoptedRow = input && !resolved.state ? {realizedPnL:input.realizedPnl, deposit:input.deposit, withdrawal:input.withdrawal} : row;
-      const read = field => hasData && resolved.source !== 'conflict' ? numeric(adoptedRow[field]) : null;
+      const input = records(models, 'monthlyAccountInputs').find(item => item.accountId === resolver.policies[key]?.accountId && item.targetMonth === targetMonth);
+      const adoptedRow = input && !resolved.state ? input.schemaVersion === 2
+        ? {realizedPnL:input.adoptedValues.realizedPnl,swapPnL:input.adoptedValues.swapPnl,unrealizedPnL:input.adoptedValues.unrealizedPnl,deposit:input.adoptedValues.deposit,withdrawal:input.adoptedValues.withdrawal}
+        : {realizedPnL:input.realizedPnl, deposit:input.deposit, withdrawal:input.withdrawal} : row;
+      const read = field => hasData && resolved.source !== 'conflict' && !observed.conflict ? numeric(adoptedRow[field]) : null;
       const partial = hasData && !complete;
       const asset = complete ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
       const unrealized = complete || resolved.source === 'legacy' ? read('unrealizedPnL')

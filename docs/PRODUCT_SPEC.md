@@ -1,8 +1,10 @@
 # Product Specification
 
-## Traders Storage / Backup v7
+## Traders PDF-only partial保存 / Backup v8
 
-**Current**：LIGHT FX／みんなのFXはImportで月次PDFを解析し、収益カレンダー「スワップ付与」月間合計を一項目入力して確認後に一括保存する。空欄では保存不可、正数・負数・明示0を受理する。成功後は「保存済み」、同一hashは無書込、訂正版は明示確認が必要。Inputは既存FXと同じ5項目・口座単位の「保存」で原値を保持した採用値訂正を行う。2026-09以降、個別建玉評価損益の手入力UIは表示しない。2026-08以前の既存UI・データは維持する。
+**Current / Decided**：LIGHT FX／みんなのFXはswap空欄でも確認後にPDF原値・建玉・部分入力を保存できる。空欄はmissingで、MonthlyAccountStateを作らない。後からInputで収益カレンダー「スワップ付与」月間合計を入力し、口座内「保存」で完全時だけ確定する。正数・負数・明示0を受理し、PDF＋swapの同時確定も可能。成功後は「保存済み」、同一hashはpartialでも無書込。訂正版は明示確認が必要で、既存calendar原入力／採用値はPDF訂正だけでは消さない。Inputは同じFX5項目・非永続Draft・口座単位保存を維持する。2026-09以降は建玉別手入力を表示せず、2026-08以前は不変。
+
+**Current**：未確定PDFの観測純資産・価格評価損益・既知flowは共通partial projectionへ反映する。未入力swapは「—」、取得済み値の合計は暫定であり、月次確定や0保存とは区別する。
 
 ## Traders Securities monthly PDF
 
@@ -24,7 +26,7 @@ GMO FXneoの月次PDFはPreviewだけでは保存せず、確認後に月次採�
 
 GMO FXneoは月次の取引残高報告書PDFだけをローカル解析する。Previewは対象月、月末日、決済損益、スワップ、入出金、評価損益、現金残高、純資産、必要証拠金を表示し、個人情報を表示しない。明示確認後にPDF Batch・口座Snapshot・月次Stateを同時保存する。正式合計と取得できた明細・区分別小計・残高式を照合し、不一致、必須値不足、未知区分、非ゼロ手数料、締後移動、未対応の外貨残高は保存不可とする。
 
-**Current**：完全バックアップの最新出力はv7。旧record、State v2、手修正State v3の原値・採用値・変更metadataとSBI部分入力を保護し、v1〜v6互換を維持する。GMO PDF取込UI・月次保存は接続済み。手修正は原Snapshotを保持し、明示編集保存だけでv3化するserviceを用意し、表示だけでは旧v2を変更しない。
+**Current**：完全バックアップの最新出力はv8。旧record、State v2、手修正State v3の原値・採用値・変更metadataとSBI部分入力を保護し、v1〜v7互換を維持する。GMO PDF取込UI・月次保存は接続済み。手修正は原Snapshotを保持し、明示編集保存だけでv3化するserviceを用意し、表示だけでは旧v2を変更しない。
 
 ## 1. 製品定義
 

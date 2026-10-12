@@ -1,8 +1,12 @@
 # Data Model
 
-## Traders Storage / Backup v7
+## Traders PDF-only partial保存 / Backup v8
 
-**Current / Decided**：1ファイルのPDF観測・全FX Holding・calendar原入力・Stateを同一保存操作で確定する。partial saveは行わない。calendar原入力はPDF overrideではなく独立したmanual sourceであり、後の採用値訂正は原値を保持する。PDF訂正は新Batch／新Snapshot／新Holdingを追加し同じState IDの採用参照を明示切替する。表示・月切替だけでモデルをseed／保存しない。
+**Current / Decided**：1ファイルのPDF観測・全FX Holding・PDF月次原値の採用参照を同一保存操作で保護する。calendar swapは独立したmanual sourceで、空欄はnull。PDFだけのpartial保存ではStateを作らず、後入力または同時入力で全5項目が揃った時だけState v4を確定する。PDF訂正は新Batch／新Snapshot／新Holdingへ明示切替し、calendar原値・採用値・履歴と既存State IDを保持する。表示・月切替でseed／保存しない。
+
+**Current / Decided**：新キーを追加せず`tradeScopeMonthlyAccountInputsV1`のTraders専用record v2をBackup v8で導入する。必須fieldはschemaVersion、id、accountId、targetMonth、adoptedAccountSnapshotId、sourceValues、adoptedValues、fieldSources、overrideFields、overrideUpdatedAt、sourceHistory、pdfObservations。2つのValuesはrealizedPnl／swapPnl／unrealizedPnl／deposit／withdrawal、swapだけnull可。他4原値は採用Snapshotの報告値と一致必須。pdfObservationsはfee／otherの照合済み0だけを受理し、非ゼロはParser／保存で停止する。fieldSourcesはPDF由来4項目とmanual-income-calendar-swap-accrualを明示する。旧SBI input v1の意味は不変。
+
+**Current**：口座・月は一意でInput IDを維持する。原calendarは最初の明示入力時にのみnullから数値へ設定し、以後同じsourceの原値を変更しない。nullable sourceHistoryに旧採用Snapshot ID・sourceValues・adoptedValues・overrideUpdatedAtを追記し、partial→completeとPDF訂正を復元可能にする。完全Stateとの5項目・source・採用先一致を検証し、swap missingのState／参照不正／未知fieldを拒否する。旧v7のInputなし完全Stateも読め、表示だけでは新Inputを作らない。明示訂正時に必要なInputを作る。State v4／Snapshot v2／FX Holding v2／envelope v1は変更しない。
 
 **Current / Decided**：Backup v7でTraders専用AccountSnapshot record v2、FX HoldingSnapshot record v2、MonthlyAccountState record v4を導入する（8キー／envelope v1は不変）。State v4は既存採用5項目・sourceValues・overrideFieldsに加えfieldSourcesとsourceHistoryを必須とする。swapの出所は`manual-income-calendar-swap-accrual`、他4項目は`imported-monthly-pdf`。original entered swapは同一採用で不変、採用値訂正／PDF訂正前のsource/adopted値・Snapshot参照・確定日時を追記履歴として保護する。Snapshot accountSpecificはrequiredMargin、orderRequiredMargin、maintenanceRate、transferableAmount、unsettledAmount、reportedAccountEvaluationPnl、monthEndUnsettledSwap、reportedSettledSwapPnl、reportedDeposit、reportedWithdrawal。FX Holdingは共通観測参照とquantity／acquisitionPrice／marketPrice／price unrealizedにfxPosition（orderId／executedAt／side／quantityUnit=reportedQuantity／unsettledSwap／requiredMargin）を保持し、FXのmarketValueを捏造しない。数量のロット換算は行わない。
 
@@ -20,7 +24,7 @@
 
 GMO PDF保存のState v2はそのまま読め、表示／未編集保存で書き換えない。最初の明示手修正だけでState record v3へ昇格する。v2では手修正機能がなかったため、既存Stateの決済・swap・入出金と採用Snapshotの評価損益を原値baselineにする。Snapshotは破壊更新しない。PDF取込は引き続きv2を生成し、Inputの5項目編集は専用serviceで採用Stateだけを保存する。
 
-v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v7で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
+v3はv2 fieldに`sourceValues`（realizedPnl／swapPnl／unrealizedPnl／deposit／withdrawalの5 decimal）、`adoptedUnrealizedPnl`、`overrideFields`（原値と数値的に異なる項目の完全な集合）、`overrideUpdatedAt`を必須追加する。採用決済・swap・入出金は従来fieldを使う。sourceの決済・評価損益はSnapshot報告値と一致必須、差分なしなら採用値も一致必須。原値の変更・同じ採用先でのv3→v2降格をRepositoryで拒否する。元へ戻す場合は原値を保ったv3と空の差分集合になる。GMO envelope／recordは変更せず、最新Backup v8で原値・採用値・metadataを保護する（v5の受理範囲は固定）。v4の受理範囲は旧recordとv2に固定する。
 
 ## Current / Decided — GMO正式月末採用
 

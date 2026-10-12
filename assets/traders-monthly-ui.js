@@ -16,7 +16,7 @@
    const error=node('p','','sbi-monthly-error');error.setAttribute('role','alert');let busy=false;
    function refresh(){save.disabled=busy||!prepared;save.textContent=busy?'保存中…':'保存';reset.hidden=!prepared||fields.every(([f])=>draft[f]===prepared.source[f]);error.hidden=!error.textContent;if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;}
    for(const[field]of fields)controls[field].addEventListener('input',()=>{draft[field]=controls[field].value;error.textContent='';refresh();});
-   reset.addEventListener('click',()=>{if(busy||!prepared)return;Object.assign(draft,prepared.source);for(const[f]of fields)controls[f].value=draft[f];error.textContent='';refresh();});
+   reset.addEventListener('click',()=>{if(busy||!prepared)return;Object.assign(draft,prepared.source);for(const[f]of fields)controls[f].value=draft[f]??'';error.textContent='';refresh();});
    save.addEventListener('click',()=>{if(busy||!prepared)return;busy=true;refresh();try{const result=service.correct({...draft,targetMonth},{expectedModels:prepared.models});if(['saved','unchanged'].includes(result.status)){drafts.delete(token);onSaved(key);}}catch(_){error.textContent='保存できませんでした。入力値と保存データを確認してください';}finally{busy=false;refresh();}});
    if(!prepared){error.textContent='この月の月次PDFを取り込んでください';const link=node('a','データ取込');link.href='../import.html';body.append(link);}
    actions.append(save);body.append(reset,actions,error);refresh();return card;

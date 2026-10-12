@@ -1,6 +1,10 @@
 # Calculation Specification
 
-## Traders Storage / Backup v7
+## Traders Storage / Backup v8
+
+**Current / Decided — PDF-only partial**：PDF由来のrealized／deposit／withdrawalはMonthlyAccountInput v2の原値・採用値を共通表示層で読む。価格評価損益・純資産観測も当月partialとして表示し、Monthly P/L／年間内訳は既知値だけの暫定集計を行う。swap nullはcanonicalの0と同一視しない。Stateなしの厳密ledgerはmissingのまま、後からcalendar入力を保存すると共有表示とfingerprintを更新する。観測netAssetValueをledgerへ加算しない。
+
+**Decided**：calendar「スワップ付与」は月ごとに独立したsource。前月末未決済swap basis・前月PDF・8月legacyのswap認識根拠は、9月以降の保存／計算条件ではない。8月の一致確認はhistorical consistency checkに限定する。PDF settled＋当月未決済−前月未決済によるcanonical計算は行わない。
 
 **Current / Input**：2026-09以降のLIGHT／みんなはPDF集計値とcalendar swapを同じFX5項目フォームに表示する。入力イベントはDraftのみ、口座単位の明示保存で採用値と訂正履歴を更新する。建玉別の旧手入力は2026-08以前だけ残し、Risk consumerは今回変更しない。
 

@@ -10,7 +10,8 @@
     4: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
     5: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates']),
     6: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
-    7: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs'])
+    7: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs']),
+    8: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -154,6 +155,12 @@
   };
   function validateRecord(entity, record) {
     let definition = definitions[entity]; if (!definition) fail();
+    if(entity==='monthlyAccountInputs'&&record?.schemaVersion===2)definition={
+      required:['schemaVersion','id','accountId','targetMonth','adoptedAccountSnapshotId','sourceValues','adoptedValues','fieldSources','overrideFields','overrideUpdatedAt','sourceHistory','pdfObservations'],
+      types:{schemaVersion:v=>v===2,id,accountId:id,targetMonth:month,adoptedAccountSnapshotId:id,
+        sourceValues:partialValues,adoptedValues:partialValues,fieldSources,overrideUpdatedAt:timestamp,
+        overrideFields:v=>Array.isArray(v)&&new Set(v).size===v.length&&v.every(f=>adoptionFields.includes(f)),
+        sourceHistory:partialHistory,pdfObservations:v=>{fields(v,['fee','other'],['fee','other']);return ['fee','other'].every(f=>decimal(v[f])&&equalDecimal(v[f],'0'));}}};
     if(entity==='accountSnapshots'&&record?.schemaVersion===2)definition={...definition,
       required:[...definition.required,'schemaVersion','accountSpecific','reportedMonthlyRealizedPnl','cashBalance','netAssetValue','unrealizedPnl','importBatchId','targetMonth','observationType','valuationCurrency'],
       types:{...definition.types,schemaVersion:v=>v===2,accountSpecific:tradersSpecific}};
@@ -283,6 +290,19 @@
     }
     const inputMonths = new Set();
     for (const input of records('monthlyAccountInputs')) {
+      if(input.schemaVersion===2){
+        const pair=JSON.stringify([input.accountId,input.targetMonth]);if(inputMonths.has(pair))fail();inputMonths.add(pair);
+        const account=accounts.get(input.accountId),snapshot=snapshots.get(input.adoptedAccountSnapshotId);
+        validateTradersInput(input,account,snapshot);
+        for(const revision of input.sourceHistory){const previous=snapshots.get(revision.adoptedAccountSnapshotId);
+          if(revision.sourceValues.swapPnl!==null&&!equalNullable(revision.sourceValues.swapPnl,input.sourceValues.swapPnl))fail();
+          validateTradersInput({...input,...revision,overrideFields:adoptionFields.filter(f=>!equalNullable(revision.sourceValues[f],revision.adoptedValues[f]))},account,previous);}
+        const state=records('monthlyAccountStates').find(r=>r.accountId===input.accountId&&r.targetMonth===input.targetMonth);
+        if(state&&(state.schemaVersion!==4||state.adoptedAccountSnapshotId!==input.adoptedAccountSnapshotId
+          ||adoptionFields.some(f=>!equalNullable(state.sourceValues[f],input.sourceValues[f])||!equalNullable(adoptedValues(state,snapshot)[f],input.adoptedValues[f]))))fail();
+        if(!state&&input.adoptedValues.swapPnl!==null)fail();
+        continue;
+      }
       const account = accounts.get(input.accountId), batch = batches.get(input.domesticImportBatchId);
       const pair = JSON.stringify([input.accountId, input.targetMonth]);
       if (inputMonths.has(pair) || input.accountId !== 'acc_sbi_sec' || account?.providerCode !== 'sbi'
@@ -317,6 +337,24 @@
     fields(value, ['marketValue', 'unrealizedPnl'], ['marketValue', 'unrealizedPnl']);
     if (!decimal(value.marketValue) || !decimal(value.unrealizedPnl)) fail();
     return true;
+  }
+  function equalNullable(a,b){return a===null||b===null?a===b:decimal(a)&&decimal(b)&&equalDecimal(a,b);}
+  function partialValues(value){fields(value,adoptionFields,adoptionFields);return adoptionFields.every(f=>f==='swapPnl'&&value[f]===null||decimal(value[f])&&(f!=='swapPnl'||/^-?(?:0|[1-9]\d*)$/.test(value[f])));}
+  function partialHistory(value){return Array.isArray(value)&&value.every(row=>{
+    fields(row,['adoptedAccountSnapshotId','sourceValues','adoptedValues','overrideUpdatedAt'],['adoptedAccountSnapshotId','sourceValues','adoptedValues','overrideUpdatedAt']);
+    return id(row.adoptedAccountSnapshotId)&&partialValues(row.sourceValues)&&partialValues(row.adoptedValues)&&timestamp(row.overrideUpdatedAt);});}
+  function validateTradersInput(input,account,snapshot){
+    const policy=adoptionPolicies[account?.providerCode];
+    if(!policy?.calendarSwap||account.id!==policy.accountId||account.accountType!=='fx'||snapshot?.schemaVersion!==2
+      ||snapshot.accountId!==input.accountId||snapshot.targetMonth!==input.targetMonth||input.targetMonth<'2026-09'
+      ||['sourceScope','sourceMode','observationType','valuationCurrency'].some(f=>snapshot[f]!==policy[f]))fail();
+    const expected={realizedPnl:snapshot.reportedMonthlyRealizedPnl,unrealizedPnl:snapshot.unrealizedPnl,
+      deposit:snapshot.accountSpecific.reportedDeposit,withdrawal:snapshot.accountSpecific.reportedWithdrawal};
+    if(Object.keys(expected).some(f=>!equalNullable(expected[f],input.sourceValues[f]))
+      ||['sourceValues','adoptedValues'].some(v=>['deposit','withdrawal'].some(f=>input[v][f].startsWith('-')))
+      ||(input.sourceValues.swapPnl===null)!==(input.adoptedValues.swapPnl===null))fail();
+    const changed=adoptionFields.filter(f=>!equalNullable(input.sourceValues[f],input.adoptedValues[f]));
+    if(changed.length!==input.overrideFields.length||changed.some(f=>!input.overrideFields.includes(f)))fail();
   }
   function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, ...models}, Object.keys(keys)); }
   // Only implemented policies can adopt a whole-account observation. Future brokers are not implicitly enabled.
@@ -384,6 +422,7 @@
     if (version === 4 && (models?.monthlyAccountStates?.records || []).some(record => record.schemaVersion === 3)) fail();
     if(version<7&&(['accountSnapshots','holdingSnapshots'].some(entity=>(models?.[entity]?.records||[]).some(record=>record.schemaVersion===2))
       ||(models?.monthlyAccountStates?.records||[]).some(record=>record.schemaVersion===4)))fail();
+    if(version<8&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===2))fail();
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -422,6 +461,17 @@
           || (item.id === record.id && (item.accountId !== record.accountId || item.targetMonth !== record.targetMonth))))) fail();
         if (entity === 'monthlyAccountInputs') for (const old of models[entity]?.records || []) {
           const next = value.records.find(item => item.id === old.id);
+          if(old.schemaVersion===2){
+            if(!next||next.schemaVersion!==2||JSON.stringify(next.sourceHistory.slice(0,old.sourceHistory.length))!==JSON.stringify(old.sourceHistory))fail();
+            if(old.sourceValues.swapPnl!==null&&!equalNullable(old.sourceValues.swapPnl,next.sourceValues.swapPnl))fail();
+            if(old.adoptedAccountSnapshotId===next.adoptedAccountSnapshotId&&adoptionFields.some(f=>
+              !(f==='swapPnl'&&old.sourceValues[f]===null)&&!equalNullable(old.sourceValues[f],next.sourceValues[f])))fail();
+            if(old.adoptedAccountSnapshotId!==next.adoptedAccountSnapshotId||JSON.stringify(old.sourceValues)!==JSON.stringify(next.sourceValues)||JSON.stringify(old.adoptedValues)!==JSON.stringify(next.adoptedValues)){
+              const revision={adoptedAccountSnapshotId:old.adoptedAccountSnapshotId,sourceValues:old.sourceValues,adoptedValues:old.adoptedValues,overrideUpdatedAt:old.overrideUpdatedAt};
+              if(next.sourceHistory.length!==old.sourceHistory.length+1||JSON.stringify(next.sourceHistory.at(-1))!==JSON.stringify(revision))fail();
+            }else if(next.sourceHistory.length!==old.sourceHistory.length)fail();
+            continue;
+          }
           if (!next || next.domesticImportBatchId === old.domesticImportBatchId && ['marketValue', 'unrealizedPnl']
             .some(field => !equalDecimal(next.sourceValues[field], old.sourceValues[field]))) fail();
         }
