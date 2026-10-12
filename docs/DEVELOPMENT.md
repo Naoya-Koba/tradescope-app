@@ -2,6 +2,8 @@
 
 ## Current — 共通取引source基盤
 
+**Current — GMO旧取込の明細補完**：`gmo-save.js`のinspectは非破壊。完全一致する一意Batch・明細0件・再解析／原観測照合成功時のみ`backfill-ready`を返し、UIの「取引明細を追加」確認後に同serviceが再検証する。通常取込と共通のInstrument依存補完・取引生成を使用し、必要Instrumentと全取引を一回のjournalで保存する。月／backfill専用の銘柄identityは作らない。既存月次正本・Top cacheは不変。partialな既存明細は停止、全件一致はno-op、別hashは既存訂正経路を維持する。匿名テストで選択／キャンセル非破壊、再取込、曖昧照合、失敗rollback、訂正原値維持、v9 roundtripを検証する。PWA v284、GMO save／preview queryは20261012-7。
+
 `assets/transaction-view.js`はDOM／Storage非依存の表示resolver。legacy manual、SBI raw、新ImportedTransactionsを読み、adopted Snapshot→ImportBatchでactive GMO sourceを選び、latest importedAtを正本にしない。曖昧dedupeは保持する。新RepositoryキーはtradeScopeImportedTransactionsV1、Backup v9／旧1〜8互換／同一journal・rollbackで保護する。画面読込からseed・Migrationしない。月次calculatorとRisk sourceは変更しない。新取引Viewは共通履歴UIからのみ使う。
 
 **Current — 履歴UI**：`history/transaction-ui.js`は安全なtextContentで表示、絞込後50件を描画し「さらに表示」で50件追加する。`history.js`はraw manualとread-only Repositoryを共通Viewへ渡す。旧parseEntries／Open Positions／manual編集・履歴部分Backupは維持し、取込データの編集や取込建玉へのRisk接続を追加しない。データ読取失敗時は明示し、旧キャッシュやダミー金融値へfallbackしない。匿名2,000件／月500件、実ブラウザGMO500件／DOM50件を検証する。PC1280／mobile390、Consoleと正本不変確認を使用し実機iPhone検証とは区別する。PWA v283、変更履歴資産queryは20261012-5／6でprecacheへ同期する。

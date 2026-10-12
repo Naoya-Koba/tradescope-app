@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradescope-static-v283';
+const CACHE_NAME = 'tradescope-static-v284';
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -11,8 +11,8 @@ const CORE_ASSETS = [
   "./assets/traders-monthly-ui.js?v=20261012-2",
   "./import/gmo-transactions-parser.js?v=20261012-6",
   "./import/gmo-parser.js?v=20261012-4",
-  "./import/gmo-save.js?v=20261012-4",
-  "./import/gmo-preview.js?v=20261012-4",
+  "./import/gmo-save.js?v=20261012-7",
+  "./import/gmo-preview.js?v=20261012-7",
   "./vendor/pdfjs-6.4.299/pdf.mjs",
   "./vendor/pdfjs-6.4.299/pdf.worker.mjs",
   "./vendor/pdfjs-6.4.299/cmaps/90ms-RKSJ-H.bcmap",

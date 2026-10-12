@@ -2,6 +2,10 @@
 
 ## Current / Decided — Imported trade source / Backup v9
 
+**Current / Decided — 旧取込の明細補完**：同一PDFの再選択は通常no-op。ただし口座・provider・PDF種別・importer・対象月・月末日・hash（保存済みsizeがあればsizeも）が一致するBatchが一意で、そのBatchのImportedTransactionsが0件の場合だけ、現在のParserで再検証した明示取引をユーザー確認後に追加できる。原Snapshotの報告値との一致、完全な取引明細取得を要求し、個別決済損益が完全取得できる場合は公式月次合計と照合する。不一致・曖昧Instrumentは停止する。1件以上の不完全／不一致集合は自動補完しない。全明細が既存と一致すればno-op。
+
+**Current / Decided**：取引は既存Batch IDとその`importedAt`を継承し、追加時刻はenvelopeの`updatedAt`だけに反映する。通常新規取込と同じ依存レコード補完で、明示されたFXペアを既存のcanonical正規化で一意に解決し、既存Instrumentを必ず再利用する。必要な未登録Instrumentだけを取引と同じjournalで追加し、失敗時は両方rollbackする。Batch／全Snapshot／月次Input／State／確定日時／採用参照／原値・訂正履歴／legacy／月次計算／Top cacheは変更しない。旧source補完後も履歴表示はStateの明示採用Batchだけを使用する。schema・キー・Backup v9契約は不変、Migration・自動統合・削除は行わない。
+
 `tradeScopeImportedTransactionsV1`を追加し、envelope v1／record v1で明示的なGMO約定イベントを保持する。必須fieldはid、accountId、instrumentId、importBatchId、sourceProvider、sourceType、sourceScope、targetMonth、tradeDate、executedAt、side、normalizedTransactionType、rawTransactionType、quantity、quantityUnit、price、realizedPnl、fee、feeCurrency、currency、providerExecutionId、providerOrderId、sourcePage、sourceRow、importedAt、schemaVersion。日時・個別損益・手数料／通貨・公式IDはnull可。decimalは文字列。現在の許可sourceはGMO PDF／gmo-fx-trades、数量は帳票の約定数（gmo-reported-count）でLotへ推測換算しない。
 
 旧RawTransactionは口座全体のexternal ID一意制約があるため、同一公式IDを含み得る訂正前後のPDF source保持へ無理に流用しない。新モデルはBatch内execution ID／page-row重複と口座・銘柄・Batch・月・日付の参照を検証する。旧legacy／SBI rawは移行・削除しない。表示Viewはmanual／SBI raw／adopted GMO sourceを共通化し、原source refsとmanual metadataを保持する。HoldingSnapshot、月次swap、入出金から売買イベントを生成しない。
@@ -44,7 +48,7 @@ GMOの正本取込元は月次取引残高報告書PDFのみ。明示保存でIm
 
 SnapshotのcashBalance／netAssetValue／unrealizedPnl／reportedMonthlyRealizedPnl／accountSpecific.requiredMarginはPDF観測値。assetValueに純資産を重複保存しない。StateのrealizedPnl／swapPnl／deposit／withdrawalはその月のledgerへの明示採用値で、reportedMonthlyRealizedPnlとの数値一致を必須とする。StateはadoptedAccountSnapshotIdを参照しSBI専用3参照はnull。targetMonthと正式月末日snapshotAsOfを一致検証する。保存日時は保存開始時に付与する。
 
-同一hashは取込済みで変更なし。同月別hashは自動採用せず、ユーザーの訂正確認後だけ新Batch・新Snapshotへ切り替える。State IDは保持しconfirmedAtを更新し、旧観測・Batchは削除しない。legacyへコピーせず、2026-09以降のState不在はmissing、有限非ゼロの旧GMO月次入力はconflict。
+同一hashは通常取込済みで変更なし（旧Batchの明細0件時の明示補完条件は上記）。同月別hashは自動採用せず、ユーザーの訂正確認後だけ新Batch・新Snapshotへ切り替える。State IDは保持しconfirmedAtを更新し、旧観測・Batchは削除しない。legacyへコピーせず、2026-09以降のState不在はmissing、有限非ゼロの旧GMO月次入力はconflict。
 
 ## 汎用月次採用参照（Current / Decided）
 

@@ -27,12 +27,16 @@
   }
   function renderSave() {
     const correction = outcome?.status === 'review-required' && outcome.reason === 'different-report';
-    $('gmo-save').hidden = !source?.preview.valid || !(outcome?.status === 'ready' || correction);
+    const enrichment = outcome?.status === 'backfill-ready';
+    $('gmo-save').hidden = !source?.preview.valid || !(outcome?.status === 'ready' || enrichment || correction);
     $('gmo-save').disabled = busy || opening;
-    $('gmo-save').textContent = correction ? '訂正する' : '保存';
-    $('gmo-save-status').textContent = busy ? '保存中…' : ['saved', 'already-imported'].includes(outcome?.status) ? '保存済み'
+    $('gmo-save').textContent = enrichment ? '取引明細を追加' : correction ? '訂正する' : '保存';
+    $('gmo-save-status').textContent = busy ? '保存中…' : outcome?.enriched ? '既存取込に取引明細を追加しました' : ['saved', 'already-imported'].includes(outcome?.status) ? '保存済み'
       : correction ? '同じ月の報告書が保存されています' : outcome?.reason === 'legacy' ? 'この月には従来のGMO入力が保存されています'
-      : outcome?.reason === 'account' ? 'GMO口座の設定を確認してください' : outcome?.reason === 'instrument' ? '通貨ペアの登録が重複しています' : outcome?.reason === 'unadopted' ? '採用されていない月次データがあります' : '';
+      : outcome?.reason === 'account' ? 'GMO口座の設定を確認してください' : outcome?.reason === 'instrument' ? '通貨ペアを一意に確認できません'
+      : outcome?.reason === 'batch-identity' ? '既存取込との照合が一致しません' : outcome?.reason === 'source-values' ? '既存の報告書の値と一致しません'
+      : outcome?.reason === 'trade-set' ? '保存済みの取引明細と一致しません。追加は停止しました'
+      : outcome?.reason === 'trade-audit' ? '取引明細の損益照合が一致しません。追加は停止しました' : outcome?.reason === 'unadopted' ? '採用されていない月次データがあります' : '';
     for (const id of ['gmo-file', 'gmo-close', 'gmo-confirm-save', 'gmo-cancel-save']) $(id).disabled = busy;
   }
   function node(tag, text, className) {
@@ -126,12 +130,14 @@
       if (selected !== source) return;
       renderSave();
       const correction = outcome.status === 'review-required' && outcome.reason === 'different-report';
-      if (outcome.status !== 'ready' && !correction) return;
+      const enrichment = outcome.status === 'backfill-ready';
+      if (outcome.status !== 'ready' && !enrichment && !correction) return;
       confirmation = correction ? { stateId: outcome.stateId, adoptedSnapshotId: outcome.adoptedSnapshotId } : {};
       $('gmo-save-summary').replaceChildren();
       for (const [label, value] of [['対象月', source.preview.targetMonth.replace('-', '/')], ['月末日', source.preview.snapshotAsOf.replaceAll('-', '/')]])
         $('gmo-save-summary').append(node('dt', label), node('dd', value));
-      $('gmo-confirm-save').textContent = correction ? '訂正して保存' : '保存';
+      if (enrichment) $('gmo-save-summary').append(node('dt', '取引明細'), node('dd', `${source.preview.tradeDetails.rows.length}件`));
+      $('gmo-confirm-save').textContent = enrichment ? '取引明細を追加' : correction ? '訂正して保存' : '保存';
       $('gmo-save-dialog').showModal();
     } catch (_) { $('gmo-issues').replaceChildren(node('p', '保存データを確認できません。再読み込みしてください', 'issue error')); }
     finally { opening = false; renderSave(); }

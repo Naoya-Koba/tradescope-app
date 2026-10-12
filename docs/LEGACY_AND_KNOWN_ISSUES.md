@@ -2,7 +2,7 @@
 
 ## Current / Known issue — 共通取引source
 
-ImportedTransactionsの新モデル・非破壊resolver・Backup v9を追加。legacy manual／SBI raw原本を維持し、HoldingSnapshotは売買履歴に変換しない。GMO parser保存と共通履歴UIは接続済み。GMOの帳票「約定数」は単位根拠未確定のためLot換算・manual FXとの数量単位一致dedupeをしない。false positiveより重複表示を優先する。既存同一hash保存済みPDFの再選択は旧sourceでもno-opで、明細を自動backfillしない。Risk／Position consumerの統合は別工程。LIGHT／みんなの既知2026-09 PDFの明示取引欄は0件で、月末建玉から当月全売買は復元できないため今回は取引sourceを生成しない。将来明示イベントがある帳票の対応は別工程。
+ImportedTransactionsの新モデル・非破壊resolver・Backup v9を追加。legacy manual／SBI raw原本を維持し、HoldingSnapshotは売買履歴に変換しない。GMO parser保存と共通履歴UIは接続済み。GMOの帳票「約定数」は単位根拠未確定のためLot換算・manual FXとの数量単位一致dedupeをしない。false positiveより重複表示を優先する。既存同一hashは通常no-opだが、旧Batchの明細0件・同一sourceの一意照合・再解析／原観測／損益検算成功時だけ、ユーザー確認後に明細と必要Instrumentを追加できる。月次正本は変更しない。選択だけでは自動補完せず、非ゼロの不完全／不一致集合は停止し修復しない。Risk／Position consumerの統合は別工程。LIGHT／みんなの既知2026-09 PDFの明示取引欄は0件で、月末建玉から当月全売買は復元できないため今回は取引sourceを生成しない。将来明示イベントがある帳票の対応は別工程。
 
 ## Traders Storage / Backup v8
 

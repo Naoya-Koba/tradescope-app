@@ -2,6 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const crypto = require('node:crypto').webcrypto;
 const model = require('../assets/data-model-storage.js'), engine = require('../import/gmo-save.js'), parser = require('../import/gmo-parser.js');
 const { MemoryStorage } = require('./gmo-support.js'), { report } = require('./gmo-pdf-fixture.js');
+const { trades } = require('./gmo-trades-fixture.js');
 class Element {
   constructor() { this.hidden=true;this.disabled=false;this.open=false;this.children=[];this.listeners={};this.textContent='';this.dataset={}; }
   addEventListener(name, cb) { (this.listeners[name] ||= []).push(cb); }
@@ -88,4 +89,32 @@ test('GMO detector/parser/validation failures have distinct diagnostic codes and
   const invalid=harness(new MemoryStorage(),report(),{TradeScopeGMOParser:{detect:()=>true,parse:()=>({valid:false,targetMonth:null,snapshotAsOf:null,values:{},errors:['必要項目がありません'],warnings:[]})}});
   await invalid.upload();assert.equal(invalid.elements['gmo-read-status'].dataset.errorCode,'GMO_VALIDATION_FAILED');
   for(const h of [detector,broken,invalid]) {assert.equal(h.elements['gmo-save'].hidden,true);assert.doesNotMatch(h.elements['gmo-issues'].children[0].textContent,/PRIVATE/);}
+});
+
+async function oldImport() {
+  const h=harness();await h.upload();await h.elements['gmo-save'].fire('click');await h.elements['gmo-confirm-save'].fire('click');return h.storage;
+}
+test('zero-detail existing source offers explicit addition; file selection and cancellation do not write',async()=>{
+  const storage=await oldImport(),before=storage.snapshot(),h=harness(storage,trades());await h.upload();
+  assert.equal(h.elements['gmo-save'].textContent,'取引明細を追加');assert.equal(h.elements['gmo-save'].hidden,false);assert.deepEqual(storage.snapshot(),before);
+  await h.elements['gmo-save'].fire('click');assert.equal(h.elements['gmo-confirm-save'].textContent,'取引明細を追加');
+  assert.ok(h.elements['gmo-save-summary'].children.some(e=>e.textContent==='2件'));
+  await h.elements['gmo-cancel-save'].fire('click');assert.deepEqual(storage.snapshot(),before);assert.equal(h.saves(),0);
+});
+test('confirmed addition executes once, preserves monthly bytes, and reload/reselection is saved',async()=>{
+  const storage=await oldImport(),before=storage.snapshot(),h=harness(storage,trades());await h.upload();await h.elements['gmo-save'].fire('click');
+  await Promise.all([h.elements['gmo-confirm-save'].fire('click'),h.elements['gmo-confirm-save'].fire('click')]);assert.equal(h.saves(),1);
+  assert.equal(h.elements['gmo-save-status'].textContent,'既存取込に取引明細を追加しました');assert.equal(h.elements['gmo-save'].hidden,true);
+  for(const [key,value] of Object.entries(before))assert.equal(storage.getItem(key),value);
+  assert.equal(model.readModels(storage).importedTransactions.records.length,2);
+  const saved=storage.snapshot(),next=harness(storage,trades());await next.upload();assert.equal(next.elements['gmo-save-status'].textContent,'保存済み');assert.equal(next.elements['gmo-save'].hidden,true);assert.deepEqual(storage.snapshot(),saved);
+});
+test('partial persisted detail set displays a concrete stop message, without a save path',async()=>{
+  const storage=await oldImport(),h=harness(storage,trades());await h.upload();await h.elements['gmo-save'].fire('click');await h.elements['gmo-confirm-save'].fire('click');
+  const m=model.readModels(storage);m.importedTransactions.records.pop();model.createRepository(storage).commit({importedTransactions:m.importedTransactions});
+  const before=storage.snapshot(),next=harness(storage,trades());await next.upload();assert.equal(next.elements['gmo-save'].hidden,true);assert.match(next.elements['gmo-save-status'].textContent,/保存済みの取引明細と一致しません/);assert.deepEqual(storage.snapshot(),before);
+});
+test('enrichment detail audit mismatch hides addition and leaves all storage unchanged',async()=>{
+  const storage=await oldImport(),before=storage.snapshot(),document=trades();document.pages[6].items.find(r=>r.text==='+10.00 JPY').text='+11 JPY';
+  const h=harness(storage,document);await h.upload();assert.equal(h.elements['gmo-save'].hidden,true);assert.match(h.elements['gmo-save-status'].textContent,/損益照合が一致しません/);assert.deepEqual(storage.snapshot(),before);
 });

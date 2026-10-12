@@ -11,6 +11,35 @@
   const rows = (models, entity) => models[entity]?.records || [];
   const copy = value => JSON.parse(JSON.stringify(value));
   const only = (object, keys) => object && typeof object === 'object' && !Array.isArray(object) && Object.keys(object).every(key => keys.includes(key));
+  // Dependency completion for imported executions, shared by new imports and enrichment.
+  // No month/provider-specific identity rule, fuzzy match or metadata replacement.
+  function instrumentDependencies(before, trades) {
+    const ids = new Map(), newSymbols = [];
+    for (const row of trades) {
+      const symbol = view.fxPair(row.symbol);
+      if (!symbol) return null;
+      if (ids.has(symbol) || newSymbols.includes(symbol)) continue;
+      const matches = rows(before, 'instruments').filter(item => item.assetType === 'FX' && view.fxPair(item.symbol) === symbol);
+      if (matches.length > 1) return null;
+      if (matches.length) ids.set(symbol, matches[0].id); else newSymbols.push(symbol);
+    }
+    return { ids, newSymbols };
+  }
+  function sameTrade(record, fact, before) {
+    const instrument = rows(before, 'instruments').find(item => item.id === record.instrumentId);
+    if (view.fxPair(instrument?.symbol) !== view.fxPair(fact.symbol)) return false;
+    const decimals = ['quantity', 'price', 'realizedPnl', 'fee'];
+    return Object.keys(fact).filter(key => key !== 'symbol').every(key => decimals.includes(key)
+      ? record[key] === null && fact[key] === null || parser.equal(record[key], fact[key]) : record[key] === fact[key]);
+  }
+  function originalSnapshotMatches(snapshot, preview) {
+    const same = (a, b) => typeof a === 'string' && typeof b === 'string' && parser.equal(a, b);
+    return snapshot?.sourceScope === policy.sourceScope && snapshot.sourceMode === policy.sourceMode
+      && snapshot.observationType === policy.observationType && snapshot.valuationCurrency === policy.valuationCurrency
+      && same(snapshot.reportedMonthlyRealizedPnl, preview.values.realizedPnl)
+      && ['cashBalance', 'netAssetValue', 'unrealizedPnl'].every(key => same(snapshot[key], preview.values[key]))
+      && same(snapshot.accountSpecific?.requiredMargin, preview.values.requiredMargin);
+  }
   function validateSource(source) {
     model.assertJson(source);
     const preview = source?.preview;
@@ -47,15 +76,34 @@
       if (resolver.hasLegacyConflict(legacy, preview.targetMonth, 'gmo')) return { status: 'conflict', reason: 'legacy' };
       const account = rows(before, 'accounts').find(row => row.id === accountId);
       if (account && (!account.enabled || account.providerCode !== 'gmo' || account.accountType !== 'fx')) return { status: 'conflict', reason: 'account' };
-      const exact = rows(before, 'importBatches').find(row => row.accountId === accountId && row.sourceType === 'pdf'
-        && row.sourceProvider === 'gmo' && row.sourceFileMetadata?.hash === source.fileHash);
-      if (exact) return { status: 'already-imported' };
-      const ids=new Map(),newSymbols=[];
-      for(const symbol of new Set((preview.tradeDetails?.rows||[]).map(row=>view.fxPair(row.symbol)))){
-        const matches=rows(before,'instruments').filter(row=>row.assetType==='FX'&&view.fxPair(row.symbol)===symbol);
-        if(matches.length>1)return {status:'conflict',reason:'instrument'};
-        if(matches.length)ids.set(symbol,matches[0].id);else newSymbols.push(symbol);
+      const hashMatches = rows(before, 'importBatches').filter(row => row.sourceFileMetadata?.hash === source.fileHash);
+      let enrichmentBatch = null;
+      if (hashMatches.length) {
+        const matches = hashMatches.filter(row => row.accountId === accountId && row.sourceType === 'pdf' && row.sourceProvider === 'gmo'
+          && row.importerId === 'gmo-fx-monthly' && ['gmo-fx-monthly-v1', parser.version].includes(row.importerVersion)
+          && row.targetMonth === preview.targetMonth && row.snapshotAsOf === preview.snapshotAsOf
+          && (row.sourceFileMetadata.size === undefined || row.sourceFileMetadata.size === source.fileSize));
+        if (matches.length !== 1 || hashMatches.length !== 1) return { status: 'conflict', reason: 'batch-identity' };
+        const exact = matches[0], existing = rows(before, 'importedTransactions').filter(row => row.importBatchId === exact.id);
+        const detail = preview.tradeDetails;
+        if (!detail?.rows.length) return existing.length ? { status: 'conflict', reason: 'trade-set' } : { status: 'already-imported' };
+        if (existing.length) {
+          if (existing.length !== detail.rows.length || detail.rows.some(fact => existing.filter(row => sameTrade(row, fact, before)).length !== 1))
+            return { status: 'conflict', reason: 'trade-set' };
+          return { status: 'already-imported' };
+        }
+        if (detail.coverage !== 'complete' || detail.audit === 'mismatch' || detail.warnings.length
+          || detail.pnlCoverage === 'complete' && (!detail.rows.filter(row => row.normalizedTransactionType === 'close').every(row => row.realizedPnl !== null)
+            || !parser.equal(csv.sum(['0', ...detail.rows.filter(row => row.normalizedTransactionType === 'close').map(row => row.realizedPnl)]), preview.values.realizedPnl)))
+          return { status: 'conflict', reason: 'trade-audit' };
+        const observations = rows(before, 'accountSnapshots').filter(row => row.importBatchId === exact.id);
+        if (observations.length !== 1 || !originalSnapshotMatches(observations[0], preview)) return { status: 'conflict', reason: 'source-values' };
+        enrichmentBatch = exact;
       }
+      const dependencies = instrumentDependencies(before, preview.tradeDetails?.rows || []);
+      if (!dependencies) return { status: 'conflict', reason: 'instrument' };
+      const { ids, newSymbols } = dependencies;
+      if (enrichmentBatch) return { status: 'backfill-ready', source, preview, before, account, ids, newSymbols, enrichmentBatch };
       const state = rows(before, 'monthlyAccountStates').find(row => row.accountId === accountId && row.targetMonth === preview.targetMonth);
       const previous = rows(before, 'accountSnapshots').filter(row => row.accountId === accountId && row.targetMonth === preview.targetMonth && row.sourceScope === policy.sourceScope);
       if (previous.length && !state) return { status: 'conflict', reason: 'unadopted' };
@@ -67,10 +115,29 @@
         ...(prepared.state ? { stateId: prepared.state.id, adoptedSnapshotId: prepared.state.adoptedAccountSnapshotId } : {}) };
     }
     async function inspect(input) { return publicResult(prepare(input)); }
+    function transactionChanges(prepared, batch, updatedAt) {
+      const { before, preview, ids, newSymbols } = prepared, changes = {};
+      const envelope = records => ({ schemaVersion: 1, records, updatedAt });
+      const instruments = newSymbols.map(symbol => { const id = model.newId('ins', cryptoApi); ids.set(symbol, id);
+        return { id, assetType: 'FX', symbol, displayName: symbol, baseCurrency: symbol.slice(0,3), quoteCurrency: symbol.slice(4), enabled: true }; });
+      if (instruments.length) changes.instruments = envelope([...copy(rows(before, 'instruments')), ...instruments]);
+      const imported = (preview.tradeDetails?.rows || []).map(row => { const { symbol, ...facts } = row;
+        return { schemaVersion: 1, id: model.newId('it', cryptoApi), accountId: batch.accountId, instrumentId: ids.get(view.fxPair(symbol)),
+          importBatchId: batch.id, sourceProvider: batch.sourceProvider, sourceType: batch.sourceType, sourceScope: 'gmo-fx-trades',
+          targetMonth: preview.targetMonth, importedAt: batch.importedAt, ...facts }; });
+      if (imported.length) changes.importedTransactions = envelope([...copy(rows(before, 'importedTransactions')), ...imported]);
+      return changes;
+    }
     async function save(input, confirmation = {}) {
       if (busy) return { status: 'busy' }; busy = true;
       try {
         const prepared = prepare(input);
+        if (prepared.status === 'backfill-ready') {
+          // The original source timestamp is part of the v9 record contract. Only envelope.updatedAt advances.
+          const changes = transactionChanges(prepared, prepared.enrichmentBatch, clock());
+          repository.commit(changes, { expectedModels: prepared.before });
+          return { status: 'saved', enriched: true, importBatchId: prepared.enrichmentBatch.id, transactionCount: prepared.preview.tradeDetails.rows.length };
+        }
         const correction = prepared.status === 'review-required' && prepared.reason === 'different-report'
           && confirmation.stateId === prepared.state.id && confirmation.adoptedSnapshotId === prepared.state.adoptedAccountSnapshotId;
         if (prepared.status !== 'ready' && !correction) return publicResult(prepared);
@@ -87,13 +154,9 @@
         const monthly = { schemaVersion: 2, id: state?.id || model.newId('mas', cryptoApi), accountId, targetMonth: preview.targetMonth, confirmedAt: importedAt,
           adoptedAccountSnapshotId: snapshotId, domesticImportBatchId: null, foreignAccountSnapshotId: null, cashAccountSnapshotId: null,
           ...Object.fromEntries(['realizedPnl', 'swapPnl', 'deposit', 'withdrawal'].map(name => [name, preview.values[name]])) };
-        const changes = {};
+        const changes = transactionChanges(prepared, batch, importedAt);
         const envelope = records => ({ schemaVersion: 1, records, updatedAt: importedAt });
         if (!account) changes.accounts = envelope([...copy(rows(before, 'accounts')), model.initialAccounts().find(row => row.id === accountId)]);
-        const instruments=prepared.newSymbols.map(symbol=>{const id=model.newId('ins',cryptoApi);prepared.ids.set(symbol,id);return {id,assetType:'FX',symbol,displayName:symbol,baseCurrency:symbol.slice(0,3),quoteCurrency:symbol.slice(4),enabled:true};});
-        if(instruments.length)changes.instruments=envelope([...copy(rows(before,'instruments')), ...instruments]);
-        const imported=(preview.tradeDetails?.rows||[]).map(row=>{const {symbol,...facts}=row;return {schemaVersion:1,id:model.newId('it',cryptoApi),accountId,instrumentId:prepared.ids.get(view.fxPair(symbol)),importBatchId:batchId,sourceProvider:'gmo',sourceType:'pdf',sourceScope:'gmo-fx-trades',targetMonth:preview.targetMonth,importedAt,...facts};});
-        if(imported.length)changes.importedTransactions=envelope([...copy(rows(before,'importedTransactions')), ...imported]);
         changes.importBatches = envelope([...copy(rows(before, 'importBatches')), batch]);
         changes.accountSnapshots = envelope([...copy(rows(before, 'accountSnapshots')), snapshot]);
         changes.monthlyAccountStates = envelope([...copy(rows(before, 'monthlyAccountStates')).filter(row => row.id !== monthly.id), monthly]);

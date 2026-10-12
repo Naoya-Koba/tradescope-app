@@ -2,6 +2,8 @@
 
 ## Current / Decided — Backup v9
 
+**Current**：旧GMO Batchの明細0件時の明示補完もv9の既存record契約で保護する。必要なFX InstrumentとImportedTransactionsだけを同一Repository journalへ書き、全キー再読込検証後に成功、途中失敗は両方を元の生文字列／キー不在へrollbackする。Batchと月次正本は変更せず、取引`importedAt`は既存Batchの原取込日時、envelope `updatedAt`は補完日時。Backup schema／Restore semantics／versionは変更しない。
+
 最新exportはv9。新しいImportedTransactionsを含む9モデルを保護するためv8契約を固定する。v9だけが新collectionを受理し、v1は9モデル維持、v2〜v8は各公開済み旧範囲を復元する際に未収録ImportedTransactionsを同じjournalでクリアする（事前確認へ表示）。旧Batch／Account置換後に参照切れsourceを残さないためである。v9は9モデル完全復元。legacy部分復元は新モデルを維持。null＝キー不在、tradeInfo保護、再読込検証、rollback、派生cache無効化は維持する。filename／PDF原本／全文／PIIは保存しない。
 
 ## Current — 固定Backup v8互換
