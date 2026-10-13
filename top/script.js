@@ -1256,6 +1256,17 @@ function formatLossJPY(value) {
 }
 
 function buildDetailDataFromPosition(position) {
+  if (isPortfolioObservation(position)) {
+    const label = window.TradeScopeOpenPositionsView.decimalLabel;
+    return {
+      title: `${portfolioSymbolLabel(position)} (SBI VC)`,
+      profit: portfolioObservationAmount(position.marketValue), rate: '—',
+      lots: `${label(position.quantity)} ${resolvePortfolioUnit(position)}`,
+      avg: '—', now: portfolioObservationAmount(position.marketPrice),
+      mmr: '—', zero: '—', half: '—',
+      note: `SBI VC · ${portfolioMonthLabel(position.targetMonth)}`
+    };
+  }
   const absQuantity = Number(position?.absQuantity) || 0;
   const avgRateValue = Number(position?.avgRate) || 0;
   const contractSize = Number(position?.contractSize) || historyCore?.FX_CONTRACT_SIZE_DEFAULT || 10000;
@@ -1307,6 +1318,21 @@ function openDetail(target) {
       accounts: []
     })
     : buildDetailDataFromPosition(target);
+
+  const observation = isPortfolioObservation(target);
+  detailPanel.classList.toggle('holding-observation-detail', observation);
+  for (const [id, text] of [
+    ['detailQuantityLabel', observation ? '数量' : 'ロット数'],
+    ['detailAcquisitionLabel', observation ? '取得原価' : '平均建値'],
+    ['detailValuationLabel', observation ? '評価レート' : '現在レート']
+  ]) {
+    const label = document.getElementById(id);
+    if (label) label.textContent = text;
+  }
+  const pnlRow = document.getElementById('detailObservationPnlRow');
+  if (pnlRow) pnlRow.hidden = !observation;
+  const riskSection = document.getElementById('detailLossRiskSection');
+  if (riskSection) riskSection.hidden = observation;
 
   if (detailTitle) detailTitle.textContent = data.title;
   if (detailProfit) {
@@ -2038,70 +2064,57 @@ function aggregateOpenPositionsForTop(entries) {
     .sort((a, b) => (Number(b.metricValue) || 0) - (Number(a.metricValue) || 0));
 }
 
-function buildCryptoPortfolioFromMonthlyHoldings() {
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const year = topSeries?.year || TOP_BASE_YEAR;
-  const month = topSeries?.month || 12;
-  
-  const sbivcData = tradingData?.[year]?.[month]?.['sbivc'];
-  if (!sbivcData || !Array.isArray(sbivcData.holdings)) return [];
-  
-  const allHoldings = sbivcData.holdings.filter(h => Number(h.quantity) > 0);
-  if (!allHoldings.length) return [];
-
-  // 各通貨ごとに行を生成（円換算額を使用）
-  return allHoldings.map(holding => {
-    const symbol = holding.symbol;
-    const quantity = Number(holding.quantity) || 0;
-
-    // JPY現金は1:1で円換算
-    if (symbol === 'JPY') {
-      return {
-        id: 'monthly::JPY',
-        symbol: 'JPY',
-        assetType: '暗号資産',
-        side: 'buy',
-        absQuantity: quantity,
-        avgRate: 1,
-        contractSize: 1,
-        accounts: ['SBI VC'],
-        strategy: '-',
-        memo: `月次報告書: ${quantity.toLocaleString()} JPY`,
-        metricValue: quantity
-      };
-    }
-
-    const rate = Number(holding.rate) || 0;
-    const hasValueJPY = holding.valueFilled === true
-      || (holding.valueJPY != null && holding.valueJPY !== '' && Number(holding.valueJPY) > 0);
-    const valueJPY = hasValueJPY ? Number(holding.valueJPY) : null;
-    // レートが入力されている場合は優先、なければ円換算額から計算
-    const avgRate = rate > 0
-      ? rate
-      : (quantity > 0 && Number.isFinite(valueJPY) ? valueJPY / quantity : 0);
-
-    return {
-      id: `monthly::${symbol}`,
-      symbol: `${symbol}/JPY`,
-      assetType: '暗号資産',
-      side: 'buy',
-      absQuantity: quantity,
-      avgRate: avgRate,
-      contractSize: 1,
-      accounts: ['SBI VC'],
-      strategy: '-',
-      memo: `月次報告書: ${quantity.toFixed(8)} ${symbol}`,
-      metricValue: Number.isFinite(valueJPY) ? valueJPY : null
-    };
-  });
+function isPortfolioObservation(row) {
+  return ['spot-observation', 'cash-observation'].includes(row?.holdingType);
 }
 
-function applyMonthlyCryptoRows(rows) {
-  const monthlyCryptoRows = buildCryptoPortfolioFromMonthlyHoldings();
-  if (!monthlyCryptoRows.length) return rows;
+function portfolioSymbolLabel(row) {
+  return row.holdingType === 'cash-observation' ? 'JPY（現金）' : row.symbol;
+}
 
-  const nonCryptoRows = rows.filter((row) => normalizeAssetTypeLabel(row.assetType) !== normalizeAssetTypeLabel('暗号資産'));
-  return [...nonCryptoRows, ...monthlyCryptoRows];
+function portfolioMonthLabel(month) {
+  return /^\d{4}-\d{2}$/.test(month || '') ? `${month.slice(0, 4)}年${Number(month.slice(5))}月時点` : '';
+}
+
+function portfolioObservationAmount(value) {
+  return value === null ? '—' : `${window.TradeScopeOpenPositionsView.decimalLabel(value)} 円`;
+}
+
+// Number conversion is exclusively for Chart.js and display percentages.
+// Source decimals, list values and detail values never pass through this conversion.
+function portfolioChartValue(row) {
+  if (!isPortfolioObservation(row)) return Number.isFinite(row.metricValue) ? row.metricValue : null;
+  const value = row.metricValue;
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^\d+(?:\.\d+)?$/.test(value))) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+}
+
+function buildCanonicalCryptoPortfolio() {
+  try {
+    const models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read();
+    const source = window.TradeScopeOpenPositionsView.latestObservation(models);
+    const rows = source.holdings.map(h => ({ ...h, id: `observation::${h.holdingSnapshotId}`, metricValue: h.marketValue }));
+    if (source.hasSource && (source.cashBalance === null || !window.TradeScopeDataStorage.equalDecimal(source.cashBalance, '0'))) {
+      rows.push({ holdingType: 'cash-observation', id: `cash::${source.accountSnapshotId}`,
+        symbol: 'JPY', assetType: '暗号資産', account: 'acc_sbivc_crypto', quantity: source.cashBalance,
+        marketPrice: '1', marketValue: source.cashBalance, metricValue: source.cashBalance,
+        acquisitionPrice: null, unrealizedPnl: null, targetMonth: source.targetMonth,
+        snapshotAsOf: source.snapshotAsOf, hasOverrides: source.hasOverrides });
+    }
+    return { ...source, rows, error: false };
+  } catch (_) {
+    return { hasSource: false, targetMonth: null, rows: [], error: true };
+  }
+}
+
+function buildCurrentPortfolioView() {
+  const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
+  // Exclusion happens before legacy netting: empty/invalid canonical data must not resurrect SBI VC.
+  const otherEntries = window.TradeScopeOpenPositionsView.legacyEntries(entries);
+  const otherRows = applyMonthlySecuritiesValues(aggregateOpenPositionsForTop(otherEntries));
+  const crypto = buildCanonicalCryptoPortfolio();
+  return { rows: [...otherRows, ...crypto.rows], crypto };
 }
 
 function isEtfLikeSecuritiesSymbol(symbol) {
@@ -2176,8 +2189,7 @@ function applyMonthlySecuritiesValues(rows) {
 }
 
 function getActivePortfolioRows() {
-  const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
-  const rows = applyMonthlyCryptoRows(aggregateOpenPositionsForTop(entries));
+  const rows = buildCurrentPortfolioView().rows;
   return rows.filter((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(activePortfolioAssetTab));
 }
 
@@ -2267,18 +2279,26 @@ function renderCurrentPortfolioSection() {
   const chartCtx = chartCanvas?.getContext('2d');
   if (!list) return;
 
-  const entries = historyCore?.parseEntries ? historyCore.parseEntries() : [];
-  let allRows = aggregateOpenPositionsForTop(entries);
-  allRows = applyMonthlyCryptoRows(allRows);
-  allRows = applyMonthlySecuritiesValues(allRows);
+  const view = buildCurrentPortfolioView();
+  const allRows = view.rows;
   const hasTabData = (tabName) => allRows.some((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(tabName));
-  if (!hasTabData(activePortfolioAssetTab)) {
+  if (activePortfolioAssetTab !== '暗号資産' && !hasTabData(activePortfolioAssetTab)) {
     const fallbackTab = ['FX', '証券', '暗号資産'].find((tabName) => hasTabData(tabName));
     if (fallbackTab) activePortfolioAssetTab = fallbackTab;
   }
   syncPortfolioTabs();
 
   const rows = allRows.filter((row) => normalizeAssetTypeLabel(row.assetType) === normalizeAssetTypeLabel(activePortfolioAssetTab));
+  const status = document.getElementById('currentPortfolioSourceStatus');
+  if (status) {
+    status.textContent = activePortfolioAssetTab === '暗号資産'
+      ? (view.crypto.error ? 'SBI VCの保有情報を取得できません' : view.crypto.hasSource ? `SBI VC · ${portfolioMonthLabel(view.crypto.targetMonth)}` : '') : '';
+    status.hidden = !status.textContent;
+  }
+  const partial = activePortfolioAssetTab === '暗号資産'
+    && (rows.some(row => portfolioChartValue(row) === null) || view.crypto.hasUnknownQuantity === true);
+  const ratioTitle = document.getElementById('currentPortfolioRatioTitle');
+  if (ratioTitle) ratioTitle.textContent = partial ? '評価額取得分の比率' : '保有比率';
 
   if (!rows.length) {
     list.innerHTML = '<li class="pair-card portfolio-empty-row"><p class="data-empty-state">データなし</p></li>';
@@ -2290,12 +2310,13 @@ function renderCurrentPortfolioSection() {
     return;
   }
 
-  const chartRows = rows.filter((row) => Number.isFinite(row.metricValue) && row.metricValue > 0);
-  const total = chartRows.reduce((sum, row) => sum + row.metricValue, 0);
+  const chartRows = rows.filter(row => portfolioChartValue(row) > 0);
+  const total = chartRows.reduce((sum, row) => sum + portfolioChartValue(row), 0);
   const palette = ['#3B6DFF', '#3EE08F', '#3DA2FF', '#D95757', '#E9C85E', '#7E7A98', '#F18E4F', '#8BC7FF'];
   list.innerHTML = rows.map((row, idx) => {
-    const hasMetric = Number.isFinite(row.metricValue);
-    const share = hasMetric && total > 0 ? ((row.metricValue / total) * 100) : null;
+    const value = portfolioChartValue(row);
+    const hasMetric = value !== null;
+    const share = hasMetric && total > 0 ? ((value / total) * 100) : null;
     const metricLabel = activePortfolioAssetTab === 'FX' ? '必要証拠金' : '評価額';
     const color = palette[idx % palette.length];
     const unit = resolvePortfolioUnit(row);
@@ -2320,16 +2341,18 @@ function renderCurrentPortfolioSection() {
       `;
     }
 
-    const metricText = hasMetric ? fmtJPY(row.metricValue) : '未取得';
-    const secondaryText = share == null
-      ? `${fmtQuantity(row.absQuantity)} ${unit}`
-      : `${fmtQuantity(row.absQuantity)} ${unit} / ${share.toFixed(1)}%`;
+    const observation = isPortfolioObservation(row);
+    const metricText = observation ? portfolioObservationAmount(row.marketValue) : hasMetric ? fmtJPY(row.metricValue) : '未取得';
+    const quantityText = observation ? window.TradeScopeOpenPositionsView.decimalLabel(row.quantity) : fmtQuantity(row.absQuantity);
+    const secondaryText = `${quantityText} ${unit}${share == null ? '' : ` / ${share.toFixed(1)}%`}`;
+    const rateText = row.holdingType === 'spot-observation' ? `<div class="portfolio-observation-rate">評価レート ${escapeHtml(portfolioObservationAmount(row.marketPrice))}</div>` : '';
     return `
-      <li class="pair-card" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
-        <div class="pair-title">${escapeHtml(row.symbol)}</div>
+      <li class="pair-card${observation ? ' portfolio-observation-row' : ''}" style="--item-color: ${color}" data-open-id="${escapeHtml(row.id)}">
+        <div class="pair-title">${escapeHtml(portfolioSymbolLabel(row))}</div>
         <div class="pair-right">
           <div class="pair-profit neutral">${metricLabel} ${metricText}</div>
-          <div class="pair-growth neutral">${secondaryText}</div>
+          <div class="pair-growth neutral">${escapeHtml(secondaryText)}</div>
+          ${rateText}
         </div>
       </li>
     `;
@@ -2350,10 +2373,10 @@ function renderCurrentPortfolioSection() {
   currentPortfolioChart = new Chart(chartCtx, {
     type: 'doughnut',
     data: {
-      labels: chartRows.map((row) => row.symbol),
+      labels: chartRows.map(portfolioSymbolLabel),
       datasets: [{
-        data: chartRows.map((row) => row.metricValue),
-        backgroundColor: chartRows.map((_, idx) => palette[idx % palette.length]),
+        data: chartRows.map(portfolioChartValue),
+        backgroundColor: chartRows.map(row => palette[rows.indexOf(row) % palette.length]),
         borderColor: 'rgba(255,255,255,0.2)',
         borderWidth: 1
       }]
@@ -2367,7 +2390,11 @@ function renderCurrentPortfolioSection() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.label}: ${fmtJPY(ctx.parsed)} (${total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0.0'}%)`
+            label: (ctx) => {
+              const row = chartRows[ctx.dataIndex];
+              const amount = isPortfolioObservation(row) ? portfolioObservationAmount(row.marketValue) : fmtJPY(ctx.parsed);
+              return `${ctx.label}: ${amount} (${total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0.0'}%)`;
+            }
           }
         }
       }

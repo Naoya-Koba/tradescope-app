@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="top/style.css?v=20261003-2" />
+  <link rel="stylesheet" href="top/style.css?v=20261013-4" />
   <link rel="stylesheet" href="assets/bottom-nav.css" />
   <link rel="stylesheet" href="assets/transitions.css" />
   <script src="assets/transitions.js"></script>
@@ -243,7 +243,7 @@
       </div>
 
       <div class="portfolio-current-block">
-        <p class="portfolio-col-title">保有比率</p>
+        <p id="currentPortfolioRatioTitle" class="portfolio-col-title">保有比率</p>
         <div class="portfolio-chart-container">
           <canvas id="currentPortfolioChart"></canvas>
         </div>
@@ -251,6 +251,7 @@
 
       <div class="portfolio-current-block">
         <p class="portfolio-col-title">保有一覧</p>
+        <p id="currentPortfolioSourceStatus" class="portfolio-source-status" hidden></p>
         <ul id="currentPortfolioList" class="sortable-list"></ul>
       </div>
     </section>
@@ -303,9 +304,10 @@
   <div class="detail-section">
     <h4 class="detail-heading">ポジション情報</h4>
     <div class="detail-grid">
-      <div><span>ロット数</span><strong id="detailLots">—</strong></div>
-      <div><span>平均建値</span><strong id="detailAvg">—</strong></div>
-      <div><span>現在レート</span><strong id="detailNow">未取得</strong></div>
+      <div><span id="detailQuantityLabel">ロット数</span><strong id="detailLots">—</strong></div>
+      <div><span id="detailAcquisitionLabel">平均建値</span><strong id="detailAvg">—</strong></div>
+      <div><span id="detailValuationLabel">現在レート</span><strong id="detailNow">未取得</strong></div>
+      <div id="detailObservationPnlRow" hidden><span>評価損益</span><strong>—</strong></div>
     </div>
   </div>
 
@@ -326,7 +328,7 @@
 </div>
 
   <!-- 損失リスク情報 -->
-  <div class="detail-section">
+  <div id="detailLossRiskSection" class="detail-section">
     <h4 class="detail-heading">損失リスク</h4>
     <div class="detail-grid">
       <div><span>証拠金維持率</span><strong id="detailMMR">—</strong></div>
@@ -443,6 +445,8 @@
   <script src="assets/storage-transaction.js?v=20261013-1"></script>
   <script src="assets/transaction-reconciliation.js?v=20261013-1"></script>
   <script src="assets/data-model-storage.js?v=20261013-1"></script>
+  <script src="assets/observation-adoption.js?v=20261012-15"></script>
+  <script src="assets/open-positions-view.js?v=20261013-4"></script>
   <script src="import/csv-core.js?v=20261005-1"></script>
   <script src="assets/monthly-account-resolver.js?v=20261012-1"></script>
   <script src="assets/monthly-display-view.js?v=20261012-2"></script>
@@ -462,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
   const splashBootLeadMs = 520;
-  const topScriptVersion = '20261013-1';
+  const topScriptVersion = '20261013-4';
   let topScriptPromise = null;
 
   const loadTopScript = () => {
