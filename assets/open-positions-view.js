@@ -16,9 +16,11 @@
   }
   // Shared current-observation selection; an adopted source with no positive rows
   // is distinct from no source. Cash is not a position and resolve() stays compatible.
-  function latestObservation(models){
+  function latestObservation(models,{year}={}){
     storage.validateModels(models);
-    const inputs=rows(models,'monthlyAccountInputs').filter(i=>i.accountId===accountId&&[3,4].includes(i.schemaVersion));
+    if(year!==undefined&&(!Number.isInteger(year)||year<1||year>9999))throw new Error('INVALID_OBSERVATION_YEAR');
+    const inputs=rows(models,'monthlyAccountInputs').filter(i=>i.accountId===accountId&&[3,4].includes(i.schemaVersion)
+      &&(year===undefined||i.targetMonth.startsWith(`${String(year).padStart(4,'0')}-`)));
     const month=inputs.map(i=>i.targetMonth).sort().at(-1);
     if(!month)return {hasSource:false,targetMonth:null,snapshotAsOf:null,cashBalance:null,holdings:[]};
     const view=adoption.resolve(models,accountId,month);

@@ -1,8 +1,12 @@
 # Data Model
 
+## Current / Decided — SBI VC選択年資産View
+
+Top純資産／Asset AllocationはMonthlyAccountInput v3／v4 → 採用AccountSnapshot → Batch → HoldingSnapshotを共通helperで解決し、active補正後の正数量保有の既知円評価額＋JPY現金を使用する。選択年内最新targetMonthのみ採用し、別年・legacyへfallbackしない。source存在・sourceMonth・holdings・cashBalance・knownAssetTotal・不明成分・観測成分completenessはメモリ上のView属性であり、新しい永続fieldではない。観測成分が既知でもMonthlyAccountState確定や完全NAVを意味しない。帳票合計・担保・取引を追加せず、永続schema・キー・Backup v13は不変。Portfolio／Open Positionsの全年横断選択は維持する。
+
 ## Current / Decided — SBI VC現在保有と取引履歴
 
-Open Positions／PortfolioのSBI VC現在保有は、最新対象月のMonthlyAccountInput v3／v4 → 明示採用AccountSnapshot → ImportBatch → 同じsourceのHoldingSnapshotを正本とする。共通observation-adoptionでquantity／marketPrice／marketValueのactive補正を解決し、正の採用数量だけ表示する。最新が0／不明なら過去の正数量へ戻さず、訂正前source・未保有0列挙を混ぜない。ImportedTransaction／legacy手入力は売買履歴であり現在保有を再計算する根拠にしない。原価・損益・レバレッジ建玉を推測せず、担保評価を別資産へ加算しない。Portfolioの現金明細は同じ採用Snapshotの補正後cashBalanceのみ。assetValueは帳票観測として保持し、明細合計へ重複加算しない。採用sourceが空／不明／エラーでもlegacy SBI VC保有を復活させない。これらは非永続projectionであり、永続schema／Backup v13は不変。Top総資産／Asset Allocation／Risk／月次計算は変更しない。
+Open Positions／PortfolioのSBI VC現在保有は、最新対象月のMonthlyAccountInput v3／v4 → 明示採用AccountSnapshot → ImportBatch → 同じsourceのHoldingSnapshotを正本とする。共通observation-adoptionでquantity／marketPrice／marketValueのactive補正を解決し、正の採用数量だけ表示する。最新が0／不明なら過去の正数量へ戻さず、訂正前source・未保有0列挙を混ぜない。ImportedTransaction／legacy手入力は売買履歴であり現在保有を再計算する根拠にしない。原価・損益・レバレッジ建玉を推測せず、担保評価を別資産へ加算しない。Portfolioの現金明細は同じ採用Snapshotの補正後cashBalanceのみ。assetValueは帳票観測として保持し、明細合計へ重複加算しない。採用sourceが空／不明／エラーでもlegacy SBI VC保有を復活させない。これらは非永続projectionであり、永続schema／Backup v13は不変。Top純資産／Asset Allocationは上記の選択年資産Viewを使用する。Risk／月次計算は変更しない。
 
 ## Current / Decided — 手入力と取込取引の確認統合
 
@@ -32,7 +36,7 @@ observationOverridesはaccount（cashBalance／assetValueの疎な差分）とho
 
 GMOと同じdecimal比較で原値と同値のfieldは差分から外す。数値は非負decimal文字列、末尾精度を保持し、空欄はnull／不明、明示0は0。差分なしfieldは原値を採用する。補正・resetは非永続Draftであり「保存」でのみInputを一回のexpectedModels／journal保護commitにより更新する。overrideHistoryは旧adoptedAccountSnapshotId／observationOverrides／overrideUpdatedAtを追記し、原値は参照で復元できる。reset後も履歴を削除しない。
 
-訂正版PDFは旧sourceHistoryと補正履歴を保持し、新公式sourceを採用してactive overrideを空にする。旧sourceの補正を新sourceへ自動適用しない。保存前確認後に補正内容が変化した場合も再確認を要求する。same-hash照合は補正値ではなく原本値を検証しno-opを維持する。未保存の無関係な0銘柄は補正対象外。損益・原価・取引は生成せず、Top等へ接続しない。
+訂正版PDFは旧sourceHistoryと補正履歴を保持し、新公式sourceを採用してactive overrideを空にする。旧sourceの補正を新sourceへ自動適用しない。保存前確認後に補正内容が変化した場合も再確認を要求する。same-hash照合は補正値ではなく原本値を検証しno-opを維持する。未保存の無関係な0銘柄は補正対象外。損益・原価・取引は生成しない。資産観測consumerは上記のViewでactive補正を解決する。
 
 ## SBI VC資産観測保存（Decided — 公開済みv3契約）
 
@@ -46,7 +50,7 @@ AccountSnapshot v1のcashBalanceはJPY現金、assetValueは帳票「総資産�
 
 同一account・provider・PDF種別・importer/version・月・基準日・hashの一意一致に加えsize／観測／保存対象holding／採用履歴参照を照合し、完全保存済みだけno-op。省略した無関係な0行は欠損ではない。再取込では同月の採用履歴の直前sourceと、保存時点で採用されていた過去月sourceから選別根拠を再現し、その後の訂正を混ぜない。不完全集合は停止する。同月別hashは明示確認と最新採用参照guard一致後に新Batch／Snapshot／Holdingを追記し、Input ID維持＋履歴追記＋参照切替を同一journalで保存する。旧sourceを削除せず、Input表示は明示採用先のholdingだけを読む。表示／reloadだけでは書かない。MonthlyAccountInput v3／Backup v10／永続schemaは不変。
 
-**Known limitation / Planned**：レバレッジ建玉・報酬・入出庫は永続化しない。現物買いは上記v2契約で保存する。MonthlyAccountState・損益・原価を推定せず、Top総資産／Allocation／Riskへ接続しない。Portfolioは上記の現物・現金観測のみ使用する。未検証取引／cashflow／月次P/L／partial projectionは別工程で検証する。
+**Known limitation / Planned**：レバレッジ建玉・報酬・入出庫は永続化しない。現物買いは上記v2契約で保存する。MonthlyAccountState・損益・原価を推定せずRiskへ接続しない。Top純資産／Allocationは上記の現物＋JPY観測Viewのみ使用する。Portfolioは上記の現物・現金観測のみ使用する。未検証取引／cashflow／月次P/L／partial projectionは別工程で検証する。
 
 ## SBI VC read-only parser result（Current / Decided）
 

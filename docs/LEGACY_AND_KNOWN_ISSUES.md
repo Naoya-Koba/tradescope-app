@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — SBI VC資産観測のTop接続
+
+Top純資産とAllocationのSBI VC額は選択年内最新採用現物＋JPYの共通観測額へ置換済み。Portfolio／Open Positionsは全年横断最新のため、過去年選択時は時点が異なり得る。取得済み部分額を完全NAVとせず、不明成分を表示状態として保持する。レバレッジ損益・月次損益を推定しない。年間Summary・過去Trend・変動額・成長率・Riskは既存期間計算のままでTop資産観測と一致を要求しない。負額口座はTopに含み配分から除外するため全体合計差も残り得る。将来の全口座current asset統合は別工程。
+
 ## Current / Known limitation — 手入力確認統合
 
 GMO／SBI証券／SBI VCで共通1:1／1:N確認統合を実装済み。元manualは削除・更新せず、Backup v13の独立関係で通常履歴だけ置換する。単位不明／曖昧なInstrument／複数候補は置換しない。投信の単位を推測しない。既存の未判断1:1非永続表示統合は互換維持する。両方保持の確定判断は保持し再編集／解除UIは今回追加しない。判断保留は次の同source再選択で明示確認し直せる。
@@ -14,11 +18,11 @@ GMO／SBI証券／SBI VCで共通1:1／1:N確認統合を実装済み。元manua
 
 ## SBI VC月次PDF資産・保有保存
 
-**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有と検証済み現物買い。Inputは旧観測採用v3／補正v4を読み、通常read-only、明示「修正」時だけ採用値を編集する。原本Snapshotは不変、active補正と訂正履歴はBackup v12で保護し、v1〜v11も復元可能。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴を変更せずRisk・Top／月次consumerへ接続しない。
+**Current**：月次PDFの資産・現物保有・レバレッジ口座観測・入出庫／ステーキング対象月をPreviewする。確認保存は資産・現物保有と検証済み現物買い。Inputは旧観測採用v3／補正v4を読み、通常read-only、明示「修正」時だけ採用値を編集する。原本Snapshotは不変、active補正と訂正履歴はBackup v12で保護し、v1〜v11も復元可能。帳票資産合計を完全純資産にせず、共通原本Viewerを使い、legacy履歴を変更せずRisk／月次consumerへ資産観測を流さない。Top純資産／Allocationは上記の選択年Viewのみ使用する。
 
 **Known limitation**：前工程の該当なし帳票に加え現物買い実行行を検証済み。現物売り／レバレッジ／建玉／貸出の実行行は未検証。月次canonical P/L、現物原価・実現／評価P/Lは生成不可。未知取引区分・不整合は保存前停止する。実iPhone Safari／Home Screen PWAの今回の操作は未確認。
 
-**Planned**：未検証取引行の確認、共通crypto cashflow／月次P/L、crypto partial projection。レバレッジ建玉・報酬・cashflowは今回は永続化しない。ZIP／CSV対応・永続archiveは今回追加しない。
+**Planned**：未検証取引行の確認、共通crypto cashflow／月次P/L、観測範囲を超えるcrypto partial projection。レバレッジ建玉・報酬・cashflowは今回は永続化しない。ZIP／CSV対応・永続archiveは今回追加しない。
 
 ## Current / Known issue — 共通取引source
 

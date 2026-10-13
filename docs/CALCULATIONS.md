@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current / Decided — 選択年のSBI VC資産観測
+
+`assets/current-asset-view.js`は共通採用resolverの選択年内最新holdings／cashBalanceを使用する。正数量の既知marketValue＋既知cashBalanceをdecimalで一度だけ合算し、旧dashboardのSBI VC資産行だけを置換した口座集合からTop純資産を再合算する。同じ口座額をAllocation一覧・円グラフへ渡し、JPYは暗号資産口座区分に含める。0数量・不明数量を推定保有にせず、nullを0にしない。全成分不明はnull、全保有0＋現金明示0は0。既知0＋不明成分は完全0とは区別し、取得済み部分額として保持する。
+
+Topの純資産額だけはこの資産観測Viewを使用する。既存dashboard／topSeries／月次calculator、年間Summary・年間損益・変動額・成長率・両Trend・Riskは変更しない。従来のTop／年間Summary／Trend一致記述は期間計算部分について維持するが、今回接続したTop純資産観測額はその期間値と一致するとは限らない。他口座は同じ値とsource月を保持し、Topは負額も含む既知額合計、Allocationは正額だけの比率という既存差を維持する。帳票資産合計・担保評価・取引履歴を加算しない。
+
 ## Current — 共通logical transaction set
 
 ユーザー確認済みの手入力置換だけを共通取引集合から除外し、採用取込約定を全件使用する。1:Nのquantity照合はdecimal係数／桁数による正確な合計であり、損益や取得原価を生成する処理ではない。keep-both／defer／未一致は別recordとして維持する。原manualは不変、訂正版の同事実は採用sourceへ再解決し、解決不能な訂正は保存停止する。月次State／台帳／Top／Trendの金融式は変更しない。まだ未接続のOpen Positions／Portfolio／Allocation／Riskへ新しい取引consumerを接続しない。

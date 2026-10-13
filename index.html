@@ -132,6 +132,7 @@
 <section class="section glass">
   <p id="topMonthlyWarning" class="empty-state" hidden></p>
   <small id="topLatestStatus" class="summary-subtitle" hidden></small>
+  <p id="topAssetSourceStatus" class="portfolio-source-status" hidden></p>
   <div class="summary-list">
     <div class="summary-row summary-primary">
       <span class="summary-label">純資産 <span class="sub-en">Total Equity</span></span>
@@ -213,6 +214,7 @@
     <!-- ===== Asset Allocation Section ===== -->
     <h2 class="heading-muted">Asset Allocation</h2>
     <section class="section glass">
+      <p id="allocationSourceStatus" class="portfolio-source-status" hidden></p>
       <div class="portfolio-columns">
         <div class="portfolio-column">
           <p class="portfolio-col-title">資産配分</p>
@@ -446,8 +448,9 @@
   <script src="assets/transaction-reconciliation.js?v=20261013-1"></script>
   <script src="assets/data-model-storage.js?v=20261013-1"></script>
   <script src="assets/observation-adoption.js?v=20261012-15"></script>
-  <script src="assets/open-positions-view.js?v=20261013-4"></script>
+  <script src="assets/open-positions-view.js?v=20261013-5"></script>
   <script src="import/csv-core.js?v=20261005-1"></script>
+  <script src="assets/current-asset-view.js?v=20261013-5"></script>
   <script src="assets/monthly-account-resolver.js?v=20261012-1"></script>
   <script src="assets/monthly-display-view.js?v=20261012-2"></script>
   <script src="assets/trade-history-core.js?v=20261003-1"></script>
@@ -466,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const splashDisplayMs = 2500;
   const splashFadeMs = 420;
   const splashBootLeadMs = 520;
-  const topScriptVersion = '20261013-4';
+  const topScriptVersion = '20261013-5';
   let topScriptPromise = null;
 
   const loadTopScript = () => {

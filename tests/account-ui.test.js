@@ -53,7 +53,7 @@ test('Old Snapshot account labels render in list/donut without mutation or alloc
   const accountData = [{ label: 'GMO', amount: 10, color: '#3B6DFF' }, { label: 'SBI', amount: 20, color: '#D95757' },
     { label: 'Light FX', amount: 5, color: '#74D2F5' }, { label: 'SBI VC', amount: 3, color: '#EAF1FF' }];
   const before = copy(accountData), nodes = {}, charts = [];
-  const context = vm.createContext({ accountData, portfolioChart: null, accountChart: null, displayAccountName: display,
+  const context = vm.createContext({ accountData, currentAssetView:{crypto:{hasSource:false,error:false},unknownComponents:false}, portfolioChart: null, accountChart: null, displayAccountName: display,
     fmtJPY: value => String(value), DONUT_REVEAL_ANIMATION: {},
     document: { getElementById: id => nodes[id] ||= { innerHTML: '', getContext: () => ({}) } },
     Chart: function (_, config) { this.config = config; charts.push(config); },

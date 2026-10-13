@@ -1,12 +1,18 @@
 # Development Guide
 
+## Current — Top純資産／Allocationの共通資産overlay
+
+`open-positions-view.latestObservation(models, {year})`は省略時の全年横断APIを保持し、年指定時だけ対象年の最新採用Inputを選ぶ。`assets/current-asset-view.js`が採用quantity／marketPrice／marketValueとcashBalance、既知decimal合計、不明成分・観測completenessを返す。旧dashboardを変更せずSBI VCのnet行だけを置換し、同じ口座集合をTop額とAllocationへ配る。純資産カードの取得可否はこのViewで判定し、SBI VC観測しかない場合も表示できる。その他のKPIは旧dashboard、Risk／両Trendは旧topSeries等のまま。
+
+fingerprintはprojection version・選択年・既存dashboard依存・採用source／holdings／cash／overrideに依存する。非永続・read-only再計算、既存storage event／pageshowで更新し、表示で正本を書かない。PWA v297、変更JSはquery 20261013-5、追加projectionもprecache。Backup／永続schema変更なし。匿名testsで年切替・訂正・補正・null／0・他口座／期間指標の非波及を検証する。
+
 ## Current — Open Positions / Portfolioの保有観測projection
 
 `assets/open-positions-view.js`はRepositoryで検証したmodelsをread-onlyで受け、最新対象月のSBI VC採用Inputを`observation-adoption.resolve`へ渡す。decimal文字列をNumberへ変換せず数量／評価レート／円評価額を表示し、補正後quantityが正の現物だけ返す。legacy SBI VC取引をOpen Positionsの取引nettingから除外し、他口座の既存集計は維持する。観測行は平均取得価格の加重平均や手入力決済へ渡さない。Snapshot／Input／Storage write／Backup変更なし。
 
-共通`latestObservation(models)`が採用sourceの有無・対象月・基準日・補正後cashBalance・正数量holdings・不明数量の有無を返す。既存`resolve()`は現物配列を返す互換APIのまま。`top/script.js`のPortfolio用adapterだけが同じhelperを読み、SBI VC legacy取引をnetting前に除外し、legacy月次holdingsは使用しない。読込失敗は当該観測だけを停止し、他口座を維持する。現金は別明細、帳票合計／担保評価は不使用。一覧／詳細はdecimal文字列、Chart.jsと表示比率だけNumberへ変換する。不明評価額／数量は「評価額取得分の比率」、詳細の取得原価／評価損益は「—」でRisk値を生成しない。Topの年選択に関係なく最新採用月を使用し、既存canonical storageイベント／pageshowで再読込する。
+共通`latestObservation(models)`が採用sourceの有無・対象月・基準日・補正後cashBalance・正数量holdings・不明数量の有無を返す。既存`resolve()`は現物配列を返す互換APIのまま。`top/script.js`のPortfolio用adapterが同じhelperを読み、SBI VC legacy取引をnetting前に除外し、legacy月次holdingsは使用しない。読込失敗は当該観測だけを停止し、他口座を維持する。現金は別明細、帳票合計／担保評価は不使用。一覧／詳細はdecimal文字列、Chart.jsと表示比率だけNumberへ変換する。不明評価額／数量は「評価額取得分の比率」、詳細の取得原価／評価損益は「—」でRisk値を生成しない。Topの年選択に関係なく最新採用月を使用し、既存canonical storageイベント／pageshowで再読込する。
 
-PWA v296で共有projection／Top JS・CSSをquery 20261013-4へ更新し、indexでは共通採用helperを先にロードする。history.htmlは共有projectionのURLだけ同期し、Open Positionsの挙動は不変。Backup v13／永続schema／保存処理は変更なし。Top総資産／Asset Allocation／Risk／Transaction History／月次計算への追加接続は行わない。匿名`tests/portfolio-view.test.js`で採用・訂正・全0・override・decimal・null・現金・比率・年切替・Storage／Backup不変と他口座を検証する。
+Portfolio導入時のPWA v296／query 20261013-4から、現行は上記v297の参照へ整合し、indexでは共通採用helperを先にロードする。history.htmlは共有projectionのURLだけ同期し、Open Positionsの挙動は不変。Backup v13／永続schema／保存処理は変更なし。Top純資産／Asset Allocationへの資産接続は上記Viewに限定し、Risk／Transaction History／月次計算には流さない。匿名`tests/portfolio-view.test.js`で採用・訂正・全0・override・decimal・null・現金・比率・年切替・Storage／Backup不変と他口座を検証する。
 
 ## Current — 共通取引確認統合
 

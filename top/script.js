@@ -903,9 +903,15 @@ function linkedDisplay(tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING)
 }
 function buildLatestDashboard(year) { return linkedDisplay().dashboard(year); }
 let latestDashboard = buildLatestDashboard(topSeries.year);
+function buildCurrentAssetView(year, dashboard) {
+  let models = null;
+  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
+  return window.TradeScopeCurrentAssets.create(dashboard, models, year);
+}
+let currentAssetView = buildCurrentAssetView(topSeries.year, latestDashboard);
 
 // ===== Portfolio Data =====
-let accountData = latestDashboard.accountData;
+let accountData = currentAssetView.accountData;
 
 function buildPortfolioAllocationFromAccounts(accounts) {
   const byKey = accounts.reduce((acc, item) => {
@@ -982,16 +988,22 @@ function updateKPIs() {
   if (warning) { warning.textContent = linkedCalculator().warning(topSeries.year); warning.hidden = !warning.textContent; }
   const status = document.getElementById('topLatestStatus');
   if (status) {
-    status.hidden = !latestDashboard.hasData || !latestDashboard.provisional;
+    status.hidden = !currentAssetView.hasData || !currentAssetView.provisional;
     status.textContent = status.hidden ? '' : '最新値・一部暫定';
-    status.title = latestDashboard.rows.map(row => {
+    status.title = currentAssetView.rows.map(row => {
       const source = row.metrics.net;
       const label = window.TradeScopeAccountUI?.displayAccountName?.(row.key) || row.name;
-      return `${label}　${source.sourceMonth ? Number(source.sourceMonth.slice(5)) + '月' : ''}${source.status === 'current partial' ? '暫定' : source.status === 'unavailable' ? '未取得' : '確定'}`;
+      return `${label}　${source.sourceMonth ? source.sourceMonth.slice(0,4) + '年' + Number(source.sourceMonth.slice(5)) + '月' : ''}${row.key === 'sbivc' && source.sourceMonth ? '時点・資産観測' : source.status === 'current partial' ? '暫定' : source.status === 'unavailable' ? '未取得' : '確定'}`;
     }).join('\n');
   }
+  const sourceStatus = document.getElementById('topAssetSourceStatus');
+  if (sourceStatus) {
+    const crypto = currentAssetView.crypto;
+    sourceStatus.hidden = !crypto.hasSource && !crypto.error;
+    sourceStatus.textContent = crypto.error ? 'SBI VCの資産情報を取得できません' : crypto.hasSource
+      ? `SBI VC ${portfolioMonthLabel(crypto.sourceMonth)}・${crypto.unknownComponents ? '評価額取得分' : '資産観測'}` : '';
+  }
   const summaryElements = [
-    'kpiTotal',
     'kpiRealized',
     'deltaTotal',
     'deltaNet',
@@ -1002,6 +1014,8 @@ function updateKPIs() {
     'annualNetPnLGrowth',
     'annualConfirmedPnLGrowth'
   ].map((id) => document.getElementById(id)).filter(Boolean);
+  const elTotal = document.getElementById('kpiTotal');
+  elTotal.textContent = Number.isFinite(currentAssetView.net.value) ? fmtJPY(currentAssetView.net.value) : '—';
 
   if (!latestDashboard.hasData) {
     summaryElements.forEach((el) => {
@@ -1013,16 +1027,12 @@ function updateKPIs() {
   }
 
   const rLast = latestDashboard.confirmed.value;
-  const tLast = latestDashboard.net.value;
   const fmtDeltaNumber = (value) => {
     const abs = Math.round(Math.abs(value)).toLocaleString();
     if (value > 0) return `+${abs}`;
     if (value < 0) return `-${abs}`;
     return '0';
   };
-
-  const elTotal = document.getElementById('kpiTotal');
-  elTotal.textContent = Number.isFinite(tLast) ? fmtJPY(tLast) : '—';
 
   const elReal = document.getElementById('kpiRealized');
   elReal.textContent = Number.isFinite(rLast) ? fmtJPY(rLast) : '—';
@@ -1768,6 +1778,13 @@ function bindSectionDonutReveal(section, chartResolver) {
 
 // ===== Portfolio Chart & List =====
 function renderPortfolio() {
+  const allocationStatus = document.getElementById('allocationSourceStatus');
+  if (allocationStatus) {
+    const crypto = currentAssetView.crypto;
+    allocationStatus.hidden = !crypto.hasSource && !currentAssetView.unknownComponents && !crypto.error;
+    allocationStatus.textContent = [crypto.hasSource ? `SBI VC ${portfolioMonthLabel(crypto.sourceMonth)}` : '',
+      currentAssetView.unknownComponents ? '評価額取得分の比率' : '', crypto.error ? 'SBI VCの資産情報を取得できません' : ''].filter(Boolean).join('・');
+  }
   const renderAllocation = ({ data, listId, canvasId, currentChart, onChartCreated }) => {
     const total = data.reduce((sum, item) => sum + item.amount, 0);
     const sortedData = data.slice().sort((a, b) => b.amount - a.amount);
@@ -2493,10 +2510,11 @@ function updateDataByYear(inputYear = null) {
   saveSelectedYear(selectedYear);
   topSeries = resolveTopSeriesForYear(selectedYear);
   latestDashboard = buildLatestDashboard(selectedYear);
+  currentAssetView = buildCurrentAssetView(selectedYear, latestDashboard);
 
   updateKPIs();
 
-  accountData = latestDashboard.accountData;
+  accountData = currentAssetView.accountData;
   portfolioData = buildPortfolioAllocationFromAccounts(accountData);
   renderPortfolio();
   updateRiskSection();
