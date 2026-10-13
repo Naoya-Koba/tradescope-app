@@ -2,10 +2,12 @@
   'use strict';
   const node=typeof module!=='undefined'&&module.exports;
   const observation=node?require('./open-positions-view.js'):root.TradeScopeOpenPositionsView;
+  const adoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
+  const balances=node?require('./balance-view.js'):root.TradeScopeBalanceView;
   const csv=node?require('../import/csv-core.js'):root.TradeScopeCSV;
-  const version='current-assets-v2';
+  const version='current-assets-v3';
   const knownSum=values=>values.length?csv.sum(values.map(String)):null;
-  const number=value=>value===null?null:Number.isFinite(Number(value))?Number(value):null;
+  const number=value=>value==null||value===''?null:Number.isFinite(Number(value))?Number(value):null;
   function sbivc(models,year){
     try{
       const source=observation.latestObservation(models,{year});
@@ -23,6 +25,50 @@
         knownAssetTotal:null,error:true};
     }
   }
+  function cryptoBalance(models,source,targetMonth){
+    const rows=(entity)=>models?.[entity]?.records||[];
+    const months=rows('monthlyAccountInputs').filter(i=>i.accountId==='acc_sbivc_crypto'&&[3,4].includes(i.schemaVersion)
+      &&i.targetMonth.startsWith(targetMonth.slice(0,4)+'-')&&i.targetMonth<=source.sourceMonth).map(i=>i.targetMonth).sort();
+    const latest=adoption.resolve(models,'acc_sbivc_crypto',source.sourceMonth);
+    const unknown=latest.holdings.filter(h=>h.adopted.quantity===null);
+    // The latest complete holding roster is authoritative: removed/zero holdings never reappear.
+    const componentKeys=['cash',...source.holdings.map(h=>'holding:'+h.instrumentId),...unknown.map(h=>'holding:'+h.instrumentId)];
+    const observations=[];
+    const holdingFields=[];
+    for(const month of months){
+      const view=adoption.resolve(models,'acc_sbivc_crypto',month);
+      const provenance={recordId:view.snapshot.id,importBatchId:view.snapshot.importBatchId,sourceType:view.snapshot.sourceMode,
+        sourceScope:view.snapshot.sourceScope};
+      observations.push({key:'cash',label:'JPY現金',value:view.adopted.cashBalance,sourceMonth:month,snapshotAsOf:view.snapshot.snapshotAsOf,
+        basis:'current-asset-observation',source:provenance});
+      for(const key of componentKeys.filter(k=>k!=='cash')){
+        const h=view.holdings.find(h=>'holding:'+h.instrumentId===key);
+        const label=rows('instruments').find(i=>'holding:'+i.id===key)?.symbol??'現物保有';
+        if(!h){observations.push({key,label,value:null,sourceMonth:month,preventCarry:true});continue;}
+        if(h.adopted.quantity===null){
+          observations.push({key,label,value:null,sourceMonth:month,preventCarry:true});
+          continue;
+        }
+        const zero=/^0+(?:\.0+)?$/.test(h.adopted.quantity);
+        observations.push({key,label,
+          value:zero?'0':h.adopted.marketValue,sourceMonth:month,snapshotAsOf:view.snapshot.snapshotAsOf,
+          basis:'current-asset-observation',source:{...provenance,holdingSnapshotId:h.holdingSnapshotId}});
+      }
+    }
+    // Quantity/rate statuses are available to future balance UI, but do not change
+    // Open Positions/Portfolio's authoritative latest-source holdings.
+    for(const h of source.holdings){
+      const fieldObservations=[];
+      for(const month of months){
+        const view=adoption.resolve(models,'acc_sbivc_crypto',month),old=view.holdings.find(row=>row.instrumentId===h.instrumentId);
+        for(const field of ['quantity','marketPrice'])fieldObservations.push({key:field,value:old?.adopted[field]??null,sourceMonth:month,
+          preventCarry:!old||old.adopted.quantity===null||/^0+(?:\.0+)?$/.test(old.adopted.quantity),
+          source:{recordId:old?.holdingSnapshotId??null,importBatchId:view.snapshot.importBatchId},snapshotAsOf:view.snapshot.snapshotAsOf});
+      }
+      holdingFields.push({instrumentId:h.instrumentId,fields:balances.resolve(fieldObservations,{targetMonth,componentKeys:['quantity','marketPrice']}).components});
+    }
+    return {...balances.resolve(observations,{targetMonth,componentKeys}),holdingFields,monthlyComplete:false};
+  }
   // Display eligibility, not a new return calculation. Compare each account's
   // basis/month/completeness before exposing the unchanged period metrics.
   function netPeriodComparison(dashboard,rows,year){
@@ -35,6 +81,8 @@
       const current=row.metrics.net,period=row.metrics.completeNet;
       let reason=null;
       if(row.conflict)reason='conflict';
+      else if(row.balance?.hasCarried)reason='carried-balance';
+      else if(row.balance?.unknownComponents)reason='unknown';
       else if(current.basis==='current-asset-observation')reason='observation-vs-period';
       else if(!Number.isFinite(current.value)||!Number.isFinite(period?.value))reason='unknown';
       else if(!complete(current)||!complete(period))reason='partial';
@@ -49,22 +97,40 @@
       growth:comparable&&Number.isFinite(dashboard.netGrowth)?dashboard.netGrowth:null};
   }
   // Asset-display overlay only: never mutates dashboard, period metrics or canonical models.
-  function create(dashboard,models,year){
-    const crypto=sbivc(models,year);
-    const rows=dashboard.rows.map(row=>row.key!=='sbivc'?row:{...row,metrics:{...row.metrics,
-      net:{value:number(crypto.knownAssetTotal),sourceMonth:crypto.sourceMonth,
-        status:crypto.knownAssetTotal===null?'unavailable':'current partial',basis:'current-asset-observation'}},assetObservation:crypto});
-    const netValues=rows.map(row=>row.key==='sbivc'?crypto.knownAssetTotal:row.metrics.net.value).filter(v=>v!==null);
+  function create(dashboard,models,year,{balanceHistory}={}){
+    let crypto=sbivc(models,year);
+    const targetMonth=[dashboard.month?`${year}-${String(dashboard.month).padStart(2,'0')}`:null,crypto.sourceMonth]
+      .filter(Boolean).sort().at(-1)??null;
+    const rows=dashboard.rows.map(row=>{
+      if(row.key==='sbivc'){
+        const balance=crypto.hasSource?cryptoBalance(models,crypto,targetMonth):balances.resolve([{key:'cash',label:'JPY現金',value:null,sourceMonth:targetMonth??`${year}-01`}],{targetMonth:targetMonth??`${year}-01`,componentKeys:['cash']});
+        crypto={...crypto,balance,knownAssetTotal:balance.knownTotal,hasCarried:balance.hasCarried,
+          unknownComponents:balance.unknownComponents,complete:balance.complete};
+        return {...row,balance,metrics:{...row.metrics,net:{value:number(balance.knownTotal),sourceMonth:crypto.sourceMonth,
+          status:balance.knownTotal===null?'unavailable':'current partial',basis:'current-asset-observation'}},assetObservation:crypto};
+      }
+      if(!balanceHistory||!targetMonth)return row;
+      const history=balanceHistory(year,row,Number(targetMonth.slice(5)));
+      const balance={...balances.resolve(history.observations,{targetMonth,componentKeys:history.componentKeys}),monthlyComplete:history.monthlyComplete};
+      const sourceMonth=balance.sourceMonths.at(-1)??null;
+      const ledger=balance.components.every(c=>c.basis==='period-ledger');
+      return {...row,balance,conflict:row.conflict||balance.blocked,metrics:{...row.metrics,net:{value:number(balance.knownTotal),sourceMonth,
+        status:balance.knownTotal===null?'unavailable':balance.currentComplete&&ledger?'current complete':balance.hasCarried&&balance.complete?'previous complete':'current partial',
+        basis:ledger?'period-ledger':'current-asset-observation'}}};
+    });
+    const netValues=rows.map(row=>row.balance?row.balance.knownTotal:row.metrics.net.value).filter(v=>v!==null);
     const net={value:number(knownSum(netValues)),sources:rows.map(row=>row.metrics.net)};
     const accountData=rows.filter(row=>Number.isFinite(row.metrics.net.value)&&row.metrics.net.value>0)
       .map(row=>({label:row.name,color:row.color,amount:row.metrics.net.value,sourceMonth:row.metrics.net.sourceMonth,
-        status:row.metrics.net.status,...(row.key==='sbivc'?{unknownComponents:crypto.unknownComponents}: {})}));
-    const source=JSON.stringify([version,year,dashboard.sourceFingerprint,crypto]);
+        status:row.metrics.net.status,...(row.balance?{balance:row.balance,unknownComponents:row.balance.unknownComponents}: {}),
+        ...(row.key==='sbivc'?{unknownComponents:crypto.unknownComponents}: {})}));
+    const source=JSON.stringify([version,balances.version,year,dashboard.sourceFingerprint,crypto,rows.map(r=>r.balance)]);
     let hash=2166136261;
     for(let i=0;i<source.length;i++){hash^=source.charCodeAt(i);hash=Math.imul(hash,16777619);}
-    return {year,rows,crypto,net,accountData,netPeriodComparison:netPeriodComparison(dashboard,rows,year),hasData:net.value!==null,
-      provisional:rows.some(row=>row.metrics.net.status!=='current complete'),
-      unknownComponents:crypto.unknownComponents||rows.some(row=>row.metrics.net.value===null),
+    return {year,targetMonth,rows,crypto,net,accountData,netPeriodComparison:netPeriodComparison(dashboard,rows,year),hasData:net.value!==null,
+      hasCarried:rows.some(row=>row.balance?.hasCarried),
+      provisional:rows.some(row=>row.balance?!row.balance.currentComplete||row.metrics.net.basis==='current-asset-observation':row.metrics.net.status!=='current complete'),
+      unknownComponents:rows.some(row=>row.balance?.unknownComponents||row.metrics.net.value===null),
       sourceFingerprint:`${version}-${(hash>>>0).toString(16)}`};
   }
   const api=Object.freeze({create,sbivc,version});

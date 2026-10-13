@@ -906,7 +906,7 @@ let latestDashboard = buildLatestDashboard(topSeries.year);
 function buildCurrentAssetView(year, dashboard) {
   let models = null;
   try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
-  return window.TradeScopeCurrentAssets.create(dashboard, models, year);
+  return window.TradeScopeCurrentAssets.create(dashboard, models, year, { balanceHistory: linkedDisplay().balanceHistory });
 }
 let currentAssetView = buildCurrentAssetView(topSeries.year, latestDashboard);
 
@@ -914,17 +914,19 @@ let currentAssetView = buildCurrentAssetView(topSeries.year, latestDashboard);
 let accountData = currentAssetView.accountData;
 
 function buildPortfolioAllocationFromAccounts(accounts) {
-  const byKey = accounts.reduce((acc, item) => {
-    acc[item.label] = Number(item.amount) || 0;
-    return acc;
-  }, {});
+  // The shared current-assets view already excludes unknown/non-positive rows.
+  // Only add known entries; a missing category is not an explicit zero balance.
+  const amount = labels => {
+    const values = accounts.filter(item => labels.includes(item.label) && Number.isFinite(item.amount)).map(item => item.amount);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+  };
 
   const data = [
-    { label: 'FX', amount: (byKey['GMO'] || 0) + (byKey['Light FX'] || 0) + (byKey['みんなのFX'] || 0), color: '#3B6DFF' },
-    { label: '証券', amount: byKey['SBI'] || 0, color: '#D95757' },
-    { label: '暗号資産', amount: byKey['SBI VC'] || 0, color: '#EAF1FF' },
-    { label: '現金', amount: byKey['三井住友銀行'] || 0, color: '#2F7A46' }
-  ].filter((item) => item.amount > 0);
+    { label: 'FX', amount: amount(['GMO', 'Light FX', 'みんなのFX']), color: '#3B6DFF' },
+    { label: '証券', amount: amount(['SBI']), color: '#D95757' },
+    { label: '暗号資産', amount: amount(['SBI VC']), color: '#EAF1FF' },
+    { label: '現金', amount: amount(['三井住友銀行']), color: '#2F7A46' }
+  ].filter((item) => item.amount !== null && item.amount > 0);
 
   return data;
 }
@@ -993,6 +995,8 @@ function updateKPIs() {
     status.title = currentAssetView.rows.map(row => {
       const source = row.metrics.net;
       const label = window.TradeScopeAccountUI?.displayAccountName?.(row.key) || row.name;
+      if (row.balance) return label + '　' + row.balance.components.map(component =>
+        `${component.label} ${component.sourceMonth || '未取得'}${component.carried ? '・以前の確認値' : component.missing ? '' : component.explicitZero ? '・確認済み0' : '・確認済み'}`).join(' / ');
       return `${label}　${source.sourceMonth ? source.sourceMonth.slice(0,4) + '年' + Number(source.sourceMonth.slice(5)) + '月' : ''}${row.key === 'sbivc' && source.sourceMonth ? '時点・資産観測' : source.status === 'current partial' ? '暫定' : source.status === 'unavailable' ? '未取得' : '確定'}`;
     }).join('\n');
   }
@@ -1001,7 +1005,7 @@ function updateKPIs() {
     const crypto = currentAssetView.crypto;
     sourceStatus.hidden = !crypto.hasSource && !crypto.error;
     sourceStatus.textContent = crypto.error ? 'SBI VCの資産情報を取得できません' : crypto.hasSource
-      ? `SBI VC ${portfolioMonthLabel(crypto.sourceMonth)}・${crypto.unknownComponents ? '評価額取得分' : '資産観測'}` : '';
+      ? `SBI VC ${portfolioMonthLabel(crypto.sourceMonth)}・${crypto.unknownComponents ? '評価額取得分' : '資産観測'}${crypto.hasCarried ? '・以前の確認値を含む' : ''}` : '';
   }
   const summaryElements = [
     'kpiRealized',
@@ -1783,7 +1787,7 @@ function renderPortfolio() {
     const crypto = currentAssetView.crypto;
     allocationStatus.hidden = !crypto.hasSource && !currentAssetView.unknownComponents && !crypto.error;
     allocationStatus.textContent = [crypto.hasSource ? `SBI VC ${portfolioMonthLabel(crypto.sourceMonth)}` : '',
-      currentAssetView.unknownComponents ? '評価額取得分の比率' : '', crypto.error ? 'SBI VCの資産情報を取得できません' : ''].filter(Boolean).join('・');
+      currentAssetView.unknownComponents ? '評価額取得分の比率' : '', currentAssetView.hasCarried ? '以前の確認値を含む' : '', crypto.error ? 'SBI VCの資産情報を取得できません' : ''].filter(Boolean).join('・');
   }
   const renderAllocation = ({ data, listId, canvasId, currentChart, onChartCreated }) => {
     const total = data.reduce((sum, item) => sum + item.amount, 0);

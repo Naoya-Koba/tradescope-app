@@ -1,8 +1,16 @@
 # Development Guide
 
+## Current — 残高projectionの責務分離
+
+`balance-view.js`は採用済み観測配列を受けるDOM／Storage非依存の共通処理。出所種別の優先順位を持たずcomponentごとに当月値／直近確認値／missing／明示0を返す。`monthly-display-view.balanceHistory`は既存adoption policyからSBI内訳／口座一括観測を供給する追加read-only APIで、既存dashboard／series／monthlyPnlを変更しない。`current-asset-view` v3はTopだけでこのAPIを受け同じ口座集合を純資産とAllocationへ配る。crypto保有集合は既存latestObservationを維持し、以前の月の採用値だけを参照候補にする。
+
+complete／partial／hasCarried／unknownComponents／currentComplete／monthlyCompleteは別の表示metadata。将来の進捗UIはこの状態と必須項目policyから導出しDOM・文言を判定根拠にしない。fingerprintはprojection version・選んだcomponent／出所・従来正本依存を含む。表示だけで書かず、PDF／CSV／手入力を正式sourceへ統一する永続方式は別工程。
+
+匿名`balance-view.test.js`／`current-balance-view.test.js`でcarry・0・partial・SBI内訳・Traders partial・SBI VC採用／補正／訂正・Storage／Backup不変・期間consumer非波及を検証する。`current-balance-browser.*`は隔離localhost専用でproduction/precacheから参照しない。PWA v299、balance-view／current-asset-view／monthly-display-view／top scriptはquery 20261013-7でHTML/precacheを同期。永続schema／Backup v13は不変。下記v298は比較可否修正時の記録で、現行は本節のv299。
+
 ## Current — 純資産カードの比較可否契約
 
-`current-asset-view.js` v2はread-only overlayの`netPeriodComparison`にcomparable／理由／口座別current・period source／表示用delta・growthを返す。理由は表示用metadataで正本ではなく、Storage・DOM・特定文言に依存しない。Topは比較条件を再実装せずこの2値を描画する。既存dashboardの値は変更しない。将来の全体整合フェーズの範囲と6確認軸はCALCULATIONSへ集約し、UI改修から独立して比較根拠を更新できる構造を維持する。
+`current-asset-view.js` v3はv2で導入したread-only overlayの`netPeriodComparison`契約を維持し、comparable／理由／口座別current・period source／表示用delta・growthを返す。今回carry／unknownの比較不可条件を追加する。理由は表示用metadataで正本ではなく、Storage・DOM・特定文言に依存しない。Topは比較条件を再実装せずこの2値を描画する。既存dashboardの値は変更しない。将来の全体整合フェーズの範囲と6確認軸はCALCULATIONSへ集約し、UI改修から独立して比較根拠を更新できる構造を維持する。
 
 匿名`tests/current-asset-period.test.js`で完全値・前月完全値・partial・unknown・別月／別年・conflict・観測と期間の根拠差・明示0・負値・UI「—」・既存期間計算不変を検証する。既存のStorage／Backup不変テストも維持。PWA v298、変更したcurrent-asset-view／top scriptだけquery 20261013-6へ更新し、HTMLとprecacheを同期する。
 

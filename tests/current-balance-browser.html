@@ -1,0 +1,19 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>匿名残高引継ぎ確認</title>
+<style>body{font-family:system-ui;margin:16px;max-width:1100px}button,a{display:inline-block;margin:6px;padding:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere}table{width:100%;table-layout:fixed;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;overflow-wrap:anywhere}</style>
+<script defer src="../assets/storage-transaction.js?v=20261013-1"></script>
+<script defer src="../assets/data-model-storage.js?v=20261013-1"></script>
+<script defer src="../import/csv-core.js?v=20261005-1"></script>
+<script defer src="../assets/profit-metrics.js?v=20261011-3"></script>
+<script defer src="../assets/monthly-account-resolver.js?v=20261012-1"></script>
+<script defer src="../assets/monthly-display-view.js?v=20261013-7"></script>
+<script defer src="../assets/sbi-monthly-save.js?v=20261011-2"></script>
+<script defer src="../assets/observation-adoption.js?v=20261012-15"></script>
+<script defer src="../assets/open-positions-view.js?v=20261013-5"></script>
+<script defer src="../assets/balance-view.js?v=20261013-7"></script>
+<script defer src="../assets/current-asset-view.js?v=20261013-7"></script>
+<script defer src="monthly-display-fixture.js"></script><script defer src="current-balance-browser.js"></script>
+<h1>匿名残高引継ぎ確認（localhost専用）</h1>
+<button id="prepare">匿名部分更新を準備</button><a href="../index.html">Topを開く</a>
+<button id="complete">当月の外国証券・現金を確認</button><button id="zero">当月の外国証券・現金を0で確認</button>
+<button id="inspect">Storage不変を確認</button><button id="cleanup">匿名テストをcleanup</button>
+<table><thead><tr><th>項目</th><th>値</th><th>確認月</th><th>状態</th></tr></thead><tbody id="balances"></tbody></table><pre id="result"></pre>

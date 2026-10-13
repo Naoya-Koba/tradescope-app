@@ -1,5 +1,11 @@
 # Data Model
 
+## Current / Decided — 非永続の残高確認状態
+
+`balance-view`のcomponentはvalue（decimal／null）、sourceMonth、snapshotAsOf、source、currentConfirmed、carried、missing、explicitZeroを持つ表示属性。確認月は対象月と区別し、出所と採用判断を分離する。全成分既知／小計のみ／過去確認値あり／不明成分ありを同時に判定できる。旧値は表示対象年内の参照に限りInput／State／Snapshotへ保存しない。新model／Storage key／record schema／Backup変更はなくv13を維持する。
+
+SBI国内／外国／現金は現行source単位、FXは口座一括単位。SBI VC保有集合は最新採用sourceのみで、正数量保有の評価額・現金だけ必要時に以前の月の採用値を参照できる。最新0／不明数量・保有終了を補完しない。同月訂正前source・取引履歴・帳票資産合計・担保を加算しない。残高completeはMonthlyAccountState確定ではない。以下のSBI VC最新source契約は保有集合について維持し、Top／Allocationの未確認残高には本節の参照状態を追加する。
+
 ## Current / Decided — SBI VC選択年資産View
 
 Top純資産／Asset AllocationはMonthlyAccountInput v3／v4 → 採用AccountSnapshot → Batch → HoldingSnapshotを共通helperで解決し、active補正後の正数量保有の既知円評価額＋JPY現金を使用する。選択年内最新targetMonthのみ採用し、別年・legacyへfallbackしない。source存在・sourceMonth・holdings・cashBalance・knownAssetTotal・不明成分・観測成分completenessはメモリ上のView属性であり、新しい永続fieldではない。観測成分が既知でもMonthlyAccountState確定や完全NAVを意味しない。帳票合計・担保・取引を追加せず、永続schema・キー・Backup v13は不変。Portfolio／Open Positionsの全年横断選択は維持する。

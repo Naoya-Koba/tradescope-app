@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — 未確認残高の一時表示
+
+Top純資産／Allocationに非永続の残高状態を導入。SBIの国内／外国／現金は独立した確認月付きで直近確認値を使用でき、部分観測も直近完全月に捨てられない。SBI VCは採用保有集合を維持し0／不明数量／終了・訂正前保有を復活させない。残高のcomplete／partial／過去値使用／unknownを保持し、期間損益・確定資産・Annual Summary・過去Trend・Riskへ流さない。
+
+**Known limitation**：SBI国内株・投信は一括Batchで、外貨現金は独立した永続sourceがない。legacy口座合計をcanonical内訳へ推測分解しない。選択年を越える残高carryは未対応。旧建玉入力の空欄→0、旧crypto集計の`Number(...) || 0`、旧年初値と欠損flowの0寄与は今回変更せず残課題。過去値が明示0かplaceholderかは推測で修復しない。正式source／採用／履歴の永続統一、月全体完了の承認契約は将来工程。
+
 ## Current / Planned — Top純資産カードの意味的整合と全体監査
 
 current資産観測額と直近完全月ベースの変動額／成長率を同じカードへ無条件に並べる不整合は、projectionの比較可否に基づく「—」表示で局所修正済み。根拠・月・完全性を比較し、金額の偶然の一致では許可しない。期間式・他カード・月次正本は不変。

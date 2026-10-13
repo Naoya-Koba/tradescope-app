@@ -3,7 +3,7 @@
   const node = typeof module !== 'undefined' && module.exports;
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
-  const version = 'monthly-display-v4';
+  const version = 'monthly-display-v5';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -31,7 +31,7 @@
         const domestic = resolver.domesticAdoption(models, targetMonth, resolved.state ? candidates.find(item => item.batch.id === resolved.state.domesticImportBatchId)
           : candidates.length === 1 ? candidates[0] : null);
         if (!resolved.state && candidates.length > 1) return { components: [], conflict: true };
-        const components = domestic ? [{ name: '国内証券', asset: domestic.marketValue, unrealized: domestic.unrealizedPnl,
+        const components = domestic ? [{ key: 'domestic', name: '国内証券', asset: domestic.marketValue, unrealized: domestic.unrealizedPnl,
           snapshotAsOf: domestic.batch.snapshotAsOf, id: domestic.batch.id }] : [];
         for (const [name, scope, adopted, value] of [['外国証券', 'sbi-foreign-securities', resolved.foreign, 'assetValue'],
           ['現金・預り金', 'sbi-cash', resolved.cash, 'cashBalance']]) {
@@ -40,7 +40,7 @@
           const inputId = input?.[scope === 'sbi-cash' ? 'cashAccountSnapshotId' : 'foreignAccountSnapshotId'];
           const snapshot = resolved.state ? adopted : input ? candidates.find(row => row.id === inputId) : candidates.length === 1 ? candidates[0] : null;
           if (!resolved.state && !input && candidates.length > 1) return { components: [], conflict: true };
-          components.push({ name, asset: snapshot?.[value] ?? null, unrealized: snapshot?.unrealizedPnl ?? null,
+          components.push({ key: scope === 'sbi-cash' ? 'cash' : 'foreign', name, asset: snapshot?.[value] ?? null, unrealized: snapshot?.unrealizedPnl ?? null,
             snapshotAsOf: snapshot?.snapshotAsOf ?? null, id: snapshot?.id ?? null });
         }
         return { components, conflict: false };
@@ -57,7 +57,7 @@
         const input = records(models, 'monthlyAccountInputs').find(row => row.schemaVersion === 2 && row.accountId === policy.accountId && row.targetMonth === targetMonth);
         const snapshot = resolved.state ? resolved.snapshot : input ? snapshots.find(row => row.id === input.adoptedAccountSnapshotId) : snapshots.length === 1 ? snapshots[0] : null;
         if (!resolved.state && ((!input && snapshots.length > 1) || (input && !snapshot))) return { components: [], conflict: true };
-        return { components: snapshot ? [{ name: '口座観測', asset: snapshot.netAssetValue ?? null,
+        return { components: snapshot ? [{ key: 'account', name: '口座観測', asset: snapshot.netAssetValue ?? null,
           unrealized: snapshot.unrealizedPnl ?? null, snapshotAsOf: snapshot.snapshotAsOf, id: snapshot.id }] : [], conflict: false };
       }
       return { components: [], conflict: false };
@@ -178,7 +178,43 @@
       const realized = knownSum(rows.map(row => row.realized)), swap = knownSum(rows.map(row => row.swap));
       return {realized, swap, total: knownSum([realized, swap])};
     }
-    return Object.freeze({ accountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint });
+    // Separate read-only history for CURRENT balances. Never used by dashboard/series/P&L.
+    // Existing source policies decide adoption; the generic balance layer only selects known dates.
+    function balanceHistory(year, account, throughMonth = 12) {
+      const history = Array.from({length:throughMonth},(_,i)=>{
+        const targetMonth=dateKey(year,i+1),resolved=calculator.resolve(year,i+1,account.key);
+        return {targetMonth,resolved,row:accountMonth(year,i+1,account),observed:observation(account.key,targetMonth,resolved)};
+      });
+      const partitioned=account.key==='sbi'&&history.some(h=>h.observed.components.some(c=>c.id));
+      const componentKeys=partitioned?['domestic','foreign','cash']:['account'];
+      const observations=[];
+      for(const {targetMonth,resolved,row,observed} of history){
+        if(row.conflict){
+          for(const key of componentKeys)observations.push({key,value:null,sourceMonth:targetMonth,blocked:true});
+          continue;
+        }
+        if(partitioned){
+          // A legacy whole-account value cannot safely fill individual missing components.
+          for(const c of observed.components){
+            const snapshot=records(models,'accountSnapshots').find(s=>s.id===c.id);
+            const batch=records(models,'importBatches').find(b=>b.id===(snapshot?.importBatchId||c.id));
+            observations.push({key:c.key,label:c.name,value:c.asset,sourceMonth:targetMonth,snapshotAsOf:c.snapshotAsOf,
+              basis:'current-asset-observation',source:{recordId:c.id,importBatchId:batch?.id??null,
+                sourceType:batch?.sourceType??snapshot?.sourceMode??null,sourceScope:snapshot?.sourceScope??(batch?'sbi-domestic-holdings':null)}});
+          }
+        }else{
+          // Preserve complete ledger amounts. Whole-account partial observations may be carried too.
+          const c=observed.components.find(c=>c.key==='account');
+          const ledgerKnown=row.complete&&Number.isFinite(row.asset);
+          const value=ledgerKnown?row.asset:c?.asset??null;
+          if(row.hasData)observations.push({key:'account',label:'口座残高',value,sourceMonth:targetMonth,snapshotAsOf:c?.snapshotAsOf??null,
+            basis:ledgerKnown?'period-ledger':'current-asset-observation',
+            source:{recordId:resolved.state?.id??c?.id??null,sourceType:resolved.source,accountKey:account.key}});
+        }
+      }
+      return {componentKeys,observations,partitioned,monthlyComplete:history.at(-1)?.row.complete===true};
+    }
+    return Object.freeze({ accountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint, balanceHistory });
   }
   const api = Object.freeze({ create, version, years });
   if (node) module.exports = api; else root.TradeScopeMonthlyDisplay = api;
