@@ -1,10 +1,16 @@
 # Development Guide
 
+## Current — 純資産カードの比較可否契約
+
+`current-asset-view.js` v2はread-only overlayの`netPeriodComparison`にcomparable／理由／口座別current・period source／表示用delta・growthを返す。理由は表示用metadataで正本ではなく、Storage・DOM・特定文言に依存しない。Topは比較条件を再実装せずこの2値を描画する。既存dashboardの値は変更しない。将来の全体整合フェーズの範囲と6確認軸はCALCULATIONSへ集約し、UI改修から独立して比較根拠を更新できる構造を維持する。
+
+匿名`tests/current-asset-period.test.js`で完全値・前月完全値・partial・unknown・別月／別年・conflict・観測と期間の根拠差・明示0・負値・UI「—」・既存期間計算不変を検証する。既存のStorage／Backup不変テストも維持。PWA v298、変更したcurrent-asset-view／top scriptだけquery 20261013-6へ更新し、HTMLとprecacheを同期する。
+
 ## Current — Top純資産／Allocationの共通資産overlay
 
 `open-positions-view.latestObservation(models, {year})`は省略時の全年横断APIを保持し、年指定時だけ対象年の最新採用Inputを選ぶ。`assets/current-asset-view.js`が採用quantity／marketPrice／marketValueとcashBalance、既知decimal合計、不明成分・観測completenessを返す。旧dashboardを変更せずSBI VCのnet行だけを置換し、同じ口座集合をTop額とAllocationへ配る。純資産カードの取得可否はこのViewで判定し、SBI VC観測しかない場合も表示できる。その他のKPIは旧dashboard、Risk／両Trendは旧topSeries等のまま。
 
-fingerprintはprojection version・選択年・既存dashboard依存・採用source／holdings／cash／overrideに依存する。非永続・read-only再計算、既存storage event／pageshowで更新し、表示で正本を書かない。PWA v297、変更JSはquery 20261013-5、追加projectionもprecache。Backup／永続schema変更なし。匿名testsで年切替・訂正・補正・null／0・他口座／期間指標の非波及を検証する。
+fingerprintはprojection version・選択年・既存dashboard依存・採用source／holdings／cash／overrideに依存する。非永続・read-only再計算、既存storage event／pageshowで更新し、表示で正本を書かない。PWAは上記v298、変更JSのqueryとprecacheを同期。Backup／永続schema変更なし。匿名testsで年切替・訂正・補正・null／0・他口座／期間指標の非波及を検証する。
 
 ## Current — Open Positions / Portfolioの保有観測projection
 

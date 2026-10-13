@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current — Top純資産の比較不可能な期間指標
+
+純資産カードの金額と既存期間値の根拠・対象月・完全性を共通projectionで照合し、比較不可能な場合は変動額／年間成長率のみ「—」にする。SBI VCの採用済み資産観測は、同額でも期間計算と同じ意味とはみなさない。資産額・Allocationと他のKPIは従来どおり。追加説明文・UI全面改修・新しい損益計算は行わない。
+
+**Planned**：全口座canonical化後に、[CALCULATIONS](CALCULATIONS.md)の「全口座canonical化後の計算・データ整合監査」で各指標の正本・時点・入出金・unknown／partial・current／period・比較可能性を再確認する。この局所修正を全体整合の完了とは扱わない。
+
 ## Current / Decided — SBI VCのTop純資産・Asset Allocation
 
 両表示は同じ非永続資産projectionを使用し、選択年内の最新採用現物の既知円評価額＋採用JPY残高で旧SBI VC口座額を置換する。JPYも現行の口座区分ベースの「暗号資産」に含める。対象年に採用sourceがなければ未取得で、別年・legacy・取引履歴へ戻さない。Portfolio／Open Positionsは全年横断の最新採用保有のまま。

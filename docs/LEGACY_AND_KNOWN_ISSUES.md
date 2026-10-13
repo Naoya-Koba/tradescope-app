@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Planned — Top純資産カードの意味的整合と全体監査
+
+current資産観測額と直近完全月ベースの変動額／成長率を同じカードへ無条件に並べる不整合は、projectionの比較可否に基づく「—」表示で局所修正済み。根拠・月・完全性を比較し、金額の偶然の一致では許可しない。期間式・他カード・月次正本は不変。
+
+全口座canonical化後の構造的確認課題として、Top純資産・確定資産・純損益・確定損益・年間成長率・月次損益・Annual Summary・Asset Trend・Performance Trend・Asset Allocation・Portfolio・Riskを残す。各指標の正本／対象時点／入出金／unknown・partial／current・period／比較可能性を個別に記録して横断照合する。詳細と今回の非変更範囲はCALCULATIONS「全口座canonical化後の計算・データ整合監査」に集約する。UI全面改修とは別工程であり、今回legacy calculatorを削除したり全指標を移行したりしない。
+
 ## Current / Known limitation — SBI VC資産観測のTop接続
 
 Top純資産とAllocationのSBI VC額は選択年内最新採用現物＋JPYの共通観測額へ置換済み。Portfolio／Open Positionsは全年横断最新のため、過去年選択時は時点が異なり得る。取得済み部分額を完全NAVとせず、不明成分を表示状態として保持する。レバレッジ損益・月次損益を推定しない。年間Summary・過去Trend・変動額・成長率・Riskは既存期間計算のままでTop資産観測と一致を要求しない。負額口座はTopに含み配分から除外するため全体合計差も残り得る。将来の全口座current asset統合は別工程。

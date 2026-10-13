@@ -1,5 +1,36 @@
 # Calculation Specification
 
+## Current / Decided — Top純資産カードの期間比較可否
+
+純資産額はcurrent asset observationを含む表示View、年初比変動額と年間成長率の原値は既存monthly dashboardの直近完全値である。この異なる根拠を同じカードへ無条件に並べない。`current-asset-view.netPeriodComparison`が表示可否・理由・口座別比較sourceを非永続で返し、Topは受け取った値を描画するだけとする。
+
+比較可能条件は、選択年が一致し、全口座のnet／completeNetが有限・完全・非conflictで、口座ごとのsourceMonthと値が一致すること。previous complete同士は同じ口座月を参照する限り可とし、口座間の混在月を今回一律禁止しない。SBI VCのcurrent-asset-observationは期間値と異なる根拠のため、同月・同額・全成分既知でも比較不可。unknown／partial／根拠差／対象月差のどれかがあれば、このカードの変動額と年間成長率だけ「—」にする。明示0や負の比較可能な期間値は従来どおり表示する。分母が0以下等で率の原値がnullなら、比較可能でも率は「—」のまま。
+
+これは表示適格性の局所修正であり、変動額＝直近完全純資産合計−年初純資産、成長率＝変動額÷年初純資産×100という既存式を変更しない。資産観測から新しい損益・入出金・成長率を逆算しない。確定資産・純損益・確定損益のカード、Annual Summary、両Trend、Allocation、Portfolio、Riskの既存計算・source選択は維持する。
+
+## Planned / Known issue — 全口座canonical化後の計算・データ整合監査
+
+legacy月次計算、canonical月次データ、current asset observation、Transaction History、Portfolio／Open Positions projectionは段階的に共存している。式が単体で正しくても参照元・対象時点・入出金・unknownの差で意味的不整合が起こり得る。今回の「—」表示はその予防であり、全体整合が完了したことを意味しない。
+
+全口座canonical化後の独立した整合フェーズで、下表の**各指標それぞれ**について次の6項目を記録・横断照合する：1. 正本、2. 対象時点（選択年・source月・採用元・基準日）、3. 入出金の扱い、4. unknown／partialの扱い、5. current値かperiod値か、6. 他指標との比較可能性。同名の指標だけを理由に等値を要求せず、意味が一致する範囲を明示する。
+
+| 確認対象 | 現行の責務・将来の照合焦点 |
+| --- | --- |
+| Top純資産 | 最新把握資産と期間純資産の根拠・時点差、観測額の重複加算防止 |
+| 確定資産 | 台帳の累積値、年初基準と外部資金移動、欠損伝播 |
+| 純損益 | 年初評価損益・入出金調整・銀行除外、資産観測との差額を利益にしない |
+| 確定損益 | 確定ベースの年初値・入出金調整と採用source |
+| 年間成長率 | 4カードの分子／分母・参照時点・資金移動・比較可否の違い |
+| 月次損益 | 明示採用した月次flow、missingと明示0、年累積値との関係 |
+| Annual Summary | 選択年内の期間値・口座別source月とTop指標との比較範囲 |
+| Asset Trend | 過去seriesの正本・時点・partial、最新観測と履歴を混同しない |
+| Performance Trend | 入出金調整済み期間損益、欠損伝播と各成長率との関係 |
+| Asset Allocation | 口座区分・正額のみの分母・不明成分、Topの負額を含む合計との差 |
+| Portfolio | 全年横断最新採用holding／現金・overrideと選択年Topの時点差、原価不明 |
+| Risk | 現行の取引・口座資産等の参照元と保有観測の役割差、重複・不明値の扱い |
+
+**Decided / 今回の境界**：全面的な式変更、全指標canonical化、legacy calculator削除、共通エンジンへの全面移行は行わない。将来の比較根拠が確定したらprojectionの比較可否契約を更新し、UI文言／DOMへ金融判定を移さない。原本・Storage・Backupを変更しない。
+
 ## Current / Decided — 選択年のSBI VC資産観測
 
 `assets/current-asset-view.js`は共通採用resolverの選択年内最新holdings／cashBalanceを使用する。正数量の既知marketValue＋既知cashBalanceをdecimalで一度だけ合算し、旧dashboardのSBI VC資産行だけを置換した口座集合からTop純資産を再合算する。同じ口座額をAllocation一覧・円グラフへ渡し、JPYは暗号資産口座区分に含める。0数量・不明数量を推定保有にせず、nullを0にしない。全成分不明はnull、全保有0＋現金明示0は0。既知0＋不明成分は完全0とは区別し、取得済み部分額として保持する。
@@ -140,7 +171,7 @@ GMO Previewでは残高明細の月間取引損益／スワップ合計をprimar
 年間確定損益成長率 = 年間確定損益 ÷ 年初の投資口座確定資産 × 100
 ```
 
-年初値が0以下の場合の表示仕様は、**Under consideration**とする。現在は0%扱いである。
+年初値が0以下の場合の表示仕様は、**Under consideration**とする。**Current**：共有dashboardの率はnull、Topは「—」と表示する。nullを明示0%へ変換しない。
 
 ## 5. Monthly P/L
 

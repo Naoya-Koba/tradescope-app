@@ -3,7 +3,7 @@
   const node=typeof module!=='undefined'&&module.exports;
   const observation=node?require('./open-positions-view.js'):root.TradeScopeOpenPositionsView;
   const csv=node?require('../import/csv-core.js'):root.TradeScopeCSV;
-  const version='current-assets-v1';
+  const version='current-assets-v2';
   const knownSum=values=>values.length?csv.sum(values.map(String)):null;
   const number=value=>value===null?null:Number.isFinite(Number(value))?Number(value):null;
   function sbivc(models,year){
@@ -23,12 +23,37 @@
         knownAssetTotal:null,error:true};
     }
   }
+  // Display eligibility, not a new return calculation. Compare each account's
+  // basis/month/completeness before exposing the unchanged period metrics.
+  function netPeriodComparison(dashboard,rows,year){
+    const complete=metric=>['current complete','previous complete'].includes(metric?.status);
+    const sources=rows.map(row=>({accountKey:row.key,current:row.metrics.net,period:row.metrics.completeNet}));
+    const reasons=[];
+    if(dashboard.year!==year)reasons.push({reason:'year-mismatch'});
+    if(!rows.length)reasons.push({reason:'missing-accounts'});
+    for(const row of rows){
+      const current=row.metrics.net,period=row.metrics.completeNet;
+      let reason=null;
+      if(row.conflict)reason='conflict';
+      else if(current.basis==='current-asset-observation')reason='observation-vs-period';
+      else if(!Number.isFinite(current.value)||!Number.isFinite(period?.value))reason='unknown';
+      else if(!complete(current)||!complete(period))reason='partial';
+      else if(!current.sourceMonth||current.sourceMonth!==period.sourceMonth
+        ||!current.sourceMonth.startsWith(`${year}-`))reason='source-month-mismatch';
+      else if(current.value!==period.value)reason='value-mismatch';
+      if(reason)reasons.push({accountKey:row.key,reason});
+    }
+    const comparable=reasons.length===0;
+    return {comparable,reasons,sources,
+      delta:comparable&&Number.isFinite(dashboard.netDelta)?dashboard.netDelta:null,
+      growth:comparable&&Number.isFinite(dashboard.netGrowth)?dashboard.netGrowth:null};
+  }
   // Asset-display overlay only: never mutates dashboard, period metrics or canonical models.
   function create(dashboard,models,year){
     const crypto=sbivc(models,year);
     const rows=dashboard.rows.map(row=>row.key!=='sbivc'?row:{...row,metrics:{...row.metrics,
       net:{value:number(crypto.knownAssetTotal),sourceMonth:crypto.sourceMonth,
-        status:crypto.knownAssetTotal===null?'unavailable':'current partial'}},assetObservation:crypto});
+        status:crypto.knownAssetTotal===null?'unavailable':'current partial',basis:'current-asset-observation'}},assetObservation:crypto});
     const netValues=rows.map(row=>row.key==='sbivc'?crypto.knownAssetTotal:row.metrics.net.value).filter(v=>v!==null);
     const net={value:number(knownSum(netValues)),sources:rows.map(row=>row.metrics.net)};
     const accountData=rows.filter(row=>Number.isFinite(row.metrics.net.value)&&row.metrics.net.value>0)
@@ -37,7 +62,7 @@
     const source=JSON.stringify([version,year,dashboard.sourceFingerprint,crypto]);
     let hash=2166136261;
     for(let i=0;i<source.length;i++){hash^=source.charCodeAt(i);hash=Math.imul(hash,16777619);}
-    return {year,rows,crypto,net,accountData,hasData:net.value!==null,
+    return {year,rows,crypto,net,accountData,netPeriodComparison:netPeriodComparison(dashboard,rows,year),hasData:net.value!==null,
       provisional:rows.some(row=>row.metrics.net.status!=='current complete'),
       unknownComponents:crypto.unknownComponents||rows.some(row=>row.metrics.net.value===null),
       sourceFingerprint:`${version}-${(hash>>>0).toString(16)}`};

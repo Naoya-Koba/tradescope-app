@@ -1041,9 +1041,9 @@ function updateKPIs() {
   const yearStartTotalActual = latestDashboard.initialNet;
   const yearStartConfirmedActual = latestDashboard.initialConfirmed;
 
-  const totalAssetDelta = latestDashboard.netDelta;
+  const totalAssetDelta = currentAssetView.netPeriodComparison.delta;
   const confirmedAssetDelta = latestDashboard.confirmedDelta;
-  const annualGrowthRate = latestDashboard.netGrowth;
+  const annualGrowthRate = currentAssetView.netPeriodComparison.growth;
   const confirmedAnnualGrowthRate = latestDashboard.confirmedGrowth;
 
   const annualNetPnL = latestDashboard.netPnl.value;
