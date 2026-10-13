@@ -8,7 +8,7 @@
   <title>データ取込 | TradeScope</title>
   <link rel="icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="assets/transitions.css">
-  <link rel="stylesheet" href="import/preview.css?v=20261012-12">
+  <link rel="stylesheet" href="import/preview.css?v=20261013-1">
   <link rel="stylesheet" href="import/pdf-viewer.css?v=20261012-10">
   <script defer src="import/pdf-viewer-ui.js?v=20261012-11"></script>
   <script defer src="assets/account-ui.js?v=20261011-1"></script>
@@ -16,20 +16,22 @@
   <script defer src="import/sbivc-transactions-parser.js?v=20261012-16"></script>
   <script defer src="import/sbivc-parser.js?v=20261012-16"></script>
   <script defer src="import/sbi-parser.js?v=20261009-2"></script>
-  <script defer src="assets/storage-transaction.js?v=20261012-3"></script>
-  <script defer src="assets/data-model-storage.js?v=20261012-16"></script>
+  <script defer src="assets/storage-transaction.js?v=20261013-1"></script>
+  <script defer src="assets/transaction-reconciliation.js?v=20261013-1"></script>
+  <script defer src="assets/data-model-storage.js?v=20261013-1"></script>
   <script defer src="assets/observation-adoption.js?v=20261012-15"></script>
-  <script defer src="import/sbivc-save.js?v=20261012-16"></script>
-  <script defer src="import/sbivc-preview.js?v=20261012-16"></script>
-  <script defer src="assets/transaction-view.js?v=20261012-16"></script>
+  <script defer src="assets/transaction-view.js?v=20261013-1"></script>
+  <script defer src="import/sbivc-save.js?v=20261013-1"></script>
+  <script defer src="import/transaction-confirmation.js?v=20261013-1"></script>
+  <script defer src="import/sbivc-preview.js?v=20261013-1"></script>
   <script defer src="import/model-preview.js?v=20261010-1"></script>
-  <script defer src="import/sbi-save.js?v=20261010-1"></script>
-  <script defer src="import/preview.js?v=20261010-1"></script>
+  <script defer src="import/sbi-save.js?v=20261013-1"></script>
+  <script defer src="import/preview.js?v=20261013-1"></script>
   <script defer src="import/gmo-transactions-parser.js?v=20261012-6"></script>
   <script defer src="import/gmo-parser.js?v=20261012-4"></script>
   <script defer src="assets/monthly-account-resolver.js?v=20261012-1"></script>
-  <script defer src="import/gmo-save.js?v=20261012-7"></script>
-  <script defer src="import/gmo-preview.js?v=20261012-10"></script>
+  <script defer src="import/gmo-save.js?v=20261013-1"></script>
+  <script defer src="import/gmo-preview.js?v=20261013-1"></script>
   <script defer src="import/traders-parser.js?v=20261012-1"></script>
   <script defer src="import/traders-save.js?v=20261012-2"></script>
   <script defer src="import/traders-preview.js?v=20261012-10"></script>
@@ -164,6 +166,7 @@
   <dialog id="save-dialog" aria-labelledby="save-title">
     <h2 id="save-title">SBI証券</h2>
     <dl id="save-summary"></dl>
+    <div id="transaction-comparison"></div>
     <div class="dialog-actions">
       <button id="cancel-save" type="button" class="secondary" autofocus>キャンセル</button>
       <button id="confirm-save" type="button" class="primary">保存</button>
@@ -172,6 +175,7 @@
   <dialog id="gmo-save-dialog" aria-labelledby="gmo-save-title">
     <h2 id="gmo-save-title">GMO FXneo</h2>
     <dl id="gmo-save-summary"></dl>
+    <div id="gmo-transaction-comparison"></div>
     <div class="dialog-actions">
       <button id="gmo-cancel-save" class="secondary" autofocus>キャンセル</button>
       <button id="gmo-confirm-save" class="primary">保存</button>
@@ -187,6 +191,7 @@
   </dialog>
   <dialog id="sbivc-dialog" aria-labelledby="sbivc-confirm-title">
     <h2 id="sbivc-confirm-title">SBI VC</h2><dl id="sbivc-confirm-summary"></dl>
+    <div id="sbivc-transaction-comparison"></div>
     <div class="dialog-actions"><button id="sbivc-cancel-save" class="secondary" autofocus>キャンセル</button><button id="sbivc-confirm-save" class="primary">保存</button></div>
   </dialog>
 </body>

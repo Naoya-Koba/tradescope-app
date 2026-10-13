@@ -6,6 +6,7 @@
   const parser = typeof module !== 'undefined' && module.exports ? require('./gmo-parser.js') : root.TradeScopeGMOParser;
   const csv = typeof module !== 'undefined' && module.exports ? require('./csv-core.js') : root.TradeScopeCSV;
   const view = typeof module !== 'undefined' && module.exports ? require('../assets/transaction-view.js') : root.TradeScopeTransactionView;
+  const reconciliation = typeof module !== 'undefined' && module.exports ? require('../assets/transaction-reconciliation.js') : root.TradeScopeTransactionReconciliation;
   const policy = resolver.policies.gmo, accountId = policy.accountId;
   const valueNames = ['realizedPnl', 'swapPnl', 'deposit', 'withdrawal', 'unrealizedPnl', 'cashBalance', 'netAssetValue', 'requiredMargin'];
   const rows = (models, entity) => models[entity]?.records || [];
@@ -90,7 +91,7 @@
         if (existing.length) {
           if (existing.length !== detail.rows.length || detail.rows.some(fact => existing.filter(row => sameTrade(row, fact, before)).length !== 1))
             return { status: 'conflict', reason: 'trade-set' };
-          return { status: 'already-imported' };
+          return { status: 'already-imported', before, existingBatchId:exact.id };
         }
         if (detail.coverage !== 'complete' || detail.audit === 'mismatch' || detail.warnings.length
           || detail.pnlCoverage === 'complete' && (!detail.rows.filter(row => row.normalizedTransactionType === 'close').every(row => row.realizedPnl !== null)
@@ -114,7 +115,13 @@
       return { status: prepared.status, reason: prepared.reason || null,
         ...(prepared.state ? { stateId: prepared.state.id, adoptedSnapshotId: prepared.state.adoptedAccountSnapshotId } : {}) };
     }
-    async function inspect(input) { return publicResult(prepare(input)); }
+    async function inspect(input) {
+      const prepared=prepare(input),out=publicResult(prepared);
+      if(prepared.status==='already-imported'&&prepared.before)return reconciliation.inspect(adapter,prepared.before,view.activeSources(prepared.before).filter(s=>s.record.importBatchId===prepared.existingBatchId),out);
+      if(!['ready','review-required','backfill-ready'].includes(prepared.status))return out;
+      const batch=prepared.enrichmentBatch||{id:'preview_batch',accountId,sourceProvider:'gmo',sourceType:'pdf',importedAt:clock()};
+      return reconciliation.inspectChanges(adapter,prepared.before,transactionChanges(prepared,batch,clock()),out);
+    }
     function transactionChanges(prepared, batch, updatedAt) {
       const { before, preview, ids, newSymbols } = prepared, changes = {};
       const envelope = records => ({ schemaVersion: 1, records, updatedAt });
@@ -132,10 +139,18 @@
       if (busy) return { status: 'busy' }; busy = true;
       try {
         const prepared = prepare(input);
+        if(prepared.status==='already-imported'&&prepared.before){
+          const changes={},checked=reconciliation.finish(adapter,prepared.before,changes,confirmation,clock(),()=>model.newId('tr',cryptoApi),view.activeSources(prepared.before).filter(s=>s.record.importBatchId===prepared.existingBatchId));
+          if(checked.status!=='ready')return checked;
+          if(Object.keys(changes).length){repository.commit(changes,{expectedModels:prepared.before,expectedManual:checked.expectedManual});return{status:'saved',reconciled:true};}
+          return publicResult(prepared);
+        }
         if (prepared.status === 'backfill-ready') {
           // The original source timestamp is part of the v9 record contract. Only envelope.updatedAt advances.
           const changes = transactionChanges(prepared, prepared.enrichmentBatch, clock());
-          repository.commit(changes, { expectedModels: prepared.before });
+          const checked=reconciliation.finish(adapter,prepared.before,changes,confirmation,clock(),()=>model.newId('tr',cryptoApi));
+          if(checked.status!=='ready')return checked;
+          repository.commit(changes, { expectedModels: prepared.before,expectedManual:checked.expectedManual });
           return { status: 'saved', enriched: true, importBatchId: prepared.enrichmentBatch.id, transactionCount: prepared.preview.tradeDetails.rows.length };
         }
         const correction = prepared.status === 'review-required' && prepared.reason === 'different-report'
@@ -161,7 +176,10 @@
         changes.accountSnapshots = envelope([...copy(rows(before, 'accountSnapshots')), snapshot]);
         changes.monthlyAccountStates = envelope([...copy(rows(before, 'monthlyAccountStates')).filter(row => row.id !== monthly.id), monthly]);
         // One journal protects all facts, adoption and derived cache invalidation. Readback completes before success.
-        repository.commit(changes, { expectedModels: before, invalidateTopSummary: true });
+        const checked=reconciliation.finish(adapter,before,changes,confirmation,importedAt,()=>model.newId('tr',cryptoApi));
+        if(checked.status!=='ready')return checked;
+        reconciliation.continuity(adapter,before,{...before,...changes},view.activeSources);
+        repository.commit(changes, { expectedModels: before, expectedManual:checked.expectedManual, invalidateTopSummary: true });
         return { status: 'saved', corrected: correction, importBatchId: batchId };
       } finally { busy = false; }
     }

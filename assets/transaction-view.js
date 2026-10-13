@@ -1,7 +1,7 @@
 (function(root){
  'use strict';
- const node=typeof module!=='undefined'&&module.exports,storage=node?require('./data-model-storage.js'):root.TradeScopeDataStorage;
- const version='transactions-view-v2',rows=(m,e)=>m?.[e]?.records||[];
+ const node=typeof module!=='undefined'&&module.exports,reconciliation=node?require('./transaction-reconciliation.js'):root.TradeScopeTransactionReconciliation;
+ const version='transactions-view-v3',rows=(m,e)=>m?.[e]?.records||[];
  const aliases=Object.freeze({gmo:'acc_gmo_fx','gmofxneo':'acc_gmo_fx','gmoクリック証券':'acc_gmo_fx',lightfx:'acc_lightfx_fx','みんなのfx':'acc_minna_fx',minna:'acc_minna_fx',minano:'acc_minna_fx',sbi:'acc_sbi_sec','sbi証券':'acc_sbi_sec','sbivc':'acc_sbivc_crypto','sbivcトレード':'acc_sbivc_crypto','三井住友銀行':'acc_smbc_bank'});
  const labels=Object.freeze({acc_gmo_fx:'GMO FXneo',acc_lightfx_fx:'LIGHT FX',acc_minna_fx:'みんなのFX',acc_sbi_sec:'SBI証券',acc_sbivc_crypto:'SBI VC',acc_smbc_bank:'三井住友銀行'});
  const accountKey=v=>String(v??'').trim().replace(/\s/g,'').toLowerCase();
@@ -56,7 +56,12 @@
   ?JSON.stringify([r.accountId,r.instrumentKey,r.side,r.date,r.type,r.unitKey,decimal(r.quantity),decimal(r.price)]):null;
  const compatible=(a,b)=>['realizedPnl','currency'].every(k=>a[k]===null||b[k]===null||a[k]===b[k])
   &&(!(a.sourceProvider==='sbivc'||b.sourceProvider==='sbivc')||a.fee===b.fee&&a.feeSemantics===b.feeSemantics);
+ function activeSources(models){const active=activeBatches(models);return [...rows(models,'rawTransactions').filter(r=>r.sourceType==='csv'&&r.sourceProvider==='sbi').map(record=>({entity:'rawTransactions',record})),
+   ...rows(models,'importedTransactions').filter(r=>active.has(r.importBatchId)).map(record=>({entity:'importedTransactions',record}))];}
  function resolve(manual,models){const records=normalize(manual,models),hidden=new Set(),groups=new Map();
+  const sources=activeSources(models);
+  const decisions=reconciliation.statuses(manual,models,sources),decided=new Set(decisions.map(d=>d.relation.manualId));
+  for(const d of decisions)if(d.relation.decision==='replace'&&d.unchanged&&d.resolved)hidden.add('manual:'+d.relation.manualId);
   for(const r of records.filter(r=>r.sources[0].kind!=='manual')){let key;
    if(r.executionId||r.orderId&&r.executedAt)key=JSON.stringify([r.accountId,r.sourceProvider,r.executionId?'execution':'order',r.executionId||r.orderId]);
    else if(!r.orderId&&r.executedAt&&r.quantityUnit&&signature(r))key=JSON.stringify([r.sourceProvider,'exact-facts',r.executedAt,r.quantityUnit,signature(r)]);
@@ -64,10 +69,10 @@
   for(const group of groups.values()){if(group.length<2||new Set(group.map(r=>r.sources[0].importBatchId)).size!==group.length)continue;
    const first=group[0];if(signature(first)&&group.every(r=>signature(r)===signature(first)&&r.quantityUnit===first.quantityUnit&&r.executedAt===first.executedAt&&compatible(r,first))){for(const r of group.slice(1)){first.sources.push(...r.sources);hidden.add(r.id);}}}
   const official=new Map(),manuals=new Map();for(const r of records.filter(r=>!hidden.has(r.id))){const key=r.unitKey?signature(r):null;if(!key)continue;const map=r.manualId?manuals:official;if(!map.has(key))map.set(key,[]);map.get(key).push(r);}
-  for(const [key,m]of manuals){const i=official.get(key);if(m.length!==1||i?.length!==1||!compatible(m[0],i[0]))continue;const target=i[0],source=m[0];target.sources.push(...source.sources);target.manualId=source.manualId;target.strategy=source.strategy;target.memo=source.memo;target.sourceLabel+='＋手入力';hidden.add(source.id);}
+  for(const [key,m]of manuals){const i=official.get(key);if(m.length!==1||decided.has(m[0].manualId)||i?.length!==1||!compatible(m[0],i[0]))continue;const target=i[0],source=m[0];target.sources.push(...source.sources);target.manualId=source.manualId;target.strategy=source.strategy;target.memo=source.memo;target.sourceLabel+='＋手入力';hidden.add(source.id);}
   return records.filter(r=>!hidden.has(r.id)).sort((a,b)=>(b.executedAt||b.date).localeCompare(a.executedAt||a.date)||a.id.localeCompare(b.id));
  }
  function filter(records,{month,account='',symbol='',type='',source='',strategy='',order='desc'}={}){return records.filter(r=>r.date.slice(0,7)===month&&(!account||r.accountId===account)&&(!symbol||r.instrumentKey===symbol||r.symbol===symbol)
    &&(!type||r.type===type)&&(!source||r.sources.some(s=>s.kind===source))&&(!strategy||r.strategy===strategy)).sort((a,b)=>order==='asc'?(a.executedAt||a.date).localeCompare(b.executedAt||b.date):(b.executedAt||b.date).localeCompare(a.executedAt||a.date));}
- const api=Object.freeze({version,accountId,fxPair,normalize,resolve,filter,activeBatches,labels});if(node)module.exports=api;else root.TradeScopeTransactionView=api;
+ const api=Object.freeze({version,accountId,fxPair,normalize,resolve,filter,activeBatches,activeSources,labels});if(node)module.exports=api;else root.TradeScopeTransactionView=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

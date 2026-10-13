@@ -3,6 +3,8 @@
   const transaction = typeof module !== 'undefined' && module.exports
     ? require('./storage-transaction.js') : root.TradeScopeStorageTransaction;
   const keys = transaction.modelKeys;
+  const reconciliation = typeof module !== 'undefined' && module.exports
+    ? require('./transaction-reconciliation.js') : root.TradeScopeTransactionReconciliation;
   // Released Backup schemas are fixed lists, not derived from current Repository keys.
   const backupModelEntities = Object.freeze({
     2: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']),
@@ -15,7 +17,8 @@
     9: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
     10: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
     11: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
-    12: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions'])
+    12: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
+    13: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -115,6 +118,16 @@
   const provenance = { accountId: id, targetMonth: month, snapshotAsOf: observed, importedAt: timestamp,
     sourceMode, sourceScope: text, importBatchId: id, observationType };
   const definitions = {
+    transactionReconciliations: {
+      required:['schemaVersion','id','manualId','decision','sourceType','facts','members','confirmedAt'],
+      types:{...common,manualId:text,decision:v=>['replace','keep-both','defer'].includes(v),sourceType:v=>['pdf','csv'].includes(v),confirmedAt:timestamp,
+        facts:v=>{const names=['accountId','instrumentId','tradeDate','side','semantic','quantity','quantityUnit','price','currency'];fields(v,names,names);
+          return id(v.accountId)&&id(v.instrumentId)&&observed(v.tradeDate)&&v.tradeDate.length===10&&['buy','sell'].includes(v.side)
+            &&['open','close','spot-buy','spot-sell'].includes(v.semantic)&&decimal(v.quantity)&&!v.quantity.startsWith('-')&&!equalDecimal(v.quantity,'0')
+            &&decimal(v.price)&&!v.price.startsWith('-')&&['currencyUnits','baseAssetUnits','shares','fundUnits'].includes(v.quantityUnit)&&currency(v.currency);},
+        members:v=>Array.isArray(v)&&v.length>0&&v.every(r=>{fields(r,['entity','id'],['entity','id']);return ['rawTransactions','importedTransactions'].includes(r.entity)&&id(r.id);})
+      }
+    },
     importedTransactions: {
       required:['schemaVersion','id','accountId','instrumentId','importBatchId','sourceProvider','sourceType','sourceScope','targetMonth','tradeDate','executedAt','side','normalizedTransactionType','rawTransactionType','quantity','quantityUnit','price','realizedPnl','fee','feeCurrency','currency','providerExecutionId','providerOrderId','sourcePage','sourceRow','importedAt'],
       nullable:['executedAt','realizedPnl','fee','feeCurrency','providerExecutionId','providerOrderId'],
@@ -225,6 +238,11 @@
     fields(models, entities, entities); assertJson(models);
     for (const entity of entities) validateEnvelope(entity, models[entity]);
     const records = entity => models[entity]?.records || [];
+    const manualIds=new Set(),replacedMembers=new Set();
+    for(const r of records('transactionReconciliations')){
+      if(manualIds.has(r.manualId)||!reconciliation.validateRelation(r,models))fail();manualIds.add(r.manualId);
+      const seen=new Set();for(const member of r.members){const key=member.entity+':'+member.id;if(seen.has(key)||r.decision==='replace'&&replacedMembers.has(key))fail();seen.add(key);if(r.decision==='replace')replacedMembers.add(key);}
+    }
     const accounts = new Map(records('accounts').map(item => [item.id, item]));
     const instruments = new Set(records('instruments').map(item => item.id));
     const batches = new Map(records('importBatches').map(item => [item.id, item]));
@@ -455,7 +473,7 @@
     const changed=adoptionFields.filter(f=>!equalNullable(input.sourceValues[f],input.adoptedValues[f]));
     if(changed.length!==input.overrideFields.length||changed.some(f=>!input.overrideFields.includes(f)))fail();
   }
-  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, importedTransactions:null, ...models}, Object.keys(keys)); }
+  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, importedTransactions:null, transactionReconciliations:null, ...models}, Object.keys(keys)); }
   // Source policy is separate from the common v2 record shape; unimplemented providers fail closed.
   function validateSpotTransaction(record,account,instrument,batch){
     if(account.id!=='acc_sbivc_crypto'||account.providerCode!=='sbivc'||account.accountType!=='crypto'
@@ -557,6 +575,9 @@
       fields(changes, Object.keys(keys));
       if (!Object.keys(changes).length) fail();
       const models = readModels(adapter);
+      if (own(guard,'expectedManual') && adapter.getItem(reconciliation.manualKey)!==guard.expectedManual) {
+        throw new Error('手入力データが変更されています。再確認してください');
+      }
       if (own(guard, 'expectedModels')) {
         validateModels(guard.expectedModels);
         if (JSON.stringify(models) !== JSON.stringify(guard.expectedModels)) {
@@ -567,6 +588,10 @@
         // No physical-delete Repository API: retain historical entities and disable Accounts.
         if (value === null) fail();
         validateEnvelope(entity, value);
+        if(entity==='transactionReconciliations')for(const old of models[entity]?.records||[]){
+          const next=value.records.find(r=>r.id===old.id);
+          if(!next||next.manualId!==old.manualId||old.decision!=='defer'&&JSON.stringify(next)!==JSON.stringify(old))fail();
+        }
         if (entity === 'accounts' && (models.accounts?.records || []).some(record => !value.records.some(item => item.id === record.id))) fail();
         if (['monthlyAccountStates', 'monthlyAccountInputs'].includes(entity) && (models[entity]?.records || []).some(record => value.records.some(item =>
           (item.accountId === record.accountId && item.targetMonth === record.targetMonth && item.id !== record.id)
@@ -636,6 +661,7 @@
       transaction.apply(actions, adapter, () => {
         verified = readModels(adapter);
         if (JSON.stringify(verified) !== JSON.stringify(models)) fail();
+        if (own(guard,'expectedManual') && adapter.getItem(reconciliation.manualKey)!==guard.expectedManual) fail();
       });
       return clone(verified);
     }

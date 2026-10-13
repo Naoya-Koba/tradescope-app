@@ -12,6 +12,7 @@
     SBIVC_FEE_SEMANTICS_UNVERIFIED:'手数料の符号を確認できませんでした',SBIVC_TRADE_SETTLEMENT_MISMATCH:'取引明細と受渡明細が一致しませんでした' });
   function createUI({ document, parser, extract, viewer, window, service, hashBytes }) {
     const $ = id => document.getElementById('sbivc-' + id);
+    const comparison=root.TradeScopeTransactionConfirmation?.create(document,$('transaction-comparison'));
     let controller = null, sequence = 0, source = null, inspected = null, saving = false;
     const node = (tag, text, className) => { const n = document.createElement(tag); n.textContent = text; if (className) n.className = className; return n; };
     const amount = (value, currency = false) => {
@@ -30,7 +31,7 @@
       $('read-status').textContent = ''; delete $('read-status').dataset.errorCode; delete $('read-status').dataset.stage;
     }
     function saveStatus(result){
-      inspected=result;$('save').hidden=!['ready','review-required'].includes(result.status);
+      inspected=result;$('save').hidden=!['ready','review-required','reconciliation-ready','confirmation-required'].includes(result.status);
       $('save').textContent='保存';
       $('save-status').textContent=['saved','already-imported'].includes(result.status)?(source?.preview.transactions.length?'資産・保有・取引情報を保存済み':'資産・保有情報を保存済み')
         :result.status==='review-required'?'同じ月の保存内容を訂正します':result.status==='conflict'?'保存済みの情報と照合できませんでした':'';
@@ -123,13 +124,14 @@
     }
     $('save').hidden=true;
     $('save').addEventListener('click',()=>{
-      if(saving||!source||!['ready','review-required'].includes(inspected?.status))return;
+      if(saving||!source||!['ready','review-required','reconciliation-ready','confirmation-required'].includes(inspected?.status))return;
       $('confirm-summary').replaceChildren();
       metric($('confirm-summary'),'対象月',source.preview.report.targetMonth.replace('-','/'));
       metric($('confirm-summary'),'基準日',source.preview.report.snapshotAsOf.replaceAll('-','/'));
       metric($('confirm-summary'),'現物保有銘柄',`${inspected.holdingCount??source.preview.spotHoldings.length}件`);
       if(source.preview.transactions.length)metric($('confirm-summary'),'現物取引',`${source.preview.transactions.length}件`);
       if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する原本情報を切り替えます');
+      comparison?.show(inspected.manualMatches);
       $('dialog').showModal();
     });
     $('cancel-save').addEventListener('click',()=>{if(!saving)$('dialog').close();});
@@ -138,7 +140,7 @@
       if(saving||!source||!inspected)return;
       saving=true;$('confirm-save').disabled=true;$('cancel-save').disabled=true;$('file').disabled=true;$('close').disabled=true;$('save').disabled=true;
       $('save-status').textContent='保存中…';
-      try{saveStatus(await service.save(source,inspected));}
+      try{saveStatus(await service.save(source,{...inspected,...(comparison?{transactionDecisions:comparison.decisions()}: {})}));}
       catch(_){$('save-status').textContent='保存できませんでした。保存内容を確認して再度お試しください';}
       finally{saving=false;$('confirm-save').disabled=false;$('cancel-save').disabled=false;$('file').disabled=false;$('close').disabled=false;$('save').disabled=false;$('dialog').close();}
     });

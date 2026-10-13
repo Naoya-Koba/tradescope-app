@@ -1,8 +1,14 @@
 # Backup and Restore Specification
 
-## Current / Decided — Backup v12
+## Current / Decided — Backup v13
 
-最新exportはv12。既存9キー・9モデル・envelope v1を維持し、ImportedTransaction record v2を正式追加する。GMO record v1、観測採用Input v3／補正v4を含む旧全recordも受理する。v1〜v11の公開済み検証範囲は固定し、v11以下へv2取引をexportせず、新fieldの切捨ても行わない。v12 Restoreはlegacy＋9モデルを置換、null collectionはキー不在へ戻す。
+最新exportはv13。既存9モデルの公開済みrecord契約を変えず、transactionReconciliationsを加えた10モデルを保存する。envelope v1／関係record v1。v13はlegacy＋10モデルを置換、nullはキー不在。関係のunknown field／version／取引全集合／口座・銘柄・事実一致／参照／重複を事前検証し、原manual・原sourceとともに復元する。manualが明示編集／削除済みなら古い関係は保持するが表示置換に適用しない。
+
+v1／Legacyは新10モデルを維持。v2〜v12は公開済み置換・clear意味を維持し、新関係キーを同じRestore journal内でclearする。旧Backupに新関係を付け足したり、新fieldを削って旧version exportしない。tradeInfo保護、書込前validation、全正本再読込検証、rollback／不能時journal保持、derived cache無効化は維持する。PDF／CSV本文・原本・PIIを新関係へ保存しない。
+
+## Decided — 公開済みBackup v12契約
+
+公開済みv12は既存9キー・9モデル・envelope v1を維持し、ImportedTransaction record v2を正式追加する。GMO record v1、観測採用Input v3／補正v4を含む旧全recordも受理する。v1〜v11の公開済み検証範囲は固定し、v11以下へv2取引をexportせず、新fieldの切捨ても行わない。v12 Restoreはlegacy＋9モデルを置換、null collectionはキー不在へ戻す。
 
 SBI VCの必要Instrument・Batch・資産Snapshot／Holding・採用Input・現物買い取引を同一journalで保護する。訂正前後の全source／取引、signed fee、decimal精度、nullを保持する。旧Backupの置換／clear意味、tradeInfo保護、書込前Validation、再読込一致検証、rollback／不能時journal保持、派生cache無効化は不変。PDF原本・抽出全文・PII・filenameを追加しない。
 

@@ -1,10 +1,16 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — 手入力確認統合
+
+GMO／SBI証券／SBI VCで共通1:1／1:N確認統合を実装済み。元manualは削除・更新せず、Backup v13の独立関係で通常履歴だけ置換する。単位不明／曖昧なInstrument／複数候補は置換しない。投信の単位を推測しない。既存の未判断1:1非永続表示統合は互換維持する。両方保持の確定判断は保持し再編集／解除UIは今回追加しない。判断保留は次の同source再選択で明示確認し直せる。
+
+同事実の訂正版は関係を再解決するが、数量内訳・公式ID・日時・手数料等が変わる訂正は、確定置換を孤立させないよう停止する。変更された約定への関係再確認UIは別工程。Open Positions／Risk／Portfolio／Allocationへ新取引sourceは接続しない。実データ・本番Storageを用いた変更は行わない。
+
 ## SBI VC現物買い取引（Current / Known limitation）
 
 現物買いの実帳票行をread-only検証済み。明示された約定をImportedTransaction v2／Backup v12で保存・採用履歴へ表示する。現物売り・レバレッジ新規／決済・実建玉・貸出は未検証で保存停止する。月次P/L・取得原価・評価P/Lを推定しない。入出金明細のsettlement／fee legsとクイック入金は売買イベントでもcanonical月次flowでもない。
 
-訂正旧sourceは保持し、採用Input参照だけでactive取引を選ぶ。legacy aggregate 1行＋公式複数fillsは共存し、many-to-one統合／削除は未実装。旧資産のみBatchに明細が欠ける場合は自動backfillせず停止する。原本PDF／PIIは保存せず、本番Storageは操作しない。実iPhone操作は未確認。Top／Portfolio／Allocation／Riskは不変。
+訂正旧sourceは保持し、採用Input参照だけでactive取引を選ぶ。legacy aggregate 1行と複数fillsは共通の確認統合で非破壊置換可能。削除は行わない。旧資産のみBatchに明細が欠ける場合は自動backfillせず停止する。原本PDF／PIIは保存せず、本番Storageは操作しない。実iPhone操作は未確認。Top／Portfolio／Allocation／Riskは不変。
 
 ## SBI VC月次PDF資産・保有保存
 
@@ -18,7 +24,7 @@
 
 **Current / Known issue — 履歴の数量表示**：一覧をコンパクト化し、監査情報はタップ後の1件詳細へ移動する。明示数量単位と公式brokerルールが揃う場合だけ表示用Lotを計算する。GMO帳票の約定数は通貨数量とユーザー確認済み（2026-10-12、約定数×約定単価＝約定金額の整合）で、GMO PDF取引sourceの表示時だけLotへ換算する。既存数量やresolver／dedupe単位は変更しない。投信の単価当たり口数は推測せず、外貨を自動円換算しない。persistent schema／Backup v9／月次consumerは不変。
 
-ImportedTransactionsの新モデル・非破壊resolver・Backup v9を追加。legacy manual／SBI raw原本を維持し、HoldingSnapshotは売買履歴に変換しない。GMO parser保存と共通履歴UIは接続済み。GMOの帳票「約定数」は保存原値・単位を維持し、Lot換算は表示層のみ。manual FXとの数量単位一致dedupeは従来どおり行わず、false positiveより重複表示を優先する。既存同一hashは通常no-opだが、旧Batchの明細0件・同一sourceの一意照合・再解析／原観測／損益検算成功時だけ、ユーザー確認後に明細と必要Instrumentを追加できる。月次正本は変更しない。選択だけでは自動補完せず、非ゼロの不完全／不一致集合は停止し修復しない。Risk／Position consumerの統合は別工程。LIGHT／みんなの既知2026-09 PDFの明示取引欄は0件で、月末建玉から当月全売買は復元できないため今回は取引sourceを生成しない。将来明示イベントがある帳票の対応は別工程。
+ImportedTransactionsの新モデル・非破壊resolver・Backup v9を追加。legacy manual／SBI raw原本を維持し、HoldingSnapshotは売買履歴に変換しない。GMO parser保存と共通履歴UIは接続済み。GMOの帳票「約定数」は保存原値・単位を維持し、Lot換算は表示層のみ。manual FXとの照合は明示contractSizeで安全に数量を比較できる場合だけ共通確認UIへ出し、単位不明は重複表示を優先する。既存同一hashは通常no-opだが、旧Batchの明細0件・同一sourceの一意照合・再解析／原観測／損益検算成功時だけ、ユーザー確認後に明細と必要Instrumentを追加できる。月次正本は変更しない。選択だけでは自動補完せず、非ゼロの不完全／不一致集合は停止し修復しない。Risk／Position consumerの統合は別工程。LIGHT／みんなの既知2026-09 PDFの明示取引欄は0件で、月末建玉から当月全売買は復元できないため今回は取引sourceを生成しない。将来明示イベントがある帳票の対応は別工程。
 
 ## Traders Storage / Backup v8
 
@@ -212,7 +218,7 @@ GMO FXneoの月次PDF解析・Preview・保護された保存／訂正・共通�
 
 ## Current / Known issue — SBI国内部分保存
 
-国内集計の手修正はMonthlyAccountInputと最新Backup v9で保護し原Holding・取得日・legacyを変更しない。必要な外国／現金／月次値が不足している間はStateを作らない。旧CSV再取込と手入力履歴のcross-store重複検出・canonical削除UIは未実装で今回追加しない。実機iPhoneでの保存・容量・中断確認は別途必要。
+国内集計の手修正はMonthlyAccountInputと最新Backup v9で保護し原Holding・取得日・legacyを変更しない。必要な外国／現金／月次値が不足している間はStateを作らない。旧CSV再取込と手入力履歴は共通確認統合で非破壊照合する。canonical削除UIは追加しない。実機iPhoneでの保存・容量・中断確認は別途必要。
 
 **Known issue / 要再現確認**：匿名localhostで390pxから1280pxへ連続切替した際、既存CDNのChart.jsでnull contextの`save`例外を1回観測した。通常のTop表示では再発せず、原因は未確定。今回のInput保存修正とは分離し、チャート処理は変更していない。
 

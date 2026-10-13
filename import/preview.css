@@ -94,3 +94,7 @@ dl > * { min-width: 0; overflow-wrap: anywhere; }
   td { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; padding: 5px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
   td::before { content: attr(data-label); color: var(--muted); }
 }
+.transaction-comparison { margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--border, #38435b); min-width: 0; overflow-wrap: anywhere; }
+.transaction-comparison p { margin: 6px 0; font-size: .88rem; }
+.transaction-comparison strong { font-size: .9rem; }
+.transaction-comparison select { display: block; width: 100%; max-width: 100%; margin-top: 10px; padding: 10px; color: inherit; background: #151d32; border: 1px solid #46516b; border-radius: 8px; font: inherit; }

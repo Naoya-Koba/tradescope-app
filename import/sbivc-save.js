@@ -5,6 +5,8 @@
   const parser=node?require('./sbivc-parser.js'):root.TradeScopeSBIVCParser;
   const tx=node?require('../assets/storage-transaction.js'):root.TradeScopeStorageTransaction;
   const adoption=node?require('../assets/observation-adoption.js'):root.TradeScopeObservationAdoption;
+  const reconciliation=node?require('../assets/transaction-reconciliation.js'):root.TradeScopeTransactionReconciliation;
+  const transactionView=node?require('../assets/transaction-view.js'):root.TradeScopeTransactionView;
   const copy=v=>JSON.parse(JSON.stringify(v)),rows=(m,e)=>m[e]?.records||[];
   const accountId='acc_sbivc_crypto',scope='sbivc-monthly-assets',importerId='sbivc-monthly';
   const decimal=v=>typeof v==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(v)&&v.length<=128;
@@ -106,7 +108,7 @@
         const saved=tradesMatch&&referenced&&holdings.length===selected.length&&s.cashBalance===p.accountObservations.jpyCash&&s.assetValue===p.accountObservations.assetTotalObservation
           &&selected.every(h=>{const matches=holdings.filter(row=>rows(before,'instruments').find(i=>i.id===row.instrumentId)?.symbol===h.symbol);
             return matches.length===1&&matches[0].accountSnapshotId===s.id&&matches[0].quantity===h.quantity&&matches[0].marketPrice===h.valuationRate&&matches[0].marketValue===h.officialJPYValue;});
-        return{status:saved?'already-imported':'conflict',holdingCount:selected.length,transactionCount:p.transactions.length};
+        return{status:saved?'already-imported':'conflict',before,existingBatchId:batch.id,holdingCount:selected.length,transactionCount:p.transactions.length};
       }
       const view=resolve(before,p.report.targetMonth);
       if(!view&&rows(before,'accountSnapshots').some(s=>s.accountId===accountId&&s.targetMonth===p.report.targetMonth))return{status:'conflict'};
@@ -120,11 +122,25 @@
       return{status:view?'review-required':'ready',before,p,account,view,ids,newSymbols,selected,holdingCount:selected.length,transactionCount:p.transactions.length};
     }
     const result=p=>({status:p.status,...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.transactionCount!==undefined?{transactionCount:p.transactionCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt,...(p.view.input.schemaVersion===4?{overrideUpdatedAt:p.view.input.overrideUpdatedAt,overrideRevision:p.view.input.overrideHistory.length}:{})}:{})});
-    async function inspect(source){return result(prepare(copy(source)));}
+    async function inspect(source){const p=prepare(copy(source)),out=result(p);
+      if(p.status==='already-imported')return reconciliation.inspect(adapter,p.before,transactionView.activeSources(p.before).filter(s=>s.record.importBatchId===p.existingBatchId),out);
+      if(!['ready','review-required'].includes(p.status))return out;
+      const instruments=p.newSymbols.map((symbol,n)=>({id:'preview_ins_'+n,assetType:'Crypto',symbol,displayName:symbol,quoteCurrency:'JPY',enabled:true}));
+      const models={...p.before,instruments:{records:[...rows(p.before,'instruments'),...instruments]}};
+      const sources=p.p.transactions.map((t,n)=>({entity:'importedTransactions',record:tradeRecord(t,{id:'preview_trade_'+n,
+        instrumentId:p.ids.get(t.symbol)||instruments.find(i=>i.symbol===t.symbol).id,importBatchId:'preview_batch',importedAt:clock(),targetMonth:p.p.report.targetMonth})}));
+      return reconciliation.inspect(adapter,models,sources,out);
+    }
     async function save(source,confirmation={}){
       if(busy)return{status:'busy'};busy=true;
       try{
         const input=copy(source),prepared=prepare(input),guard=result(prepared);
+        if(prepared.status==='already-imported'){
+          const changes={},checked=reconciliation.finish(adapter,prepared.before,changes,confirmation,clock(),()=>model.newId('tr',cryptoApi),transactionView.activeSources(prepared.before).filter(s=>s.record.importBatchId===prepared.existingBatchId));
+          if(checked.status!=='ready')return checked;
+          if(Object.keys(changes).length){repo.commit(changes,{expectedModels:prepared.before,expectedManual:checked.expectedManual});return{status:'saved',reconciled:true};}
+          return guard;
+        }
         const correction=prepared.status==='review-required'&&confirmation.inputId===guard.inputId&&confirmation.adoptedSnapshotId===guard.adoptedSnapshotId&&confirmation.adoptedAt===guard.adoptedAt&&confirmation.overrideUpdatedAt===guard.overrideUpdatedAt&&confirmation.overrideRevision===guard.overrideRevision;
         if(prepared.status!=='ready'&&!correction)return guard;
         const {before,p,account,view,ids,newSymbols,selected}=prepared,now=clock(),changes={},envelope=records=>({schemaVersion:1,records,updatedAt:now});
@@ -149,7 +165,10 @@
         changes.monthlyAccountInputs=envelope([...rows(before,'monthlyAccountInputs').filter(r=>r.id!==monthly.id),monthly]);
         if(p.transactions.length)changes.importedTransactions=envelope([...rows(before,'importedTransactions'),...p.transactions.map(t=>tradeRecord(t,
           {id:model.newId('it',cryptoApi),instrumentId:ids.get(t.symbol),importBatchId:batchId,importedAt:now,targetMonth:p.report.targetMonth}))]);
-        repo.commit(changes,{expectedModels:before});return{status:'saved',corrected:correction};
+        const checked=reconciliation.finish(adapter,before,changes,confirmation,now,()=>model.newId('tr',cryptoApi));
+        if(checked.status!=='ready')return checked;
+        reconciliation.continuity(adapter,before,{...before,...changes},transactionView.activeSources);
+        repo.commit(changes,{expectedModels:before,expectedManual:checked.expectedManual});return{status:'saved',corrected:correction};
       }finally{busy=false;}
     }
     return Object.freeze({inspect,save,read:targetMonth=>resolve(repo.read(),targetMonth)});

@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
+  const transactionComparison=window.TradeScopeTransactionConfirmation?.create(document,$('transaction-comparison'));
   let preview = null, readToken = 0, visibleRows = 0;
   let sources = {}, planToken = 0, modelPlan = null, plannedRows = 0;
   let session = TradeScopeSBIModelPreview.createSession();
@@ -26,7 +27,7 @@
   function renderSave() {
     $('save-actions').hidden = !preview;
     $('save-status').textContent = saveRunning ? '保存中…' : saveMessage(saveState);
-    $('save-preview').hidden = saveState?.status !== 'ready';
+    $('save-preview').hidden = !['ready','reconciliation-ready','confirmation-required'].includes(saveState?.status);
     $('save-preview').disabled = saveBusy;
     $('confirm-save').disabled = saveRunning;
     $('cancel-save').disabled = saveRunning;
@@ -297,7 +298,7 @@
     }
   });
   async function requestSave() {
-    if (saveBusy || !preview || saveState?.status !== 'ready') return;
+    if (saveBusy || !preview || !['ready','reconciliation-ready','confirmation-required'].includes(saveState?.status)) return;
     const selected = sources[preview.kind], kind = preview.kind, token = planToken;
     saveBusy = true; renderSave();
     try {
@@ -305,7 +306,7 @@
       const outcome = await service().inspect(input);
       if (token !== planToken || sources[kind] !== selected) return;
       saveState = outcome;
-      if (outcome.status !== 'ready') return;
+      if (!['ready','reconciliation-ready','confirmation-required'].includes(outcome.status)) return;
       confirmation = { input, selected, kind };
       $('save-summary').replaceChildren();
       const metric = (label, value) => $('save-summary').append(node('dt', label), node('dd', value));
@@ -314,6 +315,7 @@
         metric('対象月', monthLabel(input.targetMonth));
         metric(input.preview.snapshotAsOfSource === 'file' ? '基準日' : '取得日', dateLabel(input.snapshotAsOf));
       } else if (input.preview.summary?.period) metric('約定期間', input.preview.summary.period.map(dateLabel).join(' ～ '));
+      transactionComparison?.show(outcome.manualMatches);
       $('save-dialog').showModal();
       $('cancel-save').focus();
     } catch (_) {
@@ -342,7 +344,7 @@
     const pending = confirmation;
     saveRunning = true; renderSave();
     let outcome;
-    try { outcome = await service().save(pending.input); }
+    try { outcome = await service().save(pending.input,transactionComparison?{transactionDecisions:transactionComparison.decisions()}:{}); }
     catch (error) {
       // Only fixed Storage messages may reach the UI; never display input/CSV exception values.
       const journal = (() => { try { return window.localStorage.getItem(TradeScopeStorageTransaction.journalKey) !== null; } catch (_) { return true; } })();

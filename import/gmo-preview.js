@@ -3,6 +3,7 @@
   const $ = id => document.getElementById(id);
   let controller = null, token = 0;
   let source = null, service = null, outcome = null, busy = false, opening = false, confirmation = null;
+  const comparison=globalThis.TradeScopeTransactionConfirmation?.create(document,document.getElementById('gmo-transaction-comparison'));
   const readErrors = Object.freeze({
     PDF_FILE_READ_FAILED: 'PDFファイルを読み取れませんでした',
     PDF_INVALID_FILE: 'PDFファイルを確認してください',
@@ -28,7 +29,7 @@
   function renderSave() {
     const correction = outcome?.status === 'review-required' && outcome.reason === 'different-report';
     const enrichment = outcome?.status === 'backfill-ready';
-    $('gmo-save').hidden = !source?.preview.valid || !(outcome?.status === 'ready' || enrichment || correction);
+    $('gmo-save').hidden = !source?.preview.valid || !(['ready','reconciliation-ready','confirmation-required'].includes(outcome?.status) || enrichment || correction);
     $('gmo-save').disabled = busy || opening;
     $('gmo-save').textContent = enrichment ? '取引明細を追加' : correction ? '訂正する' : '保存';
     $('gmo-save-status').textContent = busy ? '保存中…' : outcome?.enriched ? '既存取込に取引明細を追加しました' : ['saved', 'already-imported'].includes(outcome?.status) ? '保存済み'
@@ -134,13 +135,14 @@
       renderSave();
       const correction = outcome.status === 'review-required' && outcome.reason === 'different-report';
       const enrichment = outcome.status === 'backfill-ready';
-      if (outcome.status !== 'ready' && !enrichment && !correction) return;
+      if (!['ready','reconciliation-ready','confirmation-required'].includes(outcome.status) && !enrichment && !correction) return;
       confirmation = correction ? { stateId: outcome.stateId, adoptedSnapshotId: outcome.adoptedSnapshotId } : {};
       $('gmo-save-summary').replaceChildren();
       for (const [label, value] of [['対象月', source.preview.targetMonth.replace('-', '/')], ['月末日', source.preview.snapshotAsOf.replaceAll('-', '/')]])
         $('gmo-save-summary').append(node('dt', label), node('dd', value));
       if (enrichment) $('gmo-save-summary').append(node('dt', '取引明細'), node('dd', `${source.preview.tradeDetails.rows.length}件`));
       $('gmo-confirm-save').textContent = enrichment ? '取引明細を追加' : correction ? '訂正して保存' : '保存';
+      comparison?.show(outcome.manualMatches);
       $('gmo-save-dialog').showModal();
     } catch (_) { $('gmo-issues').replaceChildren(node('p', '保存データを確認できません。再読み込みしてください', 'issue error')); }
     finally { opening = false; renderSave(); }
@@ -154,7 +156,7 @@
   $('gmo-confirm-save').addEventListener('click', async () => {
     if (busy || !$('gmo-save-dialog').open || !source || confirmation === null) return;
     busy = true; renderSave();
-    try { outcome = await saveService().save(source, confirmation); }
+    try { outcome = await saveService().save(source, {...confirmation,...(comparison?{transactionDecisions:comparison.decisions()}: {})}); }
     catch (failure) { outcome = null; $('gmo-issues').replaceChildren(node('p', failure.message || '保存に失敗しました。容量・保存権限を確認してください', 'issue error')); }
     finally { busy = false; confirmation = null; $('gmo-save-dialog').close(); renderSave(); }
   });

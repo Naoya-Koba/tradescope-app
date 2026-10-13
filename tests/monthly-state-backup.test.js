@@ -34,7 +34,7 @@ function fixture() {
       marketValue: '0', unrealizedPnl: null, quantity: '123456789012345.123456789', observationType: 'approximateForMonth' }]),
     accountSnapshots: envelope([{ id: 'as_foreign', ...manual, sourceScope: 'sbi-foreign-securities',
       assetValue: '0', unrealizedPnl: null }, { id: 'as_cash', ...manual, sourceScope: 'sbi-cash', cashBalance: '0' }]),
-    monthlyAccountInputs: null, importedTransactions:null,
+    monthlyAccountInputs: null, importedTransactions:null, transactionReconciliations:null,
     monthlyAccountStates: envelope([{ id: 'mas_anonymous', accountId, targetMonth, confirmedAt: now,
       domesticImportBatchId: 'batch_domestic', foreignAccountSnapshotId: 'as_foreign', cashAccountSnapshotId: 'as_cash',
       realizedPnl: null, swapPnl: '0', deposit: '123456789012345.123456789', withdrawal: '-0.25' }])
@@ -135,7 +135,7 @@ test('lazy Repository/read/export neither seeds models nor generates monthly con
   const storage = new Storage(), repo = model.createRepository(storage);
   assert.deepEqual(repo.read(), absent()); assert.deepEqual(repo.list('monthlyAccountStates'), []);
   const h = harness(), value = h.build(storage, 'http://localhost', now);
-  assert.equal(value.backupVersion, 12); assert.deepEqual(copy(value.data.models), absent());
+  assert.equal(value.backupVersion, 13); assert.deepEqual(copy(value.data.models), absent());
   assert.equal(storage.writes, 0);
   const target = seed(); h.restore.execute(h.inspect(value).restorePlan, target);
   assert.deepEqual(model.readModels(target), absent());
@@ -144,7 +144,7 @@ test('lazy Repository/read/export neither seeds models nor generates monthly con
 test('v3 seven models round-trip; filename and exportedAt unchanged, no draft/aggregate fields', () => {
   const h = harness(), source = seed(), before = source.snapshot();
   const value = h.build(source, 'http://localhost', now);
-  assert.equal(value.backupVersion, 12); assert.equal(value.exportedAt, now);
+  assert.equal(value.backupVersion, 13); assert.equal(value.exportedAt, now);
   assert.deepEqual(copy(value.data.models), fixture()); assert.deepEqual(source.snapshot(), before);
   const target = new Storage(); h.restore.execute(h.inspect(value).restorePlan, target);
   assert.deepEqual(copy(h.build(target, 'http://localhost', now)), copy(value));

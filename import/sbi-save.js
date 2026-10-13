@@ -8,6 +8,8 @@
     ? require('./model-preview.js') : root.TradeScopeSBIModelPreview;
   const parser = typeof module !== 'undefined' && module.exports
     ? require('./sbi-parser.js') : root.TradeScopeSBI;
+  const reconciliation=typeof module!=='undefined'&&module.exports?require('../assets/transaction-reconciliation.js'):root.TradeScopeTransactionReconciliation;
+  const view=typeof module!=='undefined'&&module.exports?require('../assets/transaction-view.js'):root.TradeScopeTransactionView;
   const copy = value => JSON.parse(JSON.stringify(value));
   const records = (models, entity) => models[entity]?.records || [];
   const result = (status, reason) => ({ status, reason });
@@ -49,7 +51,7 @@
       if (file.duplicateBatches.length) {
         const saved = records(before, 'importBatches').find(item => item.id === file.duplicateBatches[0]);
         return { ...result('already-imported', 'exact-file'), targetMonth: saved?.targetMonth ?? null,
-          snapshotAsOf: saved?.snapshotAsOf ?? null };
+          snapshotAsOf: saved?.snapshotAsOf ?? null, before, existingBatchId:saved?.id };
       }
       if (source.preview.kind === 'holdings') {
         const batchById = new Map(records(before, 'importBatches').map(item => [item.id, item]));
@@ -70,10 +72,19 @@
     }
     async function inspect(input) {
       const prepared = await prepare(input);
-      return prepared.status === 'ready' ? result('ready', null) : prepared;
+      if(prepared.status==='already-imported')return reconciliation.inspect(adapter,prepared.before,view.activeSources(prepared.before).filter(s=>s.record.importBatchId===prepared.existingBatchId),{status:prepared.status,reason:prepared.reason,targetMonth:prepared.targetMonth,snapshotAsOf:prepared.snapshotAsOf});
+      if(prepared.status!=='ready')return prepared;
+      const models={...prepared.before,instruments:{records:[...records(prepared.before,'instruments'),...prepared.planned.instruments.filter(i=>i.status==='new').map(i=>i.record)]}};
+      return reconciliation.inspect(adapter,models,prepared.entity==='rawTransactions'?prepared.drafts.map(record=>({entity:prepared.entity,record})):[],result('ready',null));
     }
-    async function save(input) {
+    async function save(input,confirmation={}) {
       const prepared = await prepare(input);
+      if(prepared.status==='already-imported'){
+        const changes={},checked=reconciliation.finish(adapter,prepared.before,changes,confirmation,clock(),()=>model.newId('tr',cryptoApi),view.activeSources(prepared.before).filter(s=>s.record.importBatchId===prepared.existingBatchId));
+        if(checked.status!=='ready')return checked;
+        if(Object.keys(changes).length){repository.commit(changes,{expectedModels:prepared.before,expectedManual:checked.expectedManual});return{status:'saved',reconciled:true};}
+        return{status:prepared.status,reason:prepared.reason,targetMonth:prepared.targetMonth,snapshotAsOf:prepared.snapshotAsOf};
+      }
       if (prepared.status !== 'ready') return prepared;
       const { before, planned, account, file, entity, drafts } = prepared;
 
@@ -92,7 +103,9 @@
       catch (_) { return result('invalid', 'records'); }
       // Guard against concurrent writes during asynchronous matching. This is not multi-tab locking.
       // Repository verifies all persisted records/references before the shared journal is removed.
-      repository.commit(changes, { expectedModels: before });
+      const checked=reconciliation.finish(adapter,before,changes,confirmation,importedAt,()=>model.newId('tr',cryptoApi));
+      if(checked.status!=='ready')return checked;
+      repository.commit(changes, { expectedModels: before,expectedManual:checked.expectedManual });
       return { status: 'saved', importBatchId: file.batch.id, recordCount: drafts.length };
     }
     return Object.freeze({ read: () => repository.read(), inspect, save });

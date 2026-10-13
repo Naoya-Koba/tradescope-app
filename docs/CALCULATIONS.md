@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Current — 共通logical transaction set
+
+ユーザー確認済みの手入力置換だけを共通取引集合から除外し、採用取込約定を全件使用する。1:Nのquantity照合はdecimal係数／桁数による正確な合計であり、損益や取得原価を生成する処理ではない。keep-both／defer／未一致は別recordとして維持する。原manualは不変、訂正版の同事実は採用sourceへ再解決し、解決不能な訂正は保存停止する。月次State／台帳／Top／Trendの金融式は変更しない。まだ未接続のOpen Positions／Portfolio／Allocation／Riskへ新しい取引consumerを接続しない。
+
 ## Decided — Monthly canonicalと取引内訳の分離
 
 月次損益の正本は既存MonthlyAccountStateと正式採用source。個別売買損益はdrill-down／auditであり、合計や不一致を理由に公式月間損益・Stateを上書きしない。GMO個別P/Lは明示JPY損益または明示円換算損益のみ、価格差から算出しない。quantity単位・contract sizeも推測変換しない。HoldingSnapshotは時点保有で、約定日時があっても当月Transactionにはしない。新取引source／表示resolverは共通履歴UIだけへ接続し、Top・Summary・Trend・Allocation・Portfolio・Risk consumerへ接続しない。SBIの受渡金額／決済損益混在列も個別realizedPnlへ変換しない。

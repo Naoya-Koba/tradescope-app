@@ -68,8 +68,8 @@ test('PII, PDF body, path/name, cashflow and reward do not persist',async()=>{co
 test('malformed source cannot write; invalid quantity/ticker/provider/month/zero-vs-null reject',async()=>{
  for(const mutate of [x=>x.preview.valid=false,x=>x.preview.report.provider='gmo',x=>x.preview.report.snapshotAsOf='2031-02-27',x=>x.preview.spotHoldings[0].quantity=null,x=>x.preview.spotHoldings[0].asset='PRIVATE NAME',x=>x.filename='private.pdf']){const s=new Memory(),before=s.snapshot(),a=source();mutate(a);await assert.rejects(()=>service(s).save(a));assert.equal(s.snapshot(),before);}
 });
-test('v10 export/empty restore/re-export exactly protects active and old sources',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b'),await svc.inspect(source('b')));const h=backup(s),payload=h.build();assert.equal(payload.backupVersion,12);const target=new Memory(),r=backup(target),p=r.format.inspectValue(payload);assert.equal(p.ok,true);r.restore.execute(p.restorePlan,target);assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(service(target).read('2031-02').holdings.length,3);});
-test('v9 rejects new observation-only Input, v10 accepts; fields are not silently stripped',async()=>{const s=await saved(),payload=backup(s).build();assert.throws(()=>model.validateBackupModels(9,payload.data.models));assert.equal(model.validateBackupModels(10,payload.data.models),true);});
+test('v10 export/empty restore/re-export exactly protects active and old sources',async()=>{const s=await saved(),svc=service(s);await svc.save(source('b'),await svc.inspect(source('b')));const h=backup(s),payload=h.build();assert.equal(payload.backupVersion,13);const target=new Memory(),r=backup(target),p=r.format.inspectValue(payload);assert.equal(p.ok,true);r.restore.execute(p.restorePlan,target);assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(service(target).read('2031-02').holdings.length,3);});
+test('v9 rejects new observation-only Input, v10 accepts; fields are not silently stripped',async()=>{const s=await saved(),payload=backup(s).build();assert.throws(()=>model.validateBackupModels(9,payload.data.models));assert.equal(model.validateBackupModels(10,Object.fromEntries(model.backupModelEntities[10].map(k=>[k,payload.data.models[k]]))),true);});
 for(let version=1;version<=9;version++)test('old v'+version+' restore preserves published semantics',async()=>{const sourceStorage=new Memory(),h=backup(sourceStorage),payload=copy(h.build());payload.backupVersion=version;
  if(version===1)delete payload.data.models;else{const keys=model.backupModelEntities[version];payload.data.models=Object.fromEntries(keys.map(k=>[k,null]));}
  const target=await saved(),r=backup(target),before=target.getItem(model.keys.monthlyAccountInputs),inspection=r.format.inspectValue(payload);assert.equal(inspection.ok,true);r.restore.execute(inspection.restorePlan,target);
@@ -226,7 +226,7 @@ test('filtered Instrument creation rolls back atomically when holdings fail',asy
 });
 test('Backup v10 roundtrip preserves filtered positive and adopted explicit zero observations',async()=>{
  const s=new Memory(),svc=service(s);await svc.save(listedSource());const zero=listedSource('b','2031-03',false);await svc.save(zero);
- const payload=backup(s).build(),target=new Memory(),r=backup(target);assert.equal(payload.backupVersion,12);r.restore.execute(r.format.inspectValue(payload).restorePlan,target);
+ const payload=backup(s).build(),target=new Memory(),r=backup(target);assert.equal(payload.backupVersion,13);r.restore.execute(r.format.inspectValue(payload).restorePlan,target);
  assert.deepEqual(copy(r.build().data),copy(payload.data));assert.equal(records(target,'instruments').length,1);assert.equal(records(target,'holdingSnapshots').length,2);
  assert.equal((await service(target).save(zero)).status,'already-imported');
 });

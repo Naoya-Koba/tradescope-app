@@ -66,7 +66,7 @@ test('real monthly service save and correction survive unchanged v3 export/empty
     save(original, { ...draft(), foreignUnrealizedPnl: correction ? '5.25' : '-1.20' });
     const before = model.readModels(original), expected = calc(original).snapshot(2026, [{ key: 'sbi', name: 'SBI' }]);
     const api = backupHarness(original), backup = api.TradeScopeBackupExport.buildPayload(original);
-    assert.equal(backup.backupVersion, 12);
+    assert.equal(backup.backupVersion, 13);
     const empty = new Storage(), parsed = api.TradeScopeBackupFormat.inspectValue(backup);
     assert.equal(parsed.ok, true); api.TradeScopeBackupRestore.execute(parsed.restorePlan, empty);
     assert.deepEqual(model.readModels(empty), before);

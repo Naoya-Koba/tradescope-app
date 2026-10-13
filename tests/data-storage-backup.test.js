@@ -48,7 +48,7 @@ function fixture() {
       cashBalance: null, unrealizedPnl: '0' }]),
     holdingSnapshots: envelope([{ id: 'hs_fixture', ...source, accountSnapshotId: 'as_fixture', instrumentId,
       quantity: '0', acquisitionPrice: null, marketPrice: '123.123456789', marketValue: '0', unrealizedPnl: null, currency: 'JPY' }]),
-    monthlyAccountStates: envelope([]), monthlyAccountInputs: envelope([]), importedTransactions: envelope([])
+    monthlyAccountStates: envelope([]), monthlyAccountInputs: envelope([]), importedTransactions: envelope([]), transactionReconciliations: envelope([])
   };
 }
 function seeded() {
@@ -109,7 +109,7 @@ test('download filename change preserves latest v3 JSON, ISO exportedAt and all 
   assert.equal(blob.type, 'application/json');
   const value = JSON.parse(await blob.text());
   assert.deepEqual(value, copy(h.build(storage, 'http://127.0.0.1:54321', date.toISOString())));
-  assert.equal(value.backupVersion, 12); assert.equal(value.exportedAt, date.toISOString());
+  assert.equal(value.backupVersion, 13); assert.equal(value.exportedAt, date.toISOString());
   assert.deepEqual(storage.snapshot(), before); assert.equal(storage.writes, writes);
 });
 
@@ -118,7 +118,7 @@ test('v1/v2/v3 file restore uses JSON content, including old names and browser d
   const importer = source.slice(source.indexOf('function importAllData(file)'), source.indexOf("window.addEventListener('storage'", source.indexOf('function importAllData(file)')));
   assert.ok(!/file\.(?:name|filename)|\.endsWith\(/.test(importer));
   const latest = copy(backupHarness(seeded()).build(seeded(), 'http://localhost', now));
-  const v2 = copy(latest); v2.backupVersion = 2; delete v2.data.models.monthlyAccountStates; delete v2.data.models.monthlyAccountInputs; delete v2.data.models.importedTransactions;
+  const v2 = copy(latest); v2.backupVersion = 2; delete v2.data.models.monthlyAccountStates; delete v2.data.models.monthlyAccountInputs; delete v2.data.models.importedTransactions;delete v2.data.models.transactionReconciliations;
   const values = [v1(), v2, latest];
   for (const value of values) {
     for (const name of ['tradescope-complete-backup-v2-2030-01-20T12-00-00-000Z.json',
@@ -137,7 +137,7 @@ test('v1/v2/v3 file restore uses JSON content, including old names and browser d
       assert.equal(storage.getItem('tradeScopeMemos'), JSON.stringify(value.data.memos));
       if (value.backupVersion >= 2) assert.deepEqual(model.readModels(storage), { ...value.data.models, importedTransactions: value.data.models.importedTransactions ?? null,
         monthlyAccountInputs: value.data.models.monthlyAccountInputs ?? null,
-        monthlyAccountStates: value.data.models.monthlyAccountStates ?? null });
+        monthlyAccountStates: value.data.models.monthlyAccountStates ?? null, transactionReconciliations:value.data.models.transactionReconciliations ?? null });
     }
   }
 });
@@ -263,7 +263,7 @@ test('v1 restore does not parse, reset or migrate even an unreadable/future new-
 test('F: v3 export -> cleared anonymous fixture -> restore -> re-export exact data equality', () => {
   const source = seeded(), h = backupHarness(source), before = source.snapshot();
   const payload = h.build(source, 'http://127.0.0.1:54321', now);
-  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 12);
+  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 13);
   assert.equal(payload.source.origin, 'http://127.0.0.1:54321');
   const target = new MemoryStorage(), targetHarness = backupHarness(target);
   const inspection = targetHarness.format.inspectJson(JSON.stringify(payload)); assert.equal(inspection.ok, true);
@@ -360,7 +360,7 @@ test('L: Repository storage is independent of all existing monthly/top/history/b
   assert.ok(html.includes('import/model-preview.js'));
   const preview = fs.readFileSync(path.join(root, 'import/preview.js'), 'utf8');
   assert.ok(!/createRepository|\.commit\(|\.setItem\(|\.removeItem\(|sessionStorage|indexedDB/.test(preview));
-  assert.match(preview, /service\(\)\.save\(pending\.input\)/);
+  assert.match(preview, /service\(\)\.save\(pending\.input,/);
 });
 test('every v3 write/removal position, including Snapshot and journal cleanup, rolls back exactly', () => {
   const h = backupHarness(), payload = h.build(seeded(), 'http://localhost', now);

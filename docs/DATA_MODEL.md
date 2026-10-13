@@ -1,5 +1,15 @@
 # Data Model
 
+## Current / Decided — 手入力と取込取引の確認統合
+
+共通`assets/transaction-reconciliation.js`で口座・一意なInstrument・売買／取引意味・日付（明示時刻があれば時刻）・数量単位・decimal数量合計・価格・通貨を厳密照合する。同一Batch内の同条件の全約定集合を対象とし、任意の部分集合・価格許容差・類似名で統合しない。1:1／1:Nとも新しい永続関係はユーザー確認が必要。数量はBigIntによるdecimal演算。FX手入力の明示contractSizeとGMO通貨数量、明示株数とSBI国内株式／ETF CSVの株数・JPY単価だけを比較用に解釈し、原数量・単位へ書き戻さない。投信や単位不明は推測しない。
+
+`tradeScopeTransactionReconciliationsV1`（envelope v1／record v1）をBackup v13の10番目の正本モデルとして追加する。recordはschemaVersion、id、manualId、decision（replace／keep-both／defer）、sourceType、facts、members、confirmedAt。factsはaccountId、instrumentId、tradeDate、side、semantic、quantity、quantityUnit、price、currency。membersはrawTransactions／importedTransactionsのentityとstable idで全約定を参照する。array indexやPDF本文をidentityにしない。既存tradeScopeTradeHistoryV1のrecord／metadata／生JSONは変更・削除しない。確定した置換／両方保持の関係は不変。判断保留だけは同じstable IDで次の明示確認へ進める。手入力を編集した場合は古いfactsと一致しなくなるため非適用とする。
+
+`imported data > confirmed replaced manual`を共通logical setで適用する。keep-both／defer／不確かな一致は別取引のまま。既存の未判断1:1非永続表示統合は互換維持するが、新しい1:Nは自動置換しない。訂正前source・関係を残し、採用sourceの一意な全集合で公式ID・日時・数量・価格・手数料・個別損益等が同じ場合だけ再解決する。既に有効な置換を孤立させる訂正は保存停止。自動関係書換え／削除はしない。
+
+取込と関係は同一Repository journalで保存し、保存前／再読込時に手入力の生JSONも照合する。同一hashの保存済みsourceも、取込recordを変更せず関係だけ明示確定できる。Open Positions／Portfolio／Allocation／Risk／月次計算へ新しいconsumer接続は行わない。
+
 ## ImportedTransaction record v2 / Backup v12（Current / Decided）
 
 既存`tradeScopeImportedTransactionsV1`とenvelope v1を維持し、record v1のGMO FX契約は変更しない。record v2は既存必須fieldに`marketType`と`feeSemantics`を追加する。現物はmarketType=spot、normalizedTransactionType=spot-buy／spot-sell、quantityUnit=baseAssetUnitsで、FX open／closeへ変換しない。公式execution／order IDは非空文字列を受理し、provider・account・Batch contextの内側で識別する。同じ公式IDを訂正前後の別Batchに保持可能。decimal文字列と日時の原精度を維持する。
