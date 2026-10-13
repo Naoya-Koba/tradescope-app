@@ -430,6 +430,20 @@ function dismissClosePositionModal() {
 function renderOpenPositionDetail(position) {
   const detail = document.getElementById('openPositionDetail');
   if (!detail || !position) return;
+  if (position.holdingType === 'spot-observation') {
+    const decimal = window.TradeScopeOpenPositionsView.decimalLabel;
+    detail.innerHTML = `<p class="open-position-detail-title">${escapeHtml(position.symbol)} / SBI VC</p>
+      <div class="open-position-detail-meta">
+        <span><strong>数量:</strong> ${decimal(position.quantity)} ${escapeHtml(position.symbol.split('/')[0])}</span>
+        <span><strong>評価レート:</strong> ${decimal(position.marketPrice)} 円</span>
+        <span><strong>評価額:</strong> ${decimal(position.marketValue)} 円</span>
+        <span><strong>取得原価:</strong> —</span><span><strong>評価損益:</strong> —</span>
+        <span><strong>基準日:</strong> ${escapeHtml(position.snapshotAsOf)}</span>
+        ${position.hasOverrides ? '<span>手動補正あり</span>' : ''}
+      </div>`;
+    detail.hidden = false;
+    return;
+  }
 
   const sideLabel = position.side === 'buy' ? '買い' : '売り';
   const accountsLabel = position.viewMode === 'merged'
@@ -457,15 +471,22 @@ function renderOpenPositionDetail(position) {
 }
 
 function renderOpenPositions(entries) {
-  const nonSecuritiesSbiEntries = (entries || []).filter(
+  const positionView = window.TradeScopeOpenPositionsView;
+  const legacyEntries = positionView.legacyEntries(entries);
+  let observedPositions = [], sourceUnavailable = false;
+  try {
+    observedPositions = positionView.resolve(window.TradeScopeDataStorage.readModels(
+      window.TradeScopeDataStorage.localStorageAdapter(localStorage)));
+  } catch (_) { sourceUnavailable = true; }
+  const nonSecuritiesSbiEntries = legacyEntries.filter(
     (e) => !(String(e.account || '').trim().toUpperCase().replace(/\s+/g, '') === 'SBI' &&
              (e.assetType === '証券' || e.assetType === 'NISA'))
   );
   const baseOpenPositions = historyCore.calculateOpenPositions(nonSecuritiesSbiEntries);
   const securitiesPositions = historyCore.buildSecuritiesOpenPositions
-    ? historyCore.buildSecuritiesOpenPositions(entries)
+    ? historyCore.buildSecuritiesOpenPositions(legacyEntries)
     : historyCore.calculateOpenPositions(
-        (entries || []).filter(e =>
+        legacyEntries.filter(e =>
           String(e.account || '').trim().toUpperCase().replace(/\s+/g, '') === 'SBI' &&
           (e.assetType === '証券' || e.assetType === 'NISA')
         )
@@ -476,9 +497,12 @@ function renderOpenPositions(entries) {
   const primaryHeader = document.getElementById('openPositionsPrimaryHeader');
   const detail = document.getElementById('openPositionDetail');
 
-  const rows = openPositionsView === 'merged'
+  const legacyRows = openPositionsView === 'merged'
     ? aggregateOpenPositions(openPositions)
     : normalizeAccountOpenPositions(openPositions);
+  // Observed spot holdings never enter transaction netting/weighted acquisition-rate calculations.
+  const rows = [...legacyRows, ...observedPositions.map(p => ({...p, viewMode: 'account', accountLabel: p.account}))];
+  document.getElementById('openPositionsSourceStatus').hidden = !sourceUnavailable;
 
   if (primaryHeader) {
     primaryHeader.textContent = openPositionsView === 'merged' ? '集計' : '口座';
@@ -486,7 +510,7 @@ function renderOpenPositions(entries) {
 
   if (!rows.length) {
     summary.textContent = '現在保有中の建玉はありません。';
-    tbody.innerHTML = '<tr><td colspan="5" style="color:#aab5d0;">建玉がありません</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#aab5d0;">建玉がありません</td></tr>';
     if (detail) detail.hidden = true;
     return;
   }
@@ -498,15 +522,25 @@ function renderOpenPositions(entries) {
   }
 
   tbody.innerHTML = rows.map((position, idx) => {
+    if (position.holdingType === 'spot-observation') {
+      const decimal = positionView.decimalLabel;
+      return `<tr class="open-position-row" data-open-position-index="${idx}">
+        <td data-label="口座">${escapeHtml(displayAccountName(position.accountLabel))}</td>
+        <td data-label="銘柄">${escapeHtml(position.symbol)}</td><td data-label="区分">現物</td>
+        <td data-label="数量">${decimal(position.quantity)} ${escapeHtml(position.symbol.split('/')[0])}</td>
+        <td data-label="評価レート"><small>評価レート</small>${decimal(position.marketPrice)} 円</td>
+        <td data-label="評価額">${decimal(position.marketValue)} 円</td><td></td></tr>`;
+    }
     const sideLabel = position.side === 'buy' ? '買い' : '売り';
     const sideClass = position.side === 'buy' ? 'tag-buy' : 'tag-sell';
     return `
       <tr class="open-position-row" data-open-position-index="${idx}">
-        <td>${escapeHtml(displayAccountName(position.accountLabel))}</td>
-        <td>${escapeHtml(position.symbol)}</td>
-        <td><span class="${sideClass}">${sideLabel}</span></td>
-        <td>${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')}</td>
-        <td>${fmtRate(position.avgRate, position.assetType, position.symbol)}</td>
+        <td data-label="口座">${escapeHtml(displayAccountName(position.accountLabel))}</td>
+        <td data-label="銘柄">${escapeHtml(position.symbol)}</td>
+        <td data-label="方向"><span class="${sideClass}">${sideLabel}</span></td>
+        <td data-label="数量">${fmtQuantity(position.absQuantity)}${position.assetType === 'FX' ? ' Lot' : (position.assetType === '暗号資産' ? ' ' + position.symbol.split('/')[0] : '')}</td>
+        <td data-label="平均レート"><small>平均レート</small>${fmtRate(position.avgRate, position.assetType, position.symbol)}</td>
+        <td data-label="評価額">—</td>
         <td><button type="button" class="close-position-btn" data-close-position-index="${idx}" aria-label="決済">決済</button></td>
       </tr>
     `;

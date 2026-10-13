@@ -276,6 +276,22 @@ body::before {
   background: rgba(255,255,255,.03);
 }
 
+.open-positions td small { display: block; color: var(--muted); font-size: 10px; }
+.open-position-detail { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .open-positions .data-table { min-width: 0; }
+  .open-positions thead { display: none; }
+  .open-positions .open-position-row {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.12);
+  }
+  .open-positions .open-position-row td { border: 0; overflow-wrap: anywhere; }
+  .open-positions td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 10px; color: var(--muted); margin-bottom: 3px;
+  }
+  .open-positions td small { display: none; }
+}
+
 .open-position-detail {
   margin-top: 10px;
   padding: 10px 12px;

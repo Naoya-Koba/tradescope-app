@@ -1,5 +1,9 @@
 # Development Guide
 
+## Current — Open Positionsの保有観測projection
+
+`assets/open-positions-view.js`はRepositoryで検証したmodelsをread-onlyで受け、最新対象月のSBI VC採用Inputを`observation-adoption.resolve`へ渡す。decimal文字列をNumberへ変換せず数量／評価レート／円評価額を表示し、補正後quantityが正の現物だけ返す。legacy SBI VC取引をOpen Positionsの取引nettingから除外し、他口座の既存集計は維持する。観測行は平均取得価格の加重平均や手入力決済へ渡さない。Snapshot／Input／Storage write／Backup変更なし。PWA v295で新projectionとhistory資産query 20261013-2をprecacheし、共通採用helperを先にロードする。Top／Portfolio／Allocation／Riskへの追加接続は別工程。
+
 ## Current — 共通取引確認統合
 
 matching／全約定group／確定関係不変・保留再確認／訂正continuityは`assets/transaction-reconciliation.js`、共通logical setは`assets/transaction-view.js`、比較DOMは`import/transaction-confirmation.js`に分離する。GMO／SBI証券／SBI VCのinspectはread-only、save-timeで同じ照合を再実行する。Previewの一時IDではなくsource factsで選択を再照合し、手入力rawの保存前／verification guardとexpectedModelsを使う。source＋関係を同じRepository journalへ入れ、同一hashの関係確認ではsourceを再保存しない。

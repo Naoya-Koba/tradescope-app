@@ -1,5 +1,9 @@
 # Data Model
 
+## Current / Decided — SBI VC現在保有と取引履歴
+
+Open PositionsのSBI VC現在保有は、最新対象月のMonthlyAccountInput v3／v4 → 明示採用AccountSnapshot → ImportBatch → 同じsourceのHoldingSnapshotを正本とする。共通observation-adoptionでquantity／marketPrice／marketValueのactive補正を解決し、正の採用数量だけ表示する。最新が0／不明なら過去の正数量へ戻さず、訂正前source・未保有0列挙を混ぜない。ImportedTransaction／legacy手入力は売買履歴であり現在保有を再計算する根拠にしない。原価・損益・レバレッジ建玉を推測せず、担保評価を別資産へ加算しない。永続schema／Backup v13は不変。今回の接続はOpen Positionsのみで、Top／Portfolio／Allocation／Risk／月次計算は変更しない。
+
 ## Current / Decided — 手入力と取込取引の確認統合
 
 共通`assets/transaction-reconciliation.js`で口座・一意なInstrument・売買／取引意味・日付（明示時刻があれば時刻）・数量単位・decimal数量合計・価格・通貨を厳密照合する。同一Batch内の同条件の全約定集合を対象とし、任意の部分集合・価格許容差・類似名で統合しない。1:1／1:Nとも新しい永続関係はユーザー確認が必要。数量はBigIntによるdecimal演算。FX手入力の明示contractSizeとGMO通貨数量、明示株数とSBI国内株式／ETF CSVの株数・JPY単価だけを比較用に解釈し、原数量・単位へ書き戻さない。投信や単位不明は推測しない。

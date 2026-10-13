@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="history/history.css?v=20261012-9" />
+  <link rel="stylesheet" href="history/history.css?v=20261013-2" />
   <link rel="stylesheet" href="assets/bottom-nav.css" />
   <link rel="stylesheet" href="assets/transitions.css" />
   <script src="assets/transitions.js"></script>
@@ -141,7 +141,8 @@
     </section>
 
     <h2 class="heading-muted">Open Positions</h2>
-    <section class="section glass">
+    <section class="section glass open-positions">
+      <p id="openPositionsSourceStatus" class="open-summary" hidden>SBI VCの保有情報を読み込めませんでした。</p>
       <div class="open-positions-head">
         <div id="openPositionsSummary" class="open-summary">保有建玉を集計中...</div>
         <div class="open-view-switch" role="tablist" aria-label="Open Positions表示切替">
@@ -157,7 +158,8 @@
               <th>通貨ペア</th>
               <th>方向</th>
               <th>数量</th>
-              <th>平均レート</th>
+              <th>レート</th>
+              <th>評価額</th>
               <th></th>
             </tr>
           </thead>
@@ -314,7 +316,9 @@
   <script src="assets/transaction-view.js?v=20261013-1"></script>
   <script src="assets/transaction-display.js?v=20261012-16"></script>
   <script src="history/transaction-ui.js?v=20261012-16"></script>
-  <script src="history/history.js?v=20261012-5"></script>
+  <script src="assets/observation-adoption.js?v=20261012-15"></script>
+  <script src="assets/open-positions-view.js?v=20261013-2"></script>
+  <script src="history/history.js?v=20261013-2"></script>
   <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
