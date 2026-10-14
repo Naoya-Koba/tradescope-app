@@ -1,5 +1,12 @@
 # Product Specification
 
+## Current / Decided — SBI VC入力元の確認・採用（v305）
+
+SBI VC月次Inputに「入力元・採用を確認」を追加。現物保有集合とJPY残高の現在採用、PDF／手入力候補、基準日・対象月・revision、旧訂正版、source原値と補正後値を確認できる。候補は個別折りたたみ、明示選択後に保存で確定する。PDFを自動優先せず、保有集合とJPYを別々に採用できる。
+
+操作はsource採用／現在採用継続／同内容確認（または不一致・比較不能記録）／判断保留。比較だけでは採用を切替えず、既存有効採用があるdeferは維持する。空集合は「保有なしを確認済み」、missingは「—」、現金明示0は「0円」。stale／競合は0化せず保存停止。cashflow・P/L・取引履歴・Riskは対象外。大規模デザイン変更・独立manual source作成フォームは今回追加しない。
+
+
 ## Current / Decided — SBI VCの共通残高source（v304）
 
 SBI VC PDFの現物保有集合とJPY残高を対等source／明示adoptionへ接続する。PDF保存は原値参照candidateを取得し、既存manual採用を自動置換しない。新判断がない既存月は旧観測採用・補正を互換表示する。全保有0は「正式確認した空集合」であり、未取得とは異なる。

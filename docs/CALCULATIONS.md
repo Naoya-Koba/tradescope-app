@@ -1,5 +1,12 @@
 # Calculation Specification
 
+## Current / Decided — SBI VC採用UIと期間計算の境界（v305）
+
+保有集合とJPYは別採用可能。PDF自動優先なし。UIは共通採用結果、source原値、補正後採用値、比較結果を分けて表示する。保有集合比較はv14の内訳・Instrument・基準日・scope・原値表記を含む保守的判定で、合計額だけから一致にしない。cashも同月／JPY／scope／as-ofが比較可能な場合だけ比較する。小数表記差の正規化でv14 comparison意味を変更しない。
+
+SBI VCのbalance-only判断の未解決／競合を既存period flowの欠損へ伝播させない。表示用のassetConflictとperiod flowを分離し、期間Performanceは既存ledger basisを参照する。式、初期資金、flow採用は変更せず、current balance差から損益を逆算しない。quick deposit／staking／fee／transfer／レバレッジ／原価／損益の新規接続なし。
+
+
 ## Current / Decided — SBI VC残高の採用入口（v304）
 
 Open Positions、Portfolio、current-asset-view、Top／Allocationは共通SBI VC balance adoption resolverを使う。保有集合の最新対象月と現金の最新対象月を独立して保持し、全年最新（Position／Portfolio）と選択年内最新（Top／Allocation）の時点差を維持する。positive採用保有の公式marketValue＋採用cashBalanceを一度だけ合算し、reportedAssetTotal・レバレッジ担保・旧source・legacy取引は加算しない。空集合／数量0は過去positiveを復活させず、不明数量も過去数量で補完しない。

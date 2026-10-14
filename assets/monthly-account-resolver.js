@@ -5,7 +5,7 @@
   const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
-  const sourceAdapterVersion='monthly-source-adapter-v3';
+  const sourceAdapterVersion='monthly-source-adapter-v4';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
@@ -138,7 +138,8 @@
     const bad=values.some(v=>['stale','conflict','unresolved'].includes(v.status));
     const assetRows=sources.assetComponents(values.filter(v=>v.currency==='JPY'));
     if(!values.some(v=>sources.flowMetrics.includes(v.metric)||v.metric==='unrealizedPnl'))return {...base,
-      ...(bad?{source:'conflict',confirmed:false,completeness:{monthly:false,observation:false,complete:false}}:{}),sourceAdoptions:values,
+      ...(bad&&key!=='sbivc'?{source:'conflict',confirmed:false,completeness:{monthly:false,observation:false,complete:false}}:{}),sourceAdoptions:values,
+      ...(key==='sbivc'?{balanceOnlyAdoption:true}:{}),
       observedAsset:assetRows.length?sum(assetRows.map(v=>v.value)):base.observedAsset??null};
     const old=base.source==='legacy'?tradingData?.[Number(targetMonth.slice(0,4))]?.[Number(targetMonth.slice(5))]?.[key]??{}:base;
     const names={realizedPnl:'realizedPnL',swapPnl:'swapPnL',deposit:'deposit',withdrawal:'withdrawal',unrealizedPnl:'unrealizedPnL'};

@@ -2366,8 +2366,10 @@ function renderAccountInputs() {
   
   ACCOUNTS.forEach(account => {
     if(account.key==='sbivc'){
+      const sourceDraftToken=window.TradeScopeDisplayReadState.token(currentYear,currentMonth,account.key);
       const observation=window.TradeScopeObservationInputUI.render({document,adapter:window.TradeScopeDataStorage.localStorageAdapter(localStorage),
         accountId:'acc_sbivc_crypto',targetMonth:inputTargetMonth(),displayName:displayAccountName(account.key),accountKey:account.key,color:account.color,
+        onSourceDraft:active=>{if(active)dirtyAccountDrafts.add(sourceDraftToken);else dirtyAccountDrafts.delete(sourceDraftToken);},
         onSaved:()=>refreshAccountAfterSave(account.key),onCancel:()=>refreshAccountAfterSave(account.key)});
       if(observation){container.appendChild(observation);return;}
     }

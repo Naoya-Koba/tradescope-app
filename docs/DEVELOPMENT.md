@@ -1,5 +1,16 @@
 # Development Guide
 
+## Current — SBI VC source adoption UI（PWA v305）
+
+既存月次Inputの小さい折りたたみsectionへ採用操作を追加。controller（source-selection）とDOM renderer（source-ui）を分離し、最終UI overhaulでrendererを交換可能。候補取得／比較はread-only、候補選択はメモリDraft、保存でのみmonthly-source-service.operateへ渡す。source原値を新modelへコピーしない。
+
+保留前に旧互換採用がある場合は同revision／補正の確認採用＋deferを一回のjournalで記録する。採用なしはunresolved。比較だけではadoptionを変更しない。review中のInputを外部更新／BFCache再読込から保護し、古いfingerprintは保存停止、表示と選択を保持する。ユーザーの再確認操作でのみ新guardを取得する。
+
+関連module／CSSはquery 20261014-6、PWA v305へ同期。比較のv14受理契約は変更せず、SBI VC残高状態から期間P/Lを欠損化しない境界のみ整理する。匿名DOM／Memory／browser-global初期化で採用・比較・defer・stale・rollback・Backupを検証する。production／実PDF／実Backupを使わない。
+
+検証：追加51件、全1356 tests Pass。JS構文122ファイル、precache 76資産（重複なし）、production HTMLのJS／CSS 107参照整合、diff-checkを確認。匿名Memory／localhostの検証データ・serverはcleanup済み。computer-useのbrowser一覧が空のため390px／1280px実表示・実ブラウザConsoleは未実施。Backup v14、persistent schema／Storage keyは変更なし。production Storage・実データ・実Backupは未操作。
+
+
 ## Current — SBI VC balance hook（PWA v304）
 
 `monthly-source-service.buildChanges(base, operation, {at,newId})`はStorageを操作しない純粋planner。sbivc-saveはcanonical仮modelからholding set／JPY cash／reported totalの参照candidateを組み立て、最後に一回だけRepository.commitする。別operateによる二段commitは禁止。PreviewのsourceFingerprintを保存直前に再照合し、staleは停止してPreviewを保持する。旧same-hash importを自動migrationしない。

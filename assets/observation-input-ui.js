@@ -4,13 +4,17 @@
   const storage=node?require('./data-model-storage.js'):root.TradeScopeDataStorage;
   const adoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
   const save=node?require('./observation-override-save.js'):root.TradeScopeObservationOverrideSave;
-  function render({document,adapter,accountId,targetMonth,displayName,accountKey='sbivc',color,onSaved=()=>{},onCancel=()=>{}}){
+  const sourceUI=node?require('./sbivc-source-ui.js'):root.TradeScopeSBIVCSourceUI;
+  const selection=node?require('./sbivc-source-selection.js'):root.TradeScopeSBIVCSourceSelection;
+  function render({document,adapter,accountId,targetMonth,displayName,accountKey='sbivc',color,onSaved=()=>{},onCancel=()=>{},onSourceDraft=()=>{}}){
     let models;try{models=storage.createRepository(adapter).read();}catch(_){
       const error=document.createElement('div');error.className='account-card';error.textContent='保存された資産・保有情報を確認できませんでした';return error;
     }
-    let view=adoption.resolve(models,accountId,targetMonth);if(!view)return null;
+    let view=adoption.resolve(models,accountId,targetMonth);
+    const controller=selection.createController(adapter);
+    if(!view&&!controller.inspect(targetMonth).hasData)return null;
     const service=save.createService(adapter);let editing=false,busy=false;
-    view=service.inspect(accountId,targetMonth);
+    try{if(view)view=service.inspect(accountId,targetMonth);}catch(_){view=null;}
     const make=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el;};
     const amount=value=>{if(value==null)return'—';const [integer,fraction]=value.split('.');return integer.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction===undefined?'':'.'+fraction);};
     const card=make('div','','account-card');
@@ -21,9 +25,11 @@
     if(color)dot.style.backgroundColor=color;
     title.append(dot,make('span',displayName));toggle.append(title,make('span','▼','account-toggle-icon'));
     const resize=()=>{if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;};
+    const sourcePanel=sourceUI.create({document,adapter,targetMonth,controller,onSaved,onDraft:onSourceDraft,onResize:resize});
     const yen=value=>value===null?'—':amount(value)+'円';
     function draw(){
       body.replaceChildren();
+      if(!view){body.append(sourcePanel.element);resize();return;}
       body.append(make('p','資産・保有情報を保存済み','muted'));
       const dl=make('dl','','observation-values');
       for(const[label,value]of[['対象月',targetMonth.replace('-','/')],['基準日',view.snapshot.snapshotAsOf.replaceAll('-','/')]])dl.append(make('dt',label),make('dd',value));
@@ -53,7 +59,7 @@
       details.addEventListener('toggle',resize);body.append(details);
       if(view.hasOverrides)body.append(make('p','手動補正あり','muted'));
       if(!editing&&view.editable){
-        const edit=make('button','修正','monthly-source-reset');edit.type='button';edit.addEventListener('click',()=>{editing=true;draw();});actions.append(edit);
+        const edit=make('button','修正','monthly-source-reset');edit.type='button';edit.addEventListener('click',()=>{if(sourcePanel.pending())return;editing=true;draw();});actions.append(edit);
       }else if(editing){
         const reset=make('button','PDF値に戻す','monthly-source-reset'),cancel=make('button','キャンセル','monthly-source-reset'),submit=make('button','保存','btn btn-primary monthly-account-save');
         for(const b of[reset,cancel,submit])b.type='button';
@@ -72,7 +78,7 @@
         });
         actions.append(reset,cancel,submit);
       }
-      body.append(actions,error);resize();
+      body.append(actions,error);if(!editing)body.append(sourcePanel.element);resize();
     }
     draw();card.append(toggle,body);return card;
   }

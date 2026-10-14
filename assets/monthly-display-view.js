@@ -5,7 +5,7 @@
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
-  const version = 'monthly-display-v5';
+  const version = 'monthly-display-v6';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -99,6 +99,7 @@
       const isLegacy = resolved.source === 'legacy', entered = calculator.entered(year, month, key);
       const hasData = resolved.sourceAdoptions?.length>0 || (isLegacy ? entered : present(key, targetMonth));
       const observed = observation(key, targetMonth, resolved);
+      const balanceOnly=resolved.balanceOnlyAdoption===true;
       const complete = isLegacy ? entered && Number.isFinite(calculator.net(year, month, key)) : resolved.completeness?.complete === true
         &&(!resolved.sourceAdoptions||Number.isFinite(calculator.net(year,month,key)));
       const row = calculator.row(year, month, key);
@@ -106,14 +107,14 @@
       const adoptedRow = input && !resolved.state && !resolved.sourceAdoptions ? input.schemaVersion === 2
         ? {realizedPnL:input.adoptedValues.realizedPnl,swapPnL:input.adoptedValues.swapPnl,unrealizedPnL:input.adoptedValues.unrealizedPnl,deposit:input.adoptedValues.deposit,withdrawal:input.adoptedValues.withdrawal}
         : {realizedPnL:input.realizedPnl, deposit:input.deposit, withdrawal:input.withdrawal} : row;
-      const read = field => hasData && (!isLegacy||entered) && resolved.source !== 'conflict' && !observed.conflict ? numeric(adoptedRow[field]) : null;
+      const read = field => hasData && (!isLegacy||entered) && resolved.source !== 'conflict' && (!observed.conflict||balanceOnly) ? numeric(adoptedRow[field]) : null;
       const explicitAsset=resolved.sourceAdoptions?.some(v=>v.currency==='JPY'&&['marketValue','cashBalance','holdings'].includes(v.metric));
-      const partial = hasData && (!complete||explicitAsset&&observed.components.some(c=>numeric(c.asset)===null));
+      const partial = hasData && (!complete||explicitAsset&&observed.components.some(c=>numeric(c.asset)===null)||balanceOnly&&observed.conflict);
       const asset = complete && !explicitAsset ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
       const unrealized = complete || resolved.source === 'legacy' || resolved.sourceAdoptions?.length&&numeric(resolved.unrealizedPnl)!==null ? read('unrealizedPnL')
         : knownSum(observed.components.map(item => item.unrealized));
       return { key, targetMonth, sourceMonth: targetMonth, hasData, complete, partial,
-        conflict: resolved.source === 'conflict' || observed.conflict, components: observed.components,
+        conflict: resolved.source === 'conflict' || observed.conflict&&!balanceOnly, ...(balanceOnly?{assetConflict:observed.conflict}:{}), components: observed.components,
         realized: read('realizedPnL'), swap: read('swapPnL'), unrealized,
         deposit: read('deposit'), withdrawal: read('withdrawal'), asset,
         confirmed: complete ? calculator.confirmed(year, month, key) : null,
@@ -153,7 +154,8 @@
         let latest = null;
         for (let m = baseline || 0; m > 0; m--) {
           const row = accountMonth(year, m, account);
-          if (row.complete && !row.conflict && Number.isFinite(row.asset) && Number.isFinite(row.confirmed)) { latest = row; break; }
+          const periodAsset=account.key==='sbivc'&&row.assetBasis==='source-observation'?row.ledgerAsset:row.asset;
+          if (row.complete && !row.conflict && Number.isFinite(periodAsset) && Number.isFinite(row.confirmed)) { latest = row; break; }
         }
         // A current partial observation must not borrow any previous asset component.
         const assetRow = current?.hasData ? current : latest;

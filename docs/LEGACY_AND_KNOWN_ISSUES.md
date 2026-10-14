@@ -1,5 +1,14 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — SBI VC最小採用UI（v305）
+
+保有集合／JPYの既存候補を確認・採用・比較・継続・保留するUIを接続済み。下記v304の「本格採用UIは後続」は、今回の2component以外、独立manual source作成、最終デザイン、他broker UIを指す。旧source・履歴を残し、訂正候補の追加だけでcommon採用を切替えない。原値比較と補正後採用値は別表示。
+
+保有集合comparisonは固定v14の原値一致判定で、小数表記差も差として残す。数値／表記正規化による比較契約拡張は今回行わない。旧補正フォームは同じ原sourceの修正だけ再利用し、別manual／別revisionの編集は引き続き後続。quick deposit／internal transfer／crypto transfer／staking／fee／売り／レバレッジ／損益・原価は未接続。
+
+computer-useのbrowser一覧が空のため390px／1280px実表示と実ブラウザConsoleは未実施。匿名DOM検証とは区別する。本番Storage・実データ・実Backupは操作しない。
+
+
 ## Current / Known limitation — SBI VC共通残高接続（v304）
 
 現物保有集合／JPY現金の共通resolver、PDF保存のatomic参照candidate hook、旧採用／v4補正のcompatibilityを接続済み。既存データbulk migrationなし、空集合を正式sourceとして扱う。Backup v14の公開契約を変更しない。以下v303の「broker hook未接続」はSBI VC残高に限り本節へ更新し、他broker／本格採用UIは引き続き後続。

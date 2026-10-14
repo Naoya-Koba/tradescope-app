@@ -1,5 +1,12 @@
 # Data Model
 
+## Current / Decided — SBI VC残高の最小採用UI（PWA v305）
+
+月次Input内の「入力元・採用を確認」でspot holding setとJPY cashBalanceだけを操作する。`sbivc-source-selection.js`は共通candidate／balance resolver／monthly-source-serviceを接続する非永続controller、`sbivc-source-ui.js`は表示と確認Draftだけを担当する。候補一覧の訂正前revisionは監査・明示選択用で、通常保有へ混ぜない。原金融値や旧Input履歴を複製・破壊しない。
+
+source選択、継続、comparison、deferは保存前確認＋fingerprint guard付きの既存v14操作。旧互換採用の継続／deferはユーザーの明示確認時だけ同じ物理revisionと補正を共通判断へ結び、別revisionへoverrideを継承しない。一致確認は原値比較で採用を変更しない。新record／field／key／migrationなし。
+
+
 ## Current / Decided — SBI VC共通残高採用（PWA v304）
 
 `sbivc-balance-adoption.js`を現物保有集合／JPY現金の唯一の採用入口とする。共通判断があるcomponentはmonthlySourcesの指定revision／overrideを解決し、ないcomponentだけMonthlyAccountInput v3/v4＋observation-adoptionをcompatibility adapterとして読む。明示deferで前判断なし、stale、競合を旧Inputへ戻さない。原値はBatchのholding scope／AccountSnapshot.cashBalanceへの参照のみ。空Holding集合は既存Batch＋同scope AccountSnapshotで正式観測でき、架空HoldingやInstrumentを作らない。保有集合と現金のsource month／参照を別々に保持する。帳票assetValueはreportedAssetTotal候補のみで資産合成へ加算しない。

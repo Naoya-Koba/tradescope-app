@@ -2235,3 +2235,11 @@ body.drawer-open {
 .observation-values dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .observation-holding { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; font-size: 13px; }
 .observation-edit-input { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+.sbivc-source-panel { margin-top: 16px; min-width: 0; font-size: 13px; }
+.sbivc-source-panel summary { padding: 10px 0; cursor: pointer; overflow-wrap: anywhere; }
+.sbivc-source-component { border-top: 1px solid var(--border); padding: 12px 0; min-width: 0; }
+.sbivc-source-component h4 { margin: 8px 0; }
+.sbivc-source-candidate { padding: 4px 0; }
+.sbivc-source-panel p, .sbivc-source-code { overflow-wrap: anywhere; }
+.sbivc-source-review { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.sbivc-source-panel button { min-height: 44px; max-width: 100%; white-space: normal; text-align: left; }
