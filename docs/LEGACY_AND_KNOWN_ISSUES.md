@@ -2,7 +2,7 @@
 
 ## Current / Known limitation — 最小source / adoption基盤
 
-現行はPWA v302。部分Inputに対するmetric単位の新採用でも既存既知値を保持する互換補完を追加し、既存Input／Snapshot／Stateは不変。以下v301は基盤追加時点の記録で、schema／Backupは同じv14のまま。
+現行はPWA v303。部分Inputのmetric単位採用で既存既知値を保持し、新採用のledger額は月途中でも年初基準が不明なら停止する。既存Input／Snapshot／State、新契約なしのlegacyは不変。以下v301は基盤追加時点の記録で、schema／Backupは同じv14のまま。
 
 Backup v14／PWA v301で共通のsource revision・adoption・override・comparisonを永続化。PDF／CSV／manualは対等、公式自動優先なし。候補追加だけでは採用を変えず、複数sourceを加算しない。既存State／Inputの明示採用は互換維持し、2026年1〜8月をbulk migrationしない。legacyの入力日時やplaceholder zeroを推測確認しない。登録済み原金融事実は不変、訂正は新revision・新物理source。旧overrideは非継承。
 

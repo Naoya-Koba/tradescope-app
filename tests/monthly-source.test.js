@@ -105,8 +105,10 @@ test('one manual flow does not confirm unrelated legacy auto-created zeros',()=>
  const row=view(h).accountMonth(2026,9,h.f.accounts[0]);assert.equal(row.realized,10);assert.equal(row.swap,null);assert.equal(row.deposit,null);assert.equal(row.unrealized,null);assert.equal(row.complete,false);
 });
 test('new missing initial basis cannot manufacture a complete ledger from zero',()=>{
- const h=setup({canonical:false});h.s.data.set('yearInitialFunds','{}');const items=Object.entries({realizedPnl:'0',swapPnl:'0',deposit:'0',withdrawal:'0',unrealizedPnl:'0'}).map(([k,v])=>manual(k,v,k,{targetMonth:'2027-01',asOf:'2027-01-31'}));run(h,{sources:items,adoptions:items.map(r=>({revisionId:r.id}))});
- assert.equal(view(h).accountMonth(2027,1,h.f.accounts[0]).confirmed,null);
+ for(const [targetMonth,asOf,year,number]of [['2027-01','2027-01-31',2027,1],['2026-09','2026-09-30',2026,9]]){
+  const h=setup({canonical:false});h.s.data.set('yearInitialFunds','{}');const items=Object.entries({realizedPnl:'0',swapPnl:'0',deposit:'0',withdrawal:'0',unrealizedPnl:'0'}).map(([k,v])=>manual(k,v,k,{targetMonth,asOf}));run(h,{sources:items,adoptions:items.map(r=>({revisionId:r.id}))});
+  assert.equal(view(h).accountMonth(year,number,h.f.accounts[0]).confirmed,null);
+ }
 });
 test('registered canonical source anchors cannot be overwritten via Repository',()=>{
  const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);const s=h.api.inspect().models.accountSnapshots;s.records[0].cashBalance='150';const before=h.s.snapshot();assert.throws(()=>model.createRepository(h.s).commit({accountSnapshots:s}));assert.equal(h.s.snapshot(),before);

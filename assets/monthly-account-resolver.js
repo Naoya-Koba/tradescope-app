@@ -5,7 +5,7 @@
   const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
-  const sourceAdapterVersion='monthly-source-adapter-v2';
+  const sourceAdapterVersion='monthly-source-adapter-v3';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
@@ -228,7 +228,7 @@
       const start=Math.min(Number(year)===cutoverYear?cutoverMonth:1,...explicitMonths(year,key));
       let value = start>1 ? legacy.calculateAccountConfirmedAssets(tradingData, initialFunds, year, start - 1, key)
         : Number(initialFunds?.[year]?.[key]) || 0;
-      if(explicitMonths(year,key).length&&(!Number.isFinite(value)||start===1&&number(initialFunds?.[year]?.[key])===null))return null;
+      if(explicitMonths(year,key).length&&(!Number.isFinite(value)||number(initialFunds?.[year]?.[key])===null))return null;
       for (let m = start; m <= month; m++) {
         const resolved = read(year, m, key);
         if(resolved.source==='legacy'){

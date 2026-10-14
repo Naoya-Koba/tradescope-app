@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradescope-static-v302';
+const CACHE_NAME = 'tradescope-static-v303';
 const CORE_ASSETS = [
   "./assets/monthly-source-contract.js?v=20261014-2",
   "./assets/monthly-source-service.js?v=20261014-2",
@@ -61,7 +61,7 @@ const CORE_ASSETS = [
   "./profit/soneki.js?v=20261014-1",
   "./assets/sbi-input-draft.js?v=20261014-1",
   "./assets/profit-metrics.js?v=20261011-3",
-  "./assets/monthly-account-resolver.js?v=20261014-3",
+  "./assets/monthly-account-resolver.js?v=20261014-4",
   "./assets/monthly-display-view.js?v=20261014-3",
   "./assets/sbi-monthly-save.js?v=20261011-2",
   "./assets/gmo-monthly-save.js?v=20261011-1",

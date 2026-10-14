@@ -1,6 +1,6 @@
 # Development Guide
 
-## Current — 共通source / adoption（PWA v302）
+## Current — 共通source / adoption（PWA v303）
 
 monthly-source-contract.jsはDOM／Storage／network非依存のvalidator、SHA-256、candidate／legacy adapter、採用／補正resolver、comparison、audit、進捗metadataを提供する。source種類で採用・carry順位を作らない。monthly-source-service.jsの明示注入Adapterをinspect→operateで使用し、inspect.fingerprintを必須guardとして全model＋legacy正本を保存直前に照合する。stale時は保存停止し呼出元Draftを変更しない。
 
@@ -11,6 +11,8 @@ operateのsources／overrides／adoptions／comparisonsと必要な標準Account
 本格比較／採用Input UI、broker保存接続、完了承認は後続。mutatable Input／Stateの原値を新sourceへ登録した場合も以後その参照原値は上書き不可。後続の訂正は新物理source／独立manual revisionで実装する。暗号資産取引・cashflow／Riskへ今回新契約を広げない。
 
 部分Inputに新しいmetricだけを採用する場合、Traders v2の既知adoptedValuesとSBI v1の既知月次入力を互換adapterで保持する。元Input／Snapshot／Stateは更新しない。source-adapter versionをfingerprintへ含め、PWA v302、resolver／monthly-display query 20261014-3へ同期。上記v301は基盤追加時の記録。
+
+現行v303ではsource adapter v3／resolver query 20261014-4とし、新採用のledger計算で年初基準が不明なら1月だけでなく月途中も停止する。既知flowを消さず、旧legacyには非波及。上記v302は部分Input互換追加時の記録。Backupはv14のまま。
 
 今回の検証：追加102件／全1237 tests Pass。JS構文115ファイル、precache 73資産・HTML URL整合、git diff --check、匿名localhostのv14往復／cleanupを確認。computer-use browserが利用できず390px／1280px実表示・実ブラウザConsoleは未実施（module初期化テストとは区別する）。本番Storage・実データ・実Backupは未操作。
 
