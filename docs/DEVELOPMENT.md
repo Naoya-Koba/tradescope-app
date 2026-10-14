@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — Traders parser-only検証（v311）
+
+parserの既存scalar出力と非永続`parseExecutions`を分離する。新規requiredは文字列注文ID・日時・pair・action・side・原数量・価格、closeには原新規注文参照も要求する。任意blankはnull。decimal helperは小数文字列の正規化比較で、binary浮動小数の価格計算にしない。非ゼロfeeの表記は保持するが、既存scalar保存の未対応guardは維持する。
+
+PWA v311、parser query 20261014-12、Backup v14／Storage key／validator公開契約不変。匿名fixtureは公開レイアウトとinvented values／巨大synthetic IDsのみ。既存fixtureは取引identity欄を補足したが金融集計原値は変更していない。実PDFはメモリ内read-only、原PDF・PII・実注文番号・抽出全文をfixture／ログ／Gitへ残さない。UI／transaction consumer変更なし。production Storage・実Backupは検証に使用しない。
+
+検証：追加75件／全1795 tests Pass。JS／MJS 137ファイル＋inline 3件、precache 83資産、HTML local参照179件、diff-check Pass。実LIGHTの新規月／決済月、みんなの新規・決済混在月と旧8月／9月の計5冊をread-only確認し、全冊parse valid、旧HEADとのscalar出力形／金融原値／warnings一致を確認。みんな混在月のswap不一致は正規化APIだけに診断を保持する。匿名Memoryで既存scalar保存／Backup v14往復にexecution・auditが混入しないことを確認。production Storage・実Backup未操作。UI変更なしのため新しいブラウザ／Console検証は未実施。実PDFのコピー・一時ファイルは作成していない。
+
 ## Current — みんなのFX scalar横展開（v310）
 
 既存LIGHT facadeをbroker設定で共用する。公開LIGHT APIは互換のまま、monthly resolverは共通tradersScalarsを返す。traders-saveの候補計画・guard・atomic commit、traders-monthly-uiの既存scalar-source-selection／scalar-source-uiをみんなへ再利用し、provider固有の独自adoptionを作らない。入力元操作でもdirty flow Draftを保持し、古いguardでの保存は停止する。訂正previewは候補追加であり採用切替ではないと表示する。

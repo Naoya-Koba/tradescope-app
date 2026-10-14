@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current / Decided — Traders execution auditの境界（v311）
+
+parser-onlyのauditはclose realized／transactionSwap／fee合計と受渡日別集計を小数文字列のexact比較で照合する。matched／mismatch／incomplete／no-close／unavailableを区別し、blankを0へ補完しない。新規と月末positionは注文参照・pair・side・数量・価格・日時で照合するだけで、positionを生成しない。
+
+transaction swap、settlement aggregate swap、calendar swapは別概念。みんなの確認PDFでは決済行swapと受渡集計swapが異なり、両原値・mismatch診断を保持する。差額の発生理由／イベント区分は推測しない。診断はparseExecutions側だけの警告で、既存scalar warnings／金融値・common adoption・calendar・period計算・Top／Allocationには新しい値や補正を流さない。既存ledger由来realized／入出金／settled swapの計算意味は不変。
+
 ## Current / Decided — みんなのFX scalarの単一入口（v310）
 
 LIGHTとみんなは同じbroker設定付きscalar facade → monthly-account-resolver → monthly-display／display-results／current-asset-viewを使用する。画面別source優先順位は作らず、採用価格評価損益を一度だけ期間計算へ渡す。common判断なしは旧Input／State互換、stale／conflict／参照破損は旧値へsilent fallbackしない。

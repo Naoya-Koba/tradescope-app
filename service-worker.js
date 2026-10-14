@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradescope-static-v310';
+const CACHE_NAME = 'tradescope-static-v311';
 const CORE_ASSETS = [
   "./assets/monthly-required-policy.js?v=20261014-8",
   "./assets/monthly-progress-view.js?v=20261014-11",
@@ -34,7 +34,7 @@ const CORE_ASSETS = [
   "./assets/observation-override-save.js?v=20261014-5",
   "./assets/observation-input-ui.js?v=20261014-6",
   "./import/pdf-viewer.css?v=20261012-10",
-  "./import/traders-parser.js?v=20261012-1",
+  "./import/traders-parser.js?v=20261014-12",
   "./import/traders-save.js?v=20261014-11",
   "./import/traders-preview.js?v=20261014-11",
   "./assets/traders-monthly-ui.js?v=20261014-11",

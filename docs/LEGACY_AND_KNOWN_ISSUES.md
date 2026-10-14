@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — Traders実約定parser-only（v311）
+
+LIGHTの新規8行／決済10行、みんなの新規3行／決済4行をread-only実PDFで確認し、共通execution正規化を追加。LIGHT新規8行・みんな新規3行は公式月末建玉と全件照合。LIGHTの決済realized／swap／fee合計は受渡集計と一致。みんなのrealized／feeは一致、transaction swapは帳票行の明示0と受渡集計の非0が一致しない。数値欄の読み取りを再確認済みで、差を勝手に補正・calendar化せず警告を保持する。追加swapの発生理由は未確定。
+
+新規行の空欄金融値と建玉なし維持率dash、小数同値比較を修正。今回の実例は新規買・決済売、同一新規注文への複数決済。新規売／決済買や同一決済注文のmultiple fillsはsynthetic検証のみ、非ゼロfee符号も実未検証。完全決済状態や元新規数量を推定しない。別ページにまたがる一つの論理行や未確認帳票形式は追加確認対象。維持率nullを既存保存schemaへ拡張する工程ではなく、保存guardは従来契約を維持する。正式取引保存／History／position-set／Portfolio／Open Positions／Risk移行は非接続で、FX transaction vNext／Backup v15候補は次工程。以下旧版の実約定未確認記述は当時の検証範囲。
+
 ## Current / Known limitation — みんなのFX scalar接続（v310）
 
 account scalar候補・共通採用resolver・既存UI・atomic hookをLIGHTと同じ実装で接続済み。旧account／spotの重複adoptionは履歴を保持してconflictで停止し、専用解消UI／自動削除・migrationは追加しない。みんなの訂正版もcandidate-onlyとなり、旧Input／State・flow／calendarは維持する。v309の「みんなはnativeのみ」「LIGHTに限り候補追加」は当時の記録であり、現在は両broker同じ契約。

@@ -1,5 +1,11 @@
 # Data Model
 
+## Current / Decided — Traders約定の非永続正規化（v311）
+
+`traders-parser.parseExecutions(extracted, expectedBroker)`はLIGHT／みんな共通のread-only API。executionsはsourcePage／sourceRow、sourceOrderId／sourceOpenOrderRef、executionAt／settlementDate、pair、action=open/close、side=buy/sell、quantity／quantityUnit=baseCurrencyUnits、executionPrice、realizedPnl／transactionSwap／fee、note／noteStateを持つ。注文identityはstring、数量・価格はdecimal原値でLotへ変換しない。blank／dashはnull、明示0は0。closeの原新規注文参照は必須だが、任意損益・fee・受渡日を過剰requiredにしない。同じ新規参照／決済注文番号の複数rowを上書き・一意制約で排除しない。
+
+既存scalar `parse()`の出力形・importerVersionは維持し、execution collection／auditは保存hookへ渡さない。原positionは独立観測で、約定から生成しない。自由備考はPII対策として転記せず、既知の公開金融ラベルだけ保持する。建玉・建玉／注文必要証拠金なしで明示dashの維持率はparser上null／notApplicable。既存永続Snapshot契約は拡張せず、このnullを0として保存しない。正式transaction保存・History接続は未実装。FX transaction vNext／独立transaction採用／Backup v15は別途設計承認が必要。
+
 ## Current / Decided — みんなのFX scalar共通採用（v310）
 
 みんなのFXもaccount／marketValue（Snapshot.netAssetValue）とaccount／unrealizedPnl（価格評価損益、未決済swap除外）の2metricを正式scopeとする。`lightfx-scalar-adoption.js`の`forBroker(key)`は同じ実装で口座／provider／scopeを分離し、LIGHT既存APIとv309結果を維持する。みんなはminano／acc_minna_fx／minna／minna-monthly-report。Snapshot原値は参照のみでmonthlySourcesへ複製しない。
