@@ -1,5 +1,15 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — 表示・再読込・月次詳細の整合
+
+損益管理のcanonical-only監視を修正し、legacy月次・年初資金・年初評価損益・関連旧キーもstorage／BFCache復帰で再評価する。編集Draftとlive Inputを保持し、表示だけで正本を変更しない。Topと年間Summaryの同義期間KPI／年間flowは共通display-resultsを参照する。Top swapの独立集計は除去した。年間純資産の部分額と直近完全額で増減／率を計算する不整合はbasis gateで「—」にする。年初sourceが未確認でも0寄与による見かけの比較を許可しない。
+
+月次詳細は全未入力月も設定済み6口座を表示する。missing／競合／取得失敗は「—」、明示0は「0円」。安全な開設月がないため開設前除外は推測せず、行statusを保持する。8月legacyをmigrationせず、9月sourceやcurrent carryを過去月へ渡さない。
+
+**Known limitation**：現在月に編集がある外部更新では、Draft保護のためInput grid全体を保持する。Summaryは新正本へ更新するが、入力欄の再同期は編集完了／明示画面操作後となる。Top現在残高とAnnual期間集計は別basisで、数値一致を要求しない。既存legacyの年初保存・建玉空欄・crypto集計等の`Number(...) || 0`と欠損flowの旧寄与は今回全面変更しない。既存の同月観測採用・手入力を含む永続source統一、月全体の完了承認は次工程。以前の「同一年・同一指標の共通化」は同義・同時点の期間結果に限り、current carryまで共用する意味ではない。
+
+匿名DOM／read-only Storage検証と自動回帰を実施する。computer-use browserが利用できず、今回の390px／1280px実表示と実ブラウザConsoleは未確認。UI再検証のために実データを投入しない。PWA v300、Backup v13、永続契約変更なし。
+
 ## Current / Known limitation — 未確認残高の一時表示
 
 Top純資産／Allocationに非永続の残高状態を導入。SBIの国内／外国／現金は独立した確認月付きで直近確認値を使用でき、部分観測も直近完全月に捨てられない。SBI VCは採用保有集合を維持し0／不明数量／終了・訂正前保有を復活させない。残高のcomplete／partial／過去値使用／unknownを保持し、期間損益・確定資産・Annual Summary・過去Trend・Riskへ流さない。

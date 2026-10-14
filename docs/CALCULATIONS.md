@@ -1,5 +1,15 @@
 # Calculation Specification
 
+## Current / Decided — 同義指標と期間比較の表示契約
+
+`assets/display-results.js`はmonthly-displayのdashboard／yearlyTotals／monthlyPnlを読み、その共通結果をTopと損益管理へ渡す。net／confirmed／netPnl／confirmedPnlと年間realized／swap／deposit／withdrawalを画面側で再計算しない。Top swap内訳・累計・既存推定も同じ結果から生成する。計算式・正本・canonical resolverのcomplete／missing／conflictは変更しない。
+
+Top現在純資産のcurrent balanceと、年間サマリー純資産（月次集計）は別指標。前者のcarryは後者・月次詳細・Annual期間損益・Performance Trend・過去Asset Trend・Risk・確定資産ledgerへ流さない。月次詳細は選択月の共通結果だけを使用し、6口座のmissing／conflict／読込失敗行は数値nullで保持する。既知項目のみの既存暫定合計を維持し、全未入力合計はnull、明示0だけを0表示する。
+
+年間純資産カードの比較可否は`display-results.periodComparison`が判定する。全口座でnet／completeNetが有限・完全・非conflict、同年・同sourceMonth・同period-ledger basisである場合のみ、既存年初比delta／growthを表示する。別basisの金額が偶然一致しても不可。partial／unknown／別月なら両方null、initialNetが不明なら比較不可、0以下ならgrowthのみnull。この適格性判定はTop用current比較を流用せず、期間カードの責務として分離する。金額を比較基準に合わせて変更せず、観測との差を利益・損失へ逆算しない。
+
+2026年1〜8月の6口座legacy計算は維持する。9月canonical／current carryから過去月へfallbackしない。同じ過去月の観測を正式採用する一般契約は次のsource／adoption基盤で整理する。下記の従来Annual指標維持とは期間式の維持であり、本節の比較不能時の「—」表示を優先する。
+
 ## Current / Decided — 現在残高の確認月と一時利用
 
 Top純資産／Asset Allocationだけは採用済み残高を非永続`balance-view`で解決する。当月未確認なら選択年内の直近確認値を一時表示できるが当月正本へコピーしない。componentのvalue／sourceMonth／snapshotAsOf／出所／currentConfirmed／carried／missing／explicitZeroを保持する。明示0は旧positiveへのfallbackを止め、競合・曖昧な採用は停止する。入力元の種類で優先順位を決めず、既存adoption policyが選んだ観測だけを共通処理へ渡す。

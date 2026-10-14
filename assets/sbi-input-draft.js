@@ -58,6 +58,7 @@
       read: month => ({ ...(months.get(month) || {}) }),
       initialize: (month, values) => { if (!months.has(month)) months.set(month, { ...values }); },
       clearMonth: month => months.delete(month),
+      retain: predicate => { for(const month of months.keys())if(!predicate(month))months.delete(month); },
       set: (month, field, value) => {
         if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !fields.includes(field)) throw new Error('Draft項目が不正です');
         months.set(month, { ...(months.get(month) || {}), [field]: String(value ?? '') });

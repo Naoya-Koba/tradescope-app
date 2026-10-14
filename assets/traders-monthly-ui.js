@@ -21,7 +21,7 @@
    if(!prepared){error.textContent='この月の月次PDFを取り込んでください';const link=node('a','データ取込');link.href='../import.html';body.append(link);}
    actions.append(save);body.append(reset,actions,error);refresh();return card;
   }
-  return Object.freeze({renderCard});
+  return Object.freeze({renderCard,retainDrafts:predicate=>{for(const token of drafts.keys())if(!predicate(token.slice(0,-7),token.slice(-7)))drafts.delete(token);}});
  }
  root.TradeScopeTradersMonthlyUI=Object.freeze({createController});
 })(typeof globalThis!=='undefined'?globalThis:this);

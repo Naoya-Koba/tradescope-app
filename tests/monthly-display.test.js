@@ -134,7 +134,7 @@ test('partial P/L keeps known realized even when swap is missing',()=>{
 });
 test('display source code keeps all Summary and trend consumers on the shared projection',()=>{
  const top=fs.readFileSync(require.resolve('../top/script.js'),'utf8'),profit=fs.readFileSync(require.resolve('../profit/soneki.js'),'utf8');
- assert.match(top,/currentAssetView\.netPeriodComparison\.growth/);assert.match(profit,/summary\.netGrowth/);
+ assert.match(top,/currentAssetView\.netPeriodComparison\.growth/);assert.match(profit,/result\.netComparison\.growth/);
  assert.match(fs.readFileSync(require.resolve('../assets/current-asset-view.js'),'utf8'),/Number\.isFinite\(dashboard\.netGrowth\)\?dashboard\.netGrowth:null/);
  assert.match(top,/linkedDisplay\(\)\.series\(year\)/);assert.match(profit,/display\.dashboard\(currentYear, m, targetAccounts\)/);
  assert.match(profit,/monthlyDisplayView\(\)\.yearlyTotals/);

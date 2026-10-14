@@ -4,7 +4,7 @@
   const storage=node?require('./data-model-storage.js'):root.TradeScopeDataStorage;
   const adoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
   const save=node?require('./observation-override-save.js'):root.TradeScopeObservationOverrideSave;
-  function render({document,adapter,accountId,targetMonth,displayName,accountKey='sbivc',color}){
+  function render({document,adapter,accountId,targetMonth,displayName,accountKey='sbivc',color,onSaved=()=>{},onCancel=()=>{}}){
     let models;try{models=storage.createRepository(adapter).read();}catch(_){
       const error=document.createElement('div');error.className='account-card';error.textContent='保存された資産・保有情報を確認できませんでした';return error;
     }
@@ -58,14 +58,14 @@
         for(const b of[reset,cancel,submit])b.type='button';
         reset.addEventListener('click',()=>{if(busy)return;for(const f of adoption.accountFields)accountControls[f].value=view.source[f]??'';
           for(const h of holdingControls){const original=view.holdings.find(r=>r.holdingSnapshotId===h.holdingSnapshotId);for(const f of adoption.holdingFields)h.values[f].value=original.source[f]??'';}error.hidden=true;resize();});
-        cancel.addEventListener('click',()=>{if(busy)return;editing=false;draw();});
+        cancel.addEventListener('click',()=>{if(busy)return;editing=false;draw();onCancel();});
         submit.addEventListener('click',()=>{
           if(busy)return;busy=true;for(const c of[...controls,reset,cancel,submit])c.disabled=true;
           try{
             const draft={accountId,targetMonth,account:Object.fromEntries(adoption.accountFields.map(f=>[f,accountControls[f].value])),
               holdings:holdingControls.map(h=>({holdingSnapshotId:h.holdingSnapshotId,instrumentId:h.instrumentId,values:Object.fromEntries(adoption.holdingFields.map(f=>[f,h.values[f].value]))}))};
             const result=service.save(draft,{expectedModels:models});
-            if(['saved','unchanged'].includes(result.status)){models=result.models;view=adoption.resolve(models,accountId,targetMonth);editing=false;draw();}
+            if(['saved','unchanged'].includes(result.status)){models=result.models;view=adoption.resolve(models,accountId,targetMonth);editing=false;draw();onSaved();}
           }catch(_){error.textContent='保存できませんでした。入力値と保存情報を確認してください';error.hidden=false;}
           finally{busy=false;for(const c of[...controls,reset,cancel,submit])c.disabled=false;resize();}
         });

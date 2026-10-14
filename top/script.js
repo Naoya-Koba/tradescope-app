@@ -901,14 +901,18 @@ function linkedDisplay(tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING)
   return window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData,
     parseStoredJson(PROFIT_STORAGE_KEY_INITIAL), parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models, LINKED_ACCOUNTS);
 }
-function buildLatestDashboard(year) { return linkedDisplay().dashboard(year); }
-let latestDashboard = buildLatestDashboard(topSeries.year);
-function buildCurrentAssetView(year, dashboard) {
-  let models = null;
-  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
-  return window.TradeScopeCurrentAssets.create(dashboard, models, year, { balanceHistory: linkedDisplay().balanceHistory });
+function buildSharedResults(year) {
+  const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  const display=window.TradeScopeMonthlyDisplay.create(profitMetrics,fresh.tradingData,fresh.yearInitialFunds,fresh.yearInitialUnrealized,fresh.models,LINKED_ACCOUNTS);
+  return window.TradeScopeDisplayResults.create(display, year, {
+    readFailed:fresh.failed,
+    initialSources:{funds:fresh.yearInitialFunds,unrealized:fresh.yearInitialUnrealized},
+    currentFactory: dashboard => window.TradeScopeCurrentAssets.create(dashboard,fresh.failed?null:fresh.models,year,fresh.failed?{}:{balanceHistory:display.balanceHistory})
+  });
 }
-let currentAssetView = buildCurrentAssetView(topSeries.year, latestDashboard);
+let latestResults = buildSharedResults(topSeries.year);
+let latestDashboard = latestResults.period;
+let currentAssetView = latestResults.current;
 
 // ===== Portfolio Data =====
 let accountData = currentAssetView.accountData;
@@ -1020,6 +1024,7 @@ function updateKPIs() {
   ].map((id) => document.getElementById(id)).filter(Boolean);
   const elTotal = document.getElementById('kpiTotal');
   elTotal.textContent = Number.isFinite(currentAssetView.net.value) ? fmtJPY(currentAssetView.net.value) : '—';
+  elTotal.dataset && (elTotal.dataset.basis='current-balance');
 
   if (!latestDashboard.hasData) {
     summaryElements.forEach((el) => {
@@ -1106,62 +1111,9 @@ function updateKPIs() {
 updateKPIs();
 
 // ===== Swap =====
-function buildMonthlySwapBreakdown(tradingData, year, month) {
-  const yearData = tradingData?.[year] || tradingData?.[String(year)] || {};
-  const monthData = yearData?.[month] || yearData?.[String(month)] || {};
-
-  return LINKED_ACCOUNTS.map((account) => {
-    const row = linkedCalculator(tradingData).row(year, month, account.key);
-    return {
-      name: account.name,
-      value: readStoredNumber(row, 'swapPnL')
-    };
-  }).filter((item) => Number.isFinite(item.value));
-}
-
 function buildSwapSummary(selectedYear = null) {
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const years = getNumericYears(tradingData);
-  const targetYear = selectedYear || topSeries?.year || years[years.length - 1] || TOP_BASE_YEAR;
-  const yearData = tradingData?.[targetYear] || tradingData?.[String(targetYear)] || {};
-
-  const enteredMonths = [];
-  for (let month = 1; month <= 12; month += 1) {
-    if (Number.isFinite(calculateLinkedMonthlyTotals(tradingData, targetYear, month).swap)) enteredMonths.push(month);
-  }
-
-  if (!enteredMonths.length) {
-    return {
-      prevMonth: null,
-      prevMonthSwap: 0,
-      prevMonthBreakdown: [],
-      cumulativeSwap: 0,
-      enteredMonthCount: 0,
-      estimatedYearSwap: 0
-    };
-  }
-
-  const cumulativeSwap = enteredMonths.reduce((sum, month) => {
-    return sum + calculateLinkedMonthlyTotals(tradingData, targetYear, month).swap;
-  }, 0);
-
-  const enteredMonthCount = enteredMonths.length;
-  const averageMonthlySwap = cumulativeSwap / enteredMonthCount;
-  const remainingMonths = Math.max(0, 12 - enteredMonthCount);
-  const estimatedYearSwap = cumulativeSwap + (averageMonthlySwap * remainingMonths);
-
-  const prevMonth = enteredMonths[enteredMonths.length - 1];
-  const prevMonthBreakdown = buildMonthlySwapBreakdown(tradingData, targetYear, prevMonth);
-  const prevMonthSwap = prevMonthBreakdown.reduce((sum, item) => sum + item.value, 0);
-
-  return {
-    prevMonth,
-    prevMonthSwap,
-    prevMonthBreakdown,
-    cumulativeSwap,
-    enteredMonthCount,
-    estimatedYearSwap
-  };
+  const year=selectedYear || topSeries.year;
+  return (latestResults.year===year?latestResults:buildSharedResults(year)).swap;
 }
 
 function updateSwap() {
@@ -1185,17 +1137,17 @@ function updateSwap() {
   }
 
   if (prevMonthEl) {
-    prevMonthEl.textContent = fmtJPY(swapSummary.prevMonthSwap);
+    prevMonthEl.textContent = Number.isFinite(swapSummary.prevMonthSwap)?fmtJPY(swapSummary.prevMonthSwap):'—';
     setSignClass(prevMonthEl, swapSummary.prevMonthSwap);
   }
 
   if (cumulativeEl) {
-    cumulativeEl.textContent = fmtJPY(swapSummary.cumulativeSwap);
+    cumulativeEl.textContent = Number.isFinite(swapSummary.cumulativeSwap)?fmtJPY(swapSummary.cumulativeSwap):'—';
     setSignClass(cumulativeEl, swapSummary.cumulativeSwap);
   }
 
   if (yearEstimateEl) {
-    yearEstimateEl.textContent = fmtJPY(swapSummary.estimatedYearSwap);
+    yearEstimateEl.textContent = Number.isFinite(swapSummary.estimatedYearSwap)?fmtJPY(swapSummary.estimatedYearSwap):'—';
     setSignClass(yearEstimateEl, swapSummary.estimatedYearSwap);
   }
 
@@ -2513,8 +2465,9 @@ function updateDataByYear(inputYear = null) {
 
   saveSelectedYear(selectedYear);
   topSeries = resolveTopSeriesForYear(selectedYear);
-  latestDashboard = buildLatestDashboard(selectedYear);
-  currentAssetView = buildCurrentAssetView(selectedYear, latestDashboard);
+  latestResults = buildSharedResults(selectedYear);
+  latestDashboard = latestResults.period;
+  currentAssetView = latestResults.current;
 
   updateKPIs();
 

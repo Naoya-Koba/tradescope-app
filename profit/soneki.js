@@ -445,10 +445,13 @@ let tradingData = {}; // { year: { month: { account: { realizedPnL, swapPnL, unr
 let legacyInputData = {}; // Memory-only edits; never passed to whole-page persistence or Summary.
 let yearInitialFunds = {}; // { year: { account: amount } }
 let yearInitialUnrealized = {}; // { year: { account: amount } }
+let displayReadFailed = false;
+const dirtyAccountDrafts = new Set(), dirtyInitialDrafts = new Set();
 const sbiInput = window.TradeScopeSbiInput;
 const sbiInputDrafts = sbiInput.createDrafts();
 const sbiMonthlyUI = window.TradeScopeSbiMonthlyUI.createController({ adapter: localStorage, drafts: sbiInputDrafts,
   legacyData: () => tradingData, onSaved: () => {
+    dirtyAccountDrafts.delete(window.TradeScopeDisplayReadState.token(currentYear,currentMonth,'sbi'));
     refreshMonthlyModels();
     renderAnnualSummary(); renderPerformanceChart(); renderMonthlySection(); renderAccountInputs();
     const body = document.querySelector('[data-account-body="sbi"]');
@@ -460,6 +463,7 @@ const gmoMonthlyUI = window.TradeScopeGmoMonthlyUI.createController({adapter:loc
 const tradersMonthlyUI = window.TradeScopeTradersMonthlyUI.createController({adapter:localStorage,onSaved:refreshAccountAfterSave});
 const legacyMonthlySave = window.TradeScopeLegacyMonthlySave.createService(localStorage);
 function refreshAccountAfterSave(key) {
+  dirtyAccountDrafts.delete(window.TradeScopeDisplayReadState.token(currentYear,currentMonth,key));
   refreshMonthlyModels(); renderAnnualSummary(); renderPerformanceChart(); renderMonthlySection(); renderAccountInputs();
   const body=document.querySelector(`[data-account-body="${key}"]`),toggle=document.querySelector(`[data-account-toggle="${key}"]`);
   body?.classList.add('open');toggle?.classList.add('open');toggle?.setAttribute('aria-expanded','true');
@@ -604,14 +608,32 @@ function saveToStorage() {
 
 function loadFromStorage() {
   sbiInputDrafts.clear();
-  refreshMonthlyModels();
-  tradingData = JSON.parse(localStorage.getItem(STORAGE_KEY_TRADING) || '{}');
+  const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  tradingData = fresh.tradingData; monthlyModels=fresh.models; displayReadFailed=fresh.failed;
   legacyInputData = JSON.parse(JSON.stringify(tradingData));
-  yearInitialFunds = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL) || '{}');
-  yearInitialUnrealized = JSON.parse(localStorage.getItem(STORAGE_KEY_INITIAL_UNREALIZED) || '{}');
+  yearInitialFunds = fresh.yearInitialFunds;
+  yearInitialUnrealized = fresh.yearInitialUnrealized;
+}
+
+function refreshExternalDisplay() {
+  const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  if(!fresh.failed)legacyInputData=window.TradeScopeDisplayReadState.mergeDrafts(legacyInputData,fresh.tradingData,dirtyAccountDrafts);
+  tradingData=fresh.tradingData;yearInitialFunds=fresh.yearInitialFunds;yearInitialUnrealized=fresh.yearInitialUnrealized;
+  monthlyModels=fresh.models;displayReadFailed=fresh.failed;
+  updateYearSelect();renderAnnualSummary();renderPerformanceChart();renderMonthlySection();renderMonthTabs();
+  if(monthlyDetailPane.classList.contains('open'))renderMonthlyDetailPane(currentMonth);
+  // Preserve live controls and their original save guards while any account is editing.
+  const dirty=(key,month)=>dirtyAccountDrafts.has(month+':'+key);
+  sbiInputDrafts.retain(month=>dirty('sbi',month));gmoMonthlyUI.retainDrafts(month=>dirty('gmo',month));tradersMonthlyUI.retainDrafts(dirty);
+  const editing=ACCOUNTS.some(a=>dirty(a.key,inputTargetMonth()));
+  if(!editing){
+    renderAccountInputs();
+  }
+  if(!dirtyInitialDrafts.has(currentYear))renderInitialCapitalForm();
 }
 
 function seedDemoDataIfEmpty() {
+  if (displayReadFailed) return;
   if (localStorage.getItem(STORAGE_KEY_SKIP_DEMO) === '1') return;
   const hasTrading = Object.keys(tradingData || {}).length > 0;
   const hasInitial = Object.keys(yearInitialFunds || {}).length > 0;
@@ -1414,7 +1436,7 @@ function renderPerformanceChart(options = {}) {
   const pnlEmpty = document.getElementById('pnlBarEmpty');
   if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
 
-  if (!hasMonthlyDisplayYear(currentYear)) {
+  if (displayReadFailed || !hasMonthlyDisplayYear(currentYear)) {
     if (renderAssets) {
       if (assetsTrendChart) {
         assetsTrendChart.destroy();
@@ -1844,9 +1866,13 @@ function bindChartViewControls() {
 // ===== UI Updates =====
 function renderAnnualSummary() {
   const warning = document.getElementById('annualMonthlyWarning');
-  if (warning) { warning.textContent = monthlyCalculator().warning(currentYear); warning.hidden = !warning.textContent; }
-  const summary = monthlyDisplayView().dashboard(currentYear);
+  if (warning) { warning.textContent = displayReadFailed?'既存の月次データを確認できません':monthlyCalculator().warning(currentYear); warning.hidden = !warning.textContent; }
+  const result = sharedDisplayResults();
+  const summary = result.period;
   const latestMonth = summary.month;
+  const assetElement = document.getElementById('totalAssets');
+  assetElement.dataset.basis=result.basis;
+  assetElement.title=summary.hasData?summary.rows.map(row=>displayAccountName(row.key)+' '+(row.metrics.net.sourceMonth??'未取得')+(row.metrics.net.status==='current partial'?'・暫定':'')).join('\n'):'';
   if (!summary.hasData || !latestMonth) {
     [
       'yearRealizedSum',
@@ -1874,7 +1900,7 @@ function renderAnnualSummary() {
     return;
   }
 
-  const yearly = calculateYearlyTotals(currentYear);
+  const yearly = result.annual;
   const initialCapital = calculateInitialCapital(currentYear);
   const totalAssets = summary.net.value;
   const confirmedAssets = summary.confirmed.value;
@@ -1893,9 +1919,9 @@ function renderAnnualSummary() {
 
   const yearStartTotal = initialCapital + initialUnrealizedTotal;
   const yearStartConfirmed = initialCapital;
-  const totalAssetsDelta = summary.netDelta;
+  const totalAssetsDelta = result.netComparison.delta;
   const confirmedAssetsDelta = summary.confirmedDelta;
-  const growthRate = summary.netGrowth;
+  const growthRate = result.netComparison.growth;
   const confirmedGrowthRate = summary.confirmedGrowth;
 
   // 純損益/確定損益は投資口座のみ（bankOnly除外）でトップページと定義を一致させる
@@ -1964,7 +1990,7 @@ function renderAnnualSummary() {
 }
 
 function formatOptionalJPY(value) {
-  return Number.isFinite(value) ? fmtJPY(value) : '—';
+  return Number.isFinite(value) ? value===0?'0円':fmtJPY(value) : '—';
 }
 
 function optionalSignStyle(value) {
@@ -1979,8 +2005,10 @@ function monthlyDisplayView() {
   return window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData, yearInitialFunds,
     yearInitialUnrealized, monthlyModels, ACCOUNTS);
 }
+function sharedDisplayResults(){return window.TradeScopeDisplayResults.create(monthlyDisplayView(),currentYear,{readFailed:displayReadFailed,
+  initialSources:{funds:yearInitialFunds,unrealized:yearInitialUnrealized}});}
 function monthlyDisplayTotals(year, month) {
-  const view = monthlyDisplayView().month(year, month);
+  const view = window.TradeScopeDisplayResults.month(monthlyDisplayView(),year,month,{readFailed:displayReadFailed});
   return { ...view, realizedSum: view.realized, swapSum: view.swap, unrealizedSum: view.unrealized,
     depositSum: view.deposit, withdrawSum: view.withdrawal };
 }
@@ -2072,14 +2100,14 @@ function renderMonthlyByAccount(accountKey) {
   }
 
   for (let m = 1; m <= 12; m++) {
-    const view = monthlyDisplayView().accountMonth(currentYear, m, account);
+    const view = window.TradeScopeDisplayResults.month(monthlyDisplayView(),currentYear,m,{readFailed:displayReadFailed}).rows.find(row=>row.key===account.key);
     const { realized, swap, unrealized } = view;
 
     const card = document.createElement('div');
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
     card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized,
-      total: monthlyDisplayView().monthlyPnl(currentYear, m, [account]).total, provisional: view.partial });
+      total: view.total, provisional: view.partial });
 
     card.addEventListener('click', () => {
       selectMonth(m);
@@ -2091,12 +2119,7 @@ function renderMonthlyByAccount(accountKey) {
 
 function renderMonthlyDetailPane(month = currentMonth) {
   const monthly = monthlyDisplayTotals(currentYear, month);
-  const hasData = monthly.hasData;
   monthlyDetailTitle.textContent = `${month}月 詳細${monthly.provisional ? '・暫定' : ''}`;
-  if (!hasData) {
-    monthlyDetailBody.innerHTML = '<p class="data-empty-state">—</p>';
-    return;
-  }
 
   const totalPnL = monthly.total;
   const netCashFlow = Number.isFinite(monthly.depositSum) && Number.isFinite(monthly.withdrawSum)
@@ -2105,11 +2128,10 @@ function renderMonthlyDetailPane(month = currentMonth) {
 
   const accountCards = ACCOUNTS.map(account => {
     const view = monthly.rows.find(row => row.key === account.key);
-    if (!view.hasData) return '';
     const { realized, swap, unrealized, deposit, withdrawal } = view;
     const netAssets = view.asset;
     const hideSwapRow = account.key === 'sbi' || account.key === 'sbivc';
-    const accountTotal = monthlyDisplayView().monthlyPnl(currentYear, month, [account]).total;
+    const accountTotal = view.total;
     const accountCashflow = Number.isFinite(deposit) && Number.isFinite(withdrawal)
       ? deposit - withdrawal
       : null;
@@ -2118,7 +2140,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
       return `
         <div class="detail-account-card detail-account-card-bank">
           <div class="detail-account-head">
-            <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}</span>
+            <span class="detail-account-name" data-month-status="${view.status}"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}</span>
           </div>
           <div class="detail-account-summary">
             <div class="detail-account-summary-label">月末残高</div>
@@ -2144,7 +2166,7 @@ function renderMonthlyDetailPane(month = currentMonth) {
     return `
       <div class="detail-account-card">
         <div class="detail-account-head">
-          <span class="detail-account-name"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}${view.partial ? ' <small>暫定</small>' : ''}</span>
+          <span class="detail-account-name" data-month-status="${view.status}"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}${view.partial ? ' <small>暫定</small>' : ''}</span>
         </div>
         <div class="detail-account-summary">
           <div class="detail-account-summary-label">損益合計</div>
@@ -2345,7 +2367,8 @@ function renderAccountInputs() {
   ACCOUNTS.forEach(account => {
     if(account.key==='sbivc'){
       const observation=window.TradeScopeObservationInputUI.render({document,adapter:window.TradeScopeDataStorage.localStorageAdapter(localStorage),
-        accountId:'acc_sbivc_crypto',targetMonth:inputTargetMonth(),displayName:displayAccountName(account.key),accountKey:account.key,color:account.color});
+        accountId:'acc_sbivc_crypto',targetMonth:inputTargetMonth(),displayName:displayAccountName(account.key),accountKey:account.key,color:account.color,
+        onSaved:()=>refreshAccountAfterSave(account.key),onCancel:()=>refreshAccountAfterSave(account.key)});
       if(observation){container.appendChild(observation);return;}
     }
     if (['lightfx','minano'].includes(account.key) && inputTargetMonth() >= window.TradeScopeMonthlyResolver.policies[account.key].cutover) {
@@ -3043,6 +3066,7 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
   }
 
   saveToStorage();
+  dirtyInitialDrafts.delete(year);
   updateInitialCapitalStatus();
   renderAnnualSummary();
   renderPerformanceChart();
@@ -3310,10 +3334,17 @@ window.addEventListener('load', () => {
 // Returning from import (including the browser back/forward cache) reads new observations.
 // Existing in-memory edit Drafts stay detached; this path never saves or confirms a month.
 window.addEventListener('pageshow', event => {
-  if (event.persisted) { refreshMonthlyModels(); renderAll(); }
+  if (event.persisted) refreshExternalDisplay();
 });
 window.addEventListener('storage', event => {
-  if (event.key === null || Object.values(window.TradeScopeDataStorage.keys).includes(event.key)) {
-    refreshMonthlyModels(); renderAll();
-  }
+  if (window.TradeScopeDisplayReadState.affects(event.key)) refreshExternalDisplay();
 });
+document.getElementById('accountInputGrid').addEventListener('input',event=>{
+  const key=event.target.closest('[data-account-body]')?.dataset.accountBody;
+  if(key)dirtyAccountDrafts.add(window.TradeScopeDisplayReadState.token(currentYear,currentMonth,key));
+},true);
+document.getElementById('accountInputGrid').addEventListener('click',event=>{
+  const key=event.target.closest('[data-account-body]')?.dataset.accountBody;
+  if(key&&event.target.closest('.monthly-source-reset'))dirtyAccountDrafts.add(window.TradeScopeDisplayReadState.token(currentYear,currentMonth,key));
+},true);
+document.querySelector('.initial-capital-outside')?.addEventListener('input',()=>dirtyInitialDrafts.add(currentYear),true);

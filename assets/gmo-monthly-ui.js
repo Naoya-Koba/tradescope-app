@@ -44,7 +44,7 @@
       if(!prepared){error.textContent='この月のGMO月次報告書を取り込んでください';const link=document.createElement('a');link.href='../import.html';link.textContent='データ取込';body.appendChild(link);}
       actions.append(button,status);body.append(reset,actions,error);refresh();return card;
     }
-    return Object.freeze({renderCard});
+    return Object.freeze({renderCard,retainDrafts:predicate=>{for(const month of drafts.keys())if(!predicate(month))drafts.delete(month);}});
   }
   root.TradeScopeGmoMonthlyUI=Object.freeze({createController});
 })(typeof globalThis!=='undefined'?globalThis:this);

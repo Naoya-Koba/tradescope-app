@@ -1,5 +1,17 @@
 # Development Guide
 
+## Current — 共通表示結果と外部変更の再読込
+
+`assets/display-results.js`がperiod dashboard／年間flow／月次表示／比較可否をまとめ、Topと損益管理は同義の主要指標をこの結果から描画する。画面側で同じ金融値を再計算しない。current balanceはoptional factoryで別に生成し、損益管理は呼ばない。年間カードのbasis・口座別sourceMonth・完全性を保持し、比較不能なら増減・率だけ非表示。年初sourceの未入力／null／空欄を旧calculatorの0寄与で隠さず、純資産カード比較を停止する。SMBCの年初評価損益は要求しない。
+
+`assets/display-read-state.js`が読込対象を明示する：tradingData、yearInitialFunds、yearInitialUnrealized、全canonical keys、tradeScopeTradeHistoryV1、tradeScopeSymbolListV1、tradeInfo。storage（clearを含む）とpersisted pageshowで再読込し、Summary／月次／チャートを再描画する。Storage write・全画面reload・デモ投入はしない。不正Storageは未知表示で停止し、初回デモ投入も禁止する。
+
+未保存の口座Draftは口座／月のdirty tokenで従来メモリ値を保持する。外部変更時は正本だけ新しく読み、dirty legacy行を編集用コピーへ残す。cleanなcanonical Draft cacheだけを破棄し、dirty cacheを維持する。現在月に編集があればInput grid全体を再生成しないため、live controlsと保存前の競合検証用sourceを勝手に差し替えない。年初Draftも未保存ならフォームを再描画しない。Summaryは新正本を表示し、Draftを自動保存しない。
+
+`tests/display-consistency.test.js`は匿名read-only Storage、production storage／BFCache handler、月次詳細DOM、比較basis、6口座legacy8月と9月非混入、共通結果の参照identityを検証する。PWA v300、変更資産query 20261014-1、precache 71資産。Backup v13／永続schema／キーは不変。実ブラウザ390px／1280px・Console確認は今回computer-use browserが利用できず未実施（匿名DOM実行とは区別する）。本番Storageは未操作。
+
+**Planned**：正式source／adoption永続基盤は次工程。read-only表示結果に採用判断やmigrationを実装せず、将来同じ採用済み値から共通計算へ接続する。current値と固定月末値の意味差まで同じ数字へ強制しない。
+
 ## Current — 残高projectionの責務分離
 
 `balance-view.js`は採用済み観測配列を受けるDOM／Storage非依存の共通処理。出所種別の優先順位を持たずcomponentごとに当月値／直近確認値／missing／明示0を返す。`monthly-display-view.balanceHistory`は既存adoption policyからSBI内訳／口座一括観測を供給する追加read-only APIで、既存dashboard／series／monthlyPnlを変更しない。`current-asset-view` v3はTopだけでこのAPIを受け同じ口座集合を純資産とAllocationへ配る。crypto保有集合は既存latestObservationを維持し、以前の月の採用値だけを参照候補にする。

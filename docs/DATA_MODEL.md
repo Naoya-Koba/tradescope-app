@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — 非永続の共通表示結果・未入力口座
+
+`display-results`はperiod dashboard、年間flow集計、選択月6口座のView、期間比較可否を保持するメモリ上の表示契約。current balanceは別のoptional Viewで、損益管理の期間結果には入力しない。月次行のstatus（missing／partial／complete／conflict／read-failure）は数値やDOM行の有無とは分離する。missingはnull、明示0は0で、過去値・年初値による穴埋めはしない。Accountに安全な開設月／有効期間契約がないため設定済み6口座を過去月にも行表示し、開設時点を推測しない。
+
+正本再読込はStorage readのみ。未保存編集は従来の画面内Draftのまま保護し、表示更新で保存・破棄・初期化しない。新Storage key・persistent schema・record version・migrationはなく、Backup v13を維持する。source候補と採用判断を永続化する共通基盤は次工程。
+
 ## Current / Decided — 非永続の残高確認状態
 
 `balance-view`のcomponentはvalue（decimal／null）、sourceMonth、snapshotAsOf、source、currentConfirmed、carried、missing、explicitZeroを持つ表示属性。確認月は対象月と区別し、出所と採用判断を分離する。全成分既知／小計のみ／過去確認値あり／不明成分ありを同時に判定できる。旧値は表示対象年内の参照に限りInput／State／Snapshotへ保存しない。新model／Storage key／record schema／Backup変更はなくv13を維持する。
