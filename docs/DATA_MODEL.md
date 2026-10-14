@@ -1,5 +1,20 @@
 # Data Model
 
+## Current / Decided — 最小共通source / adoption（Backup v14）
+
+PDF／CSV／独立manualは対等な正式source候補。公式自動優先・manual格下扱い・複数候補の同時加算をしない。既存canonical原値はコピーせず参照する。新キー `tradeScopeMonthlySourcesV1`（entity monthlySources）を追加し、既存10モデルのrecord schemaは不変。新envelope v1はschemaVersion、records、updatedAt、recordCount、recordsFingerprint（canonical JSONのSHA-256）。履歴欠落、未知field／version、参照不正を拒否する。全recordはappend-only。
+
+- source v1：id（revision ID）、sourceId、revisionOf、accountId、targetMonth、component、metric、temporalType、currency、unit、scope、asOf、sourceType、createdAt、confirmedAt、value、reference、fingerprint。独立manualはdecimal／null／保有集合の原valueを保存。PDF／CSVはvalue=nullで既存AccountSnapshot、Holding集合のImportBatch、原sourceValuesへのallowlist参照を保持する。derived ledger・adoptedValuesを原観測へ昇格しない。金融事実・範囲・date-only基準日・安全なBatch metadataをSHA-256で結び、本文・filename・PIIを保存しない。
+- adoption v1：account×targetMonth×component×metric×currency×unitごとに1つのactive chain。decision=adopt／defer、revisionId、revisionFingerprint、overrideId、previousId、confirmedAtを保持。切替は新record、旧判断は保持。deferは前の有効採用を維持し、採用なしならunresolved。公開済みState／Inputの明示採用は互換adapterで維持する。
+- override v1：revisionId／revisionFingerprint、previousId、value、confirmedAt。特定revisionへ所属し、adoptionが参照した補正だけ適用。独立manualと区別し、原値を上書きしない。resetは補正なしの新adoption。保有補正で別Instrumentや別保有集合を発明しない。
+- comparison v1：leftId／rightId、両fingerprint、equivalent／different／incomparable、confirmedAt。同範囲・通貨・unit・基準日の原値を比較し、一致確認でも採用を変更しない。audit APIで現行／stale／deferredを再評価する。
+
+componentはaccount／domestic／foreign／cash／spot。balance／flow／holdingsを分け、whole-account marketValueとcomponent資産のactive adoptionは排他。同componentの保有合計と評価額も加算しない。0数量・終了銘柄は復活させず、新集合の不明評価額を旧集合合計で補完しない。通貨は採用キーで区別し、自動円換算しない。
+
+訂正は同sourceの新revisionを追加し確認後に採用参照を切替える。旧overrideを自動継承しない。参照済み金融原値のRepository上書きは拒否し、新物理sourceへ訂正する。外部破損・変更はstaleで停止。legacyの不明入力日時はnull、bulk migrationやplaceholder zeroの確認済み昇格はしない。取得・採用・必須値・carry・ユーザー完了承認は別状態。今回完了承認record／UIを追加しない。Transaction reconciliationとは別契約でkeep-bothを月次加算へ流用しない。
+
+以下のv300までの「schema／Backup不変」「永続基盤は次工程」は当時の記録で、現行の新基盤は本節を優先する。
+
 ## Current — 非永続の共通表示結果・未入力口座
 
 `display-results`はperiod dashboard、年間flow集計、選択月6口座のView、期間比較可否を保持するメモリ上の表示契約。current balanceは別のoptional Viewで、損益管理の期間結果には入力しない。月次行のstatus（missing／partial／complete／conflict／read-failure）は数値やDOM行の有無とは分離する。missingはnull、明示0は0で、過去値・年初値による穴埋めはしない。Accountに安全な開設月／有効期間契約がないため設定済み6口座を過去月にも行表示し、開設時点を推測しない。

@@ -2,6 +2,7 @@
   'use strict';
   const storage = typeof module !== 'undefined' && module.exports ? require('./data-model-storage.js') : root.TradeScopeDataStorage;
   const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
+  const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
   const policies = Object.freeze({
@@ -81,7 +82,7 @@
         foreignAccountSnapshotId: state.foreignAccountSnapshotId, cashAccountSnapshotId: state.cashAccountSnapshotId } };
   }
 
-  function resolve(models, tradingData, targetMonth, key = 'sbi', enabledKeys = defaultEnabledKeys) {
+  function resolveExisting(models, tradingData, targetMonth, key = 'sbi', enabledKeys = defaultEnabledKeys) {
     const policy = policies[key];
     if (!policy || !enabledKeys.includes(key) || targetMonth < policy.cutover) return { source: 'legacy' };
     if (policy.adapter === 'sbi') return resolveSbi(models, tradingData, targetMonth);
@@ -112,13 +113,50 @@
       adoptedIds: { stateId: state.id, adoptedAccountSnapshotId: snapshot.id, importBatchId: batch.id } };
   }
 
+  const sourceAccountIds={...Object.fromEntries(Object.entries(policies).map(([key,p])=>[key,p.accountId])),sbivc:'acc_sbivc_crypto',smbc:'acc_smbc_bank'};
+  function sourceValues(models,targetMonth,key){return sources.month(models,sourceAccountIds[key],targetMonth);}
+  function resolve(models,tradingData,targetMonth,key='sbi',enabledKeys=defaultEnabledKeys){
+    const base=resolveExisting(models,tradingData,targetMonth,key,enabledKeys);
+    const existing=records(models,'monthlyAccountStates').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===targetMonth)
+      ??records(models,'monthlyAccountInputs').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===targetMonth);
+    // Defer is not a command to revoke the explicit adoption in a released contract.
+    const values=sourceValues(models,targetMonth,key).filter(v=>!(v.status==='unresolved'&&v.deferred&&existing));
+    if(!values.length)return base;
+    const bad=values.some(v=>['stale','conflict','unresolved'].includes(v.status));
+    const assetRows=sources.assetComponents(values.filter(v=>v.currency==='JPY'));
+    if(!values.some(v=>sources.flowMetrics.includes(v.metric)||v.metric==='unrealizedPnl'))return {...base,
+      ...(bad?{source:'conflict',confirmed:false,completeness:{monthly:false,observation:false,complete:false}}:{}),sourceAdoptions:values,
+      observedAsset:assetRows.length?sum(assetRows.map(v=>v.value)):base.observedAsset??null};
+    const old=base.source==='legacy'?tradingData?.[Number(targetMonth.slice(0,4))]?.[Number(targetMonth.slice(5))]?.[key]??{}:base;
+    const names={realizedPnl:'realizedPnL',swapPnl:'swapPnL',deposit:'deposit',withdrawal:'withdrawal',unrealizedPnl:'unrealizedPnL'};
+    const adopted={};
+    for(const [metric,legacyField]of Object.entries(names)){
+      const matches=values.filter(v=>v.metric===metric&&v.currency==='JPY');
+      if(matches.length){
+        const items=matches.map(v=>v.status==='adopted'&&decimal(v.value)?v.value:null);
+        if(metric==='unrealizedPnl'&&key==='sbi'&&base.source==='canonical'&&!matches.some(v=>v.component==='account')){
+          for(const [component,value]of [['domestic',base.domestic?.unrealizedPnl],['foreign',base.foreign?.unrealizedPnl]])if(!matches.some(v=>v.component===component))items.push(value??null);
+        }
+        adopted[metric]=sum(items);
+      }
+      else adopted[metric]=base.source==='legacy'?(number(old[legacyField])===null||number(old[legacyField])===0&&old.__saved!==true?null:String(old[legacyField])):old[metric]??null;
+    }
+    const balances=sources.assetComponents(values.filter(v=>v.currency==='JPY')),asset=sum(balances.map(v=>v.value));
+    const monthly=!bad&&(key==='smbc'?decimal(asset):['realizedPnl','swapPnl','deposit','withdrawal'].every(f=>decimal(adopted[f])));
+    const observation=!bad&&(key==='smbc'?decimal(asset):decimal(adopted.unrealizedPnl));
+    return {...base,...adopted,source:bad?'conflict':'canonical',sourceAdoptions:values,observedAsset:balances.length?asset:base.observedAsset??null,
+      confirmed:monthly,completeness:{monthly,observation,complete:monthly&&observation}};
+  }
+
   function dependencies(models, year, enabledKeys = defaultEnabledKeys) {
     const enabledAccounts = enabledKeys.map(key => policies[key]?.accountId);
     const states = records(models, 'monthlyAccountStates').filter(row => enabledAccounts.includes(row.accountId) && row.targetMonth.startsWith(`${year}-`));
     const batchIds = new Set(states.map(row => row.domesticImportBatchId));
     const snapshotIds = new Set(states.flatMap(row => [row.foreignAccountSnapshotId, row.cashAccountSnapshotId, row.adoptedAccountSnapshotId]));
     for (const snapshot of records(models, 'accountSnapshots')) if (snapshotIds.has(snapshot.id)) batchIds.add(snapshot.importBatchId);
-    return { calculationVersion, policyVersion, policies: enabledKeys.map(key => policies[key]), states,
+    return { calculationVersion, policyVersion, sourceVersion:sources.version,
+      sourceRecords:records(models,'monthlySources').filter(r=>r.targetMonth?.startsWith(`${year}-`)||r.kind==='override'||r.kind==='comparison'),
+      policies: enabledKeys.map(key => policies[key]), states,
       inputs: records(models, 'monthlyAccountInputs').filter(row => enabledAccounts.includes(row.accountId) && row.targetMonth.startsWith(`${year}-`)),
       batches: records(models, 'importBatches').filter(row => batchIds.has(row.id)),
       holdings: records(models, 'holdingSnapshots').filter(row => batchIds.has(row.importBatchId)),
@@ -131,7 +169,10 @@
     const yearData = year => tradingData?.[year] || {};
     const oldRow = (year, month, key) => yearData(year)?.[month]?.[key] || {};
     const enabledKeys = options.enabledKeys || defaultEnabledKeys;
-    const usesCanonical = (year, month, key) => enabledKeys.includes(key) && policies[key] && monthKey(year, month) >= policies[key].cutover;
+    const explicitMonths=(year,key)=>sources.heads(records(models,'monthlySources')).filter(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth.startsWith(`${year}-`)
+      &&(sources.flowMetrics.includes(r.metric)||r.metric==='unrealizedPnl')).map(r=>Number(r.targetMonth.slice(5)));
+    const usesCanonical = (year, month, key) => (enabledKeys.includes(key) && policies[key] && monthKey(year, month) >= policies[key].cutover)
+      ||explicitMonths(year,key).some(m=>m<=month);
     const read = (year, month, key) => models === null && usesCanonical(year, month, key)
       ? { source: 'conflict', confirmed: false, completeness: { monthly: false, observation: false, complete: false } }
       : resolve(models, tradingData, monthKey(year, month), key, enabledKeys);
@@ -159,19 +200,27 @@
       if (!monthEntered(year, month, keys)) return null;
       for (const key of keys.filter(key => usesCanonical(year, month, key))) {
         const resolved = read(year, month, key);
-        if (resolved.source !== 'canonical' || !resolved.completeness.monthly || number(row(year, month, key)[field]) === null) return null;
+        if (resolved.source !== 'legacy' && (resolved.source !== 'canonical' || !resolved.completeness.monthly || number(row(year, month, key)[field]) === null)) return null;
       }
       const values = keys.map(key => number(row(year, month, key)[field])).filter(value => value !== null);
       return values.length ? total(values) : null;
     }
     function confirmed(year, month, key) {
+      if(key==='smbc'){
+        const values=sourceValues(models,monthKey(year,month),key),cash=values.find(v=>v.metric==='cashBalance'&&v.currency==='JPY');
+        return cash?cash.status==='adopted'?number(cash.value):null:legacy.calculateAccountConfirmedAssets(tradingData,initialFunds,year,month,key);
+      }
       if (!usesCanonical(year, month, key)) return legacy.calculateAccountConfirmedAssets(tradingData, initialFunds, year, month, key);
-      const [cutoverYear, cutoverMonth] = policies[key].cutover.split('-').map(Number);
-      const start = Number(year) === cutoverYear ? cutoverMonth : 1;
-      let value = Number(year) === cutoverYear ? legacy.calculateAccountConfirmedAssets(tradingData, initialFunds, year, start - 1, key)
+      const [cutoverYear,cutoverMonth]=(policies[key]?.cutover??`${year}-12`).split('-').map(Number);
+      const start=Math.min(Number(year)===cutoverYear?cutoverMonth:1,...explicitMonths(year,key));
+      let value = start>1 ? legacy.calculateAccountConfirmedAssets(tradingData, initialFunds, year, start - 1, key)
         : Number(initialFunds?.[year]?.[key]) || 0;
+      if(explicitMonths(year,key).length&&(!Number.isFinite(value)||start===1&&number(initialFunds?.[year]?.[key])===null))return null;
       for (let m = start; m <= month; m++) {
         const resolved = read(year, m, key);
+        if(resolved.source==='legacy'){
+          const data=oldRow(year,m,key);value+=(number(data.realizedPnL)??0)+(number(data.swapPnL)??0)+(number(data.deposit)??0)-(number(data.withdrawal)??0);continue;
+        }
         if (!resolved.completeness.monthly || resolved.source !== 'canonical') return null;
         value += Number(resolved.realizedPnl) + Number(resolved.swapPnl) + Number(resolved.deposit) - Number(resolved.withdrawal);
       }
@@ -181,13 +230,14 @@
       if (key === 'smbc') return confirmed(year, month, key);
       if (!usesCanonical(year, month, key)) return legacy.calculateAccountNetAssets(tradingData, initialFunds, year, month, key);
       const value = confirmed(year, month, key), resolved = read(year, month, key);
-      return Number.isFinite(value) && resolved.source === 'canonical' && resolved.unrealizedPnl !== null
-        ? value + Number(resolved.unrealizedPnl) : null;
+      const unrealized=resolved.source==='legacy'?number(oldRow(year,month,key).unrealizedPnL):number(resolved.unrealizedPnl);
+      return Number.isFinite(value)&&unrealized!==null ? value+unrealized:null;
     }
     function flows(year, month, keys) {
       let deposit = 0, withdrawal = 0;
       for (let m = 1; m <= month; m++) for (const key of keys) {
-        if (usesCanonical(year, m, key) && !read(year, m, key).completeness.monthly) return { deposit: null, withdrawal: null };
+        const resolved=read(year,m,key);
+        if (usesCanonical(year, m, key) && resolved.source!=='legacy' && !resolved.completeness.monthly) return { deposit: null, withdrawal: null };
         const data = row(year, m, key);
         deposit += number(data.deposit) ?? 0; withdrawal += number(data.withdrawal) ?? 0;
       }

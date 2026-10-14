@@ -69,7 +69,7 @@ test('meaningful legacy conflicts cannot be bypassed by correction options', asy
 });
 test('GMO save -> v4 export -> anonymous empty -> restore -> calculation/re-export match', async () => {
   const t=new MemoryStorage();await service(t).save(source());const api=backupHarness(),backup=api.TradeScopeBackupExport.buildPayload(t,'http://localhost',now);
-  assert.equal(backup.backupVersion,13);assert.doesNotMatch(JSON.stringify(backup),/filename|absolutePath|rawText|fullText|pdfBinary|accountNumber/);
+  assert.equal(backup.backupVersion,14);assert.doesNotMatch(JSON.stringify(backup),/filename|absolutePath|rawText|fullText|pdfBinary|accountNumber/);
   const empty=new MemoryStorage();api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(backup).restorePlan,empty);
   assert.deepEqual(model.readModels(empty),model.readModels(t));assert.equal(calculator(empty).net(2026,9,'gmo'),calculator(t).net(2026,9,'gmo'));
   assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty,'http://localhost',now)),copy(backup));

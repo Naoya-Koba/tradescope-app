@@ -1,5 +1,13 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — 最小source / adoption基盤
+
+Backup v14／PWA v301で共通のsource revision・adoption・override・comparisonを永続化。PDF／CSV／manualは対等、公式自動優先なし。候補追加だけでは採用を変えず、複数sourceを加算しない。既存State／Inputの明示採用は互換維持し、2026年1〜8月をbulk migrationしない。legacyの入力日時やplaceholder zeroを推測確認しない。登録済み原金融事実は不変、訂正は新revision・新物理source。旧overrideは非継承。
+
+本格source選択UIは未接続。既存Inputは従来契約のままで、新契約がない本番値は不変。新APIへ登録した参照原値を既存UIから上書きしようとすれば安全に停止する。後続broker接続は新revision経路へ統一する必要がある。外貨自動換算、fee等の新ledger意味、未確認FX保有集合集約、完了承認は今回未実装。保有集合の曖昧な重複Instrumentは推測統合せず候補生成を停止する。
+
+全口座の正本・時点・入出金・unknown・current／period・比較可能性の最終統合監査は残す。以下の旧「永続統一は将来」は、この基盤追加後の口座UI接続・全体整合を意味する。
+
 ## Current / Known limitation — 表示・再読込・月次詳細の整合
 
 損益管理のcanonical-only監視を修正し、legacy月次・年初資金・年初評価損益・関連旧キーもstorage／BFCache復帰で再評価する。編集Draftとlive Inputを保持し、表示だけで正本を変更しない。Topと年間Summaryの同義期間KPI／年間flowは共通display-resultsを参照する。Top swapの独立集計は除去した。年間純資産の部分額と直近完全額で増減／率を計算する不整合はbasis gateで「—」にする。年初sourceが未確認でも0寄与による見かけの比較を許可しない。

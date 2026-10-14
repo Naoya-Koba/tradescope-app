@@ -1,0 +1,168 @@
+// Synthetic financial facts only; no browser, production Storage, real PDF/CSV or Backup.
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
+const model=require('../assets/data-model-storage.js'),journal=require('../assets/storage-transaction.js'),core=require('../assets/monthly-source-contract.js'),service=require('../assets/monthly-source-service.js');
+const {fixture}=require('./monthly-display-fixture.js'),display=require('../assets/monthly-display-view.js'),results=require('../assets/display-results.js'),current=require('../assets/current-asset-view.js'),balances=require('../assets/balance-view.js');
+const legacyWindow={};vm.runInNewContext(fs.readFileSync('assets/profit-metrics.js','utf8'),{window:legacyWindow});const metrics=legacyWindow.TradeScopeProfitMetrics;
+const now='2030-01-20T12:00:00.000Z',copy=v=>JSON.parse(JSON.stringify(v));
+class Memory{
+ constructor(){this.data=new Map();this.writes=0;this.failKey=null;this.corruptKey=null;this.failRollback=false;}
+ getItem(k){return this.data.get(k)??null;}
+ setItem(k,v){this.writes++;if(k===this.failKey){if(!this.failRollback)this.failKey=null;throw Error('quota');}this.data.set(k,k===this.corruptKey?'broken':v);if(k===this.corruptKey)this.corruptKey=null;}
+ removeItem(k){this.writes++;if(k===this.failKey){if(!this.failRollback)this.failKey=null;throw Error('quota');}this.data.delete(k);}
+ snapshot(){return JSON.stringify([...this.data].sort(([a],[b])=>a.localeCompare(b)));}
+}
+function setup({canonical=true}={}){const f=fixture(),s=new Memory();for(const[k,v]of [['tradingData',f.tradingData],['yearInitialFunds',f.initialFunds],['yearInitialUnrealized',f.initialUnrealized]])s.data.set(k,JSON.stringify(v));if(canonical)for(const[e,v]of Object.entries(f.models))if(v)s.data.set(model.keys[e],JSON.stringify(v));else{};let n=0;const api=service.createService(s,{clock:()=>now,newId:()=> 'new_'+(++n)});return {s,f,api};}
+function run(h,op){return h.api.operate(op,{expectedFingerprint:h.api.inspect().fingerprint});}
+const context={accountId:'acc_gmo_fx',targetMonth:'2026-09',component:'account',asOf:'2026-09-30'};
+function manual(id,value,metric='realizedPnl',extra={}){return core.descriptor({...context,...extra},metric,value,{id,sourceId:'manual_'+id,sourceType:'manual',reference:null});}
+function candidate(h,entity,field,accountId=context.accountId){return core.candidates(h.api.inspect().models,{accountId,targetMonth:context.targetMonth}).find(r=>r.reference?.entity===entity&&r.reference.field===field);}
+function adopted(h,revision,options={}){return run(h,{sources:[revision],adoptions:[{revisionId:revision.id,...options}]});}
+const query=r=>core.target(r);
+function value(h,r){return core.resolve(h.api.inspect().models,query(r));}
+function view(h){const state=h.api.inspect(),td=JSON.parse(state.legacy.tradingData??'{}'),funds=JSON.parse(state.legacy.yearInitialFunds??'{}'),unrealized=JSON.parse(state.legacy.yearInitialUnrealized??'{}');return display.create(metrics,td,funds,unrealized,state.models,h.f.accounts);}
+function backup(s){const source=fs.readFileSync('top/script.js','utf8'),part=source.slice(source.indexOf('// ===== Backup Format Core'),source.indexOf('function exportAllData()'));
+ const c=vm.createContext({window:{location:{origin:'http://127.0.0.1:54321'},TradeScopeDataStorage:model,TradeScopeStorageTransaction:journal},localStorage:s,document:{getElementById:()=>null,addEventListener(){}},
+  PROFIT_STORAGE_KEY_TRADING:'tradingData',PROFIT_STORAGE_KEY_INITIAL:'yearInitialFunds',PROFIT_STORAGE_KEY_INITIAL_UNREALIZED:'yearInitialUnrealized',PROFIT_STORAGE_KEY_TOP_SUMMARY_SNAPSHOT:'tradeScopeTopSummarySnapshotV1',console:{log(){throw Error('logging forbidden');},error(){throw Error('logging forbidden');}}});vm.runInContext(part,c);
+ return {build:()=>copy(c.window.TradeScopeBackupExport.buildPayload(s,'http://localhost',now)),inspect:p=>c.window.TradeScopeBackupFormat.inspectValue(p),restore:p=>c.window.TradeScopeBackupRestore.execute(p,s)};}
+
+for(const text of ['', 'abc','匿名の事実','a'.repeat(200)])test('SHA-256 fingerprint matches platform SHA for '+text.length+' bytes',()=>{assert.equal(core.hash(text),crypto.createHash('sha256').update(text).digest('hex'));});
+test('Repository load/inspect and candidate adapters are lazy and read-only',()=>{const h=setup(),before=h.s.snapshot(),writes=h.s.writes;h.api.inspect();core.candidates(h.api.inspect().models,context);assert.equal(h.s.writes,writes);assert.equal(h.s.snapshot(),before);});
+for(const type of ['manual','pdf','csv'])test(type+'-only source can be explicitly adopted',()=>{
+ const h=setup(),r=type==='manual'?manual('m','13'):type==='pdf'?candidate(h,'accountSnapshots','reportedMonthlyRealizedPnl'):candidate(h,'importBatches','holdings.marketValue','acc_sbi_sec');assert.ok(r);adopted(h,r);assert.equal(value(h,r).status,'adopted');assert.equal(value(h,r).source.sourceType,type);
+});
+test('manual-only complete fields feed shared calculation without a fake PDF, State or monthly approval',()=>{
+ const h=setup({canonical:false}),items=Object.entries({realizedPnl:'10',swapPnl:'5',deposit:'0',withdrawal:'0',unrealizedPnl:'-3'}).map(([k,v])=>manual(k,v,k));run(h,{sources:items,adoptions:items.map(r=>({revisionId:r.id}))});
+ const m=h.api.inspect().models;assert.equal(m.importBatches,null);assert.equal(m.monthlyAccountStates,null);const row=view(h).accountMonth(2026,9,h.f.accounts[0]);assert.equal(row.realized,10);assert.equal(row.swap,5);assert.equal(row.asset,136);assert.equal(row.confirmed,139);
+ assert.equal(core.progress(m,context.accountId,context.targetMonth,items.map(query)).userCompletionApproval,null);
+});
+for(const importedType of ['pdf','csv'])test('manual and '+importedType+' coexist; equality confirms without changing adoption or original',()=>{
+ const h=setup(),p=importedType==='pdf'?candidate(h,'accountSnapshots','cashBalance'):candidate(h,'importBatches','holdings.marketValue','acc_sbi_sec');
+ const m=manual('m',core.sourceValue(p,h.api.inspect().models),p.metric,core.target(p));adopted(h,m);run(h,{sources:[p],comparisons:[{leftId:m.id,rightId:p.id}]});
+ assert.equal(value(h,m).source.id,m.id);assert.equal(core.sourceValue(m,h.api.inspect().models),m.value);assert.equal(h.api.inspect().models.monthlySources.records.at(-1).result,'equivalent');
+ assert.equal(h.api.inspect().models.monthlySources.records.filter(r=>r.kind==='source').length,2);
+});
+for(const chosen of ['manual','pdf','csv','defer'])test('different sources allow explicit '+chosen+' decision without automatic official priority',()=>{
+ const h=setup(),p=chosen==='csv'?candidate(h,'importBatches','holdings.marketValue','acc_sbi_sec'):candidate(h,'accountSnapshots','cashBalance'),m=manual('m','77',p.metric,core.target(p));adopted(h,m);run(h,{sources:[p],comparisons:[{leftId:m.id,rightId:p.id}]});
+ assert.equal(h.api.inspect().models.monthlySources.records.at(-1).result,'different');
+ if(chosen==='pdf'||chosen==='csv')run(h,{adoptions:[{revisionId:p.id}]});if(chosen==='defer')run(h,{adoptions:[{...query(m),decision:'defer'}]});
+ assert.equal(value(h,m).source.id,['pdf','csv'].includes(chosen)?p.id:m.id);
+});
+test('defer without any valid adoption is unknown, not zero',()=>{const h=setup({canonical:false}),m=manual('m','77');run(h,{sources:[m],adoptions:[{...query(m),decision:'defer'}]});assert.equal(value(h,m).status,'unresolved');assert.equal(value(h,m).value,null);});
+test('defer preserves the explicit adoption of the released GMO contract',()=>{const h=setup(),before=view(h).month(2026,9),p=candidate(h,'accountSnapshots','reportedMonthlyRealizedPnl');run(h,{sources:[p],adoptions:[{...query(p),decision:'defer'}]});assert.deepEqual(view(h).month(2026,9),before);});
+for(const change of [r=>r.asOf='2026-09-29',r=>r.currency='USD',r=>r.component='foreign'])test('different dates/currency/scope are incomparable, never implicitly equivalent',()=>{const h=setup(),p=candidate(h,'accountSnapshots','cashBalance'),m=manual('m','139',p.metric,core.target(p));change(m);run(h,{sources:[m,p],comparisons:[{leftId:m.id,rightId:p.id}]});assert.equal(h.api.inspect().models.monthlySources.records.at(-1).result,'incomparable');});
+test('independent manual and override are separate, and override adoption is explicit',()=>{
+ const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);run(h,{overrides:[{id:'over',revisionId:p.id,value:'140'}]});assert.equal(value(h,p).value,'139');
+ run(h,{adoptions:[{revisionId:p.id,overrideId:'over'}]});assert.equal(value(h,p).value,'140');assert.equal(core.sourceValue(p,h.api.inspect().models),'139');assert.equal(value(h,p).source.value,null);
+});
+test('correction appends a new revision, retains old original/override and switches adoption only on confirmation',()=>{
+ const h=setup(),m=manual('m','10');adopted(h,m);run(h,{overrides:[{id:'over',revisionId:m.id,value:'11'}],adoptions:[{revisionId:m.id,overrideId:'over'}]});
+ const n={...m,id:'new-revision',revisionOf:m.id,value:'20'};run(h,{sources:[n]});assert.equal(value(h,m).value,'11');run(h,{adoptions:[{revisionId:n.id}]});assert.equal(value(h,m).value,'20');assert.equal(value(h,m).override,null);
+ const all=h.api.inspect().models.monthlySources.records;assert.equal(all.find(r=>r.id==='m').value,'10');assert.equal(all.find(r=>r.id==='over').value,'11');assert.equal(all.filter(r=>r.kind==='adoption').length,3);
+});
+test('override of an old revision cannot be attached to a corrected revision',()=>{const h=setup(),m=manual('m','10');adopted(h,m);run(h,{overrides:[{id:'o',revisionId:m.id,value:'11'}]});const n={...m,id:'n',revisionOf:m.id,value:'20'};run(h,{sources:[n]});const before=h.s.snapshot();assert.throws(()=>run(h,{adoptions:[{revisionId:n.id,overrideId:'o'}]}));assert.equal(h.s.snapshot(),before);});
+for(const raw of ['0','-0','0.000',null,'',' '])test('explicit zero / missing remains distinguishable: '+String(raw),()=>{const h=setup(),m=manual('m',raw);adopted(h,m);const r=value(h,m);assert.equal(r.value,typeof raw==='string'&&raw.trim()?raw:null);assert.equal(r.status,typeof raw==='string'&&raw.trim()?'adopted':'missing');assert.equal(r.explicitZero,typeof raw==='string'&&raw.trim()?true:false);});
+test('missing manual value and unknown created date do not generate an invented number/time',()=>{const h=setup(),m=manual('m',null);m.createdAt=null;m.confirmedAt=null;m.asOf=null;adopted(h,m);const r=value(h,m);assert.equal(r.source.createdAt,null);assert.equal(r.source.confirmedAt,null);assert.equal(r.source.asOf,null);});
+test('same ID and immutable source revision cannot be overwritten or physically removed',()=>{const h=setup();adopted(h,manual('m','10'));const state=h.api.inspect(),changed=copy(state.models.monthlySources);changed.records[0].value='11';assert.throws(()=>model.createRepository(h.s).commit({monthlySources:changed}));changed.records=[];assert.throws(()=>model.createRepository(h.s).commit({monthlySources:changed}));});
+test('stale Draft fails before write and the caller Draft is not modified/discarded',()=>{const h=setup(),draft={sources:[manual('m','10')]},before=JSON.stringify(draft),guard=h.api.inspect();run(h,{sources:[manual('other','12','swapPnl')]});const stored=h.s.snapshot();assert.throws(()=>h.api.operate(draft,{expectedFingerprint:guard.fingerprint}),/STALE/);assert.equal(JSON.stringify(draft),before);assert.equal(h.s.snapshot(),stored);});
+for(const key of ['tradingData','yearInitialFunds','yearInitialUnrealized'])test('external '+key+' change invalidates an opened source Draft',()=>{const h=setup(),guard=h.api.inspect();h.s.data.set(key,'{"2026":{"anonymous":1}}');const before=h.s.snapshot();assert.throws(()=>h.api.operate({sources:[manual('m','10')]},{expectedFingerprint:guard.fingerprint}),/STALE/);assert.equal(h.s.snapshot(),before);});
+test('mutable referenced source changes become stale adoption; Backup detects stale active facts',()=>{const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);const changed=h.api.inspect().models.accountSnapshots;changed.records[0].cashBalance='141';// direct anonymous tampering, not a production write
+ h.s.data.set(model.keys.accountSnapshots,JSON.stringify(changed));assert.equal(core.resolve({...h.api.inspect().models},query(p)).status,'stale');assert.throws(()=>backup(h.s).build());});
+test('removed referenced source fails closed rather than adopting another source or zero',()=>{const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);const m=h.api.inspect().models;m.accountSnapshots.records=[];assert.equal(core.resolve(m,query(p)).status,'stale');assert.throws(()=>model.validateModels(m));});
+test('balance carry uses adopted values only, independent of manual/PDF source type',()=>{const h=setup(),p=candidate(h,'accountSnapshots','netAssetValue');adopted(h,p);const m=manual('m',null,'marketValue',{targetMonth:'2026-10',asOf:'2026-10-31'});adopted(h,m);const d=view(h),hist=d.balanceHistory(2026,h.f.accounts[0],10),b=balances.resolve(hist.observations,{targetMonth:'2026-10',componentKeys:hist.componentKeys});assert.equal(b.knownTotal,'136');assert.equal(b.hasCarried,true);assert.equal(value(h,m).value,null);});
+test('flow is fixed to its own month and never carries a September value into October',()=>{const h=setup(),m=manual('m','17');adopted(h,m);const q={...query(m),targetMonth:'2026-10'};assert.equal(core.resolve(h.api.inspect().models,q).value,null);assert.equal(view(h).accountMonth(2026,10,h.f.accounts[0]).realized,null);});
+test('whole-account and component sources cannot be simultaneously adopted and double-counted',()=>{const h=setup(),whole=manual('whole','500','marketValue'),cash=manual('cash','100','cashBalance',{component:'cash'});adopted(h,whole);const before=h.s.snapshot();assert.throws(()=>adopted(h,cash));assert.equal(h.s.snapshot(),before);});
+test('derived ledger fields cannot be registered as source observations',()=>{const h=setup(),m=manual('m',null,'marketValue');m.sourceType='pdf';m.reference={entity:'monthlyAccountStates',id:'mas_gmo',field:'confirmedAssets',sourceScope:'gmo-fx-monthly-report'};assert.throws(()=>run(h,{sources:[m]}));});
+test('holdings adoption retains exact quantities/rates and zero roster without generating trades or P/L',()=>{const h=setup(),p=candidate(h,'importBatches','holdings','acc_sbi_sec');adopted(h,p);assert.equal(value(h,p).value.length,1);assert.equal(h.api.inspect().models.importedTransactions,null);assert.equal(h.api.inspect().models.rawTransactions,null);});
+test('manual holding-set override is revision-bound and does not modify source Holdings',()=>{const h=setup(),p=candidate(h,'importBatches','holdings','acc_sbi_sec');adopted(h,p);const state=h.api.inspect(),v=core.sourceValue(p,state.models);v[0].quantity='0';run(h,{overrides:[{id:'o',revisionId:p.id,value:v}],adoptions:[{revisionId:p.id,overrideId:'o'}]});assert.equal(value(h,p).value[0].quantity,'0');assert.equal(h.api.inspect().models.holdingSnapshots.records[0].quantity,state.models.holdingSnapshots.records[0].quantity);});
+for(const mutator of [r=>r.filename='PRIVATE',r=>r.schemaVersion=2,r=>r.metric='fake',r=>r.fingerprint='missing',r=>r.reference={entity:'rawTransactions',id:'x',field:'fee',sourceScope:'x'}])test('unknown fields/version/invalid reference and fingerprint are rejected',()=>{const h=setup(),m=manual('m','10');run(h,{sources:[m]});const all=copy(h.api.inspect().models);mutator(all.monthlySources.records[0]);assert.throws(()=>model.validateModels(all));});
+for(const key of [model.keys.accounts,model.keys.monthlySources,'tradeScopeTopSummarySnapshotV1'])test('atomic quota rollback restores source, Account dependency and cache: '+key,()=>{const h=setup({canonical:false});h.s.data.set('tradeScopeTopSummarySnapshotV1','stale');const before=h.s.snapshot();h.s.failKey=key;assert.throws(()=>adopted(h,manual('m','10')));assert.equal(h.s.snapshot(),before);assert.equal(h.s.getItem(journal.journalKey),null);});
+test('post-write reread mismatch rolls back all new records',()=>{const h=setup(),before=h.s.snapshot();h.s.corruptKey=model.keys.monthlySources;assert.throws(()=>adopted(h,manual('m','10')));assert.equal(h.s.snapshot(),before);});
+test('failed rollback retains journal and prohibits another save',()=>{const h=setup();adopted(h,manual('m','10'));h.s.failKey=model.keys.monthlySources;h.s.failRollback=true;assert.throws(()=>run(h,{sources:[manual('n','20')]}));assert.notEqual(h.s.getItem(journal.journalKey),null);assert.throws(()=>run(h,{sources:[manual('third','30')]}));h.s.failKey=null;h.s.failRollback=false;journal.recover(h.s);assert.equal(h.s.getItem(journal.journalKey),null);});
+test('v14 full export/empty restore/re-export protects revisions/adoption/override/comparison audit',()=>{const h=setup(),p=candidate(h,'accountSnapshots','cashBalance'),m=manual('m','139',p.metric,query(p));adopted(h,m);run(h,{sources:[p],comparisons:[{leftId:m.id,rightId:p.id}],overrides:[{id:'o',revisionId:m.id,value:'140'}],adoptions:[{revisionId:m.id,overrideId:'o'}]});const b=backup(h.s).build(),target=new Memory(),api=backup(target);assert.equal(b.backupVersion,14);const inspected=api.inspect(b);assert.equal(inspected.ok,true);api.restore(inspected.restorePlan);assert.deepEqual(api.build(),b);assert.deepEqual(model.readModels(target),model.readModels(h.s));target.data.clear();assert.equal(target.data.size,0);});
+for(const version of Array.from({length:13},(_,i)=>i+1))test('published v'+version+' restore maintains its scope; v2-v13 clear new source key while v1 preserves it',()=>{
+ const h=setup({canonical:false});adopted(h,manual('m','10'));const payload=backup(h.s).build();payload.backupVersion=version;if(version===1)delete payload.data.models;else payload.data.models=Object.fromEntries(model.backupModelEntities[version].map(e=>[e,payload.data.models[e]]));
+ const target=setup({canonical:false});adopted(target,manual('existing','99'));const previous=target.s.getItem(model.keys.monthlySources),api=backup(target.s),r=api.inspect(payload);assert.equal(r.ok,true);api.restore(r.restorePlan);assert.equal(target.s.getItem(model.keys.monthlySources),version===1?previous:null);
+});
+for(const mutate of [b=>delete b.data.models.monthlySources,b=>b.data.models.monthlySources.records.find(r=>r.kind==='adoption').revisionId='missing',b=>b.data.models.monthlySources.records.find(r=>r.kind==='source').value='12',b=>b.data.models.monthlySources.records.pop()])test('malformed/incomplete v14 is rejected before Storage mutation',()=>{const h=setup();adopted(h,manual('m','10'));const b=backup(h.s).build();mutate(b);const target=new Memory(),before=target.snapshot();assert.equal(backup(target).inspect(b).ok,false);assert.equal(target.snapshot(),before);});
+test('v14 Restore failure rolls back every legacy/model key and keeps source audit exact',()=>{const h=setup();adopted(h,manual('m','10'));const b=backup(h.s).build(),target=setup();adopted(target,manual('target','22'));const before=target.s.snapshot(),api=backup(target.s);target.s.failKey=model.keys.monthlySources;assert.throws(()=>api.restore(api.inspect(b).restorePlan));assert.equal(target.s.snapshot(),before);});
+test('legacy adapter retains unknown input timestamps and does not confirm placeholder zero',()=>{const h=setup(),td=JSON.parse(h.s.getItem('tradingData'));td[2026][8].gmo.realizedPnL=0;const c=core.legacyCandidates(td,{...context,targetMonth:'2026-08',accountKey:'gmo'});assert.equal(c.find(v=>v.metric==='realizedPnl').zeroEvidence,'unknown');assert.ok(c.every(v=>v.createdAt===null&&v.confirmedAt===null&&v.asOf===null));});
+test('unadopted candidate records do not change August/September shared results, period series, current balances or history',()=>{
+ const h=setup(),before=view(h),snap=JSON.stringify([before.month(2026,8),before.month(2026,9),before.dashboard(2026),before.series(2026),before.yearlyTotals(2026)]);
+ run(h,{sources:[manual('m','999')]});const after=view(h);assert.equal(JSON.stringify([after.month(2026,8),after.month(2026,9),after.dashboard(2026),after.series(2026),after.yearlyTotals(2026)]).replace(/monthly-ledger-v3-[a-f0-9]+|monthly-display-v5-[a-f0-9]+/g,'fingerprint'),snap.replace(/monthly-ledger-v3-[a-f0-9]+|monthly-display-v5-[a-f0-9]+/g,'fingerprint'));
+});
+test('balance-only adoption changes fixed-month/current asset but never generates period P/L or year-start return',()=>{
+ const h=setup(),d=view(h),before=d.monthlyPnl(2026,9),m=manual('asset','999','marketValue');adopted(h,m);const next=view(h),p=results.create(next,2026,{currentFactory:period=>current.create(period,h.api.inspect().models,2026,{balanceHistory:next.balanceHistory})});
+ assert.equal(next.accountMonth(2026,9,h.f.accounts[0]).asset,999);assert.equal(p.current.rows.find(r=>r.key==='gmo').metrics.net.value,999);assert.deepEqual(next.monthlyPnl(2026,9),before);assert.equal(p.netComparison.growth,null);
+});
+test('new adoption fingerprints invalidate shared caches without using DOM or source ranking',()=>{const h=setup(),before=view(h).fingerprint(2026);adopted(h,manual('m','11'));assert.notEqual(view(h).fingerprint(2026),before);for(const file of ['assets/monthly-source-contract.js','assets/monthly-source-service.js'])assert.doesNotMatch(fs.readFileSync(file,'utf8'),/localStorage\.|console\.|fetch\(|XMLHttpRequest/);});
+test('balance-only import does not confirm a legacy zero placeholder as monthly P/L',()=>{
+ const h=setup({canonical:false}),td=JSON.parse(h.s.getItem('tradingData'));td[2026][9]={sbivc:{realizedPnL:0,swapPnL:0,unrealizedPnL:0,deposit:0,withdrawal:0}};h.s.data.set('tradingData',JSON.stringify(td));
+ const m=manual('cash','25','cashBalance',{accountId:'acc_sbivc_crypto',component:'cash'});adopted(h,m);const row=view(h).accountMonth(2026,9,h.f.accounts.find(a=>a.key==='sbivc'));
+ assert.equal(row.asset,25);assert.equal(row.realized,null);assert.equal(row.swap,null);assert.equal(row.unrealized,null);assert.equal(row.complete,false);assert.equal(h.api.inspect().models.monthlyAccountStates,null);
+});
+test('one manual flow does not confirm unrelated legacy auto-created zeros',()=>{
+ const h=setup({canonical:false}),td=JSON.parse(h.s.getItem('tradingData'));td[2026][9]={gmo:{realizedPnL:0,swapPnL:0,unrealizedPnL:0,deposit:0,withdrawal:0}};h.s.data.set('tradingData',JSON.stringify(td));adopted(h,manual('pnl','10'));
+ const row=view(h).accountMonth(2026,9,h.f.accounts[0]);assert.equal(row.realized,10);assert.equal(row.swap,null);assert.equal(row.deposit,null);assert.equal(row.unrealized,null);assert.equal(row.complete,false);
+});
+test('new missing initial basis cannot manufacture a complete ledger from zero',()=>{
+ const h=setup({canonical:false});h.s.data.set('yearInitialFunds','{}');const items=Object.entries({realizedPnl:'0',swapPnl:'0',deposit:'0',withdrawal:'0',unrealizedPnl:'0'}).map(([k,v])=>manual(k,v,k,{targetMonth:'2027-01',asOf:'2027-01-31'}));run(h,{sources:items,adoptions:items.map(r=>({revisionId:r.id}))});
+ assert.equal(view(h).accountMonth(2027,1,h.f.accounts[0]).confirmed,null);
+});
+test('registered canonical source anchors cannot be overwritten via Repository',()=>{
+ const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);const s=h.api.inspect().models.accountSnapshots;s.records[0].cashBalance='150';const before=h.s.snapshot();assert.throws(()=>model.createRepository(h.s).commit({accountSnapshots:s}));assert.equal(h.s.snapshot(),before);
+});
+test('source correction can adopt a new physical anchor while retaining old source facts',()=>{
+ const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);const models=h.api.inspect().models,second={...models.accountSnapshots.records[0],id:'new_snapshot',cashBalance:'150'};models.accountSnapshots.records.push(second);model.createRepository(h.s).commit({accountSnapshots:models.accountSnapshots});
+ const revised={...p,id:'new_revision',revisionOf:p.id,reference:{...p.reference,id:second.id}};adopted(h,revised);assert.equal(value(h,p).value,'150');assert.equal(core.sourceValue(h.api.inspect().models.monthlySources.records.find(r=>r.id===p.id),h.api.inspect().models),'139');
+});
+test('stale comparison/override/adoption are safely exposed as audit status rather than a new equality',()=>{
+ const h=setup(),p=candidate(h,'accountSnapshots','cashBalance'),m=manual('m','139',p.metric,query(p));run(h,{sources:[p,m],overrides:[{id:'o',revisionId:p.id,value:'140'}],comparisons:[{leftId:p.id,rightId:m.id}],adoptions:[{revisionId:p.id,overrideId:'o'}]});const models=h.api.inspect().models;models.accountSnapshots.records[0].cashBalance='150';
+ assert.ok(core.audit(models).filter(r=>['comparison','override','adoption'].includes(r.kind)).every(r=>r.status==='stale'));
+});
+test('same component and metric can distinguish currencies without converting or summing them',()=>{const h=setup(),yen=manual('yen','10','cashBalance',{component:'cash'}),usd=manual('usd','12','cashBalance',{component:'cash',currency:'USD'});run(h,{sources:[yen,usd],adoptions:[{revisionId:yen.id},{revisionId:usd.id}]});assert.equal(value(h,yen).value,'10');assert.equal(value(h,usd).value,'12');assert.equal(view(h).accountMonth(2026,9,h.f.accounts[0]).asset,10);});
+for(const metric of ['deposit','withdrawal'])test('negative '+metric+' source/override is rejected rather than changing external-flow semantics',()=>{const h=setup();assert.throws(()=>adopted(h,manual('m','-1',metric)));adopted(h,manual('m','1',metric));assert.throws(()=>run(h,{overrides:[{revisionId:'m',value:'-1'}]}));});
+test('holding override cannot change its source roster or invent another holding',()=>{const h=setup(),p=candidate(h,'importBatches','holdings','acc_sbi_sec');adopted(h,p);assert.throws(()=>run(h,{overrides:[{revisionId:p.id,value:[]}]}));});
+test('source metadata contains only IDs, scope, dates and facts; real text/filename cannot enter Backup',()=>{const h=setup(),m=manual('m','1');adopted(h,m);const b=backup(h.s).build();assert.doesNotMatch(JSON.stringify(b.data.models.monthlySources),/filename|absolutePath|pdfBinary|csvText|rawText|accountNumber|phone|address/);});
+test('all new records and aggregate audit manifest reject unknown fields',()=>{const h=setup();adopted(h,manual('m','1'));const m=h.api.inspect().models;m.monthlySources.fullText='PRIVATE';assert.throws(()=>model.validateModels(m));});
+test('completion dimensions remain separate from adopted balance completeness',()=>{const h=setup(),m=manual('m','1','cashBalance',{component:'cash'});adopted(h,m);const p=core.progress(h.api.inspect().models,context.accountId,context.targetMonth,[query(manual('missing',null,'swapPnl'))]);assert.equal(p.sourceAcquired,true);assert.equal(p.missingRequired.length,1);assert.equal(p.carryState,null);assert.equal(p.userCompletionApproval,null);assert.equal(p.adoptionStates[0].status,'adopted');});
+test('shared browser modules load locally with no read/write/network during initialization',()=>{
+ const forbidden=()=>{throw Error('side effect');},context=vm.createContext({TextEncoder,TextDecoder,crypto:crypto.webcrypto,localStorage:{getItem:forbidden,setItem:forbidden},fetch:forbidden,console:{log:forbidden,error:forbidden}});
+ for(const file of ['assets/storage-transaction.js','assets/transaction-reconciliation.js','assets/monthly-source-contract.js','assets/data-model-storage.js','import/csv-core.js','assets/monthly-source-service.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context);
+ assert.ok(context.TradeScopeMonthlySourceService);assert.equal(context.TradeScopeMonthlySourceContract.hash('abc'),core.hash('abc'));
+});
+test('anonymous localhost/subpath serves the new offline assets; v14 restore operates only on disposable memory',async()=>{
+ const http=require('node:http'),assets=['assets/monthly-source-contract.js','assets/monthly-source-service.js','assets/data-model-storage.js','assets/storage-transaction.js'];
+ const server=http.createServer((req,res)=>{const file=new URL(req.url,'http://localhost').pathname.replace('/tradescope-app/','');if(!assets.includes(file)){res.writeHead(404).end();return;}res.setHeader('Content-Type','application/javascript');res.end(fs.readFileSync(file));});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const h=setup({canonical:false}),target=new Memory();try{for(const file of assets){const response=await fetch('http://127.0.0.1:'+server.address().port+'/tradescope-app/'+file+'?v=20261014-2');assert.equal(response.status,200);assert.ok((await response.text()).length>0);}
+  adopted(h,manual('m','1'));const api=backup(target),b=backup(h.s).build();api.restore(api.inspect(b).restorePlan);assert.deepEqual(api.build(),b);
+ }finally{h.s.data.clear();target.data.clear();await new Promise(resolve=>server.close(resolve));}assert.equal(h.s.data.size,0);assert.equal(target.data.size,0);
+});
+test('SBI VC component adoption retains the other explicitly adopted component and existing manual override',async()=>{
+ const vc=require('./observation-override-fixture.js'),s=await vc.seed(),old=vc.models?vc.models(s):model.readModels(s),source=core.candidates(old,{accountId:'acc_sbivc_crypto',targetMonth:vc.month}).find(r=>r.reference?.field==='cashBalance');
+ const before=require('../assets/observation-adoption.js').resolve(old,'acc_sbivc_crypto',vc.month),api=service.createService(s,{clock:()=>now,newId:()=> 'decision_crypto'});
+ const m=manual('cash','123','cashBalance',core.target(source));api.operate({sources:[m],adoptions:[{revisionId:m.id}]},{expectedFingerprint:api.inspect().fingerprint});
+ const models=api.inspect().models,f=fixture(),d=display.create(metrics,{}, {},{},models,f.accounts),period=d.dashboard(2031),asset=current.create(period,models,2031,{balanceHistory:d.balanceHistory});
+ const expected=Number(before.holdings.filter(h=>Number(h.adopted.quantity)>0).reduce((sum,h)=>sum+Number(h.adopted.marketValue),0))+123;
+ assert.equal(asset.rows.find(r=>r.key==='sbivc').metrics.net.value,expected);
+ assert.deepEqual(require('../assets/observation-adoption.js').resolve(models,'acc_sbivc_crypto',vc.month),before);
+ assert.equal(models.monthlyAccountStates,null);assert.equal(d.month(2031,2).rows.find(r=>r.key==='sbivc').realized,null);
+});
+test('new holding roster with unknown valuation never carries an older whole-roster subtotal',()=>{
+ const old=core.assetComponents([{...context,component:'spot',metric:'holdings',status:'adopted',value:[{instrumentId:'old',quantity:'1',marketValue:'99'}],targetMonth:'2026-09'}]);
+ const next=core.assetComponents([{...context,component:'spot',metric:'holdings',status:'adopted',value:[{instrumentId:'new',quantity:'1',marketValue:null}],targetMonth:'2026-10'}]);
+ const b=balances.resolve([...old,...next],{targetMonth:'2026-10',componentKeys:['spot']});assert.equal(b.knownTotal,null);assert.equal(b.hasCarried,false);
+});
+test('an adopted all-zero or empty holding set is not replaced by an older positive set',()=>{
+ for(const value of [[],[{instrumentId:'old',quantity:'0',marketValue:'0'}]]){const rows=[...core.assetComponents([{...context,component:'spot',metric:'holdings',status:'adopted',value:[{instrumentId:'old',quantity:'1',marketValue:'99'}],targetMonth:'2026-09'}]),...core.assetComponents([{...context,component:'spot',metric:'holdings',status:'adopted',value,targetMonth:'2026-10'}])];assert.equal(balances.resolve(rows,{targetMonth:'2026-10',componentKeys:['spot']}).knownTotal,'0');}
+});
+test('corrected PDF with equal values still yields a distinct pending source revision',()=>{
+ const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);const models=h.api.inspect().models,b={...models.importBatches.records[0],id:'same-value-correction',sourceFileMetadata:{hash:'c'.repeat(64),size:40}};
+ models.importBatches.records.push(b);models.accountSnapshots.records.push({...models.accountSnapshots.records[0],id:'same-value-snapshot',importBatchId:b.id});model.createRepository(h.s).commit({importBatches:models.importBatches,accountSnapshots:models.accountSnapshots});
+ const options=core.candidates(h.api.inspect().models,context).filter(r=>r.reference?.field==='cashBalance');assert.equal(options.length,2);assert.equal(value(h,p).source.id,p.id);
+});
+test('PDF and CSV candidates for the same metric remain independent sources',()=>{
+ const h=setup(),models=h.api.inspect().models,b={...models.importBatches.records[0],id:'synthetic-csv-observation',sourceType:'csv'};models.importBatches.records.push(b);models.accountSnapshots.records.push({...models.accountSnapshots.records[0],id:'csv-snapshot',importBatchId:b.id});model.createRepository(h.s).commit({importBatches:models.importBatches,accountSnapshots:models.accountSnapshots});
+ const options=core.candidates(h.api.inspect().models,context).filter(r=>r.reference?.field==='cashBalance');assert.equal(options.length,2);assert.notEqual(options[0].sourceId,options[1].sourceId);run(h,{sources:options});assert.equal(h.api.inspect().models.monthlySources.records.length,2);
+});
+test('reset adoption removes the active override but preserves its audit record',()=>{const h=setup(),p=candidate(h,'accountSnapshots','cashBalance');adopted(h,p);run(h,{overrides:[{id:'o',revisionId:p.id,value:'150'}],adoptions:[{revisionId:p.id,overrideId:'o'}]});run(h,{adoptions:[{revisionId:p.id}]});assert.equal(value(h,p).value,'139');assert.equal(value(h,p).override,null);assert.equal(h.api.inspect().models.monthlySources.records.find(r=>r.id==='o').value,'150');});

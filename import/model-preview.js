@@ -280,8 +280,8 @@
         sourceType: batch.sourceType,
         records: file.holdings }; // One observation, NOT a new persisted group schema or whole-account state.
       // Check the full graph in memory only. importedAt will be assigned at an eventual real save, not now.
-      const checked = Object.fromEntries(Object.keys(model.keys).map(entity => [entity, { schemaVersion: 1,
-        records: clone(records(existing, entity)), updatedAt: validationTime }]));
+      const checked = Object.fromEntries(Object.keys(model.keys).map(entity => [entity, entity==='monthlySources'
+        ?clone(existing[entity]??null):{ schemaVersion: 1, records: clone(records(existing, entity)), updatedAt: validationTime }]));
       if (!result.account.exists) checked.accounts.records.push(clone(account));
       for (const candidate of result.instruments.filter(item => item.status === 'new')) checked.instruments.records.push(clone(candidate.record));
       checked.importBatches.records.push({ ...batch, importedAt: validationTime });

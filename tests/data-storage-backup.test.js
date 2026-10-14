@@ -109,7 +109,7 @@ test('download filename change preserves latest v3 JSON, ISO exportedAt and all 
   assert.equal(blob.type, 'application/json');
   const value = JSON.parse(await blob.text());
   assert.deepEqual(value, copy(h.build(storage, 'http://127.0.0.1:54321', date.toISOString())));
-  assert.equal(value.backupVersion, 13); assert.equal(value.exportedAt, date.toISOString());
+  assert.equal(value.backupVersion, 14); assert.equal(value.exportedAt, date.toISOString());
   assert.deepEqual(storage.snapshot(), before); assert.equal(storage.writes, writes);
 });
 
@@ -118,7 +118,7 @@ test('v1/v2/v3 file restore uses JSON content, including old names and browser d
   const importer = source.slice(source.indexOf('function importAllData(file)'), source.indexOf("window.addEventListener('storage'", source.indexOf('function importAllData(file)')));
   assert.ok(!/file\.(?:name|filename)|\.endsWith\(/.test(importer));
   const latest = copy(backupHarness(seeded()).build(seeded(), 'http://localhost', now));
-  const v2 = copy(latest); v2.backupVersion = 2; delete v2.data.models.monthlyAccountStates; delete v2.data.models.monthlyAccountInputs; delete v2.data.models.importedTransactions;delete v2.data.models.transactionReconciliations;
+  const v2 = copy(latest); v2.backupVersion = 2; delete v2.data.models.monthlyAccountStates; delete v2.data.models.monthlyAccountInputs; delete v2.data.models.importedTransactions;delete v2.data.models.transactionReconciliations;delete v2.data.models.monthlySources;
   const values = [v1(), v2, latest];
   for (const value of values) {
     for (const name of ['tradescope-complete-backup-v2-2030-01-20T12-00-00-000Z.json',
@@ -137,7 +137,7 @@ test('v1/v2/v3 file restore uses JSON content, including old names and browser d
       assert.equal(storage.getItem('tradeScopeMemos'), JSON.stringify(value.data.memos));
       if (value.backupVersion >= 2) assert.deepEqual(model.readModels(storage), { ...value.data.models, importedTransactions: value.data.models.importedTransactions ?? null,
         monthlyAccountInputs: value.data.models.monthlyAccountInputs ?? null,
-        monthlyAccountStates: value.data.models.monthlyAccountStates ?? null, transactionReconciliations:value.data.models.transactionReconciliations ?? null });
+        monthlyAccountStates: value.data.models.monthlyAccountStates ?? null, transactionReconciliations:value.data.models.transactionReconciliations ?? null,monthlySources:value.data.models.monthlySources??null });
     }
   }
 });
@@ -145,8 +145,8 @@ test('v1/v2/v3 file restore uses JSON content, including old names and browser d
 test('A: new model write/read via adapter preserves all seven versioned envelopes', () => {
   const storage = new MemoryStorage(); const repo = model.createRepository(model.localStorageAdapter(storage), { clock: () => now });
   const values = fixture(); repo.commit(values);
-  assert.deepEqual(repo.read(), values); assert.equal(storage.getItem(transaction.journalKey), null);
-  for (const key of Object.values(model.keys)) assert.ok(storage.getItem(key));
+  assert.deepEqual(repo.read(), {monthlySources:null,...values}); assert.equal(storage.getItem(transaction.journalKey), null);
+  for (const entity of Object.keys(values)) assert.ok(storage.getItem(model.keys[entity]));
 });
 test('module construction/read does not seed Accounts or touch any storage key', () => {
   const storage = new MemoryStorage(); const repo = model.createRepository(storage);
@@ -263,7 +263,7 @@ test('v1 restore does not parse, reset or migrate even an unreadable/future new-
 test('F: v3 export -> cleared anonymous fixture -> restore -> re-export exact data equality', () => {
   const source = seeded(), h = backupHarness(source), before = source.snapshot();
   const payload = h.build(source, 'http://127.0.0.1:54321', now);
-  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 13);
+  assert.deepEqual(source.snapshot(), before); assert.equal(payload.backupVersion, 14);
   assert.equal(payload.source.origin, 'http://127.0.0.1:54321');
   const target = new MemoryStorage(), targetHarness = backupHarness(target);
   const inspection = targetHarness.format.inspectJson(JSON.stringify(payload)); assert.equal(inspection.ok, true);

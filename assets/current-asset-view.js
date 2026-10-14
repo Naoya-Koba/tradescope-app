@@ -5,6 +5,7 @@
   const adoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
   const balances=node?require('./balance-view.js'):root.TradeScopeBalanceView;
   const csv=node?require('../import/csv-core.js'):root.TradeScopeCSV;
+  const sourceContract=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const version='current-assets-v3';
   const knownSum=values=>values.length?csv.sum(values.map(String)):null;
   const number=value=>value==null||value===''?null:Number.isFinite(Number(value))?Number(value):null;
@@ -102,7 +103,9 @@
     const targetMonth=[dashboard.month?`${year}-${String(dashboard.month).padStart(2,'0')}`:null,crypto.sourceMonth]
       .filter(Boolean).sort().at(-1)??null;
     const rows=dashboard.rows.map(row=>{
-      if(row.key==='sbivc'){
+      const explicitCrypto=sourceContract.heads(models?.monthlySources?.records??[]).some(r=>r.accountId==='acc_sbivc_crypto'&&r.targetMonth.startsWith(`${year}-`)
+        &&r.currency==='JPY'&&['marketValue','cashBalance','holdings'].includes(r.metric)&&sourceContract.resolve(models,r).status!=='unresolved');
+      if(row.key==='sbivc'&&(!explicitCrypto||!balanceHistory)){
         const balance=crypto.hasSource?cryptoBalance(models,crypto,targetMonth):balances.resolve([{key:'cash',label:'JPY現金',value:null,sourceMonth:targetMonth??`${year}-01`}],{targetMonth:targetMonth??`${year}-01`,componentKeys:['cash']});
         crypto={...crypto,balance,knownAssetTotal:balance.knownTotal,hasCarried:balance.hasCarried,
           unknownComponents:balance.unknownComponents,complete:balance.complete};
@@ -112,6 +115,7 @@
       if(!balanceHistory||!targetMonth)return row;
       const history=balanceHistory(year,row,Number(targetMonth.slice(5)));
       const balance={...balances.resolve(history.observations,{targetMonth,componentKeys:history.componentKeys}),monthlyComplete:history.monthlyComplete};
+      if(row.key==='sbivc')crypto={...crypto,balance,knownAssetTotal:balance.knownTotal,hasCarried:balance.hasCarried,unknownComponents:balance.unknownComponents,complete:balance.complete};
       const sourceMonth=balance.sourceMonths.at(-1)??null;
       const ledger=balance.components.every(c=>c.basis==='period-ledger');
       return {...row,balance,conflict:row.conflict||balance.blocked,metrics:{...row.metrics,net:{value:number(balance.knownTotal),sourceMonth,

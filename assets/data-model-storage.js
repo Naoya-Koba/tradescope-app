@@ -3,6 +3,8 @@
   const transaction = typeof module !== 'undefined' && module.exports
     ? require('./storage-transaction.js') : root.TradeScopeStorageTransaction;
   const keys = transaction.modelKeys;
+  const monthlySources = typeof module !== 'undefined' && module.exports
+    ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const reconciliation = typeof module !== 'undefined' && module.exports
     ? require('./transaction-reconciliation.js') : root.TradeScopeTransactionReconciliation;
   // Released Backup schemas are fixed lists, not derived from current Repository keys.
@@ -18,7 +20,8 @@
     10: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
     11: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
     12: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
-    13: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations'])
+    13: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations']),
+    14: Object.freeze([...Object.keys(keys)])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -179,6 +182,7 @@
     }
   };
   function validateRecord(entity, record) {
+    if(entity==='monthlySources'){assertJson(record);monthlySources.validateRecord(record);return;}
     let definition = definitions[entity]; if (!definition) fail();
     if(entity==='importedTransactions'&&record?.schemaVersion===2)definition={...definition,
       required:[...definition.required,'marketType','feeSemantics'],
@@ -226,6 +230,7 @@
   }
   function validateEnvelope(entity, value) {
     if (value === null) return;
+    if(entity==='monthlySources'){assertJson(value);monthlySources.validateEnvelope(value);return;}
     assertJson(value); fields(value, ['schemaVersion', 'records', 'updatedAt'], ['schemaVersion', 'records', 'updatedAt']);
     if (value.schemaVersion !== 1 || !Array.isArray(value.records) || !timestamp(value.updatedAt)) fail();
     const ids = new Set();
@@ -237,6 +242,7 @@
   function validateModelSet(models, entities) {
     fields(models, entities, entities); assertJson(models);
     for (const entity of entities) validateEnvelope(entity, models[entity]);
+    monthlySources.validateSet(models);
     const records = entity => models[entity]?.records || [];
     const manualIds=new Set(),replacedMembers=new Set();
     for(const r of records('transactionReconciliations')){
@@ -473,7 +479,7 @@
     const changed=adoptionFields.filter(f=>!equalNullable(input.sourceValues[f],input.adoptedValues[f]));
     if(changed.length!==input.overrideFields.length||changed.some(f=>!input.overrideFields.includes(f)))fail();
   }
-  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, importedTransactions:null, transactionReconciliations:null, ...models}, Object.keys(keys)); }
+  function validateModels(models) { return validateModelSet({monthlyAccountInputs: null, importedTransactions:null, transactionReconciliations:null, monthlySources:null, ...models}, Object.keys(keys)); }
   // Source policy is separate from the common v2 record shape; unimplemented providers fail closed.
   function validateSpotTransaction(record,account,instrument,batch){
     if(account.id!=='acc_sbivc_crypto'||account.providerCode!=='sbivc'||account.accountType!=='crypto'
@@ -553,6 +559,7 @@
     if(version<10&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===3))fail();
     if(version<11&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===4))fail();
     if(version<12&&(models?.importedTransactions?.records||[]).some(r=>r.schemaVersion===2))fail();
+    if(version===14)monthlySources.validateSet(models,{strictStale:true});
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -575,6 +582,14 @@
       fields(changes, Object.keys(keys));
       if (!Object.keys(changes).length) fail();
       const models = readModels(adapter);
+      const registeredSourceFacts=(models.monthlySources?.records||[]).filter(r=>r.kind==='source'&&r.reference)
+        .map(source=>({source,fingerprint:monthlySources.sourceFingerprint(source,models)}));
+      const verifyLegacy=()=>{
+        if(!own(guard,'expectedLegacy'))return;
+        fields(guard.expectedLegacy,['tradingData','yearInitialFunds','yearInitialUnrealized'],['tradingData','yearInitialFunds','yearInitialUnrealized']);
+        if(Object.entries(guard.expectedLegacy).some(([k,v])=>adapter.getItem(k)!==v))throw Error('STALE_MONTHLY_SOURCE_DRAFT');
+      };
+      verifyLegacy();
       if (own(guard,'expectedManual') && adapter.getItem(reconciliation.manualKey)!==guard.expectedManual) {
         throw new Error('手入力データが変更されています。再確認してください');
       }
@@ -588,6 +603,10 @@
         // No physical-delete Repository API: retain historical entities and disable Accounts.
         if (value === null) fail();
         validateEnvelope(entity, value);
+        if(entity==='monthlySources'){
+          for(const old of models[entity]?.records||[]){if(JSON.stringify(value.records.find(r=>r.id===old.id))!==JSON.stringify(old))fail();}
+          for(const next of value.records.filter(r=>!models[entity]?.records.some(old=>old.id===r.id)))if(next.kind==='source'&&monthlySources.sourceFingerprint(next,{...models,...changes})!==next.fingerprint)fail();
+        }
         if(entity==='transactionReconciliations')for(const old of models[entity]?.records||[]){
           const next=value.records.find(r=>r.id===old.id);
           if(!next||next.manualId!==old.manualId||old.decision!=='defer'&&JSON.stringify(next)!==JSON.stringify(old))fail();
@@ -654,6 +673,9 @@
         }
         models[entity] = value;
       }
+      // Registered source facts are immutable. Corrections add a new physical source/revision,
+      // rather than destroying an anchor referenced by the audit log.
+      for(const {source,fingerprint} of registeredSourceFacts)if(monthlySources.sourceFingerprint(source,models)!==fingerprint)fail();
       validateModels(models);
       const actions = Object.entries(changes).map(([entity, value]) => ({ type: 'set', storageKey: keys[entity], rawValue: JSON.stringify(value) }));
       if (guard.invalidateTopSummary === true) actions.push({ type: 'remove', storageKey: 'tradeScopeTopSummarySnapshotV1' });
@@ -662,12 +684,13 @@
         verified = readModels(adapter);
         if (JSON.stringify(verified) !== JSON.stringify(models)) fail();
         if (own(guard,'expectedManual') && adapter.getItem(reconciliation.manualKey)!==guard.expectedManual) fail();
+        verifyLegacy();
       });
       return clone(verified);
     }
     function save(entity, records) {
       if (!own(keys, entity)) fail();
-      return commit({ [entity]: { schemaVersion: 1, records, updatedAt: clock() } });
+      return commit({ [entity]: entity==='monthlySources'?monthlySources.envelope(records,clock()):{ schemaVersion: 1, records, updatedAt: clock() } });
     }
     function upsert(entity, record) {
       validateRecord(entity, record);

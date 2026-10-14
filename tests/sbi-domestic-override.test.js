@@ -72,7 +72,7 @@ test('source rewrite, unknown field, metadata lie and dangling reference are rej
 });
 test('v6 exports empty models and round-trips partial adoption exactly',()=>{
   const api=backupHarness();assert.equal(api.TradeScopeBackupFormat.inspectValue(api.TradeScopeBackupExport.buildPayload(new MemoryStorage())).ok,true);
-  const s=seed();save(s);const payload=api.TradeScopeBackupExport.buildPayload(s);assert.equal(payload.backupVersion,13);
+  const s=seed();save(s);const payload=api.TradeScopeBackupExport.buildPayload(s);assert.equal(payload.backupVersion,14);
   const empty=new MemoryStorage();api.TradeScopeBackupRestore.execute(api.TradeScopeBackupFormat.inspectValue(payload).restorePlan,empty);
   assert.deepEqual(model.readModels(empty),model.readModels(s));assert.deepEqual(view(empty).dashboard(2026),view(s).dashboard(2026));
   assert.deepEqual(copy(api.TradeScopeBackupExport.buildPayload(empty).data),copy(payload.data));

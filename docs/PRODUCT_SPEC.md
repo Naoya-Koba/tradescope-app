@@ -1,5 +1,13 @@
 # Product Specification
 
+## Current / Decided — 対等なsourceと明示採用
+
+PDF／CSV／独立manualの正式source候補を保持し、口座・月・component・metricの採用値を1つだけ選ぶ基盤を追加。公式資料を自動優先せず、一致確認でもmanual原値と採用を保持する。不一致は選択またはdefer、比較不能は別状態。独立manualとsourceに対するoverrideを区別し、訂正は新revision、旧source／判断／補正を監査用に保持する。
+
+現行Input UIは変更せず、大規模比較UI・大量の新手入力項目・完了承認UIは未実装。共通APIで作成・採用・切替・補正・確認を検証し、採用後は共通resolver／display-results／balance-viewへ接続する。取得、採用、必須値、過去値使用、完了承認は別状態。残高だけcarryし、flowを引き継がない。whole totalと内訳を二重加算しない。
+
+既存legacy／canonicalの採用は互換adapterで維持しbulk migrationなし。原PDF／CSV・本文・PIIは保存せず、Backup v14が新契約を保護する。本番値は基盤導入だけでは変更しない。以下のv300時点の「永続基盤は次工程」は、本格source比較・採用UIと口座Input接続を後続に残す方針へ移行する。
+
 ## Current / Decided — 共通指標の表示と月次詳細
 
 Topと損益管理は非永続の`display-results`から同義・同時点の主要指標を参照する。純資産（月次集計）・確定資産・純損益・確定損益は共通monthly dashboard、年間決済損益・swap・入金・出金は共通yearly totalsが正本から算出する。Topはこれらを独自再計算しない。Topの現在把握残高は別のcurrent balance Viewであり、年間サマリーの「純資産（月次集計）」と区別する。各口座の対象月・完全性・根拠を保持し、同額でも異なるbasisを同義と扱わない。

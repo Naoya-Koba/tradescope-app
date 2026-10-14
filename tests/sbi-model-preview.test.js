@@ -457,7 +457,7 @@ test('browser-style modules load without storage effects and convert through rea
   const context = vm.createContext({ crypto, TextEncoder, TextDecoder,
     localStorage: { getItem(key) { reads.push(key); return values[key] ?? null; }, setItem: deny, removeItem: deny },
     fetch: deny, XMLHttpRequest: deny, console: { log: deny, error: deny } });
-  for (const file of ['assets/storage-transaction.js', 'assets/data-model-storage.js', 'import/csv-core.js',
+  for (const file of ['assets/storage-transaction.js','assets/monthly-source-contract.js', 'assets/data-model-storage.js', 'import/csv-core.js',
     'import/sbi-parser.js', 'import/model-preview.js']) vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context);
   assert.equal(reads.length, 0);
   context.anonymous = stock;

@@ -1,5 +1,13 @@
 # Calculation Specification
 
+## Current / Decided — 採用済みsourceと共通計算
+
+monthly-source-contractがsource候補→明示adoption→指定revisionのoverride→採用値を解決する。PDF／CSV／manualを順位付けせず、候補追加や一致確認だけで採用しない。missing、deferで採用なし、stale／conflictはnullで0ではない。新判断がない月は従来resolver／SBI VC observation adoptionを使用し、新判断があるcomponent／metricだけを共通monthly resolver／monthly-displayへ渡す。Top／損益管理はdisplay-results経由で描画し、独自source選択をしない。
+
+balanceだけをbalance-viewへ渡し過去確認値のcurrent carryを許可する。flowは当月限定、carryなし。whole totalとcomponentsは排他、同じcomponentの保有合計と評価額も二重加算しない。FXの現金componentだけなら残余unknownの小計。保有集合の0・終了・不明数量や新集合の不明評価額に旧集合合計を補完しない。原観測とderived ledgerは別basisで、観測差を利益・損失へ逆算しない。fee等の追加ledger式・外貨換算は今回導入しない。
+
+2026年8月legacyと9月canonicalは新契約なしなら同じ数値・期間式。新manual-only月は必須flowと評価損益が採用され、年初／前期間basisが既知の場合だけ従来ledger式を使う。曖昧なlegacy zeroで必須項目を自動充足しない。MonthlyAccountStateや完了承認は自動生成しない。source／adoptionはfingerprint依存に含み、明示保存で派生cacheを同一journal内invalidateする。current carryのAnnual期間損益・過去Trend・Riskへの非波及を維持する。
+
 ## Current / Decided — 同義指標と期間比較の表示契約
 
 `assets/display-results.js`はmonthly-displayのdashboard／yearlyTotals／monthlyPnlを読み、その共通結果をTopと損益管理へ渡す。net／confirmed／netPnl／confirmedPnlと年間realized／swap／deposit／withdrawalを画面側で再計算しない。Top swap内訳・累計・既存推定も同じ結果から生成する。計算式・正本・canonical resolverのcomplete／missing／conflictは変更しない。

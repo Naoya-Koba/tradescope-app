@@ -74,7 +74,7 @@ test('real shared monthly dashboard/Annual/Trend calculation remains byte unchan
  assert.equal(JSON.stringify([d.dashboard(2026),d.series(2026),d.monthlyPnl(2026,9)]),before);
 });
 test('Storage and Backup v13 remain byte unchanged after repeat/year projections',async()=>{
- const s=await seed(),before=s.snapshot(),payload=copy(backup(s).build());view(s);view(s,2029);view(s);assert.equal(s.snapshot(),before);assert.deepEqual(copy(backup(s).build()),payload);assert.equal(payload.backupVersion,13);
+ const s=await seed(),before=s.snapshot(),payload=copy(backup(s).build());view(s);view(s,2029);view(s);assert.equal(s.snapshot(),before);assert.deepEqual(copy(backup(s).build()),payload);assert.equal(payload.backupVersion,14);
 });
 test('read-only modules have no Storage mutation, history dependency or log',()=>{
  for(const file of ['assets/current-asset-view.js','assets/open-positions-view.js'])assert.doesNotMatch(fs.readFileSync(file,'utf8'),/setItem|removeItem|\.commit\(|console\.|fetch\(|TradeScopeHistory/);

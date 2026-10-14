@@ -1,5 +1,17 @@
 # Development Guide
 
+## Current — 共通source / adoption（PWA v301）
+
+monthly-source-contract.jsはDOM／Storage／network非依存のvalidator、SHA-256、candidate／legacy adapter、採用／補正resolver、comparison、audit、進捗metadataを提供する。source種類で採用・carry順位を作らない。monthly-source-service.jsの明示注入Adapterをinspect→operateで使用し、inspect.fingerprintを必須guardとして全model＋legacy正本を保存直前に照合する。stale時は保存停止し呼出元Draftを変更しない。
+
+operateのsources／overrides／adoptions／comparisonsと必要な標準Account依存は、一回のRepository commit／既存journalでatomic保存する。全recordはappend-only、登録済み原金融事実は不変。cache削除・再読込検証・rollbackも同じ保護下で行い、rollback不能ならjournal保持。loadだけで新キーを作らず、legacy全件変換なし。
+
+既存broker parser／金融原値／SBI VC補正・訂正／取引確認統合は維持。SBI CSV Previewの全model仮検証だけ新source envelopeを再生成せず既存値／nullで引き継ぐよう対応。PWA v301、変更資産query 20261014-2、precache 73資産。Backup v14は既存10＋新1モデルで、公開済みv1〜v13 schemaは固定。`tests/monthly-source.test.js`は原値保護、採用／defer、stale、履歴欠落、journal／rollback、旧Backup、匿名localhost/subpath・disposable Memory Storageを検証し、server／memoryをcleanupする。本番originへ接続しない。
+
+本格比較／採用Input UI、broker保存接続、完了承認は後続。mutatable Input／Stateの原値を新sourceへ登録した場合も以後その参照原値は上書き不可。後続の訂正は新物理source／独立manual revisionで実装する。暗号資産取引・cashflow／Riskへ今回新契約を広げない。
+
+今回の検証：追加97件／全1232 tests Pass。JS構文115ファイル、precache 73資産・HTML URL整合、git diff --check、匿名localhostのv14往復／cleanupを確認。computer-use browserが利用できず390px／1280px実表示・実ブラウザConsoleは未実施（module初期化テストとは区別する）。本番Storage・実データ・実Backupは未操作。
+
 ## Current — 共通表示結果と外部変更の再読込
 
 `assets/display-results.js`がperiod dashboard／年間flow／月次表示／比較可否をまとめ、Topと損益管理は同義の主要指標をこの結果から描画する。画面側で同じ金融値を再計算しない。current balanceはoptional factoryで別に生成し、損益管理は呼ばない。年間カードのbasis・口座別sourceMonth・完全性を保持し、比較不能なら増減・率だけ非表示。年初sourceの未入力／null／空欄を旧calculatorの0寄与で隠さず、純資産カード比較を停止する。SMBCの年初評価損益は要求しない。

@@ -3,6 +3,8 @@
   const node = typeof module !== 'undefined' && module.exports;
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
+  const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
+  const cryptoAdoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
   const version = 'monthly-display-v5';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
@@ -12,18 +14,20 @@
     return known.length ? numeric(csv.sum(known.map(String))) : null;
   };
   const strictSum = values => values.length && values.every(Number.isFinite) ? knownSum(values) : null;
-  const years = models => [...new Set(['monthlyAccountStates', 'holdingSnapshots', 'accountSnapshots', 'importBatches']
+  const years = models => [...new Set(['monthlyAccountStates', 'holdingSnapshots', 'accountSnapshots', 'importBatches','monthlySources']
     .flatMap(entity => records(models, entity).filter(row => row.targetMonth).map(row => Number(row.targetMonth.slice(0, 4)))))];
 
   // Shared display projection for Summary and trends; never feeds the canonical ledger or saves.
   function create(legacy, tradingData, initialFunds, initialUnrealized, models, accounts) {
     const calculator = resolver.createCalculator(legacy, tradingData, initialFunds, initialUnrealized, models);
     function present(key, targetMonth) {
+      const ids={sbi:'acc_sbi_sec',gmo:'acc_gmo_fx',lightfx:'acc_lightfx_fx',minano:'acc_minna_fx',sbivc:'acc_sbivc_crypto',smbc:'acc_smbc_bank'};
+      if(sources.heads(records(models,'monthlySources')).some(r=>r.accountId===ids[key]&&r.targetMonth===targetMonth))return true;
       const policy = resolver.policies[key];
       return policy && targetMonth >= policy.cutover && ['monthlyAccountStates', 'holdingSnapshots', 'accountSnapshots', 'importBatches']
         .some(entity => records(models, entity).some(row => row.accountId === policy.accountId && row.targetMonth === targetMonth));
     }
-    function observation(key, targetMonth, resolved) {
+    function observationExisting(key, targetMonth, resolved) {
       if (resolved.source === 'conflict') return { components: [], conflict: true };
       if (key === 'sbi') {
         const candidates = resolver.domesticCandidates(models, targetMonth);
@@ -62,27 +66,58 @@
       }
       return { components: [], conflict: false };
     }
+    function cryptoComponents(targetMonth){
+      const adopted=cryptoAdoption.resolve(models,'acc_sbivc_crypto',targetMonth);if(!adopted)return [];
+      const h=adopted.holdings.map(h=>h.adopted),known=h.every(h=>h.quantity!==null);
+      const values=h.filter(h=>numeric(h.quantity)>0).map(h=>h.marketValue);
+      return [{key:'spot',name:'現物保有',asset:known&&values.every(v=>numeric(v)!==null)?values.length?csv.sum(values):'0':null,unrealized:null,id:adopted.snapshot.id,snapshotAsOf:adopted.snapshot.snapshotAsOf},
+        {key:'cash',name:'現金・預り金',asset:adopted.adopted.cashBalance,unrealized:null,id:adopted.snapshot.id,snapshotAsOf:adopted.snapshot.snapshotAsOf}];
+    }
+    function observation(key,targetMonth,resolved){
+      let base=observationExisting(key,targetMonth,resolved);const values=resolved.sourceAdoptions??[];
+      if(!values.length)return base;
+      if(key==='sbivc')base={components:cryptoComponents(targetMonth),conflict:false};
+      if(resolved.source==='conflict')return {components:[],conflict:true};
+      const assets=sources.assetComponents(values.filter(v=>v.currency==='JPY'));
+      if(!assets.length){
+        const components=base.components.map(c=>({...c}));
+        for(const v of values.filter(v=>v.metric==='unrealizedPnl'&&v.currency==='JPY')){
+          let c=components.find(c=>c.key===v.component);if(!c){c={key:v.component,name:'評価損益',asset:null,id:v.source?.id??null,snapshotAsOf:v.asOf};components.push(c);}c.unrealized=v.value;
+        }
+        return {components,conflict:base.conflict};
+      }
+      const whole=assets.some(c=>c.key==='account'),partitioned=assets.some(c=>c.key!=='account');
+      const components=base.components.filter(c=>!whole&&!assets.some(v=>v.key===c.key)&&(!partitioned||c.key!=='account'));
+      for(const c of assets){const old=base.components.find(v=>v.key===c.key),unrealized=values.find(v=>v.metric==='unrealizedPnl'&&v.component===c.key&&v.currency==='JPY');
+        components.push({key:c.key,name:({domestic:'国内証券',foreign:'外国証券',cash:'現金・預り金',spot:'現物保有',account:'口座観測'})[c.key],asset:c.value,
+          unrealized:unrealized?unrealized.value:old?.unrealized??null,snapshotAsOf:c.snapshotAsOf,id:c.source.revisionId,source:c.source,preventCarry:c.preventCarry});}
+      if(partitioned&&!whole&&['gmo','lightfx','minano'].includes(key))components.push({key:'remaining',name:'未確認成分',asset:null,unrealized:null,id:null,snapshotAsOf:null});
+      return {components,conflict:assets.some(c=>c.blocked)};
+    }
     function accountMonth(year, month, account) {
       const key = account.key, targetMonth = dateKey(year, month), resolved = calculator.resolve(year, month, key);
       const isLegacy = resolved.source === 'legacy', entered = calculator.entered(year, month, key);
-      const hasData = isLegacy ? entered : present(key, targetMonth);
+      const hasData = resolved.sourceAdoptions?.length>0 || (isLegacy ? entered : present(key, targetMonth));
       const observed = observation(key, targetMonth, resolved);
-      const complete = isLegacy ? entered && Number.isFinite(calculator.net(year, month, key)) : resolved.completeness?.complete === true;
+      const complete = isLegacy ? entered && Number.isFinite(calculator.net(year, month, key)) : resolved.completeness?.complete === true
+        &&(!resolved.sourceAdoptions||Number.isFinite(calculator.net(year,month,key)));
       const row = calculator.row(year, month, key);
       const input = records(models, 'monthlyAccountInputs').find(item => item.accountId === resolver.policies[key]?.accountId && item.targetMonth === targetMonth);
-      const adoptedRow = input && !resolved.state ? input.schemaVersion === 2
+      const adoptedRow = input && !resolved.state && !resolved.sourceAdoptions ? input.schemaVersion === 2
         ? {realizedPnL:input.adoptedValues.realizedPnl,swapPnL:input.adoptedValues.swapPnl,unrealizedPnL:input.adoptedValues.unrealizedPnl,deposit:input.adoptedValues.deposit,withdrawal:input.adoptedValues.withdrawal}
         : {realizedPnL:input.realizedPnl, deposit:input.deposit, withdrawal:input.withdrawal} : row;
-      const read = field => hasData && resolved.source !== 'conflict' && !observed.conflict ? numeric(adoptedRow[field]) : null;
-      const partial = hasData && !complete;
-      const asset = complete ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
+      const read = field => hasData && (!isLegacy||entered) && resolved.source !== 'conflict' && !observed.conflict ? numeric(adoptedRow[field]) : null;
+      const explicitAsset=resolved.sourceAdoptions?.some(v=>v.currency==='JPY'&&['marketValue','cashBalance','holdings'].includes(v.metric));
+      const partial = hasData && (!complete||explicitAsset&&observed.components.some(c=>numeric(c.asset)===null));
+      const asset = complete && !explicitAsset ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
       const unrealized = complete || resolved.source === 'legacy' ? read('unrealizedPnL')
         : knownSum(observed.components.map(item => item.unrealized));
       return { key, targetMonth, sourceMonth: targetMonth, hasData, complete, partial,
         conflict: resolved.source === 'conflict' || observed.conflict, components: observed.components,
         realized: read('realizedPnL'), swap: read('swapPnL'), unrealized,
         deposit: read('deposit'), withdrawal: read('withdrawal'), asset,
-        confirmed: complete ? calculator.confirmed(year, month, key) : null };
+        confirmed: complete ? calculator.confirmed(year, month, key) : null,
+        ...(explicitAsset?{assetBasis:'source-observation',ledgerAsset:complete?calculator.net(year,month,key):null}: {}) };
     }
     function month(year, monthNumber) {
       const rows = accounts.map(account => accountMonth(year, monthNumber, account));
@@ -125,11 +160,11 @@
         const status = row => row?.targetMonth === dateKey(year, baseline) ? row.complete ? 'current complete' : 'current partial' : 'previous complete';
         const performance = latest ? calculator.performance(year, Number(latest.targetMonth.slice(5)), [account.key]) : {};
         return { ...account, metrics: {
-          net: metric(assetRow?.asset, assetRow?.targetMonth ?? null, status(assetRow)),
+          net: {...metric(assetRow?.asset, assetRow?.targetMonth ?? null, assetRow?.partial?'current partial':status(assetRow)),...(assetRow?.assetBasis?{basis:assetRow.assetBasis}:{})},
           confirmed: metric(latest?.confirmed, latest?.targetMonth ?? null, status(latest)),
           netPnl: metric(performance.net, latest?.targetMonth ?? null, status(latest)),
           confirmedPnl: metric(performance.confirmed, latest?.targetMonth ?? null, status(latest)),
-          completeNet: metric(latest?.asset, latest?.targetMonth ?? null, status(latest)) },
+          completeNet: metric(latest?.assetBasis?latest.ledgerAsset:latest?.asset, latest?.targetMonth ?? null, status(latest)) },
           conflict: current?.conflict || false };
       });
       const growth = rows.filter(row => !row.bankOnly), keys = selectedAccounts.map(account => account.key), growthKeys = growth.map(row => row.key);
@@ -185,8 +220,10 @@
         const targetMonth=dateKey(year,i+1),resolved=calculator.resolve(year,i+1,account.key);
         return {targetMonth,resolved,row:accountMonth(year,i+1,account),observed:observation(account.key,targetMonth,resolved)};
       });
-      const partitioned=account.key==='sbi'&&history.some(h=>h.observed.components.some(c=>c.id));
-      const componentKeys=partitioned?['domestic','foreign','cash']:['account'];
+      const commonPartition=history.some(h=>h.resolved.sourceAdoptions?.some(v=>v.currency==='JPY'&&v.component!=='account'&&['marketValue','cashBalance','holdings'].includes(v.metric)));
+      if(commonPartition&&account.key==='sbivc')for(const h of history)if(!h.resolved.sourceAdoptions?.length)h.observed={components:cryptoComponents(h.targetMonth),conflict:false};
+      const partitioned=commonPartition||account.key==='sbi'&&history.some(h=>h.observed.components.some(c=>c.id));
+      const componentKeys=partitioned?account.key==='sbi'?['domestic','foreign','cash']:account.key==='sbivc'?['spot','cash']:[...new Set(history.flatMap(h=>h.observed.components.map(c=>c.key)).filter(k=>k!=='account'))]:['account'];
       const observations=[];
       for(const {targetMonth,resolved,row,observed} of history){
         if(row.conflict){
@@ -195,17 +232,17 @@
         }
         if(partitioned){
           // A legacy whole-account value cannot safely fill individual missing components.
-          for(const c of observed.components){
+          for(const c of observed.components.filter(c=>componentKeys.includes(c.key))){
             const snapshot=records(models,'accountSnapshots').find(s=>s.id===c.id);
             const batch=records(models,'importBatches').find(b=>b.id===(snapshot?.importBatchId||c.id));
-            observations.push({key:c.key,label:c.name,value:c.asset,sourceMonth:targetMonth,snapshotAsOf:c.snapshotAsOf,
-              basis:'current-asset-observation',source:{recordId:c.id,importBatchId:batch?.id??null,
+            observations.push({key:c.key,label:c.name,value:c.asset,sourceMonth:targetMonth,snapshotAsOf:c.snapshotAsOf,preventCarry:c.preventCarry===true,
+              basis:'current-asset-observation',source:c.source??{recordId:c.id,importBatchId:batch?.id??null,
                 sourceType:batch?.sourceType??snapshot?.sourceMode??null,sourceScope:snapshot?.sourceScope??(batch?'sbi-domestic-holdings':null)}});
           }
         }else{
           // Preserve complete ledger amounts. Whole-account partial observations may be carried too.
           const c=observed.components.find(c=>c.key==='account');
-          const ledgerKnown=row.complete&&Number.isFinite(row.asset);
+          const ledgerKnown=!row.assetBasis&&row.complete&&Number.isFinite(row.asset);
           const value=ledgerKnown?row.asset:c?.asset??null;
           if(row.hasData)observations.push({key:'account',label:'口座残高',value,sourceMonth:targetMonth,snapshotAsOf:c?.snapshotAsOf??null,
             basis:ledgerKnown?'period-ledger':'current-asset-observation',
