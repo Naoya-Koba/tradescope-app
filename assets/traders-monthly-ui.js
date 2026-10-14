@@ -1,6 +1,6 @@
 (function(root){
  'use strict';
- function createController({adapter,onSaved}){
+ function createController({adapter,onSaved,onSourceDraft=()=>{},onSourceSaved=()=>{}}){
   const services=new Map(),drafts=new Map();const fields=[['realizedPnl','決済損益'],['swapPnl','スワップ損益'],['unrealizedPnl','評価損益'],['deposit','入金'],['withdrawal','出金']];
   function renderCard(account,targetMonth,label){
    const key=account.key,token=key+targetMonth;if(!services.has(key))services.set(key,root.TradeScopeTradersSave.createService(adapter,key));const service=services.get(key);
@@ -13,13 +13,26 @@
     if(field==='swapPnl')body.append(node('p','収益カレンダー「スワップ付与」月間合計','monthly-source-note'));
    }
    const reset=node('button','元の入力値に戻す','monthly-source-reset');reset.type='button';const actions=node('div','','monthly-account-actions'),save=node('button','保存','btn btn-primary btn-block monthly-account-save');save.type='button';
-   const error=node('p','','sbi-monthly-error');error.setAttribute('role','alert');let busy=false;
-   function refresh(){save.disabled=busy||!prepared;save.textContent=busy?'保存中…':'保存';reset.hidden=!prepared||fields.every(([f])=>draft[f]===prepared.source[f]);error.hidden=!error.textContent;if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;}
+   const error=node('p','','sbi-monthly-error');error.setAttribute('role','alert');let busy=false,sourcePanel=null;
+   function refresh(){save.disabled=busy||!prepared;save.textContent=busy?'保存中…':'保存';reset.hidden=!prepared||fields.every(([f])=>draft[f]===prepared.source[f]);controls.unrealizedPnl.readOnly=prepared?.commonUnrealized===true;error.hidden=!error.textContent;if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;}
    for(const[field]of fields)controls[field].addEventListener('input',()=>{draft[field]=controls[field].value;error.textContent='';refresh();});
-   reset.addEventListener('click',()=>{if(busy||!prepared)return;Object.assign(draft,prepared.source);for(const[f]of fields)controls[f].value=draft[f]??'';error.textContent='';refresh();});
-   save.addEventListener('click',()=>{if(busy||!prepared)return;busy=true;refresh();try{const result=service.correct({...draft,targetMonth},{expectedModels:prepared.models});if(['saved','unchanged'].includes(result.status)){drafts.delete(token);onSaved(key);}}catch(_){error.textContent='保存できませんでした。入力値と保存データを確認してください';}finally{busy=false;refresh();}});
+   reset.addEventListener('click',()=>{if(busy||!prepared)return;for(const[f]of fields)if(f!=='unrealizedPnl'||!prepared.commonUnrealized)draft[f]=prepared.source[f];for(const[f]of fields)controls[f].value=draft[f]??'';error.textContent='';refresh();});
+   save.addEventListener('click',()=>{if(busy||!prepared)return;if(sourcePanel?.pending()||sourcePanel?.form()){error.textContent='入力元の選択を先に保存または取消してください';refresh();return;}busy=true;refresh();try{const result=service.correct({...draft,targetMonth},{expectedModels:prepared.models});if(['saved','unchanged'].includes(result.status)){drafts.delete(token);onSaved(key);}}catch(_){error.textContent='保存できませんでした。入力値と保存データを確認してください';}finally{busy=false;refresh();}});
    if(!prepared){error.textContent='この月の月次PDFを取り込んでください';const link=node('a','データ取込');link.href='../import.html';body.append(link);}
-   actions.append(save);body.append(reset,actions,error);refresh();return card;
+   actions.append(save);body.append(reset,actions,error);
+   if(key==='lightfx'&&root.TradeScopeScalarSourceSelection&&root.TradeScopeScalarSourceUI){
+     const facade=root.TradeScopeLightScalarAdoption;
+     const controller=root.TradeScopeScalarSourceSelection.createController(adapter,{accountId:facade.accountId,targets:facade.targets,
+       manualTargets:[],cutover:facade.cutover,resolveBalance:facade.resolve,validateSource:facade.supportsSource});
+     sourcePanel=root.TradeScopeScalarSourceUI.create({document,controller,targetMonth,
+       onDraft:active=>onSourceDraft(key,targetMonth,active),onResize:refresh,onSaved:()=>{
+         const dirty=prepared&&fields.some(([f])=>String(draft[f]??'')!==String(prepared.adopted[f]??''));
+         if(!dirty){try{prepared=service.monthlyInspect(targetMonth);Object.assign(draft,prepared.adopted);for(const[f]of fields)controls[f].value=draft[f]??'';}catch(_){prepared=null;}}
+         // Dirty financial Drafts retain their old guard and fail stale rather than being overwritten.
+         onSourceSaved(key,targetMonth);refresh();
+       }});body.append(sourcePanel.element);
+   }
+   refresh();return card;
   }
   return Object.freeze({renderCard,retainDrafts:predicate=>{for(const token of drafts.keys())if(!predicate(token.slice(0,-7),token.slice(-7)))drafts.delete(token);}});
  }

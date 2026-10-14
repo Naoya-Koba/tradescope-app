@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current / Decided — LIGHT FX scalar source操作（v309）
+
+LIGHT月次Inputの「入力元・採用を確認」で、口座純資産観測と価格評価損益を別々に選択できる。PDF／manualに自動順位を付けず、候補追加／比較確認だけでは採用を切り替えない。保留は有効な採用を維持し、採用なしならunknown。旧補正は新revisionへ継承しない。これは最小機能UIで、全体デザイン・進捗UIの改修ではない。
+
+calendar swapは従来収益カレンダーmanual、PDF settled／未決済swapは観測のみ。PDF約定・公式建玉consumer・event分類・internal transferは未接続。Portfolio／Open Positionsはlegacy/manual、Riskは後の全セクション責務・情報設計監査対象。みんなのFXの共通採用横展開は次工程。Backup v14維持。
+
 ## Current / Decided — SBI期間計算bridge（v308）
 
 common採用された国内評価額・評価損益、外国円評価額・評価損益、JPY cashを固定月の正式期間入力へ接続する。manual／CSVの自動優先なし。existing manual flowと参照条件が揃えば、別Stateを作らずderived resolverで期間計算可能。不足はpartial／missingで、残高差をP/Lにしない。進捗UI・完了承認・holding-set・Portfolio／Open Positions移行は未実装のまま。

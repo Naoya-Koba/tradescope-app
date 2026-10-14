@@ -1,5 +1,13 @@
 # Calculation Specification
 
+## Current / Decided — LIGHT FX scalarの単一入口（v309）
+
+共通scalar facade → monthly resolver → monthly-display／display-results／current-asset-viewを使用し、各画面にsource優先順位を作らない。価格評価損益はaccount scopeの採用値を一度だけ使用し、同じFX Holding集計を追加しない。common判断のstale／conflict／参照破損は旧値へsilent fallbackしない。
+
+realized／deposit／withdrawalは従来Input／Stateの集計・採用値。calendar swapは独立manual-income-calendarで、PDF settled／未決済swapを代用しない。非ゼロ入出金の外部／内部／cashback分類は今回追加しない。PDF純資産観測とcalendar ledgerは別basisで、残高差からP/Lを作らない。candidate追加だけなら従来の完全ledger current額を維持し、純資産観測の明示採用時のみsource-observationとして表示する。
+
+current carryはcurrentだけで、当月採用済み・過去確認値使用中・missing・明示0を区別する。固定月のmissingにはcarryしない。8月legacyをmigrationせず、Monthly／Annual／両Trendは既存共通period経路。Portfolio／Open Positions／Transaction History／Risk／みんなのFXのsourceは変更しない。
+
 ## Current / Decided — SBI common adoptionから期間入力への橋渡し（v308）
 
 SBI証券はcommon balance resolver → derived period input → 既存月次ledger → Monthly／Annual Summary・Asset／Performance Trendを使用する。式は変更せず、国内／外国評価損益は採用済み値を一度だけ渡す。国内評価額＋外国円評価額＋JPY cashは公式観測参照で、ledger純資産やrealizedを残高差から作らない。current carry、他月、年初値で固定月のmissingを埋めない。

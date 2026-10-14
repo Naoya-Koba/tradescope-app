@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   if(location.protocol!=='http:'||!['localhost','127.0.0.1'].includes(location.hostname)||!location.port)return;
-  const model=TradeScopeDataStorage,keys=['tradingData','yearInitialFunds','yearInitialUnrealized',...Object.values(model.keys)],token='anonymousProgressBaseline';
+  const model=TradeScopeDataStorage,keys=[...TradeScopeStorageTransaction.primaryKeys],token='anonymousProgressBaseline';
   const show=v=>document.getElementById('result').textContent=JSON.stringify(v,null,2);
   const original=()=>keys.map(k=>[k,localStorage.getItem(k)]);
   const unchanged=()=>JSON.stringify(original())===sessionStorage.getItem(token);
@@ -34,6 +34,18 @@
     sessionStorage.setItem(token,JSON.stringify(original()));render('2026-09');
   }
   document.getElementById('prepare').onclick=()=>prepare();document.getElementById('bridge').onclick=()=>prepare(true);
+  document.getElementById('light').onclick=async()=>{
+    if(localStorage.length)return show({refused:'fresh origin required'});
+    prepare();
+    const names=['cashBalance','requiredMargin','orderRequiredMargin','reportedAccountEvaluationPnl','netAssetValue','transferableAmount','maintenanceRate','unsettledAmount','unrealizedPnl','monthEndUnsettledSwap','realizedPnl','reportedSettledSwapPnl','deposit','withdrawal','fee','other'];
+    const values=Object.fromEntries(names.map(k=>[k,['cashBalance','netAssetValue','transferableAmount'].includes(k)?'1000':'0']));
+    await TradeScopeTradersSave.createService(localStorage,'lightfx').save({preview:{broker:'lightfx',importerVersion:TradeScopeTradersParser.version,targetMonth:'2026-09',snapshotAsOf:'2026-09-30',observationType:'officialMonthEnd',valuationCurrency:'JPY',values,positions:[],errors:[],warnings:[],valid:true},fileHash:'c'.repeat(64),fileSize:100,calendarSwap:'0'});
+    const api=TradeScopeMonthlySourceService.createService(localStorage),core=TradeScopeMonthlySourceContract;
+    const sources=['2000','1000'].map((value,i)=>core.descriptor({accountId:'acc_lightfx_fx',targetMonth:'2026-09',component:'account',asOf:'2026-09-30'},'marketValue',value,{id:'anonymous_light_'+i,sourceId:'anonymous_light_'+i,sourceType:'manual'}));
+    api.operate({sources,adoptions:[{revisionId:sources[0].id}]},{expectedFingerprint:api.inspect().fingerprint});
+    sessionStorage.setItem(token,JSON.stringify(original()));show({anonymousOnly:true,lightPrepared:true,storageUnchanged:unchanged()});
+  };
+  document.getElementById('baseline').onclick=()=>{if(!sessionStorage.getItem(token))return show({refused:true});sessionStorage.setItem(token,JSON.stringify(original()));show({anonymousOnly:true,baselineCaptured:true});};
   document.getElementById('september').onclick=()=>render('2026-09');document.getElementById('october').onclick=()=>render('2026-10');
   document.getElementById('inspect').onclick=()=>show({storageUnchanged:!!sessionStorage.getItem(token)&&unchanged()});
   document.getElementById('cleanup').onclick=async()=>{

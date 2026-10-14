@@ -6,6 +6,8 @@
  const parser=node?require('./traders-parser.js'):root.TradeScopeTradersParser;
  const tx=node?require('../assets/storage-transaction.js'):root.TradeScopeStorageTransaction;
  const csv=node?require('./csv-core.js'):root.TradeScopeCSV;
+ const light=node?require('../assets/lightfx-scalar-adoption.js'):root.TradeScopeLightScalarAdoption;
+ const sourceService=node?require('../assets/monthly-source-service.js'):root.TradeScopeMonthlySourceService;
  const copy=v=>JSON.parse(JSON.stringify(v)),rows=(m,e)=>m[e]?.records||[];
  const valueNames=['cashBalance','requiredMargin','orderRequiredMargin','reportedAccountEvaluationPnl','netAssetValue','transferableAmount','maintenanceRate','unsettledAmount','unrealizedPnl','monthEndUnsettledSwap','realizedPnl','reportedSettledSwapPnl','deposit','withdrawal','fee','other'];
  const only=(v,names)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>names.includes(k));
@@ -54,9 +56,10 @@
    for(const symbol of new Set(p.positions.map(r=>r.symbol))){const matches=rows(before,'instruments').filter(r=>r.assetType==='FX'&&parser.pair(r.symbol)===symbol);
     if(matches.length>1)return {status:'conflict',reason:'instrument'};
     if(matches.length)ids.set(symbol,matches[0].id);else instruments.push(symbol);}
-   return {status:state||monthlyInput?'review-required':'ready',reason:state||monthlyInput?'different-report':null,before,source,p,state,input:monthlyInput,account,swap,instruments,ids};
+   const sourceGuard=broker==='lightfx'?sourceService.createService(adapter).inspect():null;
+   return {status:state||monthlyInput?'review-required':'ready',reason:state||monthlyInput?'different-report':null,before,source,p,state,input:monthlyInput,account,swap,instruments,ids,sourceGuard};
   }
-  const result=p=>({status:p.status,reason:p.reason||null,...(p.state||p.input?{stateId:p.state?.id||null,inputId:p.input?.id||null,adoptedSnapshotId:p.state?.adoptedAccountSnapshotId||p.input.adoptedAccountSnapshotId,
+  const result=p=>({status:p.status,reason:p.reason||null,...(p.sourceGuard?{sourceFingerprint:p.sourceGuard.fingerprint}:{}),...(p.state||p.input?{stateId:p.state?.id||null,inputId:p.input?.id||null,adoptedSnapshotId:p.state?.adoptedAccountSnapshotId||p.input.adoptedAccountSnapshotId,
     calendarSwap:p.input?.adoptedValues.swapPnl??p.state?.swapPnl??p.swap}:{})});
   async function inspect(input){return result(prepare(input));}
   async function save(input,confirmation={}){if(busy)return{status:'busy'};busy=true;try{
@@ -64,6 +67,7 @@
      &&confirmation.adoptedSnapshotId===(prepared.state?.adoptedAccountSnapshotId||prepared.input?.adoptedAccountSnapshotId)
      &&(!prepared.input||confirmation.inputId===prepared.input.id)&&confirmation.calendarSwap===result(prepared).calendarSwap;
    if(prepared.status!=='ready'&&!correction)return result(prepared);
+   if(broker==='lightfx'&&confirmation.sourceFingerprint!==undefined&&confirmation.sourceFingerprint!==prepared.sourceGuard.fingerprint)throw Error('STALE_MONTHLY_SOURCE_DRAFT');
    const {before,source,p,state,input:oldInput,account,swap,ids}=prepared,now=clock(),batchId=model.newId('batch',cryptoApi),snapshotId=model.newId('as',cryptoApi),changes={};
    const envelope=records=>({schemaVersion:1,records,updatedAt:now});
    if(!account)changes.accounts=envelope([...copy(rows(before,'accounts')),model.initialAccounts().find(r=>r.id===accountId)]);
@@ -88,7 +92,21 @@
    changes.monthlyAccountInputs=envelope([...copy(rows(before,'monthlyAccountInputs')).filter(r=>r.id!==monthlyInput.id),monthlyInput]);
    if(adopted.swapPnl!==null){const monthly=makeState(monthlyInput,state,oldSnapshot,now);
      changes.monthlyAccountStates=envelope([...copy(rows(before,'monthlyAccountStates')).filter(r=>r.id!==monthly.id),monthly]);}
-   repo.commit(changes,{expectedModels:before,invalidateTopSummary:true});return{status:'saved',corrected:correction,complete:adopted.swapPnl!==null};
+   if(broker==='lightfx'){
+     // A new PDF revision acquires observations only. Native flows/calendar and
+     // the existing compatibility adoption remain unchanged until explicit selection.
+     if(correction){delete changes.monthlyAccountInputs;delete changes.monthlyAccountStates;}
+     let combined={...before,...changes};
+     const oldId=oldInput?.adoptedAccountSnapshotId??state?.adoptedAccountSnapshotId;
+     const build=options.buildSourceChanges??sourceService.buildChanges;
+     for(const id of [oldId,snapshotId].filter(Boolean)){
+       const operation=light.candidateOperation(combined,p.targetMonth,id,{required:id===snapshotId});
+       if(!operation.sources.length)continue;
+       Object.assign(changes,build(combined,operation,{at:now,newId:()=>model.newId('ms',cryptoApi)}).changes);
+       combined={...before,...changes};
+     }
+   }
+   repo.commit(changes,{expectedModels:before,...(prepared.sourceGuard?{expectedLegacy:prepared.sourceGuard.legacy}:{}),invalidateTopSummary:true});return{status:'saved',corrected:correction,complete:adopted.swapPnl!==null};
   }finally{busy=false;}}
   function makeState(input,state,snapshot,now){const values=input.adoptedValues;
     return {schemaVersion:4,id:state?.id||model.newId('mas',cryptoApi),accountId,targetMonth:input.targetMonth,confirmedAt:now,adoptedAccountSnapshotId:input.adoptedAccountSnapshotId,
@@ -98,14 +116,22 @@
   function monthlyInspect(targetMonth){const models=repo.read();let legacy;try{legacy=JSON.parse(adapter.getItem('tradingData')||'{}');}catch(_){throw Error('従来入力を確認できません');}
    const r=resolver.resolve(models,legacy,targetMonth,broker);if(r.source==='conflict'||targetMonth<policy.cutover)throw Error('保存データを確認してください');
    const input=rows(models,'monthlyAccountInputs').find(row=>row.accountId===accountId&&row.targetMonth===targetMonth&&row.schemaVersion===2);
-   if(input){const snapshot=rows(models,'accountSnapshots').find(row=>row.id===input.adoptedAccountSnapshotId);return{models,input,state:r.state,snapshot,source:copy(input.sourceValues),adopted:copy(input.adoptedValues)};}
+   const adoptedView=values=>broker==='lightfx'&&r.lightScalars?.metrics[1].hasCommon?{...values,unrealizedPnl:r.lightScalars.unrealizedPnl}:values;
+   if(input){const snapshot=rows(models,'accountSnapshots').find(row=>row.id===input.adoptedAccountSnapshotId);return{models,input,state:r.state,snapshot,source:copy(input.sourceValues),adopted:adoptedView(copy(input.adoptedValues)),commonUnrealized:broker==='lightfx'&&r.lightScalars?.metrics[1].hasCommon};}
    if(r.source!=='canonical'||!r.completeness.complete)throw Error('この月の月次PDFを取り込んでください');
-   return{models,input:null,state:r.state,snapshot:r.snapshot,source:copy(r.state.sourceValues),adopted:model.adoptedValues(r.state,r.snapshot)};}
+   return{models,input:null,state:r.state,snapshot:r.snapshot,source:copy(r.state.sourceValues),adopted:adoptedView(model.adoptedValues(r.state,r.snapshot)),commonUnrealized:broker==='lightfx'&&r.lightScalars?.metrics[1].hasCommon};}
   function correct(draft,guard={}){
    const p=monthlyInspect(draft.targetMonth);if(guard.expectedModels&&JSON.stringify(guard.expectedModels)!==JSON.stringify(p.models))throw Error('保存データが変更されています');
    const values={};for(const field of model.adoptionFields){try{values[field]=field==='swapPnl'?calendarValue(draft[field]):csv.decimal(draft[field]);}catch(_){throw Error('入力値を確認してください');}if(values[field]===null)throw Error('空欄の項目を入力してください');}
    if(['deposit','withdrawal'].some(k=>values[k].startsWith('-')))throw Error('入金・出金は0以上を入力してください');
-   if(model.adoptionFields.every(k=>!differs(values[k],p.adopted[k])))return{status:'unchanged'};
+   if(broker==='lightfx'){
+     const balance=light.resolve(p.models,draft.targetMonth);
+     if(balance.metrics[1].hasCommon&&differs(values.unrealizedPnl,balance.unrealizedPnl))throw Error('評価損益は入力元・採用の補正操作を使用してください');
+     // Common overrides belong to their revision; native flow editing must not copy them into Input.
+     if(balance.metrics[1].hasCommon)values.unrealizedPnl=p.input?.adoptedValues.unrealizedPnl??model.adoptedValues(p.state,p.snapshot).unrealizedPnl;
+   }
+   const baseline=broker==='lightfx'&&p.commonUnrealized?(p.input?.adoptedValues??model.adoptedValues(p.state,p.snapshot)):p.adopted;
+   if(model.adoptionFields.every(k=>!differs(values[k],baseline[k])))return{status:'unchanged'};
    const now=clock(),original={...p.source,swapPnl:p.source.swapPnl??values.swapPnl};
    const nextInput={schemaVersion:2,id:p.input?.id||model.newId('mai',cryptoApi),accountId,targetMonth:draft.targetMonth,adoptedAccountSnapshotId:p.snapshot.id,
      sourceValues:original,adoptedValues:values,fieldSources:fieldSources(),overrideFields:model.adoptionFields.filter(k=>differs(values[k],original[k])),overrideUpdatedAt:now,

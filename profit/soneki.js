@@ -465,7 +465,9 @@ const sbiMonthlyUI = window.TradeScopeSbiMonthlyUI.createController({ adapter: l
     if (body) requestAnimationFrame(() => { body.style.maxHeight = `${body.scrollHeight}px`; });
   } });
 const gmoMonthlyUI = window.TradeScopeGmoMonthlyUI.createController({adapter:localStorage, onSaved:refreshAccountAfterSave});
-const tradersMonthlyUI = window.TradeScopeTradersMonthlyUI.createController({adapter:localStorage,onSaved:refreshAccountAfterSave});
+const tradersMonthlyUI = window.TradeScopeTradersMonthlyUI.createController({adapter:localStorage,onSaved:refreshAccountAfterSave,
+  onSourceDraft:(key,month,active)=>{const token=month+':'+key;if(active)sourceAccountDrafts.add(token);else sourceAccountDrafts.delete(token);},
+  onSourceSaved:()=>{refreshMonthlyModels();renderAnnualSummary();renderPerformanceChart();renderMonthlySection();}});
 const legacyMonthlySave = window.TradeScopeLegacyMonthlySave.createService(localStorage);
 function refreshAccountAfterSave(key) {
   dirtyAccountDrafts.delete(window.TradeScopeDisplayReadState.token(currentYear,currentMonth,key));

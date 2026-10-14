@@ -70,5 +70,5 @@ for(const broker of ['lightfx','minano'])test(`${broker}: Preview PDF-only save 
 test('corrected PDF displays retained calendar value, not a silently ignored new entry',async()=>{
  const h=preview();await h.upload();await h.swap('13');await h.el('save').fire('click');await h.el('confirm-save').fire('click');
  await h.upload('lightfx','lightfx',[37,80,68,70,45,49,46,55,9]);assert.equal(h.el('swap').value,'13');assert.equal(h.el('swap').disabled,true);await h.el('save').fire('click');
- assert.equal(h.el('confirm-summary').children.at(-1).textContent,'13円');await h.el('confirm-save').fire('click');assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records[0].swapPnl,'13');
+ assert.ok(h.el('confirm-summary').children.some(e=>e.textContent==='13円'));assert.match(h.el('confirm-summary').children.at(-1).textContent,/候補として追加/);await h.el('confirm-save').fire('click');assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records[0].swapPnl,'13');
 });

@@ -5,9 +5,10 @@
   const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const sbiBalances = typeof module !== 'undefined' && module.exports ? require('./sbi-balance-adoption.js') : root.TradeScopeSbiBalanceAdoption;
   const sbiPeriod = typeof module !== 'undefined' && module.exports ? require('./sbi-period-input.js') : root.TradeScopeSbiPeriodInput;
+  const lightScalars = typeof module !== 'undefined' && module.exports ? require('./lightfx-scalar-adoption.js') : root.TradeScopeLightScalarAdoption;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
-  const sourceAdapterVersion='monthly-source-adapter-v6';
+  const sourceAdapterVersion='monthly-source-adapter-v7';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
@@ -168,6 +169,21 @@
 
   function resolve(models,tradingData,targetMonth,key='sbi',enabledKeys=defaultEnabledKeys){
     let base=resolveCore(models,tradingData,targetMonth,key,enabledKeys);
+    if(key==='lightfx'&&targetMonth>=policies.lightfx.cutover&&models!==null&&enabledKeys.includes(key)){
+      const balance=lightScalars.resolve(models,targetMonth,{validate:false});
+      if(!balance.hasCommon)return base;
+      const input=records(models,'monthlyAccountInputs').find(r=>r.accountId===policies.lightfx.accountId&&r.targetMonth===targetMonth);
+      const swap=base.sourceAdoptions?.find(v=>v.metric==='swapPnl'&&v.currency==='JPY');
+      const calendar=swap?swap.status==='adopted'&&swap.source?.sourceType==='manual'
+        :(input??base.state)?.fieldSources?.swapPnl==='manual-income-calendar-swap-accrual';
+      const blocked=balance.blocked||base.source==='conflict';
+      const monthly=!blocked&&calendar&&['realizedPnl','swapPnl','deposit','withdrawal'].every(f=>decimal(base[f]));
+      const observedAsset=balance.metrics[0].hasCommon?balance.observedAsset:base.observedAsset;
+      const observation=!blocked&&decimal(balance.unrealizedPnl)&&decimal(observedAsset);
+      return {...base,lightScalars:balance,source:blocked?'conflict':'canonical',confirmed:monthly,
+        observedAsset,unrealizedPnl:balance.unrealizedPnl,observedUnrealized:balance.unrealizedPnl,
+        ...(calendar?{}:{swapPnl:null}),completeness:{monthly,observation,complete:monthly&&observation}};
+    }
     if(key!=='sbi'||targetMonth<cutover||models===null||!enabledKeys.includes(key))return base;
     // createCalculator validates the shared models once; this pure read facade also
     // preserves the old direct resolver's missing-fact diagnostics.

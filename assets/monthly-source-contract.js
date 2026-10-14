@@ -238,6 +238,9 @@
       }
     }
     for(const b of rows(models,'importBatches').filter(r=>r.accountId===accountId&&r.targetMonth===targetMonth)){
+      // LIGHT's FX position P/L is already the account price-unrealized observation.
+      // It is not a spot component/holding set. Keep old records for audit only.
+      if(b.accountId==='acc_lightfx_fx'&&b.sourceProvider==='lightfx')continue;
       const scopes=[...new Set([...rows(models,'holdingSnapshots').filter(h=>h.importBatchId===b.id).map(h=>h.sourceScope),
         ...rows(models,'accountSnapshots').filter(s=>s.importBatchId===b.id&&s.sourceScope==='sbivc-monthly-assets').map(s=>s.sourceScope)])];
       for(const sourceScope of scopes)for(const [field,metric]of Object.entries(refFields.importBatches)){

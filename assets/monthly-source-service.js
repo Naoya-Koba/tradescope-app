@@ -39,7 +39,7 @@
       }
       if(!added.length)throw Error('EMPTY_MONTHLY_SOURCE_OPERATION');
       const changes={monthlySources:models.monthlySources};
-      for(const accountId of new Set(added.filter(r=>r.kind==='source').map(r=>r.accountId))){
+      for(const accountId of new Set(added.filter(r=>r.kind==='source'||r.kind==='adoption').map(r=>r.accountId))){
         if(!models.accounts?.records.some(r=>r.id===accountId)){
           const known=storage.initialAccounts().find(r=>r.id===accountId);if(!known)throw Error('MISSING_SOURCE_ACCOUNT');
           models.accounts={schemaVersion:1,records:[...(models.accounts?.records||[]),known],updatedAt:at};changes.accounts=models.accounts;

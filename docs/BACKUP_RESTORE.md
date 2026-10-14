@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — LIGHT FX scalar参照とBackup v14（v309）
+
+Backup v14維持。新規sourceは既存monthlySources v1のaccount／marketValue・unrealizedPnlと不変AccountSnapshot参照で表現し、原値・PDF本文・PIIを複製しない。候補revision／採用／同revision補正／比較／deferは既存契約で往復する。旧v13以前に新sourceがなくてもnative互換を維持し、bulk migrationしない。
+
+新record・field・metric・component・Storage key・validator公開契約は追加しない。旧重複範囲の履歴recordを削除せず、金融consumerがconflictを表示する。canonical＋candidateは一回のRepository journal／再読込検証／rollbackで保護し、rollback不能時はjournalを保持する。取引・FX position-setの契約拡張は今回は行わない。
+
 ## Current — SBI残高UI／hookと固定Backup v14（v306）
 
 Backup v14維持。国内Batch参照2metric、外国／cash Snapshot参照、独立manual scalar原値、採用／同revision補正／比較／defer／訂正は既存monthlySources v1受理範囲内。新field・component enum・record・Storage keyなし。原CSV本文・PII・金融原値の参照先複製を追加しない。

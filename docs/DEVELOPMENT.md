@@ -1,5 +1,15 @@
 # Development Guide
 
+## Current — LIGHT scalar resolver／hook／最小UI（v309）
+
+`assets/lightfx-scalar-adoption.js`が2metricの正式scopeを定義し、monthly resolver／required進捗診断／scalar UIはこのfacadeを使用する。既存scalar-source-selection／scalar-source-uiをLIGHT月次Inputへ再利用する。選択はDraft、保存でのみ共通serviceを呼ぶ。current source／candidate／基準日／revision／原値／補正／比較／保留を表示し、独立manual作成UIの拡大はしない。金融flow Draftとsource選択は分離し、外部更新・source操作でも未保存flowを破棄しない。
+
+Traders保存はLIGHTだけSnapshot参照candidate計画を合成して一回commit。previewの確認fingerprintとcommitの全model／legacy guardを検証する。source追加で採用を変更せず、訂正版の確認にも候補追加であることを表示する。source判断がある価格評価損益の補正は共通UIを使い、native flow保存へ共通overrideをコピーしない。先行account recordがない明示deferは共通serviceで標準Account依存だけをatomic追加し、金融source／値は作らない。
+
+PWA v309、変更資産query 20261014-10、Backup v14不変。匿名`tests/lightfx-scalar.test.js`とlocalhost harnessで重複排他・候補／採用・訂正・補正・stale／Draft・atomic／rollback・Backup・current／periodを検証する。実PDFは8月／9月read-only parser回帰だけで、原値をfixtureへ転記しない。production Storage・実Backupは使用しない。
+
+検証：追加67件／全1650 tests Pass。JS／MJS構文134ファイル＋production inline 3件、precache 83資産、production 122＋匿名harness 22 local参照、diff-checkを確認。実LIGHT 8月／9月PDFは各2ページ・建玉11行・parser内部照合Pass。computer-useの匿名localhostでmanual→PDF明示切替・同内容確認後の採用維持・defer・別タブ更新後のstale停止／Draft保持、390px／1280px、横overflowなし・Console Error／Warningなしを確認。Top表示後も全金融正本18キーの値／不在状態は不変。匿名Memoryでatomic rollback・journal保持・v14往復／v13互換を確認。検証用Storage／SW／cache・tab／viewport override／serverはcleanup済み。
+
 ## Current — SBI derived period input（v308）
 
 新module `assets/sbi-period-input.js`は既存balance facadeから渡された金融観測とnative manual flowだけを評価する。monthly-account-resolverのSBI共通判断あり分岐から一度だけ呼び、Monthly／Annual／Trendに個別source選択を追加しない。progressのperiodReferenceも同じ結果を読み、financial calculatorへ逆流しない。新State・金融原値コピー・Storage書込・current carry依存なし。partial InputのBatch／Snapshot参照もcalculator fingerprintへ含め、採用参照・原観測変更後のcacheを再利用しない。

@@ -107,7 +107,10 @@
         let r=c??compatibility(t);
         // Common diagnostics refine invalid/stale reasons, but broker balance values
         // must still pass the SAME facade as the ordinary financial consumers.
-        if(c&&!bad.has(c.status)&&!legacy&&(key==='sbivc'||key==='sbi'&&t.component!=='account')){
+        if(key==='lightfx'&&native?.lightScalars&&['marketValue','unrealizedPnl'].includes(t.metric)){
+          const metric=native.lightScalars.metrics.find(m=>m.metric===t.metric);
+          r={...metric,asOf:metric.snapshotAsOf};
+        }else if(c&&!bad.has(c.status)&&!legacy&&(key==='sbivc'||key==='sbi'&&t.component!=='account')){
           const adopted=compatibility(t);
           r={...c,status:adopted.status,value:adopted.value??null};
         }

@@ -31,17 +31,17 @@ test('partial display exposes known flows/price unrealized/net observation, miss
 test('partial reimport is a byte-identical no-op, even when calendar is provided',async()=>{
  const s=new MemoryStorage();await api(s).save(source());const before=s.snapshot();assert.equal((await api(s).save(source('lightfx','a','13'))).status,'already-imported');assert.deepEqual(s.snapshot(),before);
 });
-test('partial corrected PDF retains old source, explicitly adopts new source, remains missing swap',async()=>{
+test('LIGHT partial corrected PDF adds revisions without replacing adoption or missing swap',async()=>{
  const s=new MemoryStorage(),a=api(s);await a.save(source());const old=a.read(),next=source('lightfx','b'),confirmation=await a.inspect(next);
  assert.equal(confirmation.status,'review-required');const before=s.snapshot();assert.equal((await a.save(next)).status,'review-required');assert.deepEqual(s.snapshot(),before);
  assert.equal((await a.save(next,confirmation)).complete,false);const m=a.read();assert.equal(m.accountSnapshots.records.length,2);assert.equal(m.monthlyAccountStates,null);assert.equal(m.monthlyAccountInputs.records[0].id,old.monthlyAccountInputs.records[0].id);
- assert.equal(m.monthlyAccountInputs.records[0].sourceHistory[0].adoptedAccountSnapshotId,old.accountSnapshots.records[0].id);assert.equal(view(s).month(2026,9).rows[0].asset,1006);
+ assert.deepEqual(m.monthlyAccountInputs,old.monthlyAccountInputs);assert.equal(m.monthlySources.records.filter(r=>r.revisionOf!==null).length,2);assert.equal(view(s).month(2026,9).rows[0].asset,1006);
  assert.doesNotThrow(()=>a.monthlyInspect('2026-09'));
 });
 test('PDF correction alone preserves original calendar AND later adopted calendar correction',async()=>{
  const s=new MemoryStorage(),a=api(s);await a.save(source('lightfx','a','13'));let p=a.monthlyInspect('2026-09');a.correct({targetMonth:'2026-09',...p.adopted,swapPnl:'17'});
  const stateId=a.read().monthlyAccountStates.records[0].id;const next=source('lightfx','b','');await a.save(next,await a.inspect(next));p=a.monthlyInspect('2026-09');assert.equal(p.source.swapPnl,'13');assert.equal(p.adopted.swapPnl,'17');assert.equal(p.state.id,stateId);
- assert.equal(p.input.sourceHistory.length,2);assert.equal(p.state.sourceHistory.length,2);assert.equal(p.snapshot.accountSpecific.reportedSettledSwapPnl,'5');
+ assert.equal(p.input.sourceHistory.length,1);assert.equal(p.state.sourceHistory.length,1);assert.equal(p.snapshot.accountSpecific.reportedSettledSwapPnl,'5');assert.equal(a.read().monthlySources.records.filter(r=>r.revisionOf!==null).length,2);
 });
 test('old v7 complete source without partial input remains readable and calendar survives PDF correction',async()=>{
  const s=new MemoryStorage(),a=api(s);await a.save(source('lightfx','a','13'));s.removeItem(model.keys.monthlyAccountInputs);const old=model.readModels(s);assert.doesNotThrow(()=>model.validateBackupModels(7,Object.fromEntries(model.backupModelEntities[7].map(k=>[k,old[k]]))));

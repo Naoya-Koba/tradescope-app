@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — LIGHT FX scalar採用（v309）
+
+正式対象はaccount／marketValue（AccountSnapshot.netAssetValue：帳票の純資産観測）とaccount／unrealizedPnl（価格評価損益、未決済swap除外）のJPY scalar。`lightfx-scalar-adoption.js`が共通判断／同revision補正／旧Input・State互換を一度だけ解決する。PDF保存hookは不変Snapshotへのreference sourceをcanonicalと同じjournalへ追加し、金融原値をコピーしない。既存mutable Input／Stateの受理済み参照は読むだけで、新hookでは作らない。
+
+FX Holding集計をspot scalarとして新規candidate生成しない。既存の重複範囲adoptionは監査recordを保持したままresolverでconflictにし、account値とposition subtotalを同時加算しない。既存JPY cash-onlyのgeneric採用互換は残すが、今回のLIGHT UI／hookの対象にはしない。
+
+LIGHT訂正版は新Batch／Snapshot／Holding／candidate revisionを追加するだけで、旧Input／State・calendar・flow・adoptionを切り替えない。source UIで残高2metricを明示選択する。初回PDFの旧互換採用は維持し、独立manualの共通採用があればPDF追加で置換しない。Backup v14／11キー／validatorの公開受理契約・persistent schemaは不変。みんなのFXは今回native保存契約のまま。
+
 ## Current / Decided — SBI derived period input（v308）
 
 `sbi-period-input.js`は新金融recordではなく、`sbi-balance-adoption`の採用済み5metricと既存MonthlyAccountInput／Stateのmanual realized／deposit／withdrawalから固定月の入力を導く非永続bridge。共通残高判断がない月は旧State経路を維持し、共通判断のあるmetricは旧Snapshotを別優先順位で再採用しない。CSV／manual／互換sourceは同義の入力、stale／競合／参照不正／missingは有効値に戻さない。
