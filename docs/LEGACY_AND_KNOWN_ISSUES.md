@@ -1,5 +1,13 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Planned — FX transaction契約と未接続境界（v312）
+
+record v3・参照型collection・append-only adoption／defer・Backup v15は実装済み。既存v1／v2をbulk migrationせず、monthlySources／reconciliation v1／旧採用・金融計算を維持する。Historyのv3除外は誤流入防御だけでconsumer対応ではない。
+
+**Planned**：共通transaction reader／History projection、LIGHTのatomic candidate保存・明示採用、実運用照合要件を確認後のreconciliation拡張、みんな保存、将来GMO新sourceのv3化。今回reconciliation v2はv15へ入れないため、正式追加時のBackup versioningは改めて判断する。過去月の2026-09 cutover解除、official position-set、Portfolio／Open Positions移行は別工程。
+
+**Known limitation**：新規売／決済買、同一close order multiple fills、非ゼロfee符号はsynthetic契約検証であり実PDF確認済みではない。実例のswap差の理由・未確認帳票・ページ跨ぎ論理行は未確定。partial collectionはcandidate-only、完全採用不可。production save未有効、UIなし、実ブラウザ未検証。複数タブの完全排他は既存限界。
+
 ## Current / Known limitation — Traders実約定parser-only（v311）
 
 LIGHTの新規8行／決済10行、みんなの新規3行／決済4行をread-only実PDFで確認し、共通execution正規化を追加。LIGHT新規8行・みんな新規3行は公式月末建玉と全件照合。LIGHTの決済realized／swap／fee合計は受渡集計と一致。みんなのrealized／feeは一致、transaction swapは帳票行の明示0と受渡集計の非0が一致しない。数値欄の読み取りを再確認済みで、差を勝手に補正・calendar化せず警告を保持する。追加swapの発生理由は未確定。

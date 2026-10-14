@@ -1,5 +1,13 @@
 # Backup and Restore Specification
 
+## Current / Decided — Backup v15とFX event契約（v312）
+
+最新exportはv15。v14の公開対象は既存11モデルの固定一覧とし、動的Repository key列挙から切り離す。v15だけがImportedTransaction v3と12番目のtransactionSourcesを受理する。v1〜v14の公開受理範囲は拡張せず、v3をfield切捨てで旧version化しない。reconciliationはv1のままで、v2・position-set・完了承認・UI stateを追加しない。以下のv14節は公開済み旧契約の記録であり、最新exportの指定は本節を優先する。
+
+v15は原rows、参照型collection、adopt／keep-current／defer履歴を完全往復し、null・0・正式空集合・partialを区別する。全member、account／provider／month／scope／Batch、row／collection fingerprint、訂正・採用chain、過去方向参照、未知field／versionを検証し、不正は復元前に拒否する。旧Backupに取引集合がないことをconfirmed zeroへ昇格しない。
+
+v2〜v14完全置換では未収録transactionSourcesを同journalでclearする。v1およびlegacy部分復元は従来どおり未収録モデルをpreserveし、読取時migrationをしない。v15は12モデルを置換し、null modelはキー不在へ戻す。書込後全正本を再読込検証し、失敗は元の生文字列／キー不在へrollback、不能ならjournal保持。原PDF／CSV本文・PIIを追加しない。検証は匿名MemoryStorageのみで実Backupを使用しない。
+
 ## Current — みんなのFX scalar参照と固定Backup v14（v310）
 
 みんなも既存monthlySources v1のaccount scalarとcanonical Snapshot参照だけを保存する。新record／field／component／metric／Storage key／validator公開契約なし。候補revision・採用・補正・comparison・deferは既存v14往復対象。原PDF本文／PII／金融原値コピーは追加しない。

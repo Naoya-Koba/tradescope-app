@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradescope-static-v311';
+const CACHE_NAME = 'tradescope-static-v312';
 const CORE_ASSETS = [
   "./assets/monthly-required-policy.js?v=20261014-8",
   "./assets/monthly-progress-view.js?v=20261014-11",
@@ -56,13 +56,14 @@ const CORE_ASSETS = [
   "./manifest.webmanifest",
   "./assets/app-gestures.js",
   "./assets/account-ui.js?v=20261011-1",
-  "./assets/storage-transaction.js?v=20261014-2",
-  "./assets/data-model-storage.js?v=20261014-2",
-  "./assets/transaction-view.js?v=20261013-1",
+  "./assets/storage-transaction.js?v=20261015-1",
+  "./assets/transaction-source-contract.js?v=20261015-1",
+  "./assets/data-model-storage.js?v=20261015-1",
+  "./assets/transaction-view.js?v=20261015-1",
   "./assets/transaction-display.js?v=20261012-16",
   "./assets/trade-history-core.js?v=20261003-1",
   "./top/style.css?v=20261013-4",
-  "./top/script.js?v=20261014-5",
+  "./top/script.js?v=20261015-1",
   "./history/history.css?v=20261013-2",
   "./history/history.js?v=20261013-2",
   "./history/transaction-ui.js?v=20261012-16",

@@ -1,5 +1,17 @@
 # Data Model
 
+## Current / Decided — FX transaction保存契約のみ（v312）
+
+`tradeScopeImportedTransactionsV1`はenvelope v1のままrecord v1（GMO）／v2（SBI VC spot）／v3（FX execution）を共存させる。旧recordのmigrationなし。v3の全fieldは`assets/transaction-source-contract.js`の`rowFields`に固定し、nullable fieldも明示nullで保持する。必須identityはid／collectionId／accountId／instrumentId／importBatchId、provider／PDF scope／month、action=open|closeとside=buy|sell、tradeDate、sourcePage／sourceRow、rowFingerprint、importedAt。数量は`baseCurrencyUnits`の原通貨decimal string、価格もdecimal stringで双方正。Lot変換・position方向・残存数量を保存しない。
+
+executedAt／settlementDate、sourceOrderId／sourceExecutionId／sourceOpenOrderRef、realizedPnl／transactionSwap／fee／currency／feeCurrencyはnullable。IDはopaque stringで巨大値・先頭0を保持し公式execution IDを捏造しない。LIGHT／みんなの確認済みPDF policyのみ日時・数字の注文番号・close時の数字の新規注文参照を要求する。open realizedはnull、fee符号は原値のまま未分類。同一order／open refの複数rowを許容し、同一fingerprintでもdedupeしない。row locatorはcollection＋page＋row。fingerprintは内部ID・locator・取込日時と分離した金融事実のSHA-256で、nullableと0・decimal原表記を区別する。
+
+新Repository entity `transactionSources`／key `tradeScopeTransactionSourcesV1`はenvelope v1（schemaVersion／records／updatedAt）。record v1は`collection`と`decision`だけ。collectionはaccount／sourceProvider／month／sourceScope／Batch／normalizerVersion／transactionIds／fingerprint／coverage／correctionOfCollectionId／createdAtを保持し、金融原値をコピーしない。scopeはgmo-fx-trades／lightfx-fx-trades／minna-fx-trades。complete＋空集合は正式0件、partial＋空集合は取得不完全であり0件確認ではない。不在はunknown。partialは候補として保存可能だが完全な取引集合として採用できない。
+
+採用単位はaccount×month×provider×scope。decisionはadopt／keep-current／defer、collection参照と確認時fingerprint、previousId、confirmedAtを持つappend-only chain。keep-currentは有効採用がある時のみ、deferは旧採用維持／採用なしならunknown。参照はappend順・日時とも過去方向のみ。候補追加で採用は変わらない。訂正／normalizer変更は新collection＋新rowsで旧revision・Batchを保持し、同hashを同collectionと断定しない。既存v3 row・collection・decisionと参照BatchはRepositoryで不変。
+
+balance adoption／monthlySourcesとは独立し、公開済みmonthlySources契約は拡張しない。低レベルreader／validatorのみで、LIGHT／みんなproduction保存hook、History v3表示、reconciliation v2、official position-setは未実装。Historyにはv3除外guardだけ追加し、旧v1／v2表示・reconciliation v1は維持する。Backup v15で12モデル、v14は既存11モデルに固定する。
+
 ## Current / Decided — Traders約定の非永続正規化（v311）
 
 `traders-parser.parseExecutions(extracted, expectedBroker)`はLIGHT／みんな共通のread-only API。executionsはsourcePage／sourceRow、sourceOrderId／sourceOpenOrderRef、executionAt／settlementDate、pair、action=open/close、side=buy/sell、quantity／quantityUnit=baseCurrencyUnits、executionPrice、realizedPnl／transactionSwap／fee、note／noteStateを持つ。注文identityはstring、数量・価格はdecimal原値でLotへ変換しない。blank／dashはnull、明示0は0。closeの原新規注文参照は必須だが、任意損益・fee・受渡日を過剰requiredにしない。同じ新規参照／決済注文番号の複数rowを上書き・一意制約で排除しない。

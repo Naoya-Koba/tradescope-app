@@ -1,5 +1,17 @@
 # Development Guide
 
+## Current — FX contract／Backup v15のみ（v312）
+
+`assets/transaction-source-contract.js`は副作用なしのrecord／reference／fingerprint／history validatorと低レベルresolver。既存SHA-256 primitiveだけを再利用し、monthlySourcesの公開契約は変更しない。Repositoryはv3原rowと参照Batchの不変性、新entityのappend-only履歴、expectedModels、既存journal／再読込／rollbackを保護する。将来Batch／Snapshot／Holding／v3 rows／collection／明示decisionを一回のcommitへ合成可能。PDF保存hook・History consumer・reconciliation v2は接続しない。
+
+PWA v312、変更依存query 20261015-1、新moduleを各production HTML／匿名harnessのdata-model-storage前へ配置しprecacheへ追加。Backup v15、v14固定11モデル、v15は12モデル。旧テストはlatest export期待値・新key不存在・追加module依存だけを更新し、旧形式の互換fixtureはその公開対象へ限定する。
+
+`tests/fx-transaction-contract.test.js`はinvented匿名値のみ。4種action／side、巨大ID／先頭0、複数close／同order複数row、null／0／負値、collection／決定履歴、訂正／同PDF normalizer revision、stale、旧Backup互換、v15往復／破損拒否、combined commit／rollback／不能時journal保持、History非流入を検証する。全テスト・構文・precache／URL・diff-checkを確認する。production Storage・実データ・実Backup・実PDFを使用しない。実ブラウザ／Console検証は本工程では未実施（UI変更なし、匿名DOM／browser-global VM回帰で確認）。
+
+既存journalはrollback保護であり、複数タブの完全排他やWeb Storage障害下の完全復旧保証ではない。新contractはその限界を拡大保証せず、排他方式は別工程。
+
+検証：追加154件／全1949 tests Pass（旧1795件維持）。JS／MJS 139ファイル＋inline 3件、precache 84資産、全HTML local URL 228件と依存順、diff-check Pass。公開済み非空v14 source／採用／補正／比較往復、v1〜v14 restore、v15混在record・履歴往復、破損拒否、書込後破損／旧key clear失敗／rollback不能時journal保持を匿名Memoryで確認。localhost HTTP回帰もPass、匿名fixtureはプロセス終了で破棄。実ブラウザ／Consoleは未実施。
+
 ## Current — Traders parser-only検証（v311）
 
 parserの既存scalar出力と非永続`parseExecutions`を分離する。新規requiredは文字列注文ID・日時・pair・action・side・原数量・価格、closeには原新規注文参照も要求する。任意blankはnull。decimal helperは小数文字列の正規化比較で、binary浮動小数の価格計算にしない。非ゼロfeeの表記は保持するが、既存scalar保存の未対応guardは維持する。

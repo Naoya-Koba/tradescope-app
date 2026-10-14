@@ -128,7 +128,7 @@ test('SBI VC corrected same-month unknown does not borrow the unadopted original
 test('repeat balance projections do not write Storage or change Backup v13',async()=>{
  const s=await vc.seed(),before=s.snapshot(),b=vc.copy(vc.backup(s).build());
  for(const month of [2,3,4])assets.create({year:2031,month,rows:[{key:'sbivc',metrics:{}}]},model.readModels(s),2031);
- assert.equal(s.snapshot(),before);assert.deepEqual(vc.copy(vc.backup(s).build()),b);assert.equal(b.backupVersion,14);
+ assert.equal(s.snapshot(),before);assert.deepEqual(vc.copy(vc.backup(s).build()),b);assert.equal(b.backupVersion,15);
 });
 test('Risk, Portfolio and Open Positions stay on their original source; no production carry consumer outside Top',()=>{
  const top=fs.readFileSync('top/script.js','utf8');assert.match(top,/const cryptoAccount = \(topSeries\.accountData/);

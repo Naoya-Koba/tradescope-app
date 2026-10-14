@@ -629,7 +629,7 @@ test('Service Worker precache exists, has no duplicate URLs and matches preview 
 
 test('localhost HTTP smoke: preview document and all local resources are served', async () => {
   const http = require('node:http');
-  const allowed = new Set(['import.html', 'assets/icon-192.png', 'assets/storage-transaction.js', 'assets/data-model-storage.js',
+  const allowed = new Set(['import.html', 'assets/icon-192.png', 'assets/storage-transaction.js', 'assets/transaction-source-contract.js','assets/data-model-storage.js',
     'import/csv-core.js', 'import/sbi-parser.js', 'import/model-preview.js', 'import/preview.js', 'import/preview.css']);
   const server = http.createServer((request, response) => {
     const file = new URL(request.url, 'http://localhost').pathname.slice(1);

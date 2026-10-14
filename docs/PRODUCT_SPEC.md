@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current / Decided — FX取引保存の基盤のみ（v312）
+
+FX ImportedTransaction record v3と独立transaction collection／adoptionをBackup v15へ登録する。原通貨decimal数量、open/close＋buy/sell、nullable金融値、source参照と訂正revisionを保持する。collection採用は残高採用と別判断で、candidate追加では切り替えず、旧原値・決定履歴を削除しない。
+
+今回は画面・取込機能の追加ではない。LIGHT／みんなのproduction transaction保存、History v3表示、manual reconciliation v2、official position-set、Portfolio／Open Positions移行は未実装。既存GMO v1／SBI VC v2／manual表示と金融計算を維持する。月次swapとtransaction swapを混同しない。
+
 ## Current / Decided — みんなのFX scalar source操作（v310）
 
 みんな月次Inputにも既存「入力元・採用を確認」を接続し、口座純資産観測と価格評価損益を別採用できる。source種別／月／基準日／revision／原値／補正値／比較／保留／stale・conflictを表示する。PDF／manual自動順位なし。新PDF候補追加・同内容確認だけでは採用を変えず、保留は有効な採用を維持する。訂正版は旧revisionと履歴を残し、補正を自動継承しない。

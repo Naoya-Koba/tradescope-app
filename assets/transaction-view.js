@@ -45,7 +45,7 @@
     sources:[{kind:'sbi',id:r.id,importBatchId:r.importBatchId}],sourceLabel:'SBI CSV',sourceProvider:'sbi',executionId:r.externalTransactionId||null,orderId:null});
   }
   const active=activeBatches(models);
-  for(const r of rows(models,'importedTransactions')){if(!active.has(r.importBatchId))continue;const ins=rows(models,'instruments').find(i=>i.id===r.instrumentId);
+  for(const r of rows(models,'importedTransactions')){if(![1,2].includes(r.schemaVersion)||!active.has(r.importBatchId))continue;const ins=rows(models,'instruments').find(i=>i.id===r.instrumentId);
    normalized.push({id:'imported:'+r.id,manualId:null,date:r.tradeDate,executedAt:r.executedAt,accountId:r.accountId,account:labels[r.accountId]||r.accountId,...instrument(ins?.symbol,ins?.assetType,r.instrumentId,models),
     side:r.side,type:r.normalizedTransactionType,category:r.rawTransactionType,marketType:r.marketType||null,quantity:r.quantity,quantityUnit:r.schemaVersion===2?r.quantityUnit:'約定数',unitKey:null,price:r.price,realizedPnl:r.realizedPnl,fee:r.fee,feeSemantics:r.feeSemantics||null,currency:r.currency,strategy:'',memo:'',
     sources:[{kind:r.schemaVersion===2?'sbivc':'gmo',id:r.id,importBatchId:r.importBatchId,page:r.sourcePage,row:r.sourceRow}],sourceLabel:r.schemaVersion===2?'SBI VC PDF':'GMO PDF',sourceProvider:r.sourceProvider,executionId:r.providerExecutionId,orderId:r.providerOrderId});
@@ -57,7 +57,7 @@
  const compatible=(a,b)=>['realizedPnl','currency'].every(k=>a[k]===null||b[k]===null||a[k]===b[k])
   &&(!(a.sourceProvider==='sbivc'||b.sourceProvider==='sbivc')||a.fee===b.fee&&a.feeSemantics===b.feeSemantics);
  function activeSources(models){const active=activeBatches(models);return [...rows(models,'rawTransactions').filter(r=>r.sourceType==='csv'&&r.sourceProvider==='sbi').map(record=>({entity:'rawTransactions',record})),
-   ...rows(models,'importedTransactions').filter(r=>active.has(r.importBatchId)).map(record=>({entity:'importedTransactions',record}))];}
+   ...rows(models,'importedTransactions').filter(r=>[1,2].includes(r.schemaVersion)&&active.has(r.importBatchId)).map(record=>({entity:'importedTransactions',record}))];}
  function resolve(manual,models){const records=normalize(manual,models),hidden=new Set(),groups=new Map();
   const sources=activeSources(models);
   const decisions=reconciliation.statuses(manual,models,sources),decided=new Set(decisions.map(d=>d.relation.manualId));

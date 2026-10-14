@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current / Decided — FX transaction v3は非計算契約（v312）
+
+v3は原通貨数量・約定価格・open/close＋buy/sellを保持するeventであり、positionや月次金融値ではない。close＋sellをshortと扱わず、原新規注文参照から残存数量を推定しない。nullable realized／transactionSwap／feeを月次realized・calendar swap・入出金・取得原価へ転記しない。transaction swapとsettlement／calendar swapは別意味。不一致は帳票範囲に応じた診断であり差額を補完しない。
+
+transaction collection採用は残高採用と独立。今回History／Top／Allocation／Monthly・Annual Summary／Asset・Performance Trend／Risk／Portfolio／Open Positionsへ新値を接続しない。v1／v2／manual・reconciliation v1・legacyの既存結果を維持し、migrationなし。official month-end position-setは独立契約であり、eventから生成しない。
+
 ## Current / Decided — Traders execution auditの境界（v311）
 
 parser-onlyのauditはclose realized／transactionSwap／fee合計と受渡日別集計を小数文字列のexact比較で照合する。matched／mismatch／incomplete／no-close／unavailableを区別し、blankを0へ補完しない。新規と月末positionは注文参照・pair・side・数量・価格・日時で照合するだけで、positionを生成しない。
