@@ -5,6 +5,7 @@
   const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
+  const sourceAdapterVersion='monthly-source-adapter-v2';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
@@ -116,12 +117,24 @@
   const sourceAccountIds={...Object.fromEntries(Object.entries(policies).map(([key,p])=>[key,p.accountId])),sbivc:'acc_sbivc_crypto',smbc:'acc_smbc_bank'};
   function sourceValues(models,targetMonth,key){return sources.month(models,sourceAccountIds[key],targetMonth);}
   function resolve(models,tradingData,targetMonth,key='sbi',enabledKeys=defaultEnabledKeys){
-    const base=resolveExisting(models,tradingData,targetMonth,key,enabledKeys);
+    let base=resolveExisting(models,tradingData,targetMonth,key,enabledKeys);
     const existing=records(models,'monthlyAccountStates').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===targetMonth)
       ??records(models,'monthlyAccountInputs').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===targetMonth);
     // Defer is not a command to revoke the explicit adoption in a released contract.
     const values=sourceValues(models,targetMonth,key).filter(v=>!(v.status==='unresolved'&&v.deferred&&existing));
     if(!values.length)return base;
+    // Partial Input already contains explicitly adopted values even without a complete State.
+    // Overlay only the new metric; do not discard those compatible known values.
+    if(base.source==='missing'&&existing?.schemaVersion===2&&existing.adoptedValues){
+      const snapshot=records(models,'accountSnapshots').find(r=>r.id===existing.adoptedAccountSnapshotId);
+      base={...base,...existing.adoptedValues,source:'canonical',snapshot,
+        observedAsset:snapshot?.netAssetValue??null,observedUnrealized:snapshot?.unrealizedPnl??null};
+    }else if(base.source==='missing'&&key==='sbi'&&existing?.schemaVersion===1){
+      const domestic=domesticAdoption(models,targetMonth,domesticCandidates(models,targetMonth).find(c=>c.batch.id===existing.domesticImportBatchId));
+      const snapshots=records(models,'accountSnapshots'),foreign=snapshots.find(s=>s.id===existing.foreignAccountSnapshotId),cash=snapshots.find(s=>s.id===existing.cashAccountSnapshotId);
+      base={...base,source:'canonical',domestic,foreign,cash,realizedPnl:existing.realizedPnl,deposit:existing.deposit,withdrawal:existing.withdrawal,
+        unrealizedPnl:sum([domestic?.unrealizedPnl??null,foreign?.unrealizedPnl??null])};
+    }
     const bad=values.some(v=>['stale','conflict','unresolved'].includes(v.status));
     const assetRows=sources.assetComponents(values.filter(v=>v.currency==='JPY'));
     if(!values.some(v=>sources.flowMetrics.includes(v.metric)||v.metric==='unrealizedPnl'))return {...base,
@@ -154,7 +167,7 @@
     const batchIds = new Set(states.map(row => row.domesticImportBatchId));
     const snapshotIds = new Set(states.flatMap(row => [row.foreignAccountSnapshotId, row.cashAccountSnapshotId, row.adoptedAccountSnapshotId]));
     for (const snapshot of records(models, 'accountSnapshots')) if (snapshotIds.has(snapshot.id)) batchIds.add(snapshot.importBatchId);
-    return { calculationVersion, policyVersion, sourceVersion:sources.version,
+    return { calculationVersion, policyVersion, sourceVersion:sources.version,sourceAdapterVersion,
       sourceRecords:records(models,'monthlySources').filter(r=>r.targetMonth?.startsWith(`${year}-`)||r.kind==='override'||r.kind==='comparison'),
       policies: enabledKeys.map(key => policies[key]), states,
       inputs: records(models, 'monthlyAccountInputs').filter(row => enabledAccounts.includes(row.accountId) && row.targetMonth.startsWith(`${year}-`)),

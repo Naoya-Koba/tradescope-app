@@ -2,6 +2,8 @@
 
 ## Current / Decided — 採用済みsourceと共通計算
 
+新しいmetricだけを採用した部分Inputは、既存Traders／SBIの明示採用済み月次値を互換adapterで維持する。State不存在だけを理由に既知値をnullへ落とさず、swap未入力など元から不明の項目は不明のまま。新採用がない従来monthは変えない。
+
 monthly-source-contractがsource候補→明示adoption→指定revisionのoverride→採用値を解決する。PDF／CSV／manualを順位付けせず、候補追加や一致確認だけで採用しない。missing、deferで採用なし、stale／conflictはnullで0ではない。新判断がない月は従来resolver／SBI VC observation adoptionを使用し、新判断があるcomponent／metricだけを共通monthly resolver／monthly-displayへ渡す。Top／損益管理はdisplay-results経由で描画し、独自source選択をしない。
 
 balanceだけをbalance-viewへ渡し過去確認値のcurrent carryを許可する。flowは当月限定、carryなし。whole totalとcomponentsは排他、同じcomponentの保有合計と評価額も二重加算しない。FXの現金componentだけなら残余unknownの小計。保有集合の0・終了・不明数量や新集合の不明評価額に旧集合合計を補完しない。原観測とderived ledgerは別basisで、観測差を利益・損失へ逆算しない。fee等の追加ledger式・外貨換算は今回導入しない。

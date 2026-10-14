@@ -110,7 +110,7 @@
       const explicitAsset=resolved.sourceAdoptions?.some(v=>v.currency==='JPY'&&['marketValue','cashBalance','holdings'].includes(v.metric));
       const partial = hasData && (!complete||explicitAsset&&observed.components.some(c=>numeric(c.asset)===null));
       const asset = complete && !explicitAsset ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
-      const unrealized = complete || resolved.source === 'legacy' ? read('unrealizedPnL')
+      const unrealized = complete || resolved.source === 'legacy' || resolved.sourceAdoptions?.length&&numeric(resolved.unrealizedPnl)!==null ? read('unrealizedPnL')
         : knownSum(observed.components.map(item => item.unrealized));
       return { key, targetMonth, sourceMonth: targetMonth, hasData, complete, partial,
         conflict: resolved.source === 'conflict' || observed.conflict, components: observed.components,
