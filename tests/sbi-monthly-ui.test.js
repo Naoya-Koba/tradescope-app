@@ -10,6 +10,7 @@ class Element {
    this.classList={contains:name=>name==='open'};this.scrollHeight=1200; }
  setAttribute() {}
  append(...nodes) { this.children.push(...nodes); }
+ replaceChildren(...nodes) { this.children=[...nodes]; }
  appendChild(node) { this.append(node); return node; }
  addEventListener(name,fn) { this.listeners[name]=fn; }
  set innerHTML(value) {
@@ -27,7 +28,8 @@ function harness(mutator = () => {}) {
  const values={tradingData:'{}',...Object.fromEntries(Object.entries(models).filter(([,v])=>v).map(([key,v])=>[model.keys[key],JSON.stringify(v)]))};
  const adapter={getItem:key=>values[key]??null,setItem:(key,v)=>{values[key]=v;},removeItem:key=>{delete values[key];}};
  const drafts=input.createDrafts(), document={createElement:tag=>new Element(tag)};
- const context=vm.createContext({document,TradeScopeCSV:require('../import/csv-core.js'),TradeScopeMonthlyInputUI:monthlyInput,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service});
+ const context=vm.createContext({document,TradeScopeCSV:require('../import/csv-core.js'),TradeScopeMonthlyInputUI:monthlyInput,TradeScopeDataStorage:model,TradeScopeSbiInput:input,TradeScopeMonthlyResolver:resolver,TradeScopeSbiMonthlySave:service,
+   TradeScopeSbiBalanceAdoption:require('../assets/sbi-balance-adoption.js'),TradeScopeScalarSourceSelection:require('../assets/scalar-source-selection.js'),TradeScopeScalarSourceUI:require('../assets/scalar-source-ui.js')});
  vm.runInContext(fs.readFileSync(require.resolve('../assets/sbi-monthly-ui.js'),'utf8'),context);
  let card, saved=0;
  const controller=context.TradeScopeSbiMonthlyUI.createController({adapter,drafts,legacyData:()=>JSON.parse(values.tradingData),onSaved:()=>{saved++;render();}});
@@ -81,7 +83,7 @@ test('editable domestic fields update aggregate Draft only, persist partial and 
 });
 test('each domestic reset changes Draft only; explicit save clears metadata without changing acquisition date',()=>{
  const h=harness();h.fill('domesticMarketValue','12');h.fill('domesticUnrealizedPnl','3');h.button().listeners.click();
- const before=JSON.stringify(h.values),resets=h.children().filter(el=>el.className==='monthly-source-reset');assert.equal(resets.length,2);
+ const before=JSON.stringify(h.values),resets=h.children().filter(el=>el.className==='monthly-source-reset'&&el.textContent==='取込値に戻す');assert.equal(resets.length,2);
  resets[0].listeners.click();assert.equal(h.control('domesticMarketValue').value,'0');assert.equal(h.control('domesticUnrealizedPnl').value,'3');
  resets[1].listeners.click();assert.equal(JSON.stringify(h.values),before);h.button().listeners.click();
  assert.deepEqual(JSON.parse(h.values[model.keys.monthlyAccountInputs]).records[0].overrideFields,[]);

@@ -2243,3 +2243,5 @@ body.drawer-open {
 .sbivc-source-panel p, .sbivc-source-code { overflow-wrap: anywhere; }
 .sbivc-source-review { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
 .sbivc-source-panel button { min-height: 44px; max-width: 100%; white-space: normal; text-align: left; }
+.scalar-source-panel label { display: block; margin: 8px 0; }
+.scalar-source-panel input { display: block; min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; margin-top: 4px; }

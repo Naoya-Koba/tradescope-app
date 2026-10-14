@@ -307,7 +307,7 @@
       if (token !== planToken || sources[kind] !== selected) return;
       saveState = outcome;
       if (!['ready','reconciliation-ready','confirmation-required'].includes(outcome.status)) return;
-      confirmation = { input, selected, kind };
+      confirmation = { input, selected, kind, sourceFingerprint:outcome.sourceFingerprint };
       $('save-summary').replaceChildren();
       const metric = (label, value) => $('save-summary').append(node('dt', label), node('dd', value));
       metric(kind === 'holdings' ? '保有証券' : '約定履歴', `${input.preview.rows.length}件`);
@@ -344,7 +344,8 @@
     const pending = confirmation;
     saveRunning = true; renderSave();
     let outcome;
-    try { outcome = await service().save(pending.input,transactionComparison?{transactionDecisions:transactionComparison.decisions()}:{}); }
+    try { outcome = await service().save(pending.input,{...(transactionComparison?{transactionDecisions:transactionComparison.decisions()}:{}),
+      ...(pending.kind==='holdings'?{sourceFingerprint:pending.sourceFingerprint}:{})}); }
     catch (error) {
       // Only fixed Storage messages may reach the UI; never display input/CSV exception values.
       const journal = (() => { try { return window.localStorage.getItem(TradeScopeStorageTransaction.journalKey) !== null; } catch (_) { return true; } })();

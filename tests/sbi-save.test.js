@@ -197,7 +197,7 @@ test('exact file reimport returns already-imported with every key byte-for-byte 
     assert.deepEqual(storage.snapshot(), before); assert.equal(storage.actions.length, count);
   }
 });
-test('same Holdings observation, different hash -> conflict without append or replacement', async () => {
+test('same Holdings observation without common adoption, different hash -> conflict without append or replacement', async () => {
   const storage = new Storage(), save = service(storage); await save.save(source()); const before = storage.snapshot();
   const outcome = await save.save(source('holdings', stock, 'b'.repeat(64)));
   assert.equal(outcome.status, 'conflict'); assert.equal(outcome.reason, 'holding-observation');

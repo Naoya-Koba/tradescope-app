@@ -5,7 +5,7 @@
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
-  const version = 'monthly-display-v6';
+  const version = 'monthly-display-v7';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -30,6 +30,7 @@
     function observationExisting(key, targetMonth, resolved) {
       if (resolved.source === 'conflict') return { components: [], conflict: true };
       if (key === 'sbi') {
+        if(resolved.sbiBalances)return {components:resolved.sbiBalances.components,conflict:resolved.sbiBalances.compatibilityConflict};
         const candidates = resolver.domesticCandidates(models, targetMonth);
         const input = records(models, 'monthlyAccountInputs').find(row => row.accountId === resolver.accountId && row.targetMonth === targetMonth);
         const domestic = resolver.domesticAdoption(models, targetMonth, resolved.state ? candidates.find(item => item.batch.id === resolved.state.domesticImportBatchId)
@@ -75,6 +76,7 @@
     }
     function observation(key,targetMonth,resolved){
       let base=observationExisting(key,targetMonth,resolved);const values=resolved.sourceAdoptions??[];
+      if(key==='sbi'&&resolved.sbiBalances)return base;
       if(!values.length)return base;
       if(key==='sbivc')base={components:cryptoComponents(targetMonth),conflict:false};
       if(resolved.source==='conflict')return {components:[],conflict:true};
@@ -225,7 +227,9 @@
       const commonPartition=history.some(h=>h.resolved.sourceAdoptions?.some(v=>v.currency==='JPY'&&v.component!=='account'&&['marketValue','cashBalance','holdings'].includes(v.metric)));
       if(commonPartition&&account.key==='sbivc')for(const h of history)if(!h.resolved.sourceAdoptions?.length)h.observed={components:cryptoComponents(h.targetMonth),conflict:false};
       const partitioned=commonPartition||account.key==='sbi'&&history.some(h=>h.observed.components.some(c=>c.id));
-      const componentKeys=partitioned?account.key==='sbi'?['domestic','foreign','cash']:account.key==='sbivc'?['spot','cash']:[...new Set(history.flatMap(h=>h.observed.components.map(c=>c.key)).filter(k=>k!=='account'))]:['account'];
+      const latestObservation=history.filter(h=>h.row.hasData).at(-1);
+      const sbiWhole=account.key==='sbi'&&latestObservation?.resolved.sbiBalances?.whole;
+      const componentKeys=sbiWhole?['account']:partitioned?account.key==='sbi'?['domestic','foreign','cash']:account.key==='sbivc'?['spot','cash']:[...new Set(history.flatMap(h=>h.observed.components.map(c=>c.key)).filter(k=>k!=='account'))]:['account'];
       const observations=[];
       for(const {targetMonth,resolved,row,observed} of history){
         if(row.conflict){
@@ -239,7 +243,7 @@
             const batch=records(models,'importBatches').find(b=>b.id===(snapshot?.importBatchId||c.id));
             observations.push({key:c.key,label:c.name,value:c.asset,sourceMonth:targetMonth,snapshotAsOf:c.snapshotAsOf,preventCarry:c.preventCarry===true,
               basis:'current-asset-observation',source:c.source??{recordId:c.id,importBatchId:batch?.id??null,
-                sourceType:batch?.sourceType??snapshot?.sourceMode??null,sourceScope:snapshot?.sourceScope??(batch?'sbi-domestic-holdings':null)}});
+                sourceType:batch?.sourceType??snapshot?.sourceMode??null,sourceScope:snapshot?.sourceScope??(batch?'sbi-domestic-holdings':null)},blocked:c.blocked===true});
           }
         }else{
           // Preserve complete ledger amounts. Whole-account partial observations may be carried too.

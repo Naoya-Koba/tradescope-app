@@ -26,8 +26,10 @@
     const account = records(models, 'accounts').find(row => row.id === accountId);
     if (account?.providerCode !== 'sbi' || account.accountType !== 'securities') return { ...base, status: 'unavailable' };
     // A future explicit adoption may identify a batch; never infer adoption from recency.
-    const selected = state ? batches.find(batch => batch.id === state.domesticImportBatchId)
-      : batches.length === 1 ? batches[0] : null;
+    // Native-form provenance also comes from the single balance entry. It is
+    // distinct from the current common-adopted metric, which the source UI shows.
+    const balances=typeof module!=='undefined'&&module.exports?require('./sbi-balance-adoption.js'):root.TradeScopeSbiBalanceAdoption;
+    const selected=balances.resolve(models,targetMonth).nativeDomestic?.batch??null;
     if (!selected) return { ...base, status: batches.length > 1 ? 'multiple' : 'unavailable' };
     const group = holdings.filter(row => row.importBatchId === selected.id);
     // Historical SBI domestic CSV records omit currency. This compatibility is

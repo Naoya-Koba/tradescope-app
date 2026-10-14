@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — SBI残高UI／hookと固定Backup v14（v306）
+
+Backup v14維持。国内Batch参照2metric、外国／cash Snapshot参照、独立manual scalar原値、採用／同revision補正／比較／defer／訂正は既存monthlySources v1受理範囲内。新field・component enum・record・Storage keyなし。原CSV本文・PII・金融原値の参照先複製を追加しない。
+
+CSV canonical＋candidate、manual作成＋明示採用はそれぞれ一回のRepository journal。容量不足・参照／fingerprint不正・再読込失敗はrollback、rollback不能ならjournal保持。v14完全往復とv13以前のRestore／clear・preserve規則を維持し、旧Backupに新契約がなくてもcompatibilityで読む。匿名Memoryのみで検証し、実Backup／production Restoreは使用しない。
+
 ## Current — 採用UIと固定Backup v14（v305）
 
 採用UIは既存monthlySourcesのsource参照・adoption・override・comparison・deferだけを保存する。新field／record／Storage key／version追加なし。旧互換sourceの確認採用も明示操作のみで、読込時migrationしない。source切替、比較記録、保留、同revision補正は既存journal／rollback／再読込保護とv14完全Backupで保持する。v13以前のRestore契約は不変。実Backup／production Restoreは検証に使わない。

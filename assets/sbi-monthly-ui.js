@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  function createController({ adapter, drafts, legacyData, onSaved }) {
+  function createController({ adapter, drafts, legacyData, onSaved, onSourceSaved=onSaved, onSourceDraft=()=>{} }) {
     const data = root.TradeScopeDataStorage, resolver = root.TradeScopeMonthlyResolver;
     const service = root.TradeScopeSbiMonthlySave.createService(adapter);
     const inputView = root.TradeScopeSbiInput;
@@ -33,6 +33,9 @@
       date.textContent = view.snapshotAsOf ? `取得日：${view.snapshotAsOf.slice(0, 10).replace(/-/g, '/')}` : ''; date.hidden = !date.textContent;
       const body = card.querySelector('.account-body');
       const values = drafts.read(targetMonth);
+      let adopted=models?root.TradeScopeSbiBalanceAdoption.resolve(models,targetMonth):null;
+      const fieldTargets={domesticMarketValue:'domestic:marketValue',domesticUnrealizedPnl:'domestic:unrealizedPnl',foreignAssetValue:'foreign:marketValue',foreignUnrealizedPnl:'foreign:unrealizedPnl',cashBalance:'cash:cashBalance'};
+      const nativeGroups={},resetButtons={};
       const controls = {};
       const amountGroup = root.TradeScopeMonthlyInputUI.readOnlyField(document, 'assetValue', '評価額', null, 'sbi-monthly');
       const pnlGroup = root.TradeScopeMonthlyInputUI.readOnlyField(document, 'unrealizedPnL', '評価損益', null, 'sbi-monthly');
@@ -56,11 +59,14 @@
         labelElement.htmlFor = control.id; labelElement.textContent = title; group.append(labelElement, control);
         if (type === 'number') { const suffix = document.createElement('span'); suffix.className = 'suffix'; suffix.textContent = '¥'; group.appendChild(suffix); }
         destination.appendChild(group); controls[field] = control;
+        const managedNote=document.createElement('p');managedNote.textContent=`${title}：入力元・採用で管理`;managedNote.hidden=true;destination.appendChild(managedNote);
+        nativeGroups[field]={group,note:managedNote};
         if (field.startsWith('domestic')) {
           const reset=document.createElement('button');reset.type='button';reset.className='monthly-source-reset';reset.textContent='取込値に戻す';
           reset.addEventListener('click',()=>{if(busy)return;const value=field==='domesticMarketValue'?view.sourceMarketValue:view.sourceUnrealizedPnl;
             control.value=value??'';drafts.set(targetMonth,field,control.value);error.textContent=unavailable;refresh();});
           destination.appendChild(reset);
+          resetButtons[field]=reset;
         }
       }
       domesticSection.appendChild(date);
@@ -72,15 +78,22 @@
       let busy = false, saved = resolved?.source === 'canonical' && resolved.completeness.complete;
       const unavailable = !models ? '取込データを確認できません'
         : resolved?.source === 'conflict' ? 'この月には従来方式のSBI入力が保存されています'
-        : resolver.domesticCandidates(models, targetMonth).length > 1 ? '国内証券の取込候補が複数あります'
+        : resolver.domesticCandidates(models, targetMonth).length > 1&&!((persisted||resolved?.state)&&adopted?.metrics.some(m=>m.component==='domestic'&&m.hasCommon)) ? '国内証券の取込候補が複数あります'
         : view.status !== 'ready' ? '国内証券データを取り込んでください'
         : view.marketValue === null || view.unrealizedPnl === null ? '国内証券の評価額・評価損益が不足しています' : '';
       function refresh() {
+        try{adopted=root.TradeScopeSbiBalanceAdoption.resolve(data.createRepository({getItem:key=>adapter.getItem(key)}).read(),targetMonth);}catch(_){adopted=null;}
+        for(const [field,{group,note}]of Object.entries(nativeGroups)){
+          const managed=adopted?.metrics.some(m=>m.hasCommon&&(fieldTargets[field]===m.component+':'+m.metric||field==='foreignDate'&&m.component==='foreign'||field==='cashDate'&&m.component==='cash'))===true;
+          group.hidden=managed;note.hidden=!managed;controls[field].readOnly=managed;if(resetButtons[field])resetButtons[field].hidden=managed;
+        }
         const current = drafts.read(targetMonth), csv = root.TradeScopeCSV;
         const decimal = value => { try{return csv.decimal(value);}catch(_){return null;} };
         const sum = values => { const known=values.map(decimal).filter(value=>value!==null);return known.length?csv.sum(known):null; };
-        const amount=sum([current.domesticMarketValue, current.foreignAssetValue, current.cashBalance]);
-        const pnl=sum([current.domesticUnrealizedPnl, current.foreignUnrealizedPnl]);
+        const fieldValue=(field,component,metric)=>adopted?.metrics.find(m=>m.component===component&&m.metric===metric)?.hasCommon
+          ?adopted.metrics.find(m=>m.component===component&&m.metric===metric).value:current[field];
+        const amount=sum([fieldValue('domesticMarketValue','domestic','marketValue'),fieldValue('foreignAssetValue','foreign','marketValue'),fieldValue('cashBalance','cash','cashBalance')]);
+        const pnl=sum([fieldValue('domesticUnrealizedPnl','domestic','unrealizedPnl'),fieldValue('foreignUnrealizedPnl','foreign','unrealizedPnl')]);
         amountInput.value=amount??'';pnlInput.value=pnl??'';
         const unchanged = fields.every(([field]) => String(drafts.read(targetMonth)[field] ?? '') === String(baseline[field] ?? ''));
         button.hidden = false; button.disabled = busy || Boolean(unavailable);
@@ -94,6 +107,7 @@
       });
       button.addEventListener('click', () => {
         if (busy || unavailable || button.hidden) return;
+        if(sourcePanel.pending()||sourcePanel.form()){error.textContent='入力元の編集・選択を先に保存または取消してください';refresh();return;}
         busy = true; refresh();
         try {
           const result = service.save({ ...drafts.read(targetMonth), targetMonth, domesticImportBatchId: view.importBatchId }, { expectedModels: models });
@@ -102,7 +116,13 @@
         } catch (failure) { error.textContent = failure.message; }
         finally { busy = false; refresh(); }
       });
-      actions.append(button, status); body.append(actions, error); refresh(); return card;
+      const sourceController=root.TradeScopeScalarSourceSelection.createController(adapter,{accountId:resolver.accountId,
+        targets:root.TradeScopeSbiBalanceAdoption.targets,manualTargets:root.TradeScopeSbiBalanceAdoption.targets.filter(t=>t.component!=='domestic'),
+        cutover:root.TradeScopeSbiBalanceAdoption.cutover,resolveBalance:root.TradeScopeSbiBalanceAdoption.resolve,validateSource:root.TradeScopeSbiBalanceAdoption.supportsSource});
+      const sourcePanel=root.TradeScopeScalarSourceUI.create({document,controller:sourceController,targetMonth,
+        onDraft:active=>onSourceDraft(targetMonth,active),onSaved:()=>{refresh();onSourceSaved(targetMonth);},
+        onResize:()=>{if(body.classList.contains('open'))body.style.maxHeight=`${body.scrollHeight}px`;}});
+      actions.append(button, status); body.append(actions, error,sourcePanel.element); refresh(); return card;
     }
     return Object.freeze({ renderCard });
   }

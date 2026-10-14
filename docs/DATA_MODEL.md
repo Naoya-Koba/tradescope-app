@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — SBI scalar balance adoption（v306）
+
+`sbi-balance-adoption.js`が国内marketValue／unrealizedPnl、外国marketValue／unrealizedPnl、JPY cashBalanceの唯一の採用入口。common adoption→同revision overrideを解決し、新判断がないmetricだけ旧MonthlyAccountInput／State参照を内部compatibilityで読む。明示common判断のstale／競合／未解決は旧値へsilent fallbackしない。
+
+国内はImportBatch＋sbi-domestic-holdings集合の参照、外国／現金は既存manual AccountSnapshot参照。原金融値をmonthlySourcesへ複製しない。新独立manual sourceだけ既存v1契約のvalueを原値として持つ。source作成とadoptionは別操作、公式自動優先なし。訂正・補正・比較・deferは既存append-only履歴を使う。
+
+CSV＋candidateは同じjournal。bulk migrationなし、Backup v14／既存11キー／validator／record version不変。国内holding set・国内株／投信分割・外国数量推定・外貨cash・入出金自動source化・内部振替は未実装。
+
 ## Current / Decided — SBI VC残高の最小採用UI（PWA v305）
 
 月次Input内の「入力元・採用を確認」でspot holding setとJPY cashBalanceだけを操作する。`sbivc-source-selection.js`は共通candidate／balance resolver／monthly-source-serviceを接続する非永続controller、`sbivc-source-ui.js`は表示と確認Draftだけを担当する。候補一覧の訂正前revisionは監査・明示選択用で、通常保有へ混ぜない。原金融値や旧Input履歴を複製・破壊しない。

@@ -447,10 +447,15 @@ let yearInitialFunds = {}; // { year: { account: amount } }
 let yearInitialUnrealized = {}; // { year: { account: amount } }
 let displayReadFailed = false;
 const dirtyAccountDrafts = new Set(), dirtyInitialDrafts = new Set();
+const sourceAccountDrafts = new Set();
 const sbiInput = window.TradeScopeSbiInput;
 const sbiInputDrafts = sbiInput.createDrafts();
 const sbiMonthlyUI = window.TradeScopeSbiMonthlyUI.createController({ adapter: localStorage, drafts: sbiInputDrafts,
-  legacyData: () => tradingData, onSaved: () => {
+  onSourceDraft:(month,active)=>{const token=month+':sbi';if(active)sourceAccountDrafts.add(token);else sourceAccountDrafts.delete(token);},
+  // A source action must not clear unsaved monthly-flow Drafts or rebuild their old guards.
+  onSourceSaved:()=>{refreshMonthlyModels();renderAnnualSummary();renderPerformanceChart();renderMonthlySection();},
+  legacyData: () => tradingData, onSaved: month => {
+    sourceAccountDrafts.delete(month+':sbi');
     dirtyAccountDrafts.delete(window.TradeScopeDisplayReadState.token(currentYear,currentMonth,'sbi'));
     refreshMonthlyModels();
     renderAnnualSummary(); renderPerformanceChart(); renderMonthlySection(); renderAccountInputs();
@@ -623,7 +628,7 @@ function refreshExternalDisplay() {
   updateYearSelect();renderAnnualSummary();renderPerformanceChart();renderMonthlySection();renderMonthTabs();
   if(monthlyDetailPane.classList.contains('open'))renderMonthlyDetailPane(currentMonth);
   // Preserve live controls and their original save guards while any account is editing.
-  const dirty=(key,month)=>dirtyAccountDrafts.has(month+':'+key);
+  const dirty=(key,month)=>dirtyAccountDrafts.has(month+':'+key)||sourceAccountDrafts.has(month+':'+key);
   sbiInputDrafts.retain(month=>dirty('sbi',month));gmoMonthlyUI.retainDrafts(month=>dirty('gmo',month));tradersMonthlyUI.retainDrafts(dirty);
   const editing=ACCOUNTS.some(a=>dirty(a.key,inputTargetMonth()));
   if(!editing){

@@ -1,5 +1,15 @@
 # Product Specification
 
+## Current / Decided — SBI入力元作成・採用（v306）
+
+SBI月次Inputの「入力元・採用を確認」で国内集計2metric、外国円評価2metric、JPY現金を個別確認・採用する。種別・対象月・基準日・revision・原値／補正後値・候補・比較／staleを表示。CSV自動優先なし。
+
+外国評価額／評価損益／JPY現金には設定可能なscalar manual source作成UIを接続。component／metric／JPY／対象月を明示し、値とdate-only基準日を入力する。blankは未取得、0は有効、負の評価損益可。作成だけでは採用を変えず、採用なしの場合だけ明示「保存して採用」を選べる。既存採用がある場合は候補作成後に別途明示選択する。
+
+同内容／不一致／比較不能の記録だけでadoptionを切替えない。deferは有効な採用を維持。同revision補正・原値reset・manual訂正版を扱い、旧revision／補正を保持し新revisionへ自動継承しない。stale保存を止め、入力と選択を保持。月次flow Draftもsource操作で破棄しない。
+
+国内holding set／株・投信分割／外国数量／外貨／配当／入出金自動取得／内部振替／Portfolio・Position canonical移行／Riskは対象外。1〜8月legacyは自動migrationしない。
+
 ## Current / Decided — SBI VC入力元の確認・採用（v305）
 
 SBI VC月次Inputに「入力元・採用を確認」を追加。現物保有集合とJPY残高の現在採用、PDF／手入力候補、基準日・対象月・revision、旧訂正版、source原値と補正後値を確認できる。候補は個別折りたたみ、明示選択後に保存で確定する。PDFを自動優先せず、保有集合とJPYを別々に採用できる。

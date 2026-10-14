@@ -1,5 +1,15 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — SBI scalar adoption（v306）
+
+国内集計2metric・外国円評価2metric・JPY現金はcommon adoption／compatibility入口へ接続済み。独立manual scalarの作成・採用・比較・保留・補正・訂正UIはSBIへ接続。他口座UIは後続だがcontroller／rendererは口座非依存のtarget設定で再利用可能。旧補正は同じ原revisionを明示継続した場合のみcommon overrideへ接続する。
+
+国内holding set、同一Instrumentの特定／NISA複数行identity、株／投信の独立更新、空の国内集合の正式確認は後続。国内CSV同月同基準日の訂正版はcommon国内採用がある場合に別candidateとして追加可能。採用なしの既存観測は従来どおり競合停止し、先に現候補を確認・採用する。訂正版追加だけではadoptionを変更しない。
+
+Top／AllocationとPortfolio／Open PositionsのSBI残高sourceはまだ完全統一されていない。後者はlegacy holdings＋manual取引差分の移行途中で、恒久仕様ではない。外国Holding／数量推定、外貨残高・換算、入出金自動取得、internal transfer、配当、corporate action、Risk新sourceは未実装。口座flowを全体external cashflowと推測確定しない。独立manual残高採用だけでMonthlyAccountStateを完成させる橋渡しも行わない。
+
+current carryは同一年内、固定historical月には混ぜない。8月legacy／9月canonicalは互換。browser一覧が空のため390px／1280px実表示・実Console未実施。匿名DOM検証とは区別する。
+
 ## Current / Known limitation — SBI VC最小採用UI（v305）
 
 保有集合／JPYの既存候補を確認・採用・比較・継続・保留するUIを接続済み。下記v304の「本格採用UIは後続」は、今回の2component以外、独立manual source作成、最終デザイン、他broker UIを指す。旧source・履歴を残し、訂正候補の追加だけでcommon採用を切替えない。原値比較と補正後採用値は別表示。

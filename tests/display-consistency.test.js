@@ -101,7 +101,7 @@ function refreshHarness(){
  const context={window:{TradeScopeDisplayReadState:read,addEventListener:(name,fn)=>events[name]=fn},localStorage:store,
   tradingData:f.tradingData,legacyInputData:structuredClone(f.tradingData),yearInitialFunds:f.initialFunds,yearInitialUnrealized:f.initialUnrealized,
   monthlyModels:f.models,displayReadFailed:false,currentYear:2026,currentMonth:8,ACCOUNTS:f.accounts,
-  dirtyAccountDrafts:new Set(),dirtyInitialDrafts:new Set(),inputTargetMonth:()=> '2026-08',
+  dirtyAccountDrafts:new Set(),sourceAccountDrafts:new Set(),dirtyInitialDrafts:new Set(),inputTargetMonth:()=> '2026-08',
   monthlyDetailPane:{classList:{contains:()=>true}},
   sbiInputDrafts:{retain:fn=>calls.sbi=fn},gmoMonthlyUI:{retainDrafts:fn=>calls.gmo=fn},tradersMonthlyUI:{retainDrafts:fn=>calls.traders=fn}};
  for(const name of ['updateYearSelect','renderAnnualSummary','renderPerformanceChart','renderMonthlySection','renderMonthTabs','renderMonthlyDetailPane','renderAccountInputs','renderInitialCapitalForm'])context[name]=()=>calls[name]=(calls[name]??0)+1;
@@ -133,6 +133,11 @@ test('BFCache refresh preserves dirty live account/initial controls and unsaved 
 test('canonical editing is retained without rebuilding controls or adopting stale save guards',()=>{
  const h=refreshHarness(),c=h.context;c.currentMonth=9;c.inputTargetMonth=()=> '2026-09';c.dirtyAccountDrafts.add(read.token(2026,9,'sbi'));
  h.events.storage({key:model.keys.holdingSnapshots});assert.equal(h.calls.sbi('2026-09'),true);assert.equal(h.calls.sbi('2026-10'),false);assert.equal(h.calls.renderAccountInputs,undefined);
+});
+test('source adoption Draft survives canonical storage events and BFCache without rebuilding Input',()=>{
+ const h=refreshHarness(),c=h.context;c.currentMonth=9;c.inputTargetMonth=()=> '2026-09';c.sourceAccountDrafts.add('2026-09:sbi');
+ h.events.storage({key:model.keys.monthlySources});h.events.pageshow({persisted:true});assert.equal(h.calls.renderAccountInputs,undefined);assert.equal(h.calls.sbi('2026-09'),true);
+ c.sourceAccountDrafts.delete('2026-09:sbi');h.events.storage({key:model.keys.monthlySources});assert.equal(h.calls.renderAccountInputs,1);
 });
 test('read failure refresh preserves Draft and marks display unknown without Storage writes',()=>{
  const h=refreshHarness(),before=JSON.stringify(h.context.legacyInputData);h.store.data.set('tradingData','broken');const storageBefore=JSON.stringify([...h.store.data]);

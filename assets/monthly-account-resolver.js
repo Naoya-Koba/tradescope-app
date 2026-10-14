@@ -3,9 +3,10 @@
   const storage = typeof module !== 'undefined' && module.exports ? require('./data-model-storage.js') : root.TradeScopeDataStorage;
   const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
+  const sbiBalances = typeof module !== 'undefined' && module.exports ? require('./sbi-balance-adoption.js') : root.TradeScopeSbiBalanceAdoption;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
-  const sourceAdapterVersion='monthly-source-adapter-v4';
+  const sourceAdapterVersion='monthly-source-adapter-v5';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
@@ -71,8 +72,9 @@
     const manualValid = (row, scope) => row?.accountId === accountId && row.targetMonth === targetMonth
       && row.sourceMode === 'manual' && row.sourceScope === scope && row.valuationCurrency === 'JPY' && Boolean(row.snapshotAsOf);
     const foreignValid = manualValid(foreign, 'sbi-foreign-securities'), cashValid = manualValid(cash, 'sbi-cash');
-    const observedUnrealized = sum([domestic?.unrealizedPnl, foreignValid ? foreign.unrealizedPnl : null]);
-    const observedAsset = sum([domestic?.marketValue, foreignValid ? foreign.assetValue : null, cashValid ? cash.cashBalance : null]);
+    const balance=sbiBalances.resolve(models,targetMonth,{validate:false});
+    const observedUnrealized = foreignValid ? balance.unrealizedPnl : null;
+    const observedAsset = foreignValid && cashValid ? balance.observedAsset : null;
     const monthly = ['realizedPnl', 'deposit', 'withdrawal'].every(field => decimal(state[field])) && state.swapPnl === '0';
     const observation = observedAsset !== null && observedUnrealized !== null && Boolean(domestic?.batch.snapshotAsOf);
     return { ...base, source: 'canonical', confirmed: true, state, domestic, foreign, cash,
@@ -116,12 +118,13 @@
 
   const sourceAccountIds={...Object.fromEntries(Object.entries(policies).map(([key,p])=>[key,p.accountId])),sbivc:'acc_sbivc_crypto',smbc:'acc_smbc_bank'};
   function sourceValues(models,targetMonth,key){return sources.month(models,sourceAccountIds[key],targetMonth);}
-  function resolve(models,tradingData,targetMonth,key='sbi',enabledKeys=defaultEnabledKeys){
+  function resolveCore(models,tradingData,targetMonth,key='sbi',enabledKeys=defaultEnabledKeys){
     let base=resolveExisting(models,tradingData,targetMonth,key,enabledKeys);
     const existing=records(models,'monthlyAccountStates').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===targetMonth)
       ??records(models,'monthlyAccountInputs').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===targetMonth);
     // Defer is not a command to revoke the explicit adoption in a released contract.
-    const values=sourceValues(models,targetMonth,key).filter(v=>!(v.status==='unresolved'&&v.deferred&&existing));
+    const values=sourceValues(models,targetMonth,key).filter(v=>!(key==='sbi'&&targetMonth>=cutover&&sbiBalances.targets.some(t=>t.component===v.component&&t.metric===v.metric&&v.currency==='JPY')))
+      .filter(v=>!(v.status==='unresolved'&&v.deferred&&existing));
     if(!values.length)return base;
     // Partial Input already contains explicitly adopted values even without a complete State.
     // Overlay only the new metric; do not discard those compatible known values.
@@ -160,6 +163,26 @@
     const observation=!bad&&(key==='smbc'?decimal(asset):decimal(adopted.unrealizedPnl));
     return {...base,...adopted,source:bad?'conflict':'canonical',sourceAdoptions:values,observedAsset:balances.length?asset:base.observedAsset??null,
       confirmed:monthly,completeness:{monthly,observation,complete:monthly&&observation}};
+  }
+
+  function resolve(models,tradingData,targetMonth,key='sbi',enabledKeys=defaultEnabledKeys){
+    let base=resolveCore(models,tradingData,targetMonth,key,enabledKeys);
+    if(key!=='sbi'||targetMonth<cutover||models===null||!enabledKeys.includes(key))return base;
+    // createCalculator validates the shared models once; this pure read facade also
+    // preserves the old direct resolver's missing-fact diagnostics.
+    const balance=sbiBalances.resolve(models,targetMonth,{validate:false});
+    if(!balance.hasCommon)return {...base,sbiBalances:balance};
+    const input=records(models,'monthlyAccountInputs').find(r=>r.accountId===accountId&&r.targetMonth===targetMonth);
+    // Partial native flows remain native flows, not invented from adopted balance differences.
+    if(base.source==='missing'&&input)base={...base,source:'canonical',realizedPnl:input.realizedPnl,deposit:input.deposit,withdrawal:input.withdrawal};
+    const values=sourceValues(models,targetMonth,key);
+    // An existing account-scope P/L decision is outside the five balance targets;
+    // adding a cash/value candidate must not replace it with component observations.
+    const unrealized=values.some(v=>v.component==='account'&&v.metric==='unrealizedPnl'&&v.currency==='JPY')?base.unrealizedPnl:balance.unrealizedPnl;
+    const monthly=base.completeness.monthly,observation=unrealized!==null;
+    return {...base,sbiBalances:balance,sourceAdoptions:values,balanceOnlyAdoption:!values.some(v=>sources.flowMetrics.includes(v.metric)||v.component==='account'&&v.metric==='unrealizedPnl'),
+      observedAsset:balance.observedAsset,unrealizedPnl:unrealized,
+      completeness:{...base.completeness,observation,complete:monthly&&observation}};
   }
 
   function dependencies(models, year, enabledKeys = defaultEnabledKeys) {

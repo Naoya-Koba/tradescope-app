@@ -1,5 +1,13 @@
 # Calculation Specification
 
+## Current / Decided — SBI採用済みscalar残高（v306）
+
+国内証券評価額・評価損益、外国円評価額・円評価損益、JPY現金は共通SBI balance resolverを通す。Top／Allocationは同じcurrent-asset-view／balance-view結果を参照し、国内・外国・現金の確認月／基準日／unknown／carryを独立保持する。明示0は前月positiveへ戻さず、未取得は0に保存しない。whole-account sourceとcomponent合成は排他、legacy合計を成分へ推測分解・追加加算しない。
+
+固定月Monthly Summaryは当月採用値だけを読み、current carryをAnnual／過去Asset Trend／Performance／Risk／月次flowへ流さない。価格評価損益の明示採用は同義値を既存unrealized計算へ渡すが、評価額差をrealized／incomeへ変換しない。Stateを勝手に完成させず、manual realized／deposit／withdrawal契約を維持。残高判断の未解決で既知flowを0化・逆算しない。
+
+Portfolio／Open PositionsのSBIはまだlegacy holdings＋manual取引差分で、Top／Allocationと残高sourceが完全統一されていない。恒久仕様ではなく後続の保有identity／外国Holding整備の移行課題。Risk新source、数量推定、外貨換算、入出金自動取得／内部振替は非接続。
+
 ## Current / Decided — SBI VC採用UIと期間計算の境界（v305）
 
 保有集合とJPYは別採用可能。PDF自動優先なし。UIは共通採用結果、source原値、補正後採用値、比較結果を分けて表示する。保有集合比較はv14の内訳・Instrument・基準日・scope・原値表記を含む保守的判定で、合計額だけから一致にしない。cashも同月／JPY／scope／as-ofが比較可能な場合だけ比較する。小数表記差の正規化でv14 comparison意味を変更しない。

@@ -1,5 +1,17 @@
 # Development Guide
 
+## Current — SBI scalar resolver／UI（PWA v306）
+
+`sbi-balance-adoption.js`は5metricのscope・provider・参照型を検証し、共通判断と旧Input／Stateを一回で解決する。monthly resolver／monthly-display／native Input provenanceは同じ入口を使用し、原Batch集計／Snapshotを別source値へコピーしない。
+
+`scalar-source-selection.js`は口座／target／read-view設定を受けるDOM非依存controller、`scalar-source-ui.js`は小さいrenderer。作成／revision訂正／同revision補正／採用／comparison／deferは既存monthly-source-serviceを使用。全model＋legacy fingerprintを保存直前に再確認し、staleはDraft保持で停止する。source編集中Inputをstorage／BFCacheで再構築せず、source保存で月次flow Draftをclearしない。
+
+SBI CSV保存は仮canonicalへcandidate buildChangesを合成し一回commit。PreviewにもsourceFingerprint guardを渡す。same hash no-op、訂正版は旧record保持、候補だけで採用しない。旧月次フォームは共通採用済みbalance変更を拒否しsource UIへ案内。flow・取引確認統合・Portfolio／Position／Riskの契約は不変。
+
+asset query 20261014-7、PWA v306。Backup v14／既存キー／validator不変。匿名Memory／DOM／localhostで作成・採用・比較・保留・stale・atomic rollback・Backup互換を確認しcleanup。実CSV・production Storage・実データ・実Backupは使用しない。browser一覧が空のため390px／1280px・実Consoleは未実施。
+
+検証：追加86件、全1442 tests Pass。JavaScript構文126ファイル、precache 79資産（重複なし）、production HTMLのJS／CSS 112参照を確認。browser-global module初期化・匿名DOMの明示保存／Draft保持、v14往復・v13互換・rollbackを検証し、diff-checkは問題なし。匿名localhost server／Memoryはcleanup済み。
+
 ## Current — SBI VC source adoption UI（PWA v305）
 
 既存月次Inputの小さい折りたたみsectionへ採用操作を追加。controller（source-selection）とDOM renderer（source-ui）を分離し、最終UI overhaulでrendererを交換可能。候補取得／比較はread-only、候補選択はメモリDraft、保存でのみmonthly-source-service.operateへ渡す。source原値を新modelへコピーしない。

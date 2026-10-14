@@ -4,6 +4,7 @@
   const storage = node ? require('./data-model-storage.js') : root.TradeScopeDataStorage;
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
+  const balances=node?require('./sbi-balance-adoption.js'):root.TradeScopeSbiBalanceAdoption;
   function createService(adapter, options = {}) {
     const clock = options.clock || (() => new Date().toISOString());
     const repo = storage.createRepository(adapter, {clock});
@@ -13,9 +14,14 @@
       let legacy; try {legacy = JSON.parse(adapter.getItem('tradingData') || '{}');} catch (_) {throw Error('既存の月次データを読み取れません');}
       if (resolver.hasLegacyConflict(legacy, draft.targetMonth)) throw Error('この月には従来方式のSBI入力が保存されています');
       const candidates = resolver.domesticCandidates(models, draft.targetMonth);
-      if (candidates.length > 1) throw Error('国内証券の取込候補が複数あります');
+      const balanceView=balances.resolve(models,draft.targetMonth);
+      const explicitNative=models.monthlyAccountInputs?.records.find(r=>r.accountId===resolver.accountId&&r.targetMonth===draft.targetMonth)
+        ??models.monthlyAccountStates?.records.find(r=>r.accountId===resolver.accountId&&r.targetMonth===draft.targetMonth);
+      const preserveNative=!!explicitNative&&balanceView.metrics.some(m=>m.component==='domestic'&&m.hasCommon);
+      if (candidates.length > 1&&!preserveNative) throw Error('国内証券の取込候補が複数あります');
       if (!candidates.length) throw Error('国内証券データを取り込んでください');
-      const domestic = candidates[0];
+      const domestic = preserveNative?candidates.find(c=>c.batch.id===explicitNative.domesticImportBatchId):candidates[0];
+      if(!domestic)throw Error('国内証券の採用参照を確認してください');
       if (domestic.batch.id !== draft.domesticImportBatchId || expectedModels && JSON.stringify(models) !== JSON.stringify(expectedModels)) throw Error('保存前に国内証券データが変更されました');
       const account = models.accounts.records.find(row => row.id === resolver.accountId);
       if (!account?.enabled || account.providerCode !== 'sbi' || account.accountType !== 'securities') throw Error('SBI証券の口座設定を確認してください');
@@ -30,6 +36,18 @@
       for (const field of ['foreignDate','cashDate']) {
         try {values[field] = csv.date(draft[field] || null);} catch (_) {throw Error('取得日を正しく入力してください');}
       }
+      // The released form remains a native-flow editor. Common-adopted balances are
+      // edited through their revision-bound source UI, never silently overwritten here.
+      const adoptedBalance=balances.resolve(models,draft.targetMonth),native=models.monthlyAccountInputs?.records.find(r=>r.accountId===resolver.accountId&&r.targetMonth===draft.targetMonth);
+      const references=native??models.monthlyAccountStates?.records.find(r=>r.accountId===resolver.accountId&&r.targetMonth===draft.targetMonth);
+      const foreign=models.accountSnapshots?.records.find(r=>r.id===references?.foreignAccountSnapshotId),cash=models.accountSnapshots?.records.find(r=>r.id===references?.cashAccountSnapshotId);
+      const originals={domesticMarketValue:native?.adoptedValues.marketValue??domestic.marketValue,domesticUnrealizedPnl:native?.adoptedValues.unrealizedPnl??domestic.unrealizedPnl,
+        foreignAssetValue:foreign?.assetValue??null,foreignUnrealizedPnl:foreign?.unrealizedPnl??null,cashBalance:cash?.cashBalance??null};
+      const mapped={domesticMarketValue:'domestic:marketValue',domesticUnrealizedPnl:'domestic:unrealizedPnl',foreignAssetValue:'foreign:marketValue',foreignUnrealizedPnl:'foreign:unrealizedPnl',cashBalance:'cash:cashBalance'};
+      for(const [field,target]of Object.entries(mapped))if(adoptedBalance.metrics.some(m=>m.hasCommon&&m.component+':'+m.metric===target)
+        &&(values[field]===null||originals[field]===null?values[field]!==originals[field]:!storage.equalDecimal(values[field],originals[field])))throw Error('共通採用済みの残高は入力元・採用から修正してください');
+      for(const [field,component,date]of [['foreignDate','foreign',foreign?.snapshotAsOf??null],['cashDate','cash',cash?.snapshotAsOf??null]])
+        if(adoptedBalance.metrics.some(m=>m.hasCommon&&m.component===component)&&values[field]!==date)throw Error('共通採用済みの基準日は入力元・採用から修正してください');
       if ([values.foreignAssetValue,values.foreignUnrealizedPnl,values.foreignDate].some(v=>v!==null)
         && [values.foreignAssetValue,values.foreignUnrealizedPnl,values.foreignDate].some(v=>v===null)) throw Error('外国証券の評価額・評価損益・取得日を入力してください');
       if ((values.cashBalance === null) !== (values.cashDate === null)) throw Error('現金の残高・取得日を入力してください');
