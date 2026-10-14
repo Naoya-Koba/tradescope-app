@@ -1,5 +1,15 @@
 # Calculation Specification
 
+## Current / Decided — SBI common adoptionから期間入力への橋渡し（v308）
+
+SBI証券はcommon balance resolver → derived period input → 既存月次ledger → Monthly／Annual Summary・Asset／Performance Trendを使用する。式は変更せず、国内／外国評価損益は採用済み値を一度だけ渡す。国内評価額＋外国円評価額＋JPY cashは公式観測参照で、ledger純資産やrealizedを残高差から作らない。current carry、他月、年初値で固定月のmissingを埋めない。
+
+期間入力はbalanceの5metricに正しいsource／基準日があり、manual realized／deposit／withdrawalが既知の場合に成立する。0／負評価損益は有効、nullは0ではない。balance充足だけではperiod completeにならない。swap固定0は現行契約を維持し、flow未取得の月を新しい0損益にしない。native State不存在だけでは正式common値を捨てず、計算時にderived inputsを導く。Stateを自動生成・更新しない。
+
+月次入力条件と年間ledgerの基準充足も別。新derived Input経路ではcash-only common判断であっても年初資金missingを0で補わず、確定資産／ledger純資産をnullにする。月次に明示されたflow・観測は保持する。旧legacy／native State経路の式を全面変更しない。
+
+v307 required policyのperiodReferenceは同じderived reference条件を評価し、progressから金融値は変更しない。観測合計とledger派生値は別basisで、Monthly Summaryのsource-observation／ledgerAsset区別も維持する。Top／Allocationのcurrent balanceは同じ既存resolver／carryを維持し、Portfolio／Open Positions・SBI VC P/L・Riskのsourceは変更しない。新common判断なしの8月legacy／9月native結果、現行flow契約とBackup v14を保持する。
+
 ## Current / Decided — required policyと月次進捗（v307）
 
 金融計算と入力条件判定は別責務。`monthly-required-policy`／`monthly-progress-view`は金融値を変更せず、既存共通採用入口の値・参照・基準日を評価する。current表示のcarryは当月入力充足ではなく、fixed historical／periodへ混ぜない。残高complete、期間計算complete、月次完了承認を同一化しない。

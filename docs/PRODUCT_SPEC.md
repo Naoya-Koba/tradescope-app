@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current / Decided — SBI期間計算bridge（v308）
+
+common採用された国内評価額・評価損益、外国円評価額・評価損益、JPY cashを固定月の正式期間入力へ接続する。manual／CSVの自動優先なし。existing manual flowと参照条件が揃えば、別Stateを作らずderived resolverで期間計算可能。不足はpartial／missingで、残高差をP/Lにしない。進捗UI・完了承認・holding-set・Portfolio／Open Positions移行は未実装のまま。
+
+Top／Allocationの現在資産と固定月末観測／期間ledgerのbasis差を維持する。current carryは期間計算に使わず、入出金自動取得・internal transfer・外国数量推定は追加しない。Backup v14／Storage契約不変。
+
 ## Current / Decided — 月次進捗API（v307）
 
 6口座の共通required policyと非永続projectionを提供する。現在のUIに完了表示・演出は追加せず、将来の月次詳細6口座行へsourceあり／採用待ち／不足／条件充足／carry／要再確認を接続可能。条件充足だけで「完了」へ昇格せず、approvalStatusはnot-recorded。残高確認とperiod計算条件を別に返し、SBI VCの残高充足を月次P/L完成と表現しない。manual sourceは対等な正式入力。

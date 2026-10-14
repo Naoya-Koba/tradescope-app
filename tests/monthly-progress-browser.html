@@ -6,21 +6,24 @@
 <script defer src="../assets/transaction-reconciliation.js?v=20261013-1"></script>
 <script defer src="../assets/monthly-source-contract.js?v=20261014-5"></script>
 <script defer src="../assets/data-model-storage.js?v=20261014-2"></script>
+<script defer src="../assets/monthly-source-service.js?v=20261014-5"></script>
 <script defer src="../import/csv-core.js?v=20261005-1"></script>
 <script defer src="../assets/observation-adoption.js?v=20261012-15"></script>
 <script defer src="../assets/sbivc-balance-adoption.js?v=20261014-5"></script>
 <script defer src="../assets/sbi-balance-adoption.js?v=20261014-7"></script>
 <script defer src="../assets/profit-metrics.js?v=20261011-3"></script>
-<script defer src="../assets/monthly-account-resolver.js?v=20261014-7"></script>
+<script defer src="../assets/sbi-period-input.js?v=20261014-9"></script>
+<script defer src="../assets/monthly-account-resolver.js?v=20261014-9"></script>
 <script defer src="../assets/monthly-display-view.js?v=20261014-7"></script>
 <script defer src="../assets/balance-view.js?v=20261013-7"></script>
 <script defer src="../assets/sbi-monthly-save.js?v=20261014-7"></script>
 <script defer src="../assets/monthly-required-policy.js?v=20261014-8"></script>
-<script defer src="../assets/monthly-progress-view.js?v=20261014-8"></script>
+<script defer src="../assets/monthly-progress-view.js?v=20261014-9"></script>
 <script defer src="monthly-display-fixture.js"></script>
 <script defer src="monthly-progress-browser.js"></script>
 <h1>匿名月次進捗確認（localhost専用）</h1>
 <button id="prepare">匿名データを準備</button><button id="september">9月progress確認</button><button id="october">10月carry確認</button>
+<button id="bridge">StateなしSBI期間入力を準備</button>
 <button id="inspect">Storage不変を確認</button><button id="cleanup">匿名データをcleanup</button>
 <a href="../index.html">匿名Topを開く</a><a href="../profit/soneki.html">匿名損益管理を開く</a>
 <table><thead><tr><th>口座</th><th>残高条件</th><th>期間条件</th><th>carry</th></tr></thead><tbody id="rows"></tbody></table>

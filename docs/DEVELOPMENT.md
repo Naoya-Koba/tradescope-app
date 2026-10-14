@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — SBI derived period input（v308）
+
+新module `assets/sbi-period-input.js`は既存balance facadeから渡された金融観測とnative manual flowだけを評価する。monthly-account-resolverのSBI共通判断あり分岐から一度だけ呼び、Monthly／Annual／Trendに個別source選択を追加しない。progressのperiodReferenceも同じ結果を読み、financial calculatorへ逆流しない。新State・金融原値コピー・Storage書込・current carry依存なし。partial InputのBatch／Snapshot参照もcalculator fingerprintへ含め、採用参照・原観測変更後のcacheを再利用しない。
+
+`tests/sbi-period-input.test.js`は匿名MemoryでStateなしperiod成立、5metric原参照、manual／CSV対等、flow missing、0／負値、stale／参照破損／競合、whole排他、固定月no-carry、8月／9月互換、Summary／Trend、current金額不変、Backup v14往復・Storage不変を検証する。PWA v308、変更module query 20261014-9、Backup v14／persistent schema不変。Portfolio／Open Positions／Transaction History／Risk／SBI VCのsource契約は変更しない。
+
+検証：追加58件／全1583 tests Pass。JS／MJS構文132ファイル＋production inline 3件、precache 82資産、production 119＋匿名harness 19 local参照、diff-checkを確認。匿名MemoryでBackup v14往復・原model／Storage不変、匿名localhostでStateなしSBI period条件充足と翌月carryの当月非充足を確認した。既存Top／損益管理を390px／1280pxで確認し横overflow・Console Error／Warningなし。匿名Storage不変確認後、テストStorage／Service Worker／cacheをcleanupし、temporary tab／viewport override／serverを終了。本番Storage・実データ・実Backupは未操作。
+
 ## Current — required policy／progress（v307）
 
 新共有moduleは`assets/monthly-required-policy.js`と`assets/monthly-progress-view.js`。index／損益管理で依存resolverの後にロードし、UIはまだ呼び出さずAPIを提供する。PWA v307、query 20261014-8、Backup v14／永続契約変更なし。`tests/monthly-progress.test.js`は匿名Memoryで6口座、calendar swap、common manual／CSV、空集合、0／missing、stale／conflict／broken reference、carryの当月非充足、legacy互換、金融結果／Backup／Storage不変を検証する。

@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — SBI derived period input（v308）
+
+`sbi-period-input.js`は新金融recordではなく、`sbi-balance-adoption`の採用済み5metricと既存MonthlyAccountInput／Stateのmanual realized／deposit／withdrawalから固定月の入力を導く非永続bridge。共通残高判断がない月は旧State経路を維持し、共通判断のあるmetricは旧Snapshotを別優先順位で再採用しない。CSV／manual／互換sourceは同義の入力、stale／競合／参照不正／missingは有効値に戻さない。
+
+新Stateや原値の複製を作らず、partial Inputに正式flowがあればnative外国／現金Snapshot不在でも共通scalar採用から期間入力を成立させられる。返値periodInputはflowSource、5metricのeligibility、referenceSatisfied、missingFlows／missingReferences、monthly／observation条件を持つ。SBI swapは現行固定0で、flow未取得の月へ新しい0損益を作らない。条件充足はuser approvalではない。Backup v14／11キー／persistent schema／migrationは不変。
+
+whole accountとcomponentsは既存balance resolver内の排他を維持。既存account-scope P/L採用は5metric bridgeの範囲外として同じexclusive basisを保持し、component P/Lへ追加加算しない。SBI国内holding-set・Portfolio／Open Positions・外国銘柄別残高・外貨cash・internal transferは今回未接続。
+
 ## Current / Decided — 非永続月次進捗（v307）
 
 `monthly-required-policy.js`が固定6口座のcurrent-balance／fixed-balance／period条件を定義し、`monthly-progress-view.js`が既存source・共通採用resolverから読む。source取得、adoption、required metric、carry、conflict／stale／invalid-reference、balance条件、period条件、user approvalを分離する。既存State・Input・balance-view.complete・monthly-display.complete・__savedの意味を変更しない。

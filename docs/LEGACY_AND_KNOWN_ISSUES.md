@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — SBI period input bridge（v308）
+
+正式common balance採用と既存manual monthly flowからderived period inputを作る。旧native外国／現金Snapshotだけを必須にする橋渡し不足は解消し、新MonthlyAccountStateは作らない。common判断がない月は旧契約、8月legacyはmigrationしない。部分残高やflow missingでcompleteにならず、stale／競合／参照破損は旧値へ戻さない。
+
+flow入力UI／保存契約は既存のままで、domestic CSV等のnative入力参照が全くない月にflowを新規作成するgeneric UIは今回対象外。progress UI／user approval persistence／SBI holding-set・Portfolio／Open Positions移行は後続。Top／Allocationはcommon current balance、Portfolio／Open Positionsはlegacy＋manual差分という保有移行課題を維持する。SBI VC・Risk・cashflow architecture・外貨cashは未変更。旧版記述の「State自動完成橋渡しなし」は履歴であり、現在は非永続period bridgeを用いる。
+
 ## Current / Known limitation — 非永続月次進捗（v307）
 
 required policy／progress APIを追加。financial completeと入力条件／user approvalは別。carryは既存current balance結果の入力時だけ表示用として評価し、当月充足へ使わない。legacy __saved／計算互換から新完了承認や未知zero根拠を推測しない。SBIの採用manual残高を評価できるが、native period Stateの自動完成橋渡しは未実装。SBI VC canonical period P/Lは未完成、SMBCは銀行残高scopeのみ。

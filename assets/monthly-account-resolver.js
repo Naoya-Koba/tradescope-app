@@ -4,9 +4,10 @@
   const csv = typeof module !== 'undefined' && module.exports ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources = typeof module !== 'undefined' && module.exports ? require('./monthly-source-contract.js') : root.TradeScopeMonthlySourceContract;
   const sbiBalances = typeof module !== 'undefined' && module.exports ? require('./sbi-balance-adoption.js') : root.TradeScopeSbiBalanceAdoption;
+  const sbiPeriod = typeof module !== 'undefined' && module.exports ? require('./sbi-period-input.js') : root.TradeScopeSbiPeriodInput;
   const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
   const policyVersion = 'monthly-policies-v3';
-  const sourceAdapterVersion='monthly-source-adapter-v5';
+  const sourceAdapterVersion='monthly-source-adapter-v6';
   const policies = Object.freeze({
     sbi: Object.freeze({ accountId, cutover, adapter: 'sbi' }),
     gmo: Object.freeze({ accountId: 'acc_gmo_fx', cutover: '2026-09', adapter: 'official-account',
@@ -172,26 +173,22 @@
     // preserves the old direct resolver's missing-fact diagnostics.
     const balance=sbiBalances.resolve(models,targetMonth,{validate:false});
     if(!balance.hasCommon)return {...base,sbiBalances:balance};
-    const input=records(models,'monthlyAccountInputs').find(r=>r.accountId===accountId&&r.targetMonth===targetMonth);
-    // Partial native flows remain native flows, not invented from adopted balance differences.
-    if(base.source==='missing'&&input)base={...base,source:'canonical',realizedPnl:input.realizedPnl,deposit:input.deposit,withdrawal:input.withdrawal};
     const values=sourceValues(models,targetMonth,key);
-    // An existing account-scope P/L decision is outside the five balance targets;
-    // adding a cash/value candidate must not replace it with component observations.
-    const unrealized=values.some(v=>v.component==='account'&&v.metric==='unrealizedPnl'&&v.currency==='JPY')?base.unrealizedPnl:balance.unrealizedPnl;
-    const monthly=base.completeness.monthly,observation=unrealized!==null;
+    const periodInput=sbiPeriod.build({models,targetMonth,balance,base,sourceAdoptions:values});
     return {...base,sbiBalances:balance,sourceAdoptions:values,balanceOnlyAdoption:!values.some(v=>sources.flowMetrics.includes(v.metric)||v.component==='account'&&v.metric==='unrealizedPnl'),
-      observedAsset:balance.observedAsset,unrealizedPnl:unrealized,
-      completeness:{...base.completeness,observation,complete:monthly&&observation}};
+      source:periodInput.conflict?'conflict':'canonical',confirmed:periodInput.monthly,periodInput,
+      ...Object.fromEntries(['realizedPnl','swapPnl','deposit','withdrawal','unrealizedPnl','observedAsset','observedUnrealized'].map(k=>[k,periodInput[k]])),
+      completeness:{monthly:periodInput.monthly,observation:periodInput.observation,complete:periodInput.complete}};
   }
 
   function dependencies(models, year, enabledKeys = defaultEnabledKeys) {
     const enabledAccounts = enabledKeys.map(key => policies[key]?.accountId);
     const states = records(models, 'monthlyAccountStates').filter(row => enabledAccounts.includes(row.accountId) && row.targetMonth.startsWith(`${year}-`));
-    const batchIds = new Set(states.map(row => row.domesticImportBatchId));
-    const snapshotIds = new Set(states.flatMap(row => [row.foreignAccountSnapshotId, row.cashAccountSnapshotId, row.adoptedAccountSnapshotId]));
+    const inputs=records(models,'monthlyAccountInputs').filter(row=>enabledAccounts.includes(row.accountId)&&row.targetMonth.startsWith(`${year}-`));
+    const batchIds = new Set([...states,...inputs].map(row => row.domesticImportBatchId));
+    const snapshotIds = new Set([...states,...inputs].flatMap(row => [row.foreignAccountSnapshotId, row.cashAccountSnapshotId, row.adoptedAccountSnapshotId]));
     for (const snapshot of records(models, 'accountSnapshots')) if (snapshotIds.has(snapshot.id)) batchIds.add(snapshot.importBatchId);
-    return { calculationVersion, policyVersion, sourceVersion:sources.version,sourceAdapterVersion,
+    return { calculationVersion, policyVersion, sourceVersion:sources.version,sourceAdapterVersion,periodInputVersion:sbiPeriod.version,
       sourceRecords:records(models,'monthlySources').filter(r=>r.targetMonth?.startsWith(`${year}-`)||r.kind==='override'||r.kind==='comparison'),
       policies: enabledKeys.map(key => policies[key]), states,
       inputs: records(models, 'monthlyAccountInputs').filter(row => enabledAccounts.includes(row.accountId) && row.targetMonth.startsWith(`${year}-`)),
@@ -252,7 +249,8 @@
       const start=Math.min(Number(year)===cutoverYear?cutoverMonth:1,...explicitMonths(year,key));
       let value = start>1 ? legacy.calculateAccountConfirmedAssets(tradingData, initialFunds, year, start - 1, key)
         : Number(initialFunds?.[year]?.[key]) || 0;
-      if(explicitMonths(year,key).length&&(!Number.isFinite(value)||number(initialFunds?.[year]?.[key])===null))return null;
+      const derivedInput=key==='sbi'&&read(year,month,key).periodInput?.flowSource?.entity==='monthlyAccountInputs';
+      if((explicitMonths(year,key).length||derivedInput)&&(!Number.isFinite(value)||number(initialFunds?.[year]?.[key])===null))return null;
       for (let m = start; m <= month; m++) {
         const resolved = read(year, m, key);
         if(resolved.source==='legacy'){

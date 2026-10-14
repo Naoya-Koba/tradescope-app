@@ -75,20 +75,23 @@
           const v=old[oldField[t.metric]],known=decimal(v)&&(!zero(v)||old.__saved===true);
           return {status:'legacy-compatibility',value:known?String(v):null,sourceType:'manual',asOf:null,legacy:true,zeroEvidence:zero(v)?old.__saved===true?'account-saved':'unknown':null};
         }
-        if(nativeError||nativeReference||native?.source==='conflict')return {status:nativeReference??nativeError??'conflict',value:null};
         if(key==='sbi'&&t.component!=='account'){
           const ref=t.component==='domestic'?(state??input)?.domesticImportBatchId:(state??input)?.[t.component==='foreign'?'foreignAccountSnapshotId':'cashAccountSnapshotId'];
-          if(ref&&!rows(models,t.component==='domestic'?'importBatches':'accountSnapshots').some(r=>r.id===ref))return {status:'invalid-reference',value:null};
           const m=balance?.metrics.find(r=>r.component===t.component&&r.metric===t.metric);
+          if(!m?.hasCommon&&ref&&!rows(models,t.component==='domestic'?'importBatches':'accountSnapshots').some(r=>r.id===ref))return {status:'invalid-reference',value:null};
           return {...m,status:m?.status??'missing',value:m?.excludedByWhole?null:m?.value??null,asOf:m?.snapshotAsOf??null};
         }
+        if(nativeError||nativeReference||native?.source==='conflict')return {status:nativeReference??nativeError??'conflict',value:null};
         if(key==='sbivc'){
           const spot=t.metric==='holdings',prov=spot?balance?.holdingSource:balance?.cashSource;
           return {status:spot?balance?.spotStatus??'missing':balance?.cashStatus??'missing',sourceType:prov?.sourceType??null,asOf:prov?.snapshotAsOf??null,
             source:candidates.find(c=>c.component===t.component&&c.metric===t.metric&&c.reference?.id===(spot?prov?.importBatchId:prov?.recordId)),
             value:spot?balance?.holdingSetKnown?balance.holdings.map(h=>({instrumentId:h.instrumentId,...h.adopted})):null:balance?.adopted.cashBalance??null};
         }
-        if(t.metric==='periodReference')return {status:native?.completeness?.monthly===true?'compatibility':'missing',value:native?.completeness?.monthly===true?true:null};
+        if(t.metric==='periodReference'){
+          const valid=key==='sbi'&&native?.periodInput?native.periodInput.referenceSatisfied&&native.periodInput.monthly:native?.completeness?.monthly===true;
+          return {status:valid?'compatibility':'missing',value:valid?true:null};
+        }
         if(key==='sbi')return {status:input||state?'compatibility':'missing',value:native?.[t.metric]??input?.[t.metric]??null,sourceType:'manual'};
         if(!validFx)return {status:'missing',value:null};
         const adopted=input?.adoptedValues;

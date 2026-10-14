@@ -13,17 +13,27 @@
     const p=TradeScopeMonthlyProgress.create({models,tradingData:data}).month(targetMonth,{scope:'current-balance',currentBalances});
     const body=document.getElementById('rows');body.replaceChildren();
     for(const a of p.accounts){const tr=document.createElement('tr');for(const text of [a.accountKey,String(a.balanceRequirementsSatisfied),a.periodStatus,a.carriedComponents.map(c=>c.key+':'+c.sourceMonth).join(', ')||'—']){const td=document.createElement('td');td.textContent=text;tr.appendChild(td);}body.appendChild(tr);}
+    const period=TradeScopeMonthlyResolver.resolve(models,data,targetMonth,'sbi');
     show({anonymousOnly:true,targetMonth,accountCount:p.accounts.length,storageUnchanged:unchanged(),approvalAlwaysNotRecorded:p.accounts.every(a=>a.approvalStatus==='not-recorded'),
+      derivedPeriod:period.periodInput?.derived??false,periodSatisfied:period.completeness?.complete===true,sbiStatePresent:models.monthlyAccountStates?.records.some(s=>s.accountId==='acc_sbi_sec'&&s.targetMonth===targetMonth)===true,
       sbi:p.accounts.find(a=>a.accountKey==='sbi'),smbc:p.accounts.find(a=>a.accountKey==='smbc')});
   }
-  document.getElementById('prepare').onclick=()=>{
+  function prepare(bridge=false){
     if(localStorage.length)return show({refused:'fresh origin required'});
     const f=AnonymousMonthlyDisplay.fixture();f.tradingData[2026][9]={smbc:{monthEndBalance:0,__saved:true}};
     localStorage.setItem('tradingData',JSON.stringify(f.tradingData));localStorage.setItem('yearInitialFunds',JSON.stringify(f.initialFunds));localStorage.setItem('yearInitialUnrealized','{}');
     for(const [key,value]of Object.entries(f.models))if(value)localStorage.setItem(model.keys[key],JSON.stringify(value));
-    TradeScopeSbiMonthlySave.createService(localStorage).save({targetMonth:'2026-09',domesticImportBatchId:'batch_sbi',foreignAssetValue:'50',foreignUnrealizedPnl:'-2',foreignDate:'2026-09-30',cashBalance:'0',cashDate:'2026-09-30',realizedPnL:'0',deposit:'0',withdrawal:'0'});
+    TradeScopeSbiMonthlySave.createService(localStorage).save({targetMonth:'2026-09',domesticImportBatchId:'batch_sbi',realizedPnL:'0',deposit:'0',withdrawal:'0',
+      ...(bridge?{}:{foreignAssetValue:'50',foreignUnrealizedPnl:'-2',foreignDate:'2026-09-30',cashBalance:'0',cashDate:'2026-09-30'})});
+    if(bridge){
+      const service=TradeScopeMonthlySourceService.createService(localStorage),models=service.inspect().models,core=TradeScopeMonthlySourceContract;
+      const sources=core.candidates(models,{accountId:'acc_sbi_sec',targetMonth:'2026-09'}).filter(s=>s.component==='domestic'&&['marketValue','unrealizedPnl'].includes(s.metric));
+      for(const [component,metric,value]of [['foreign','marketValue','50'],['foreign','unrealizedPnl','-2'],['cash','cashBalance','0']])sources.push(core.descriptor({accountId:'acc_sbi_sec',targetMonth:'2026-09',component,asOf:'2026-09-30'},metric,value,{id:'anonymous_'+metric+'_'+component,sourceId:'anonymous_'+metric+'_'+component,sourceType:'manual'}));
+      service.operate({sources:sources.filter(s=>!s.registered),adoptions:sources.map(s=>({revisionId:s.id}))},{expectedFingerprint:service.inspect().fingerprint});
+    }
     sessionStorage.setItem(token,JSON.stringify(original()));render('2026-09');
-  };
+  }
+  document.getElementById('prepare').onclick=()=>prepare();document.getElementById('bridge').onclick=()=>prepare(true);
   document.getElementById('september').onclick=()=>render('2026-09');document.getElementById('october').onclick=()=>render('2026-10');
   document.getElementById('inspect').onclick=()=>show({storageUnchanged:!!sessionStorage.getItem(token)&&unchanged()});
   document.getElementById('cleanup').onclick=async()=>{
