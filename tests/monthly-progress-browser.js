@@ -1,0 +1,37 @@
+(function(){
+  'use strict';
+  if(location.protocol!=='http:'||!['localhost','127.0.0.1'].includes(location.hostname)||!location.port)return;
+  const model=TradeScopeDataStorage,keys=['tradingData','yearInitialFunds','yearInitialUnrealized',...Object.values(model.keys)],token='anonymousProgressBaseline';
+  const show=v=>document.getElementById('result').textContent=JSON.stringify(v,null,2);
+  const original=()=>keys.map(k=>[k,localStorage.getItem(k)]);
+  const unchanged=()=>JSON.stringify(original())===sessionStorage.getItem(token);
+  function render(targetMonth){
+    if(!sessionStorage.getItem(token))return show({refused:'prepare fresh anonymous origin first'});
+    const f=AnonymousMonthlyDisplay.fixture(),models=model.readModels(localStorage),data=JSON.parse(localStorage.getItem('tradingData'));
+    const d=TradeScopeMonthlyDisplay.create(TradeScopeProfitMetrics,data,f.initialFunds,{},models,f.accounts),[year,month]=targetMonth.split('-').map(Number);
+    const currentBalances=Object.fromEntries(f.accounts.map(a=>{const h=d.balanceHistory(year,a,month);return [a.key,TradeScopeBalanceView.resolve(h.observations,{targetMonth,componentKeys:h.componentKeys})];}));
+    const p=TradeScopeMonthlyProgress.create({models,tradingData:data}).month(targetMonth,{scope:'current-balance',currentBalances});
+    const body=document.getElementById('rows');body.replaceChildren();
+    for(const a of p.accounts){const tr=document.createElement('tr');for(const text of [a.accountKey,String(a.balanceRequirementsSatisfied),a.periodStatus,a.carriedComponents.map(c=>c.key+':'+c.sourceMonth).join(', ')||'—']){const td=document.createElement('td');td.textContent=text;tr.appendChild(td);}body.appendChild(tr);}
+    show({anonymousOnly:true,targetMonth,accountCount:p.accounts.length,storageUnchanged:unchanged(),approvalAlwaysNotRecorded:p.accounts.every(a=>a.approvalStatus==='not-recorded'),
+      sbi:p.accounts.find(a=>a.accountKey==='sbi'),smbc:p.accounts.find(a=>a.accountKey==='smbc')});
+  }
+  document.getElementById('prepare').onclick=()=>{
+    if(localStorage.length)return show({refused:'fresh origin required'});
+    const f=AnonymousMonthlyDisplay.fixture();f.tradingData[2026][9]={smbc:{monthEndBalance:0,__saved:true}};
+    localStorage.setItem('tradingData',JSON.stringify(f.tradingData));localStorage.setItem('yearInitialFunds',JSON.stringify(f.initialFunds));localStorage.setItem('yearInitialUnrealized','{}');
+    for(const [key,value]of Object.entries(f.models))if(value)localStorage.setItem(model.keys[key],JSON.stringify(value));
+    TradeScopeSbiMonthlySave.createService(localStorage).save({targetMonth:'2026-09',domesticImportBatchId:'batch_sbi',foreignAssetValue:'50',foreignUnrealizedPnl:'-2',foreignDate:'2026-09-30',cashBalance:'0',cashDate:'2026-09-30',realizedPnL:'0',deposit:'0',withdrawal:'0'});
+    sessionStorage.setItem(token,JSON.stringify(original()));render('2026-09');
+  };
+  document.getElementById('september').onclick=()=>render('2026-09');document.getElementById('october').onclick=()=>render('2026-10');
+  document.getElementById('inspect').onclick=()=>show({storageUnchanged:!!sessionStorage.getItem(token)&&unchanged()});
+  document.getElementById('cleanup').onclick=async()=>{
+    if(!sessionStorage.getItem(token))return show({refused:true});
+    for(const k of keys)localStorage.removeItem(k);
+    for(const k of ['tradeScopeTopSummarySnapshotV1','tradeScopeTopSplashSeen','tradeScopeSelectedYear','tradeScopeSelectedMonth','profitSelectedYear','profitSelectedMonth'])localStorage.removeItem(k);
+    for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();
+    for(const k of await caches.keys())if(k.startsWith('tradescope-static-'))await caches.delete(k);
+    sessionStorage.removeItem(token);show({cleaned:true,financialKeysAbsent:keys.every(k=>localStorage.getItem(k)===null)});
+  };
+})();

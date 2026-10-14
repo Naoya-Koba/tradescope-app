@@ -1,5 +1,15 @@
 # Development Guide
 
+## Current — required policy／progress（v307）
+
+新共有moduleは`assets/monthly-required-policy.js`と`assets/monthly-progress-view.js`。index／損益管理で依存resolverの後にロードし、UIはまだ呼び出さずAPIを提供する。PWA v307、query 20261014-8、Backup v14／永続契約変更なし。`tests/monthly-progress.test.js`は匿名Memoryで6口座、calendar swap、common manual／CSV、空集合、0／missing、stale／conflict／broken reference、carryの当月非充足、legacy互換、金融結果／Backup／Storage不変を検証する。
+
+progress APIはmodels／tradingDataを読むだけで、Storage・DOM・networkへアクセスしない。current carryを評価する際は既存current-asset-viewの口座balance結果を渡す。未供給のcarryを推測せず、fixed／periodには渡さない。requirementsSatisfiedは指定scopeに対する条件充足で、月次承認ではない。SBI custody-aware契約・user approval永続化は別工程。
+
+検証：追加83件／全1525 tests Pass。JS／MJS構文128ファイル＋production inline 3件、precache 81資産、production 116＋匿名harness 17 local参照、diff-checkを確認。通常sandboxでlocalhost接続がEACCESとなる2テストは、許可された匿名loopback環境で全件通過。`tests/monthly-progress-browser.*`はfresh localhost専用で6口座・9月明示0／採用・10月carry／当月非充足・Storage不変を確認する。production／precacheへharnessは含めない。
+
+computer-use browserで既存Top／損益管理の390px／1280pxを確認し、横overflow・Console Error／Warningなし。匿名originの金融Storage不変確認後、テストStorage／Service Worker／cacheをcleanupし、temporary tab／viewport override／serverを終了した。本番Storage・実データ・実Backupは未操作。
+
 ## Current — SBI scalar resolver／UI（PWA v306）
 
 `sbi-balance-adoption.js`は5metricのscope・provider・参照型を検証し、共通判断と旧Input／Stateを一回で解決する。monthly resolver／monthly-display／native Input provenanceは同じ入口を使用し、原Batch集計／Snapshotを別source値へコピーしない。

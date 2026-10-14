@@ -1,5 +1,21 @@
 # Data Model
 
+## Current / Decided — 非永続月次進捗（v307）
+
+`monthly-required-policy.js`が固定6口座のcurrent-balance／fixed-balance／period条件を定義し、`monthly-progress-view.js`が既存source・共通採用resolverから読む。source取得、adoption、required metric、carry、conflict／stale／invalid-reference、balance条件、period条件、user approvalを分離する。既存State・Input・balance-view.complete・monthly-display.complete・__savedの意味を変更しない。
+
+APIは`TradeScopeMonthlyProgress.create({models, tradingData}).account(accountKey, targetMonth, {scope, currentBalance})`／`.month(targetMonth, {scope, currentBalances})`。返値はbalanceMetrics／periodMetrics、missingRequired、balanceRequirementsSatisfied／periodRequirementsSatisfied／requirementsSatisfied、sourceStatus／candidates、carriedComponents、pendingReview、approvalStatus等。manualもPDF／CSVと対等な採用済み既知値。candidateだけ・deferの採用なし・stale・参照破損は充足しない。明示0／空保有集合とmissingを区別する。source typeを優先順位にしない。
+
+carryは既存current-asset-viewの各口座balance結果を入力するだけで、未供給はnot-evaluated、fixed／periodはnot-applicable。当月requiredを過去値で充足させず、別年carryを導入しない。approvalStatusは常にnot-recorded、approvalSupported=false。legacyはcalculationCompatible／legacyDataAvailable／approval unknownを分離し、旧全0を推測で確認済みにしない。現在残高計算・期間金融値へ進捗を逆流させず、新field／record／Storage key／migration／Backup変更はない。
+
+scopeのrequirementsStateはnot-started／source-acquired／partial／satisfied／needs-review／unsupported。既存の`monthly-source-contract.progress()`は低レベル情報で、required policyを持つ画面用入口は新projection。基準日は原値のまま保持する。SBI CSV取得日は対象月末とは限らず、条件充足は全口座同時点の完全NAVを保証しない。
+
+## Decided / Planned — SBI国内保有identityと移行境界
+
+原HoldingSnapshotは預り区分別の原行とstable IDを保持し、金融原値を統合・破壊しない。Instrumentは銘柄identity、custodyはHolding属性。保存identityと表示identityを分離し、将来Portfolio／Open Positionsは口座×Instrument集約を基本としcustody別詳細を残す。数量単位・通貨・基準日・欠損の整合を確認して集約し、取得原価を評価額から推測しない。
+
+国内canonicalと外国legacy/manualのcoverageを明示し、対象国内の旧経路を置換して取引差分を再加算しない。外国scalarから架空holdingを生成しない。現行common holding-setのinstrumentId一意／spot-holdings契約を今回拡張しない。集合採用・空集合の正式確認、完了承認履歴は後続正式契約（Backup v15候補）。Portfolio／Open Positionsは今回未変更。
+
 ## Current / Decided — SBI scalar balance adoption（v306）
 
 `sbi-balance-adoption.js`が国内marketValue／unrealizedPnl、外国marketValue／unrealizedPnl、JPY cashBalanceの唯一の採用入口。common adoption→同revision overrideを解決し、新判断がないmetricだけ旧MonthlyAccountInput／State参照を内部compatibilityで読む。明示common判断のstale／競合／未解決は旧値へsilent fallbackしない。

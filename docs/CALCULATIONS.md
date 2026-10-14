@@ -1,5 +1,16 @@
 # Calculation Specification
 
+## Current / Decided — required policyと月次進捗（v307）
+
+金融計算と入力条件判定は別責務。`monthly-required-policy`／`monthly-progress-view`は金融値を変更せず、既存共通採用入口の値・参照・基準日を評価する。current表示のcarryは当月入力充足ではなく、fixed historical／periodへ混ぜない。残高complete、期間計算complete、月次完了承認を同一化しない。
+
+- GMO／LIGHT／みんな：残高は採用口座資産観測、periodはrealized／swap／deposit／withdrawal／unrealizedと既存期間参照。LIGHT／みんなのswapはmanual income-calendar契約で、PDF settled swapだけでは充足しない。
+- SBI：balanceは国内評価額・外国円評価額・JPY現金、periodは国内／外国評価損益・realized・入出金・既存期間参照。固定swap=0をmissing扱いしない。scalar manualの正式採用も残高条件を満たすが、既存期間State成立の橋渡しを今回自動化しない。whole totalをcomponentへ推測分解しない。
+- SBI VC：採用spot集合の数量／必要円評価額とJPY現金・基準日がbalance条件。空集合／0数量は有効、不明数量／評価額は不足。reported total／担保は加算せず、balance条件充足でもperiodはunsupported-canonical-pnl。
+- SMBC：明示monthEndBalanceまたは共通採用JPY cashが残高条件。銀行に投資P/Lを要求せず、periodはbank-balance-only。
+
+legacy計算互換性は新required充足・承認とは別で、旧SBI whole値を国内／外国へ分解しない。年初値・ledger派生資産を残高原観測へ昇格しない。unknown／blankは0へ変換せず、source訂正候補はpendingReviewで採用値と分離する。user approvalの永続化は将来正式契約。
+
 ## Current / Decided — SBI採用済みscalar残高（v306）
 
 国内証券評価額・評価損益、外国円評価額・円評価損益、JPY現金は共通SBI balance resolverを通す。Top／Allocationは同じcurrent-asset-view／balance-view結果を参照し、国内・外国・現金の確認月／基準日／unknown／carryを独立保持する。明示0は前月positiveへ戻さず、未取得は0に保存しない。whole-account sourceとcomponent合成は排他、legacy合計を成分へ推測分解・追加加算しない。

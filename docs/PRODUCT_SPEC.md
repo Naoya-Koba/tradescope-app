@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current / Decided — 月次進捗API（v307）
+
+6口座の共通required policyと非永続projectionを提供する。現在のUIに完了表示・演出は追加せず、将来の月次詳細6口座行へsourceあり／採用待ち／不足／条件充足／carry／要再確認を接続可能。条件充足だけで「完了」へ昇格せず、approvalStatusはnot-recorded。残高確認とperiod計算条件を別に返し、SBI VCの残高充足を月次P/L完成と表現しない。manual sourceは対等な正式入力。
+
+**Planned**：ユーザー完了承認・再確認・履歴は別永続契約。SBI保有は原custody別行を残して表示時に口座×銘柄集約し、国内canonical／外国legacy coverageを明示する。外国scalarから架空holdingを作らない。今回はholding-set契約・Portfolio／Open Positions・最終UIを変更しない。
+
 ## Current / Decided — SBI入力元作成・採用（v306）
 
 SBI月次Inputの「入力元・採用を確認」で国内集計2metric、外国円評価2metric、JPY現金を個別確認・採用する。種別・対象月・基準日・revision・原値／補正後値・候補・比較／staleを表示。CSV自動優先なし。

@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — 非永続月次進捗（v307）
+
+required policy／progress APIを追加。financial completeと入力条件／user approvalは別。carryは既存current balance結果の入力時だけ表示用として評価し、当月充足へ使わない。legacy __saved／計算互換から新完了承認や未知zero根拠を推測しない。SBIの採用manual残高を評価できるが、native period Stateの自動完成橋渡しは未実装。SBI VC canonical period P/Lは未完成、SMBCは銀行残高scopeのみ。
+
+進捗表示UI・承認永続化・承認stale履歴は未実装。SBI国内は原custody別Snapshot保持＋将来consumer銘柄集約を正式方針とし、common集合identity／正式な空集合／Portfolio・Open Positions移行は後続。foreign scalarとのcoverage差を恒久仕様にしない。金融計算・Risk・Transaction History・cashflowは今回未変更。Backup v14／キー／schema不変。
+
 ## Current / Known limitation — SBI scalar adoption（v306）
 
 国内集計2metric・外国円評価2metric・JPY現金はcommon adoption／compatibility入口へ接続済み。独立manual scalarの作成・採用・比較・保留・補正・訂正UIはSBIへ接続。他口座UIは後続だがcontroller／rendererは口座非依存のtarget設定で再利用可能。旧補正は同じ原revisionを明示継続した場合のみcommon overrideへ接続する。
