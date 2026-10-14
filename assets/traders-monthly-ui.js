@@ -20,8 +20,8 @@
    save.addEventListener('click',()=>{if(busy||!prepared)return;if(sourcePanel?.pending()||sourcePanel?.form()){error.textContent='入力元の選択を先に保存または取消してください';refresh();return;}busy=true;refresh();try{const result=service.correct({...draft,targetMonth},{expectedModels:prepared.models});if(['saved','unchanged'].includes(result.status)){drafts.delete(token);onSaved(key);}}catch(_){error.textContent='保存できませんでした。入力値と保存データを確認してください';}finally{busy=false;refresh();}});
    if(!prepared){error.textContent='この月の月次PDFを取り込んでください';const link=node('a','データ取込');link.href='../import.html';body.append(link);}
    actions.append(save);body.append(reset,actions,error);
-   if(key==='lightfx'&&root.TradeScopeScalarSourceSelection&&root.TradeScopeScalarSourceUI){
-     const facade=root.TradeScopeLightScalarAdoption;
+   if(['lightfx','minano'].includes(key)&&root.TradeScopeScalarSourceSelection&&root.TradeScopeScalarSourceUI){
+     const facade=root.TradeScopeLightScalarAdoption.forBroker(key);
      const controller=root.TradeScopeScalarSourceSelection.createController(adapter,{accountId:facade.accountId,targets:facade.targets,
        manualTargets:[],cutover:facade.cutover,resolveBalance:facade.resolve,validateSource:facade.supportsSource});
      sourcePanel=root.TradeScopeScalarSourceUI.create({document,controller,targetMonth,

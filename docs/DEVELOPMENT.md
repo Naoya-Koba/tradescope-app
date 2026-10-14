@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — みんなのFX scalar横展開（v310）
+
+既存LIGHT facadeをbroker設定で共用する。公開LIGHT APIは互換のまま、monthly resolverは共通tradersScalarsを返す。traders-saveの候補計画・guard・atomic commit、traders-monthly-uiの既存scalar-source-selection／scalar-source-uiをみんなへ再利用し、provider固有の独自adoptionを作らない。入力元操作でもdirty flow Draftを保持し、古いguardでの保存は停止する。訂正previewは候補追加であり採用切替ではないと表示する。
+
+PWA v310、変更module query 20261014-11、Backup v14維持。`tests/minna-scalar.test.js`は匿名Memory／DOMで候補・重複排他・採用・訂正・補正・比較／defer・stale・rollback・Backup・current carry／historical no-carryを検証し、既存LIGHT／SBI／SBI VC回帰も全維持する。localhost harnessに匿名みんな準備を追加。production Storage・実Backupは使用しない。実みんな8月／9月PDFはread-only parser回帰のみで、原値をfixtureへ転記しない。
+
+検証：追加70件／全1720 tests Pass。JS／MJS構文135ファイル＋inline 3件、precache 83資産、production 122＋匿名harness 57 local参照、diff-checkを確認。実みんな8月／9月PDFは各2ページ・建玉14行・当月取引0件・残高／価格評価損益／入出金／settled・未決済swapの取得とparser内部照合Pass。匿名localhostでmanual→PDF明示採用、同内容確認後の採用維持、defer、別タブ更新後のstale停止／Draft保持、390px／1280px横overflowなし、Console Error／Warningなしを確認。current carryのsourceMonthとfixed month不足を区別し、Top／Allocationの採用値反映後も金融正本18キーは不変。匿名Memoryでatomic rollback・rollback不能時journal保持・Backup v14往復／v13互換を確認。匿名Storage／SW／cache・tab／viewport override／serverはcleanup済み。
+
 ## Current — LIGHT scalar resolver／hook／最小UI（v309）
 
 `assets/lightfx-scalar-adoption.js`が2metricの正式scopeを定義し、monthly resolver／required進捗診断／scalar UIはこのfacadeを使用する。既存scalar-source-selection／scalar-source-uiをLIGHT月次Inputへ再利用する。選択はDraft、保存でのみ共通serviceを呼ぶ。current source／candidate／基準日／revision／原値／補正／比較／保留を表示し、独立manual作成UIの拡大はしない。金融flow Draftとsource選択は分離し、外部更新・source操作でも未保存flowを破棄しない。

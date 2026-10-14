@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — みんなのFX scalar接続（v310）
+
+account scalar候補・共通採用resolver・既存UI・atomic hookをLIGHTと同じ実装で接続済み。旧account／spotの重複adoptionは履歴を保持してconflictで停止し、専用解消UI／自動削除・migrationは追加しない。みんなの訂正版もcandidate-onlyとなり、旧Input／State・flow／calendarは維持する。v309の「みんなはnativeのみ」「LIGHTに限り候補追加」は当時の記録であり、現在は両broker同じ契約。
+
+確認済みみんな8月／9月実PDFは各2ページ・当月取引0件・月末建玉14行、parser内部照合Pass。実約定／partial close／multiple fills／取引ID identityは未検証。PDF約定Transaction History、公式建玉Portfolio／Open Positions、FX position-setは後続。calendarはmanualのみ、入出金event／internal transfer／cashback分類は未追加。Riskは将来の製品設計監査。user completion approval／進捗UI／全体計算統合も本工程の対象外。
+
 ## Current / Known limitation — LIGHT scalar接続（v309）
 
 2metricのcommon候補・採用resolver・最小UI・atomic hookを追加。accountとFX Holding由来spotの同一評価損益が同時加算される潜在経路を新candidate生成とresolverで排他した。旧重複adoptionが存在する場合はconflictで停止し、履歴削除や自動採用解除は行わない。その監査付き解消操作は今回追加しない。

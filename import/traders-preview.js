@@ -38,7 +38,7 @@
   $('save').addEventListener('click',async()=>{if(busy||opening||$('dialog').open||!source?.preview.valid)return;opening=true;renderSave();const selected=source;try{const next=await api().inspect(selected);if(selected!==source)return;outcome=next;renderSave();const correction=outcome.status==='review-required'&&outcome.reason==='different-report';if(outcome.status!=='ready'&&!correction)return;confirmation=correction?{stateId:outcome.stateId,inputId:outcome.inputId,adoptedSnapshotId:outcome.adoptedSnapshotId,calendarSwap:outcome.calendarSwap}:{};
     if(outcome.sourceFingerprint)confirmation.sourceFingerprint=outcome.sourceFingerprint;
     $('confirm-summary').replaceChildren();for(const[label,value]of [['対象月',source.preview.targetMonth.replace('-','/')],['スワップ損益',amount(correction?outcome.calendarSwap:TradeScopeTradersSave.calendarValue(source.calendarSwap))]])$('confirm-summary').append(node('dt',label),node('dd',value));
-    if(correction&&broker==='lightfx')$('confirm-summary').append(node('p','訂正版を候補として追加します。現在の採用・月次flowは維持し、残高sourceは月次Inputで選択できます。'));
+    if(correction&&['lightfx','minano'].includes(broker))$('confirm-summary').append(node('p','訂正版を候補として追加します。現在の採用・月次flowは維持し、残高sourceは月次Inputで選択できます。'));
     $('confirm-save').textContent=correction?'訂正して保存':'保存';$('dialog').showModal();
    }catch(_){$('issues').replaceChildren(node('p','保存データを確認できません','issue error'));}finally{opening=false;renderSave();}});
   $('cancel-save').addEventListener('click',()=>{if(!busy)$('dialog').close();});$('dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault();});

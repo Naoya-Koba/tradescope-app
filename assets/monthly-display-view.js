@@ -76,7 +76,7 @@
     }
     function observation(key,targetMonth,resolved){
       let base=observationExisting(key,targetMonth,resolved);const values=resolved.sourceAdoptions??[];
-      if(key==='lightfx'&&resolved.lightScalars?.metrics[0].hasCommon)return {components:resolved.lightScalars.components,conflict:resolved.source==='conflict'};
+      if(['lightfx','minano'].includes(key)&&resolved.tradersScalars?.metrics[0].hasCommon)return {components:resolved.tradersScalars.components,conflict:resolved.source==='conflict'};
       if(key==='sbi'&&resolved.sbiBalances)return base;
       if(!values.length)return base;
       if(key==='sbivc')base={components:cryptoComponents(targetMonth),conflict:false};

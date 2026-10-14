@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current / Decided — みんなのFX scalarの単一入口（v310）
+
+LIGHTとみんなは同じbroker設定付きscalar facade → monthly-account-resolver → monthly-display／display-results／current-asset-viewを使用する。画面別source優先順位は作らず、採用価格評価損益を一度だけ期間計算へ渡す。common判断なしは旧Input／State互換、stale／conflict／参照破損は旧値へsilent fallbackしない。
+
+realized／deposit／withdrawalは既存native flow契約、calendar swapは独立manual。PDF settled／未決済／累積swapをcalendarへ変換せず、残高差からP/Lを作らない。候補追加のみなら旧正常値とledger basisを維持し、純資産観測の明示採用はsource-observationとして区別する。carryはcurrentだけでsourceMonthと明示0を保持、固定月のmissingは埋めない。Monthly／Annual／Asset・Performance Trendは共通period経路。Portfolio／Open Positions／Transaction History／Riskの採用・計算契約は変更しない。v309のみんな非接続記述は当時の境界。
+
 ## Current / Decided — LIGHT FX scalarの単一入口（v309）
 
 共通scalar facade → monthly resolver → monthly-display／display-results／current-asset-viewを使用し、各画面にsource優先順位を作らない。価格評価損益はaccount scopeの採用値を一度だけ使用し、同じFX Holding集計を追加しない。common判断のstale／conflict／参照破損は旧値へsilent fallbackしない。

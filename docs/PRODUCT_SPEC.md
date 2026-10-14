@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current / Decided — みんなのFX scalar source操作（v310）
+
+みんな月次Inputにも既存「入力元・採用を確認」を接続し、口座純資産観測と価格評価損益を別採用できる。source種別／月／基準日／revision／原値／補正値／比較／保留／stale・conflictを表示する。PDF／manual自動順位なし。新PDF候補追加・同内容確認だけでは採用を変えず、保留は有効な採用を維持する。訂正版は旧revisionと履歴を残し、補正を自動継承しない。
+
+calendarは独立manual income-calendar、settled／未決済swapは代用しない。入出金の外部／内部／cashback分類、PDF取引保存、公式建玉consumer、FX position-setは非接続。Portfolio／Open Positionsは従来legacy/manual、Riskは将来の全セクション責務・情報設計監査対象。最終UI overhaulではなく最小機能追加。Backup v14不変。以下v309の横展開予定は本工程で完了。
+
 ## Current / Decided — LIGHT FX scalar source操作（v309）
 
 LIGHT月次Inputの「入力元・採用を確認」で、口座純資産観測と価格評価損益を別々に選択できる。PDF／manualに自動順位を付けず、候補追加／比較確認だけでは採用を切り替えない。保留は有効な採用を維持し、採用なしならunknown。旧補正は新revisionへ継承しない。これは最小機能UIで、全体デザイン・進捗UIの改修ではない。

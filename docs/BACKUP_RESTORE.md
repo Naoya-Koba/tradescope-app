@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — みんなのFX scalar参照と固定Backup v14（v310）
+
+みんなも既存monthlySources v1のaccount scalarとcanonical Snapshot参照だけを保存する。新record／field／component／metric／Storage key／validator公開契約なし。候補revision・採用・補正・comparison・deferは既存v14往復対象。原PDF本文／PII／金融原値コピーは追加しない。
+
+canonical＋candidateは一回のRepository journal、再読込検証とrollbackで保護する。rollback不能ならjournal保持。v13以前のRestore・clear／preserve規則、旧source不存在時のnative互換を維持し、bulk migrationしない。匿名Memoryでv14往復／v13互換／rollbackを検証し、実Backup・production Restoreは使用しない。
+
 ## Current — LIGHT FX scalar参照とBackup v14（v309）
 
 Backup v14維持。新規sourceは既存monthlySources v1のaccount／marketValue・unrealizedPnlと不変AccountSnapshot参照で表現し、原値・PDF本文・PIIを複製しない。候補revision／採用／同revision補正／比較／deferは既存契約で往復する。旧v13以前に新sourceがなくてもnative互換を維持し、bulk migrationしない。

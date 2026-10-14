@@ -1,5 +1,11 @@
 # Data Model
 
+## Current / Decided — みんなのFX scalar共通採用（v310）
+
+みんなのFXもaccount／marketValue（Snapshot.netAssetValue）とaccount／unrealizedPnl（価格評価損益、未決済swap除外）の2metricを正式scopeとする。`lightfx-scalar-adoption.js`の`forBroker(key)`は同じ実装で口座／provider／scopeを分離し、LIGHT既存APIとv309結果を維持する。みんなはminano／acc_minna_fx／minna／minna-monthly-report。Snapshot原値は参照のみでmonthlySourcesへ複製しない。
+
+新FX Holding由来spot候補の重複生成を停止。旧重複adoptionは履歴を残してconflictとし、silent fallback／二重加算しない。訂正版は新Batch／Snapshot／Holding／candidate revisionだけを追加し、旧Input／State・flow・calendar・採用・補正履歴を維持する。新候補だけでは採用を変えず、旧overrideを別revisionへ継承しない。Backup v14、Storage key、persistent schema、validator公開契約、legacyは不変。以下v309の「みんなnativeのみ」は当時の記録であり、現在は共通hook／resolverを使用する。
+
 ## Current / Decided — LIGHT FX scalar採用（v309）
 
 正式対象はaccount／marketValue（AccountSnapshot.netAssetValue：帳票の純資産観測）とaccount／unrealizedPnl（価格評価損益、未決済swap除外）のJPY scalar。`lightfx-scalar-adoption.js`が共通判断／同revision補正／旧Input・State互換を一度だけ解決する。PDF保存hookは不変Snapshotへのreference sourceをcanonicalと同じjournalへ追加し、金融原値をコピーしない。既存mutable Input／Stateの受理済み参照は読むだけで、新hookでは作らない。
