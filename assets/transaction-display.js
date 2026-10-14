@@ -54,7 +54,7 @@
   }
   function facts(record, context) {
     const source = record.sources.find(s => s.kind !== 'manual') || record.sources[0];
-    const original = context?.[source?.kind === 'sbi' ? 'raw' : ['gmo','sbivc'].includes(source?.kind) ? 'imported' : 'manual']?.get(source?.id) || {};
+    const original = context?.[source?.kind === 'sbi' ? 'raw' : ['gmo','sbivc','lightfx','minna'].includes(source?.kind) ? 'imported' : 'manual']?.get(source?.id) || {};
     const raw = original.rawFields || {}, master = context?.instruments.get(record.instrumentId), batch = context?.batches.get(original.importBatchId);
     const domestic = original.sourceProvider === 'sbi' && original.sourceType === 'csv'
       && (batch?.importerId === 'sbi-domestic-csv' || ['国内株式', '国内ETF'].includes(raw.product) || /^(東証|名証|福証|札証)(?:PR|ST|GR|P|S|G)?$/.test(raw.market || ''));
@@ -104,7 +104,7 @@
     if(record.marketType==='spot')info.price=amount(original.price??record.price,currency,true);
     const receiptFee=original.feeSemantics==='receipt-positive-payment-negative';
     const feeText=amount(original.fee,original.feeCurrency,receiptFee),fee=receiptFee&&feeText!==null&&!feeText.startsWith('-')&&decimal(original.fee)!=='0'?'+'+feeText:feeText;
-    return { ...info, fee, feeLabel:receiptFee?'手数料（受取＋／支払−）':'手数料',shortDate, fullDate, dateLabel: hasTime ? '日時' : '日付', priceLabel, settlementObservation: amount(raw.settlementOrPnl, currency), pnl: signedPnl, pnlSign: decimal(record.realizedPnl)?.startsWith('-') ? 'negative' : decimal(record.realizedPnl) === '0' ? 'neutral' : 'positive',
+    return { ...info, fee, transactionSwap:record.transactionVersion===3?amount(record.transactionSwap,record.currency):null, feeLabel:receiptFee?'手数料（受取＋／支払−）':'手数料',shortDate, fullDate, dateLabel: hasTime ? '日時' : '日付', priceLabel, settlementObservation: amount(raw.settlementOrPnl, currency), pnl: signedPnl, pnlSign: decimal(record.realizedPnl)?.startsWith('-') ? 'negative' : decimal(record.realizedPnl) === '0' ? 'neutral' : 'positive',
       summary: [info.amount || info.quantity, info.amount || !info.price ? null : record.assetType === 'FX' ? priceLabel + ' ' + info.price : info.price].filter(Boolean).join('　'), facts: fact };
   }
   const api = Object.freeze({ getFxLotSize, number, multiply, createContext, present });

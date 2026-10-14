@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — FX v3の非永続adoption reader／History projection（v313）
+
+`assets/transaction-adoption-view.js`はaccount／provider／month／transaction scopeの共通読取入口。v312の公開record／validator／Repository／Backup v15を変更せず、adopted／unknown／deferred-with-current／deferred-without-current／stale／conflict／broken-referenceを返す。採用なしはtransactions=null、正式complete empty採用だけtransactions=[]／confirmedEmpty=true。同一target内の候補・履歴参照、全member、事実fingerprintを検証し、不正なら通常rowを返さず、balance採用へfallbackしない。partialは候補のみ。別targetの異常を正常targetのsource選択へ混ぜない。
+
+readerはbalance State／Input／Snapshot／monthlySourcesを読まず、transaction Sources／rows／Batch／Account／Instrumentだけを参照する。取得時fingerprintで後続のstaleを判定し、返却rowは原値・collection順／locatorを保つ独立コピー。`transaction-view.projectV3`は状態metadataとHistory recordsを分離し、v3だけを独立readerから解決する。v1 GMO／v2 SBI VCは既存active Batch互換、manualとreconciliation v1も従来経路。v3は既存自動dedupe／manual照合へ入れない。
+
+production LIGHT／みんな保存hook、reconciliation v2、official position-setは引き続き未実装。v3 History接続は原通貨・action／side・nullable金融値を表示するだけで、period計算／current positionsへ接続しない。以下v312の「History未接続」は当時の工程境界。
+
 ## Current / Decided — FX transaction保存契約のみ（v312）
 
 `tradeScopeImportedTransactionsV1`はenvelope v1のままrecord v1（GMO）／v2（SBI VC spot）／v3（FX execution）を共存させる。旧recordのmigrationなし。v3の全fieldは`assets/transaction-source-contract.js`の`rowFields`に固定し、nullable fieldも明示nullで保持する。必須identityはid／collectionId／accountId／instrumentId／importBatchId、provider／PDF scope／month、action=open|closeとside=buy|sell、tradeDate、sourcePage／sourceRow、rowFingerprint、importedAt。数量は`baseCurrencyUnits`の原通貨decimal string、価格もdecimal stringで双方正。Lot変換・position方向・残存数量を保存しない。

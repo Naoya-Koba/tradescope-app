@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — 非永続FX reader／projectionと固定v15（v313）
+
+Backup v15／12モデル／全公開record契約を維持。新key・schema・migrationなし。adoption readerの状態、fingerprint token、History projection／display quantityを永続化しない。v3の採用／defer／訂正履歴は既存v15のまま往復し、v1〜v14 Restore／clear・preserveを維持する。confirmed emptyとunknownは原collection／decisionから再解決する。reconciliation v2は追加しない。検証は匿名Memoryだけで、production Storage／実Backupは使用しない。
+
 ## Current / Decided — Backup v15とFX event契約（v312）
 
 最新exportはv15。v14の公開対象は既存11モデルの固定一覧とし、動的Repository key列挙から切り離す。v15だけがImportedTransaction v3と12番目のtransactionSourcesを受理する。v1〜v14の公開受理範囲は拡張せず、v3をfield切捨てで旧version化しない。reconciliationはv1のままで、v2・position-set・完了承認・UI stateを追加しない。以下のv14節は公開済み旧契約の記録であり、最新exportの指定は本節を優先する。

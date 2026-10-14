@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — FX v3 History reader（v313）
+
+共通adoption readerとv3 History projectionを接続。balance採用とは独立し、unknown／defer／正式空集合／stale／conflict／参照切れを区別する。v3は既存reconciliation v1と自動dedupeの対象外。GMO v1／SBI VC v2は旧active Batch互換を維持しmigrationなし。
+
+LIGHT／みんなproduction保存hook、reconciliation v2、official position-set／Portfolio・Open Positions移行は未実装。History表示は匿名synthetic検証であり、新規売／決済買・multiple fills・非ゼロfeeの実PDF検証完了を意味しない。実ブラウザ390px／1280px・Console確認はブラウザ接続不可で未実施。以下v312の未接続記述は当時の工程境界。
+
 ## Current / Planned — FX transaction契約と未接続境界（v312）
 
 record v3・参照型collection・append-only adoption／defer・Backup v15は実装済み。既存v1／v2をbulk migrationせず、monthlySources／reconciliation v1／旧採用・金融計算を維持する。Historyのv3除外は誤流入防御だけでconsumer対応ではない。

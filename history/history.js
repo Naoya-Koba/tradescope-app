@@ -258,6 +258,14 @@ function buildFilters(entries) {
   } catch (_) { transactionHistory.fail(); }
 }
 
+// Read-only History refresh: never rerender positions or overwrite an unsaved manual form.
+const historySourceKeys=new Set(['tradeScopeTradeHistoryV1','tradeScopeAccountsV1','tradeScopeInstrumentsV1','tradeScopeImportBatchesV1',
+  'tradeScopeRawTransactionsV1','tradeScopeImportedTransactionsV1','tradeScopeTransactionSourcesV1','tradeScopeTransactionReconciliationsV1',
+  'tradeScopeMonthlyAccountStatesV1','tradeScopeMonthlyAccountInputsV1','tradeScopeAccountSnapshotsV1']);
+window.addEventListener('storage',event=>{if(event.key===null||historySourceKeys.has(event.key))buildFilters();});
+window.addEventListener('pageshow',event=>{if(event.persisted)buildFilters();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&transactionHistory)buildFilters();});
+
 function readFilters() {
   return {
     account: document.getElementById('filterAccount').value,

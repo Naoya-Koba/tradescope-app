@@ -1,5 +1,17 @@
 # Development Guide
 
+## Current — FX v3 reader／History projection（v313）
+
+新共有moduleは`assets/transaction-adoption-view.js`。v312 contractの後、transaction-view／History UIより前にロードする。read-only・snapshot fingerprint保護付きで、stale／conflict／brokenは旧残高sourceへ戻さない。`transaction-view.projectV3`が状態と表示rowを返し、既存resolveは旧v1／v2／manualの照合終了後にv3を追加する。v3をreconciliation v1や自動dedupeへ渡さない。production parser／save hook・position consumerは変更しない。
+
+Historyはstorage／BFCache／再表示で正本を再読込し、filter／詳細操作でも変更されたmodelの古いv3表示を使わない。再読込はHistory部分だけで、manual編集Draft／positionsを再生成しない。必要最小限の詳細項目でnullは—、0は原通貨付き0を表示。内部IDは通常一覧へ出さない。
+
+PWA v313、変更依存query 20261015-2、Backup v15不変。追加74件／全2023 tests Pass。匿名fixtureは`tests/fx-history-fixture.js`、実ブラウザ準備は`tests/fx-history-browser.html`／`.js`。harnessは既存History CSS／controllerを使い、GMO／SBI VC／manual＋v3、候補追加／採用切替／defer／stale／空集合をプロセス内メモリだけで操作し、終了操作で破棄する。production Storage・実PDF・実注文番号・実Backupは使用しない。
+
+JS／MJS 143ファイル＋inline 3件、precache 85資産、HTML local URL 249件と依存順、diff-checkを確認。後続decisionの対象破損をscope filterで落として旧採用を復活させず、参照の双方向連結も検証する。v15往復／v1〜v14 Restore回帰は匿名MemoryでPass。
+
+実ブラウザ検証は接続待ち：Chrome／アプリ内ブラウザとも利用不可、ブラウザ接続一覧は空。390px／1280px・Consoleは未確認であり、匿名DOM／browser-global VM回帰を実ブラウザ結果としない。
+
 ## Current — FX contract／Backup v15のみ（v312）
 
 `assets/transaction-source-contract.js`は副作用なしのrecord／reference／fingerprint／history validatorと低レベルresolver。既存SHA-256 primitiveだけを再利用し、monthlySourcesの公開契約は変更しない。Repositoryはv3原rowと参照Batchの不変性、新entityのappend-only履歴、expectedModels、既存journal／再読込／rollbackを保護する。将来Batch／Snapshot／Holding／v3 rows／collection／明示decisionを一回のcommitへ合成可能。PDF保存hook・History consumer・reconciliation v2は接続しない。

@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current / Decided — v3 Historyの表示境界（v313）
+
+HistoryのFX v3行は独立transaction adoption readerだけから取得する。日時はtradeDate／executedAtで、settlementDateによって取引月を変更しない。open／closeとbuy／sellを別軸で表示し、決済売をshort建玉と解釈しない。原数量は不変、確認済みprovider／pairのLot換算は既存presentationだけ。未知pairでは原通貨を表示する。
+
+採用なし／defer without currentはunknownであり確認済み0件ではない。complete empty採用だけ0件確認。stale／conflict／参照切れはv3行を返さず残高Batchへfallbackしない。realized／transactionSwap／feeのnullと明示0を区別し、transactionSwapをcalendar swapへ変換しない。v1／v2／manualの既存表示・reconciliation v1は維持し、v3との自動mergeなし。Top／Allocation／月次・年間／Trend／Risk／Portfolio／Open Positions／入出金・損益の正本・計算には非波及。
+
 ## Current / Decided — FX transaction v3は非計算契約（v312）
 
 v3は原通貨数量・約定価格・open/close＋buy/sellを保持するeventであり、positionや月次金融値ではない。close＋sellをshortと扱わず、原新規注文参照から残存数量を推定しない。nullable realized／transactionSwap／feeを月次realized・calendar swap・入出金・取得原価へ転記しない。transaction swapとsettlement／calendar swapは別意味。不一致は帳票範囲に応じた診断であり差額を補完しない。

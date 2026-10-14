@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current — 独立採用FX v3のTransaction History表示（v313）
+
+採用済みcomplete collectionのFX v3だけを既存Historyへ表示する。候補だけ／採用なし／defer without currentは未確定、正式空collection採用は確認済み0件。訂正候補追加だけでは切替せず、明示採用した集合だけ表示する。stale／競合／参照切れで残高sourceへfallbackしない。v1 GMO／v2 SBI VC spot／manualの既存意味を維持し、v3と自動統合しない。
+
+既存の一覧・filter・詳細を最小接続し、開発用単位・内部revision IDを一覧へ増やさない。production LIGHT／みんなPDF保存、manual reconciliation v2、official position-set／Portfolio移行は未実装。金融集計とBackup v15契約は不変。
+
 ## Current / Decided — FX取引保存の基盤のみ（v312）
 
 FX ImportedTransaction record v3と独立transaction collection／adoptionをBackup v15へ登録する。原通貨decimal数量、open/close＋buy/sell、nullable金融値、source参照と訂正revisionを保持する。collection採用は残高採用と別判断で、candidate追加では切り替えず、旧原値・決定履歴を削除しない。
