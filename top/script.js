@@ -2067,13 +2067,13 @@ function buildCanonicalCryptoPortfolio() {
   try {
     const models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read();
     const source = window.TradeScopeOpenPositionsView.latestObservation(models);
-    const rows = source.holdings.map(h => ({ ...h, id: `observation::${h.holdingSnapshotId}`, metricValue: h.marketValue }));
+    const rows = source.holdings.map(h => ({ ...h, id: `observation::${h.holdingSnapshotId ?? `${source.holdingSource?.revisionId}::${h.instrumentId}`}`, metricValue: h.marketValue }));
     if (source.hasSource && (source.cashBalance === null || !window.TradeScopeDataStorage.equalDecimal(source.cashBalance, '0'))) {
-      rows.push({ holdingType: 'cash-observation', id: `cash::${source.accountSnapshotId}`,
+      rows.push({ holdingType: 'cash-observation', id: `cash::${source.cashSource?.recordId ?? source.cashSource?.revisionId ?? source.accountSnapshotId}`,
         symbol: 'JPY', assetType: '暗号資産', account: 'acc_sbivc_crypto', quantity: source.cashBalance,
         marketPrice: '1', marketValue: source.cashBalance, metricValue: source.cashBalance,
-        acquisitionPrice: null, unrealizedPnl: null, targetMonth: source.targetMonth,
-        snapshotAsOf: source.snapshotAsOf, hasOverrides: source.hasOverrides });
+        acquisitionPrice: null, unrealizedPnl: null, targetMonth: source.cashSource?.sourceMonth ?? source.targetMonth,
+        snapshotAsOf: source.cashSource?.snapshotAsOf ?? null, hasOverrides: source.hasOverrides });
     }
     return { ...source, rows, error: false };
   } catch (_) {

@@ -1,5 +1,16 @@
 # Development Guide
 
+## Current — SBI VC balance hook（PWA v304）
+
+`monthly-source-service.buildChanges(base, operation, {at,newId})`はStorageを操作しない純粋planner。sbivc-saveはcanonical仮modelからholding set／JPY cash／reported totalの参照candidateを組み立て、最後に一回だけRepository.commitする。別operateによる二段commitは禁止。PreviewのsourceFingerprintを保存直前に再照合し、staleは停止してPreviewを保持する。旧same-hash importを自動migrationしない。
+
+`sbivc-balance-adoption`が唯一の残高採用入口。旧observation-adoptionは内部compatibility、旧Inputの取引active Batch選択は変更しない。旧補正の同source修正・resetはInput監査履歴と共通override判断を同journalで保存し、別sourceを古いフォームから上書きしない。PDF候補追加のみではmanual/common採用を変更しない。本格採用比較UIは後続。
+
+`tests/sbivc-common-balance.test.js`は匿名Memoryで空集合・別source・補正・stale・atomic rollback・v14／v13 restore・非接続eventを検証する。production・実Backupを使わず、依存順序／precache／URLも検証する。金融原値・取引schema・Backupは既存v14内。
+
+検証：追加68件、全1305 tests Pass。JS構文119ファイル、precache 74資産、production HTMLのJS／CSS 105参照整合、diff-checkを確認。匿名Memory／localhost／browser-global初期化のみで検証・cleanup。computer-useのbrowser一覧が空のため390px／1280px実表示・実ブラウザConsoleは未実施。production Storage・実データ・実Backupを操作していない。
+
+
 ## Current — 共通source / adoption（PWA v303）
 
 monthly-source-contract.jsはDOM／Storage／network非依存のvalidator、SHA-256、candidate／legacy adapter、採用／補正resolver、comparison、audit、進捗metadataを提供する。source種類で採用・carry順位を作らない。monthly-source-service.jsの明示注入Adapterをinspect→operateで使用し、inspect.fingerprintを必須guardとして全model＋legacy正本を保存直前に照合する。stale時は保存停止し呼出元Draftを変更しない。

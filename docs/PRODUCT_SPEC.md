@@ -1,5 +1,12 @@
 # Product Specification
 
+## Current / Decided — SBI VCの共通残高source（v304）
+
+SBI VC PDFの現物保有集合とJPY残高を対等source／明示adoptionへ接続する。PDF保存は原値参照candidateを取得し、既存manual採用を自動置換しない。新判断がない既存月は旧観測採用・補正を互換表示する。全保有0は「正式確認した空集合」であり、未取得とは異なる。
+
+Position／Portfolio／Top／Allocationは同じ残高採用入口を参照する。Portfolioの現金は別明細、Top／AllocationのJPYは従来どおり暗号資産口座額に含める。帳票合計・担保評価を追加資産にしない。取引履歴と現在保有は別契約で、残高採用操作から取引採用を変更しない。月次P/L・quick deposit・staking・fee monthly flow等は未接続。
+
+
 ## Current / Decided — 対等なsourceと明示採用
 
 PDF／CSV／独立manualの正式source候補を保持し、口座・月・component・metricの採用値を1つだけ選ぶ基盤を追加。公式資料を自動優先せず、一致確認でもmanual原値と採用を保持する。不一致は選択またはdefer、比較不能は別状態。独立manualとsourceに対するoverrideを区別し、訂正は新revision、旧source／判断／補正を監査用に保持する。

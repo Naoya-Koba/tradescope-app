@@ -177,6 +177,8 @@ test('prior zero-only observation and registry existence do not establish SBI VC
  await service(s).save(listedSource('a','2031-02',false));await service(s).save(listedSource('b','2031-03',false));
  assert.equal(records(s,'holdingSnapshots').length,0);assert.equal(records(s,'instruments').length,1);
  // An older unfiltered zero record is not deleted and is still not positive evidence.
+ // Reconstruct pre-hook storage; registered source facts cannot be retroactively mutated.
+ s.removeItem(model.keys.monthlySources);
  const snapshot=records(s,'accountSnapshots')[0],oldZero={id:'old_zero',schemaVersion:1,accountId:snapshot.accountId,importBatchId:snapshot.importBatchId,
   sourceMode:snapshot.sourceMode,sourceScope:snapshot.sourceScope,targetMonth:snapshot.targetMonth,snapshotAsOf:snapshot.snapshotAsOf,
   importedAt:snapshot.importedAt,observationType:snapshot.observationType,instrumentId:'unused',accountSnapshotId:snapshot.id,quantity:'0',marketPrice:null,marketValue:'0',currency:'JPY'};

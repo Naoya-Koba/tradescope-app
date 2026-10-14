@@ -10,6 +10,7 @@
     }
     let view=adoption.resolve(models,accountId,targetMonth);if(!view)return null;
     const service=save.createService(adapter);let editing=false,busy=false;
+    view=service.inspect(accountId,targetMonth);
     const make=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el;};
     const amount=value=>{if(value==null)return'—';const [integer,fraction]=value.split('.');return integer.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction===undefined?'':'.'+fraction);};
     const card=make('div','','account-card');
@@ -51,9 +52,9 @@
       }
       details.addEventListener('toggle',resize);body.append(details);
       if(view.hasOverrides)body.append(make('p','手動補正あり','muted'));
-      if(!editing){
+      if(!editing&&view.editable){
         const edit=make('button','修正','monthly-source-reset');edit.type='button';edit.addEventListener('click',()=>{editing=true;draw();});actions.append(edit);
-      }else{
+      }else if(editing){
         const reset=make('button','PDF値に戻す','monthly-source-reset'),cancel=make('button','キャンセル','monthly-source-reset'),submit=make('button','保存','btn btn-primary monthly-account-save');
         for(const b of[reset,cancel,submit])b.type='button';
         reset.addEventListener('click',()=>{if(busy)return;for(const f of adoption.accountFields)accountControls[f].value=view.source[f]??'';
@@ -65,7 +66,7 @@
             const draft={accountId,targetMonth,account:Object.fromEntries(adoption.accountFields.map(f=>[f,accountControls[f].value])),
               holdings:holdingControls.map(h=>({holdingSnapshotId:h.holdingSnapshotId,instrumentId:h.instrumentId,values:Object.fromEntries(adoption.holdingFields.map(f=>[f,h.values[f].value]))}))};
             const result=service.save(draft,{expectedModels:models});
-            if(['saved','unchanged'].includes(result.status)){models=result.models;view=adoption.resolve(models,accountId,targetMonth);editing=false;draw();onSaved();}
+            if(['saved','unchanged'].includes(result.status)){models=result.models;view=service.inspect(accountId,targetMonth);editing=false;draw();onSaved();}
           }catch(_){error.textContent='保存できませんでした。入力値と保存情報を確認してください';error.hidden=false;}
           finally{busy=false;for(const c of[...controls,reset,cancel,submit])c.disabled=false;resize();}
         });

@@ -2,11 +2,10 @@
   'use strict';
   const node=typeof module!=='undefined'&&module.exports;
   const observation=node?require('./open-positions-view.js'):root.TradeScopeOpenPositionsView;
-  const adoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
+  const adoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
   const balances=node?require('./balance-view.js'):root.TradeScopeBalanceView;
   const csv=node?require('../import/csv-core.js'):root.TradeScopeCSV;
-  const sourceContract=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
-  const version='current-assets-v3';
+  const version='current-assets-v4';
   const knownSum=values=>values.length?csv.sum(values.map(String)):null;
   const number=value=>value==null||value===''?null:Number.isFinite(Number(value))?Number(value):null;
   function sbivc(models,year){
@@ -17,6 +16,7 @@
       const unknownQuantity=source.hasUnknownQuantity===true;
       const unknownComponents=source.hasSource&&(!cashKnown||unknownValuation||unknownQuantity);
       const values=source.holdings.map(h=>h.marketValue).filter(v=>v!==null);
+      if(source.emptyHoldingSet)values.push('0');
       if(cashKnown)values.push(source.cashBalance);
       return {...source,sourceMonth:source.targetMonth,cashKnown,unknownValuation,unknownQuantity,unknownComponents,
         complete:source.hasSource&&!unknownComponents,monthlyComplete:false,knownAssetTotal:knownSum(values),error:false};
@@ -28,21 +28,25 @@
   }
   function cryptoBalance(models,source,targetMonth){
     const rows=(entity)=>models?.[entity]?.records||[];
-    const months=rows('monthlyAccountInputs').filter(i=>i.accountId==='acc_sbivc_crypto'&&[3,4].includes(i.schemaVersion)
-      &&i.targetMonth.startsWith(targetMonth.slice(0,4)+'-')&&i.targetMonth<=source.sourceMonth).map(i=>i.targetMonth).sort();
-    const latest=adoption.resolve(models,'acc_sbivc_crypto',source.sourceMonth);
+    const months=adoption.months(models,{year:Number(targetMonth.slice(0,4))}).filter(m=>m<=source.sourceMonth);
+    const latest=adoption.latest(models,{year:Number(targetMonth.slice(0,4))});
     const unknown=latest.holdings.filter(h=>h.adopted.quantity===null);
     // The latest complete holding roster is authoritative: removed/zero holdings never reappear.
-    const componentKeys=['cash',...source.holdings.map(h=>'holding:'+h.instrumentId),...unknown.map(h=>'holding:'+h.instrumentId)];
+    const componentKeys=['cash',...source.holdings.map(h=>'holding:'+h.instrumentId),...unknown.map(h=>'holding:'+h.instrumentId),
+      ...(source.emptyHoldingSet&&source.cashBalance===null?['spot-empty']:[]),...(!latest.holdingSetKnown?['spot-unknown']:[])];
     const observations=[];
     const holdingFields=[];
     for(const month of months){
-      const view=adoption.resolve(models,'acc_sbivc_crypto',month);
-      const provenance={recordId:view.snapshot.id,importBatchId:view.snapshot.importBatchId,sourceType:view.snapshot.sourceMode,
-        sourceScope:view.snapshot.sourceScope};
-      observations.push({key:'cash',label:'JPY現金',value:view.adopted.cashBalance,sourceMonth:month,snapshotAsOf:view.snapshot.snapshotAsOf,
-        basis:'current-asset-observation',source:provenance});
+      const view=adoption.resolve(models,month);
+      const provenance=view.holdingSource;
+      observations.push({key:'cash',label:'JPY現金',value:view.adopted.cashBalance,sourceMonth:month,snapshotAsOf:view.cashSource?.snapshotAsOf??null,
+        basis:'current-asset-observation',source:view.cashSource,blocked:['stale','conflict','unresolved'].includes(view.cashStatus)});
       for(const key of componentKeys.filter(k=>k!=='cash')){
+        if(key==='spot-empty'||key==='spot-unknown'){
+          observations.push({key,value:key==='spot-empty'&&view.emptyHoldingSet?'0':null,sourceMonth:month,preventCarry:true,
+            basis:'current-asset-observation',source:provenance});continue;
+        }
+        if(view.spotStatus==='missing')continue;
         const h=view.holdings.find(h=>'holding:'+h.instrumentId===key);
         const label=rows('instruments').find(i=>'holding:'+i.id===key)?.symbol??'現物保有';
         if(!h){observations.push({key,label,value:null,sourceMonth:month,preventCarry:true});continue;}
@@ -52,7 +56,7 @@
         }
         const zero=/^0+(?:\.0+)?$/.test(h.adopted.quantity);
         observations.push({key,label,
-          value:zero?'0':h.adopted.marketValue,sourceMonth:month,snapshotAsOf:view.snapshot.snapshotAsOf,
+          value:zero?'0':h.adopted.marketValue,sourceMonth:month,snapshotAsOf:provenance?.snapshotAsOf??null,
           basis:'current-asset-observation',source:{...provenance,holdingSnapshotId:h.holdingSnapshotId}});
       }
     }
@@ -61,10 +65,10 @@
     for(const h of source.holdings){
       const fieldObservations=[];
       for(const month of months){
-        const view=adoption.resolve(models,'acc_sbivc_crypto',month),old=view.holdings.find(row=>row.instrumentId===h.instrumentId);
+        const view=adoption.resolve(models,month),old=view.holdings.find(row=>row.instrumentId===h.instrumentId);
         for(const field of ['quantity','marketPrice'])fieldObservations.push({key:field,value:old?.adopted[field]??null,sourceMonth:month,
           preventCarry:!old||old.adopted.quantity===null||/^0+(?:\.0+)?$/.test(old.adopted.quantity),
-          source:{recordId:old?.holdingSnapshotId??null,importBatchId:view.snapshot.importBatchId},snapshotAsOf:view.snapshot.snapshotAsOf});
+          source:{recordId:old?.holdingSnapshotId??null,importBatchId:view.holdingSource?.importBatchId??null},snapshotAsOf:view.holdingSource?.snapshotAsOf??null});
       }
       holdingFields.push({instrumentId:h.instrumentId,fields:balances.resolve(fieldObservations,{targetMonth,componentKeys:['quantity','marketPrice']}).components});
     }
@@ -103,9 +107,7 @@
     const targetMonth=[dashboard.month?`${year}-${String(dashboard.month).padStart(2,'0')}`:null,crypto.sourceMonth]
       .filter(Boolean).sort().at(-1)??null;
     const rows=dashboard.rows.map(row=>{
-      const explicitCrypto=sourceContract.heads(models?.monthlySources?.records??[]).some(r=>r.accountId==='acc_sbivc_crypto'&&r.targetMonth.startsWith(`${year}-`)
-        &&r.currency==='JPY'&&['marketValue','cashBalance','holdings'].includes(r.metric)&&sourceContract.resolve(models,r).status!=='unresolved');
-      if(row.key==='sbivc'&&(!explicitCrypto||!balanceHistory)){
+      if(row.key==='sbivc'){
         const balance=crypto.hasSource?cryptoBalance(models,crypto,targetMonth):balances.resolve([{key:'cash',label:'JPY現金',value:null,sourceMonth:targetMonth??`${year}-01`}],{targetMonth:targetMonth??`${year}-01`,componentKeys:['cash']});
         crypto={...crypto,balance,knownAssetTotal:balance.knownTotal,hasCarried:balance.hasCarried,
           unknownComponents:balance.unknownComponents,complete:balance.complete};

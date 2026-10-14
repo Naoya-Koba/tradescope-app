@@ -1,5 +1,12 @@
 # Calculation Specification
 
+## Current / Decided — SBI VC残高の採用入口（v304）
+
+Open Positions、Portfolio、current-asset-view、Top／Allocationは共通SBI VC balance adoption resolverを使う。保有集合の最新対象月と現金の最新対象月を独立して保持し、全年最新（Position／Portfolio）と選択年内最新（Top／Allocation）の時点差を維持する。positive採用保有の公式marketValue＋採用cashBalanceを一度だけ合算し、reportedAssetTotal・レバレッジ担保・旧source・legacy取引は加算しない。空集合／数量0は過去positiveを復活させず、不明数量も過去数量で補完しない。
+
+balance-viewの現在表示だけ同一年内の未確認評価額／現金をcarryできる。固定月resolverはcarryせず、historical flow／P&L、期間ledger、Annual／両Trend／Riskは今回変更しない。quick deposit、JPY出金、crypto移動、settlement legs、staking、signed feeを月次deposit／swap／損益／原価へ接続しない。月次損益不明を0へ変換しない。取引source adoptionと残高adoptionは別責務。
+
+
 ## Current / Decided — 採用済みsourceと共通計算
 
 新しいmetricだけを採用した部分Inputは、既存Traders／SBIの明示採用済み月次値を互換adapterで維持する。State不存在だけを理由に既知値をnullへ落とさず、swap未入力など元から不明の項目は不明のまま。新採用がない従来monthは変えない。

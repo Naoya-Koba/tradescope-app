@@ -4,7 +4,7 @@
   const resolver = node ? require('./monthly-account-resolver.js') : root.TradeScopeMonthlyResolver;
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
-  const cryptoAdoption=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
+  const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
   const version = 'monthly-display-v5';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
@@ -67,11 +67,11 @@
       return { components: [], conflict: false };
     }
     function cryptoComponents(targetMonth){
-      const adopted=cryptoAdoption.resolve(models,'acc_sbivc_crypto',targetMonth);if(!adopted)return [];
-      const h=adopted.holdings.map(h=>h.adopted),known=h.every(h=>h.quantity!==null);
+      const adopted=cryptoAdoption.resolve(models,targetMonth);if(!adopted)return [];
+      const h=adopted.holdings.map(h=>h.adopted),known=adopted.holdingSetKnown&&h.every(h=>h.quantity!==null);
       const values=h.filter(h=>numeric(h.quantity)>0).map(h=>h.marketValue);
-      return [{key:'spot',name:'現物保有',asset:known&&values.every(v=>numeric(v)!==null)?values.length?csv.sum(values):'0':null,unrealized:null,id:adopted.snapshot.id,snapshotAsOf:adopted.snapshot.snapshotAsOf},
-        {key:'cash',name:'現金・預り金',asset:adopted.adopted.cashBalance,unrealized:null,id:adopted.snapshot.id,snapshotAsOf:adopted.snapshot.snapshotAsOf}];
+      return [{key:'spot',name:'現物保有',asset:known&&values.every(v=>numeric(v)!==null)?values.length?csv.sum(values):'0':null,unrealized:null,id:adopted.holdingSource?.recordId??null,snapshotAsOf:adopted.holdingSource?.snapshotAsOf??null},
+        {key:'cash',name:'現金・預り金',asset:adopted.adopted.cashBalance,unrealized:null,id:adopted.cashSource?.recordId??null,snapshotAsOf:adopted.cashSource?.snapshotAsOf??null}];
     }
     function observation(key,targetMonth,resolved){
       let base=observationExisting(key,targetMonth,resolved);const values=resolved.sourceAdoptions??[];

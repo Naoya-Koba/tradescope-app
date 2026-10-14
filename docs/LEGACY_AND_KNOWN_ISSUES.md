@@ -1,5 +1,14 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known limitation — SBI VC共通残高接続（v304）
+
+現物保有集合／JPY現金の共通resolver、PDF保存のatomic参照candidate hook、旧採用／v4補正のcompatibilityを接続済み。既存データbulk migrationなし、空集合を正式sourceとして扱う。Backup v14の公開契約を変更しない。以下v303の「broker hook未接続」はSBI VC残高に限り本節へ更新し、他broker／本格採用UIは引き続き後続。
+
+candidate取得とadoptionは別操作。PDF取得だけでmanual/common採用を切替えない。別source混在や独立manualの本格編集・採用UIは未実装で、旧PDF補正フォームから異なるsourceを上書きせず停止する。Transaction Historyのactive sourceは旧Input契約のままで、残高adoptionとは独立。fixed month balanceの期間P/L採用は今回拡張しない。
+
+quick deposit／crypto transfer／staking／fee monthly flow／貸出は未接続、現物売り／レバレッジ実取引は実例未検証。帳票合計は完全NAVではなく、担保は別資産ではない。損益・原価を逆算しない。
+
+
 ## Current / Known limitation — 最小source / adoption基盤
 
 現行はPWA v303。部分Inputのmetric単位採用で既存既知値を保持し、新採用のledger額は月途中でも年初基準が不明なら停止する。既存Input／Snapshot／State、新契約なしのlegacyは不変。以下v301は基盤追加時点の記録で、schema／Backupは同じv14のまま。

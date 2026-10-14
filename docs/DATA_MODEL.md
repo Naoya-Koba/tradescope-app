@@ -1,5 +1,12 @@
 # Data Model
 
+## Current / Decided — SBI VC共通残高採用（PWA v304）
+
+`sbivc-balance-adoption.js`を現物保有集合／JPY現金の唯一の採用入口とする。共通判断があるcomponentはmonthlySourcesの指定revision／overrideを解決し、ないcomponentだけMonthlyAccountInput v3/v4＋observation-adoptionをcompatibility adapterとして読む。明示deferで前判断なし、stale、競合を旧Inputへ戻さない。原値はBatchのholding scope／AccountSnapshot.cashBalanceへの参照のみ。空Holding集合は既存Batch＋同scope AccountSnapshotで正式観測でき、架空HoldingやInstrumentを作らない。保有集合と現金のsource month／参照を別々に保持する。帳票assetValueはreportedAssetTotal候補のみで資産合成へ加算しない。
+
+PDF確認保存はcanonical recordsと3参照candidateを一回のjournalで追加する。candidate取得だけではcommon adoptionを変更せず、既存PDF採用は互換契約を維持する。旧source／Input補正履歴をbulk migrationしない。共通明示選択は既存source APIで行う。旧補正フォームは同じ物理revisionへの補正だけ共通override／adoptionとatomic同期し、別manual／訂正前sourceへの変更は停止する。原金融値は複製せず、既存v14のsource／adoption／override型、validator、11キーを維持する。
+
+
 ## Current / Decided — 最小共通source / adoption（Backup v14）
 
 PDF／CSV／独立manualは対等な正式source候補。公式自動優先・manual格下扱い・複数候補の同時加算をしない。既存canonical原値はコピーせず参照する。新キー `tradeScopeMonthlySourcesV1`（entity monthlySources）を追加し、既存10モデルのrecord schemaは不変。新envelope v1はschemaVersion、records、updatedAt、recordCount、recordsFingerprint（canonical JSONのSHA-256）。履歴欠落、未知field／version、参照不正を拒否する。全recordはappend-only。

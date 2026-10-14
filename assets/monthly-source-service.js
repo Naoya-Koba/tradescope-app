@@ -5,16 +5,9 @@
   const contract=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const copy=v=>JSON.parse(JSON.stringify(v));
   const legacyKeys=['tradingData','yearInitialFunds','yearInitialUnrealized'];
-  function createService(adapter,{clock=()=>new Date().toISOString(),newId=()=> 'ms_'+globalThis.crypto.randomUUID()}={}){
-    const repository=storage.createRepository(adapter);
-    function inspect(){
-      const models=repository.read(),legacy=Object.fromEntries(legacyKeys.map(k=>[k,adapter.getItem(k)]));
-      for(const raw of Object.values(legacy)){if(raw!==null){const v=JSON.parse(raw);if(!v||typeof v!=='object'||Array.isArray(v))throw Error('INVALID_LEGACY_SOURCE');storage.assertJson(v);}}
-      return {models,legacy,fingerprint:contract.draftFingerprint(models,legacy)};
-    }
-    function operate(operation,{expectedFingerprint}={}){
-      const before=inspect();if(typeof expectedFingerprint!=='string'||before.fingerprint!==expectedFingerprint)throw Error('STALE_MONTHLY_SOURCE_DRAFT');
-      const models=copy(before.models),all=[...(models.monthlySources?.records||[])],at=clock(),added=[];
+  // Pure plan: brokers can combine canonical records and source records in ONE journal.
+  function buildChanges(base,operation,{at,newId=()=> 'ms_'+globalThis.crypto.randomUUID()}={}){
+      const models=copy(base),all=[...(models.monthlySources?.records||[])],added=[];
       const append=r=>{contract.validateRecord(r);if(all.some(old=>old.id===r.id))throw Error('DUPLICATE_MONTHLY_SOURCE_ID');all.push(r);added.push(r);models.monthlySources=contract.envelope(all,at);return r;};
       for(const descriptor of operation.sources||[]){
         const r={schemaVersion:1,id:descriptor.id??newId(),kind:'source',...contract.target(descriptor),sourceId:descriptor.sourceId,
@@ -53,10 +46,22 @@
         }
       }
       contract.validateSet(models);
+      return {changes,added:copy(added),models};
+  }
+  function createService(adapter,{clock=()=>new Date().toISOString(),newId=()=> 'ms_'+globalThis.crypto.randomUUID()}={}){
+    const repository=storage.createRepository(adapter);
+    function inspect(){
+      const models=repository.read(),legacy=Object.fromEntries(legacyKeys.map(k=>[k,adapter.getItem(k)]));
+      for(const raw of Object.values(legacy)){if(raw!==null){const v=JSON.parse(raw);if(!v||typeof v!=='object'||Array.isArray(v))throw Error('INVALID_LEGACY_SOURCE');storage.assertJson(v);}}
+      return {models,legacy,fingerprint:contract.draftFingerprint(models,legacy)};
+    }
+    function operate(operation,{expectedFingerprint}={}){
+      const before=inspect();if(typeof expectedFingerprint!=='string'||before.fingerprint!==expectedFingerprint)throw Error('STALE_MONTHLY_SOURCE_DRAFT');
+      const {changes,added}=buildChanges(before.models,operation,{at:clock(),newId});
       const saved=repository.commit(changes,{expectedModels:before.models,expectedLegacy:before.legacy,invalidateTopSummary:true});
-      return {models:saved,added:copy(added),fingerprint:contract.draftFingerprint(saved,before.legacy)};
+      return {models:saved,added,fingerprint:contract.draftFingerprint(saved,before.legacy)};
     }
     return Object.freeze({inspect,operate});
   }
-  const api=Object.freeze({createService});if(node)module.exports=api;else root.TradeScopeMonthlySourceService=api;
+  const api=Object.freeze({createService,buildChanges});if(node)module.exports=api;else root.TradeScopeMonthlySourceService=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

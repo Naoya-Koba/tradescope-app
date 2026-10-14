@@ -1,5 +1,12 @@
 # Backup and Restore Specification
 
+## Current — SBI VC残高接続と固定v14契約（v304）
+
+Backupはv14を維持する。新record／field／Storage key／validator受理範囲の拡張なし。SBI VC PDF保存時の原Batch／Snapshot／Holding、参照source候補、明示採用・revision補正は既存11モデル内で保護する。正式な空holding setはBatch＋AccountSnapshot scope参照で復元し、JPY明示0とnullを区別する。原金融値を新sourceへ複製しない。
+
+候補・canonical・補正の書込みは一回のRepository journalで検証・再読込・rollbackし、rollback不能時はjournalを保持する。v13以前のclear／preserve規則は本書の既存公開契約のまま。実Backup／production Restoreを使わず匿名roundtripを検証する。
+
+
 ## Current / Decided — Backup v14
 
 最新exportはv14。legacy＋既存10モデル＋monthlySourcesの11モデルを完全置換する。新envelope／record、原source参照、adoption・override・comparison・履歴chain、recordCount／SHA-256、active採用のsource fingerprintを検証する。新model key欠落、参照revision不存在、未知field／version、履歴欠落、stale active採用を拒否し、値を切捨てて旧version化しない。null modelはキー不在、null金融値はunknown、明示0は0で往復。

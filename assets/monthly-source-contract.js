@@ -238,7 +238,8 @@
       }
     }
     for(const b of rows(models,'importBatches').filter(r=>r.accountId===accountId&&r.targetMonth===targetMonth)){
-      const scopes=[...new Set(rows(models,'holdingSnapshots').filter(h=>h.importBatchId===b.id).map(h=>h.sourceScope))];
+      const scopes=[...new Set([...rows(models,'holdingSnapshots').filter(h=>h.importBatchId===b.id).map(h=>h.sourceScope),
+        ...rows(models,'accountSnapshots').filter(s=>s.importBatchId===b.id&&s.sourceScope==='sbivc-monthly-assets').map(s=>s.sourceScope)])];
       for(const sourceScope of scopes)for(const [field,metric]of Object.entries(refFields.importBatches)){
         add({accountId,targetMonth,component:sourceScope==='sbi-domestic-holdings'?'domestic':'spot',asOf:b.snapshotAsOf??null},metric,{entity:'importBatches',id:b.id,field,sourceScope},b.sourceType,b.importedAt);
       }

@@ -34,7 +34,7 @@
       inspected=result;$('save').hidden=!['ready','review-required','reconciliation-ready','confirmation-required'].includes(result.status);
       $('save').textContent='保存';
       $('save-status').textContent=['saved','already-imported'].includes(result.status)?(source?.preview.transactions.length?'資産・保有・取引情報を保存済み':'資産・保有情報を保存済み')
-        :result.status==='review-required'?'同じ月の保存内容を訂正します':result.status==='conflict'?'保存済みの情報と照合できませんでした':'';
+        :result.status==='review-required'?'同じ月の保存内容を訂正します':result.status==='stale'?'保存情報が変更されています。解析内容を保持しています。再確認してください':result.status==='conflict'?'保存済みの情報と照合できませんでした':'';
     }
     function render(result) {
       $('preview').hidden = false;

@@ -7,6 +7,8 @@
   const adoption=node?require('../assets/observation-adoption.js'):root.TradeScopeObservationAdoption;
   const reconciliation=node?require('../assets/transaction-reconciliation.js'):root.TradeScopeTransactionReconciliation;
   const transactionView=node?require('../assets/transaction-view.js'):root.TradeScopeTransactionView;
+  const sourceContract=node?require('../assets/monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
+  const sourceService=node?require('../assets/monthly-source-service.js'):root.TradeScopeMonthlySourceService;
   const copy=v=>JSON.parse(JSON.stringify(v)),rows=(m,e)=>m[e]?.records||[];
   const accountId='acc_sbivc_crypto',scope='sbivc-monthly-assets',importerId='sbivc-monthly';
   const decimal=v=>typeof v==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(v)&&v.length<=128;
@@ -88,6 +90,7 @@
     function prepare(source){
       if(adapter.getItem(tx.journalKey)!==null)throw Error('未完了のジャーナルがあります。保存を停止しました');
       const p=validate(source),before=repo.read(),account=rows(before,'accounts').find(r=>r.id===accountId);
+      sourceContract.validateSet(before,{strictStale:true});
       if(account&&(!account.enabled||account.providerCode!=='sbivc'||account.accountType!=='crypto'))return{status:'conflict'};
       const existing=rows(before,'importBatches').filter(b=>b.accountId===accountId&&b.sourceType==='pdf'&&b.sourceProvider==='sbivc'
         &&b.importerId===importerId&&[p.version,'sbivc-monthly-preview-v1'].includes(b.importerVersion)&&b.targetMonth===p.report.targetMonth&&b.snapshotAsOf===p.report.snapshotAsOf
@@ -121,7 +124,7 @@
       }
       return{status:view?'review-required':'ready',before,p,account,view,ids,newSymbols,selected,holdingCount:selected.length,transactionCount:p.transactions.length};
     }
-    const result=p=>({status:p.status,...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.transactionCount!==undefined?{transactionCount:p.transactionCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt,...(p.view.input.schemaVersion===4?{overrideUpdatedAt:p.view.input.overrideUpdatedAt,overrideRevision:p.view.input.overrideHistory.length}:{})}:{})});
+    const result=p=>({status:p.status,...(p.before?{sourceFingerprint:sourceContract.draftFingerprint(p.before)}:{}),...(p.holdingCount!==undefined?{holdingCount:p.holdingCount}:{}),...(p.transactionCount!==undefined?{transactionCount:p.transactionCount}:{}),...(p.view?{inputId:p.view.input.id,adoptedSnapshotId:p.view.snapshot.id,adoptedAt:p.view.input.adoptedAt,...(p.view.input.schemaVersion===4?{overrideUpdatedAt:p.view.input.overrideUpdatedAt,overrideRevision:p.view.input.overrideHistory.length}:{})}:{})});
     async function inspect(source){const p=prepare(copy(source)),out=result(p);
       if(p.status==='already-imported')return reconciliation.inspect(adapter,p.before,transactionView.activeSources(p.before).filter(s=>s.record.importBatchId===p.existingBatchId),out);
       if(!['ready','review-required'].includes(p.status))return out;
@@ -135,6 +138,7 @@
       if(busy)return{status:'busy'};busy=true;
       try{
         const input=copy(source),prepared=prepare(input),guard=result(prepared);
+        if(confirmation.sourceFingerprint!==undefined&&confirmation.sourceFingerprint!==guard.sourceFingerprint)return prepared.status==='review-required'?{...guard,stale:true}:{status:'stale'};
         if(prepared.status==='already-imported'){
           const changes={},checked=reconciliation.finish(adapter,prepared.before,changes,confirmation,clock(),()=>model.newId('tr',cryptoApi),transactionView.activeSources(prepared.before).filter(s=>s.record.importBatchId===prepared.existingBatchId));
           if(checked.status!=='ready')return checked;
@@ -165,6 +169,13 @@
         changes.monthlyAccountInputs=envelope([...rows(before,'monthlyAccountInputs').filter(r=>r.id!==monthly.id),monthly]);
         if(p.transactions.length)changes.importedTransactions=envelope([...rows(before,'importedTransactions'),...p.transactions.map(t=>tradeRecord(t,
           {id:model.newId('it',cryptoApi),instrumentId:ids.get(t.symbol),importBatchId:batchId,importedAt:now,targetMonth:p.report.targetMonth}))]);
+        // Candidate acquisition is NOT a command to replace an independent manual/common adoption.
+        // Empty collections use the existing Batch + AccountSnapshot scope, not invented Holding rows.
+        const combined={...before,...changes};
+        const candidates=sourceContract.candidates(combined,{accountId,targetMonth:p.report.targetMonth}).filter(r=>!r.registered&&(
+          r.metric==='holdings'&&r.reference?.id===batchId||['cashBalance','reportedAssetTotal'].includes(r.metric)&&r.reference?.id===snapshotId));
+        if(candidates.length!==3)throw Error('SBIVC_SOURCE_CANDIDATES_INVALID');
+        Object.assign(changes,sourceService.buildChanges(combined,{sources:candidates},{at:now,newId:()=>model.newId('ms',cryptoApi)}).changes);
         const checked=reconciliation.finish(adapter,before,changes,confirmation,now,()=>model.newId('tr',cryptoApi));
         if(checked.status!=='ready')return checked;
         reconciliation.continuity(adapter,before,{...before,...changes},transactionView.activeSources);
