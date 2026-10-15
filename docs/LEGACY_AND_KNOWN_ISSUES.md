@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known issue — FX重複候補のみ（v319）
+
+LIGHT／みんなのv3/manual候補をread-onlyで導出可能。manualは日付のみ・Number保存であり、双方一意でも確認済み同一取引ではない。ZAR／MXN等のlegacy contractSize不整合は修正せずincomparable。数量・価格許容差、時刻近似、部分集合の自動対応は行わない。通常Historyはmanual＋使用中PDFを引き続き別行表示し、metadata統合・reconciliation v2・undo永続契約は後続工程。Backup v15維持。Chrome接続不可につき実ブラウザ回帰は未確認。
+
 ## Current — Open Positions公式化の限定範囲（v318）
 
 LIGHT／みんなのOpen Positionsだけ公式月末観測へ切替。PortfolioのFX保有比率（推定必要証拠金）とRiskはmanual由来のままで、元データの一時的不一致は既知の移行境界。manual／PDF照合、Portfolioの役割・比率、Riskの公式化は別工程。SBI VCの既存official readerとGMOのlegacy表示は変更しない。

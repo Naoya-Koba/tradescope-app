@@ -1,5 +1,9 @@
 # Product Specification
 
+## Current — LIGHT／みんなの重複候補API（v319）
+
+使用中PDF v3取引と手入力の重複候補を非永続・read-onlyで抽出する内部APIのみ追加。unique-candidate／ambiguous／unmatched-manual／unmatched-imported／incomparableを区別する。unique candidateは同一取引確定ではなく、ambiguousを自動選択しない。本番確認UI・History dedupe・manual行非表示・metadata統合・対応関係保存・reconciliation v2は未実装。History、公式Open Positions、Portfolio／Riskは従来どおり。Backup v15維持。
+
 ## Current — LIGHT／みんなの公式Open Positions（v318）
 
 Open PositionsのLIGHT／みんなは、現在使用中の残高PDFに紐づく月末建玉を口座×通貨ペア×買／売で表示する。短い「09/30時点」を付け、リアルタイム建玉と誤認させない。建値・数量・評価損益を通常行、評価レート・未決済swap・必要証拠金を既存詳細panelで確認できる。注文番号や内部source用語は一覧へ増やさない。

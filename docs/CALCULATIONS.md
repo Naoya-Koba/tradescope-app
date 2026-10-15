@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Current — FX取引候補比較のみ（v319）
+
+候補projectionはmanual数量×明示contractSizeを既存decimal演算で比較するだけで原値へ書き戻さない。Lot定義は既存TransactionDisplayを再利用し、TRY10,000／HUF100,000、単位不明・legacy contractSize矛盾はincomparable。末尾0を正規化するが価格・数量許容差はない。manual.dateとPDF.tradeDateを比較し、createdAt／executedAt時刻／受渡日／realized／swap／fee／注文番号をkeyにしない。unique candidateは確認済み一致ではない。Historyの行数・metadata、official Open Positions、Portfolio／Risk、Top／Allocation／Monthly／Annual／Trends／swap／入出金の正本・計算は変更しない。
+
 ## Current — 公式建玉はOpen Positions表示専用（v318）
 
 LIGHT／みんなのOpen Positionsだけが公式月末HoldingSnapshotを使う。保存原数量・建値・評価レート・価格評価損益・未決済swap・必要証拠金は変更しない。表示projectionはaccount×instrument×sideで数量・評価損益・未決済swap・必要証拠金を合計し、建値を数量加重平均する（exact decimal、循環小数の表示は小数18桁half-up）。評価レート不一致は平均せずnull。買／売をnettingしない。

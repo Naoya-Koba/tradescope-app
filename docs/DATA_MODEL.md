@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — v3/manual重複候補projection（v319）
+
+`assets/fx-transaction-candidate-view.js`の`project(rawManual, models, options)`は非永続・read-only。LIGHT／みんなの使用中transaction collectionだけを既存adoption readerで読み、account／provider／一意Instrument／action／side／比較用原通貨数量／decimal価格／tradeDateから候補を導出する。manualを保存用normalizerへ通さず、原record・未知metadataを変更しない。結果はmanual／imported別のID参照、matchingFields、status、reasonとsource状態。unique-candidateは日付精度の双方一意候補であり確認済み同一取引ではない。ambiguousは自動選択しない。全未一致集合の数量合計だけが一致する場合はaggregate-onlyの要確認とし、部分集合探索・価格平均はしない。参照不良sourceは比較対象外で、該当月manualも比較不能とする。
+
+APIをHistoryページに読み込むだけで通常History・metadata・金融consumerには未接続。既存reconciliation v1不変、v2・関係保存・History dedupeは未実装。新key／schema／migrationなし、Backup v15維持。
+
 ## Current — 公式FX建玉の非永続reader（v318）
 
 `official-fx-position-view.js`はLIGHT／みんなの現在使用中のaccount marketValue・unrealizedPnlのPDF参照が同じAccountSnapshotを指すことを検証し、そのSnapshot／ImportBatchに属するHoldingSnapshot v2だけを返す。旧native参照はfingerprint完全一致の履歴Snapshotへ解決する。manual・異版混在・stale／broken／conflictはunknownで、別PDFやmanual建玉へfallbackしない。

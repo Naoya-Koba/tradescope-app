@@ -1,5 +1,11 @@
 # Development Guide
 
+## Current — FX transaction candidate projection（v319）
+
+`assets/fx-transaction-candidate-view.js`を既存adoption／transaction-view／transaction-displayの後にHistoryページでロードする。内部`TradeScopeFxTransactionCandidateView.project(rawManual, models, options)`のみ提供し、History rendererや金融計算からは呼ばない。decimal正規化／合計の純粋helperだけ既存reconciliationから再利用し、v3をv1照合へ流さず保存用manual normalizerも使わない。新asset query 20261015-8、PWA v319／Backup v15。
+
+匿名synthetic testsで双方一意・複数候補・分割／まとめ・単位矛盾・decimal精度・日付精度・口座分離・使用collection切替・原record／Storage不変・History非変更・v15往復・browser-global VMを確認した。追加75件／全2589 tests Pass。全体suiteでv1〜v14 restore／GMO／SBI VC／official Open Positions等を回帰。JS／MJS 156件＋inline 3件、precache 92件、全HTML local URL 262件・依存順・diff-checkを確認した。通常sandboxでは既存localhost通信2件がEACCESとなり、匿名loopback通信を許可した再実行で全件通過。production Storage／実PDF／実Backupは未操作。computer-useスキルでChrome接続を試したが利用不可であり、390px／1280px／実Console／既定回帰は未確認。匿名VM成功とは区別する。
+
 ## Current — 公式FX建玉reader／Open Positions（v318）
 
 新しい`assets/official-fx-position-view.js`のresolve／accountsはread-onlyでraw個別Holdingを返し、projectだけが表示用集約・Lot換算を担当する。`history/history.js`のOpen Positions部分だけへ接続し、shared SBI VC reader／Portfolio／Risk／transaction consumerは変更しない。残高採用を再利用し、position専用採用は作らない。別タブ・BFCache・復帰時の再読込はOpen Positionsだけを更新し、未保存manual form／History filterを触らない。

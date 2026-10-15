@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — 非永続FX候補はBackup対象外（v319）
+
+v3/manual candidate projectionはread-onlyで毎回導出し、関係・候補・metadataを保存しない。Backup v15／既存12モデル／v1〜v14 restoreを維持し、Storage key／schema／migration追加なし。reconciliation v1は変更せず、reconciliation v2／Backup v16は未実装。
+
 ## Current — 公式FX建玉読取と固定v15（v318）
 
 公式建玉reader／表示projectionは非永続。既存ImportBatch／AccountSnapshot v2／HoldingSnapshot v2／monthly source・採用／native月次参照から導出する。Backup v15・12モデル・v1〜v14 restore契約を維持し、新key／schema／migration／position専用decisionは追加しない。
