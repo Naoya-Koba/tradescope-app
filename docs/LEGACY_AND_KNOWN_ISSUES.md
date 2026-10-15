@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current — Open Positions公式化の限定範囲（v318）
+
+LIGHT／みんなのOpen Positionsだけ公式月末観測へ切替。PortfolioのFX保有比率（推定必要証拠金）とRiskはmanual由来のままで、元データの一時的不一致は既知の移行境界。manual／PDF照合、Portfolioの役割・比率、Riskの公式化は別工程。SBI VCの既存official readerとGMOのlegacy表示は変更しない。
+
+同じPDFのNAV／価格評価損益へ一意に結び付かない場合、未対応importer、破損参照、証明できない空集合はunknownで停止表示し、manualや別月へfallbackしない。公式建玉はリアルタイムではなく基準日の観測。Chrome接続不可で実ブラウザ390px／1280px・overflow・Console・既定History回帰・PDF抽出は未確認。匿名DOM／VM成功と区別する。Backup v15、新position-set永続化なし。 以下の旧版記述は当時の工程境界。
+
 ## Current — 残高再取り込み整合（v317）
 
 LIGHT／みんなの旧candidate-only訂正を置換し、確認後はPDF残高と受渡aggregateを一括更新する。同一PDFの不足candidate／使用判断はcanonical再利用で補完可能。manual calendar／独立manual原値は保護し、旧PDF補正は履歴に残して新PDFへ持ち越さない。由来を特定できない場合やRepository参照破損は停止し、validator回避／record削除による復旧をしない。同一hashで金融事実が異なる再解析も上書きせず停止する。

@@ -258,6 +258,17 @@ function buildFilters(entries) {
   } catch (_) { transactionHistory.fail(); }
 }
 
+// Position observation refresh is independent of History and never touches forms.
+const officialPositionKeys=new Set(['tradeScopeAccountsV1','tradeScopeInstrumentsV1','tradeScopeImportBatchesV1',
+  'tradeScopeAccountSnapshotsV1','tradeScopeHoldingSnapshotsV1','tradeScopeMonthlyAccountInputsV1',
+  'tradeScopeMonthlyAccountStatesV1','tradeScopeMonthlySourcesV1','tradeScopeRestoreJournalV1']);
+function refreshOfficialPositions(){
+  if(document.getElementById('openPositionsBody')&&historyCore?.parseEntries)renderOpenPositions(historyCore.parseEntries());
+}
+window.addEventListener('storage',event=>{if(event.key===null||officialPositionKeys.has(event.key))refreshOfficialPositions();});
+window.addEventListener('pageshow',event=>{if(event.persisted)refreshOfficialPositions();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&transactionHistory)refreshOfficialPositions();});
+
 // Read-only History refresh: never rerender positions or overwrite an unsaved manual form.
 const historySourceKeys=new Set(['tradeScopeTradeHistoryV1','tradeScopeAccountsV1','tradeScopeInstrumentsV1','tradeScopeImportBatchesV1',
   'tradeScopeRawTransactionsV1','tradeScopeImportedTransactionsV1','tradeScopeTransactionSourcesV1','tradeScopeTransactionReconciliationsV1',
@@ -438,6 +449,24 @@ function dismissClosePositionModal() {
 function renderOpenPositionDetail(position) {
   const detail = document.getElementById('openPositionDetail');
   if (!detail || !position) return;
+  if (position.holdingType === 'official-fx-observation') {
+    const number = window.TradeScopeTransactionDisplay.number;
+    const quote = position.quoteCurrency === 'JPY' ? '円' : position.quoteCurrency;
+    const rate = value => value === null ? '—' : `${number(value)} ${escapeHtml(quote)}`;
+    detail.innerHTML = `<p class="open-position-detail-title">${escapeHtml(position.symbol)} / ${escapeHtml(displayAccountName(position.account))}</p>
+      <div class="open-position-detail-meta">
+        <span><strong>方向:</strong> ${position.side === 'buy' ? '買い' : '売り'}</span>
+        <span><strong>数量:</strong> ${escapeHtml(position.quantityLabel)}（${number(position.quantity)} ${escapeHtml(position.baseCurrency)}）</span>
+        <span><strong>平均建値:</strong> ${rate(position.acquisitionPrice)}</span>
+        <span><strong>評価レート:</strong> ${rate(position.marketPrice)}</span>
+        <span><strong>評価損益:</strong> ${number(position.unrealizedPnl)} 円</span>
+        <span><strong>未決済スワップ:</strong> ${number(position.unsettledSwap)} 円</span>
+        <span><strong>必要証拠金:</strong> ${number(position.requiredMargin)} 円</span>
+        <span><strong>基準日:</strong> ${escapeHtml(position.snapshotAsOf)}</span>
+      </div>`;
+    detail.hidden = false;
+    return;
+  }
   if (position.holdingType === 'spot-observation') {
     const decimal = window.TradeScopeOpenPositionsView.decimalLabel;
     detail.innerHTML = `<p class="open-position-detail-title">${escapeHtml(position.symbol)} / SBI VC</p>
@@ -480,12 +509,18 @@ function renderOpenPositionDetail(position) {
 
 function renderOpenPositions(entries) {
   const positionView = window.TradeScopeOpenPositionsView;
-  const legacyEntries = positionView.legacyEntries(entries);
+  const officialFX = window.TradeScopeOfficialFXPositionView;
+  let legacyEntries = positionView.legacyEntries(entries);
+  let fxObservations = ['acc_lightfx_fx','acc_minna_fx'].map(accountId => ({accountId,status:'unknown',holdings:[]}));
   let observedPositions = [], sourceUnavailable = false;
   try {
-    observedPositions = positionView.resolve(window.TradeScopeDataStorage.readModels(
-      window.TradeScopeDataStorage.localStorageAdapter(localStorage)));
+    if(localStorage.getItem('tradeScopeRestoreJournalV1')!==null)throw new Error('PENDING_POSITION_UPDATE');
+    const models = window.TradeScopeDataStorage.readModels(window.TradeScopeDataStorage.localStorageAdapter(localStorage));
+    if (officialFX) fxObservations = officialFX.accounts(models);
+    observedPositions = positionView.resolve(models);
   } catch (_) { sourceUnavailable = true; }
+  if (officialFX) legacyEntries = officialFX.legacyEntries(legacyEntries,fxObservations);
+  else legacyEntries = legacyEntries.filter(e => !['LIGHTFX','ACC_LIGHTFX_FX','MINANO','MINNA','ACC_MINNA_FX','みんなのFX'].includes(String(e.account||'').trim().toUpperCase().replace(/\s+/g,'')));
   const nonSecuritiesSbiEntries = legacyEntries.filter(
     (e) => !(String(e.account || '').trim().toUpperCase().replace(/\s+/g, '') === 'SBI' &&
              (e.assetType === '証券' || e.assetType === 'NISA'))
@@ -504,32 +539,52 @@ function renderOpenPositions(entries) {
   const summary = document.getElementById('openPositionsSummary');
   const primaryHeader = document.getElementById('openPositionsPrimaryHeader');
   const detail = document.getElementById('openPositionDetail');
+  if (detail) detail.hidden = true; // Do not retain an old revision's expanded facts.
 
   const legacyRows = openPositionsView === 'merged'
     ? aggregateOpenPositions(openPositions)
     : normalizeAccountOpenPositions(openPositions);
   // Observed spot holdings never enter transaction netting/weighted acquisition-rate calculations.
-  const rows = [...legacyRows, ...observedPositions.map(p => ({...p, viewMode: 'account', accountLabel: p.account}))];
-  document.getElementById('openPositionsSourceStatus').hidden = !sourceUnavailable;
+  const fxRows = officialFX ? fxObservations.flatMap(v => officialFX.project(v)) : [];
+  const rows = [...legacyRows, ...observedPositions, ...fxRows].map(p => p.holdingType ? {...p,viewMode:'account',accountLabel:p.account} : p);
+  const status = document.getElementById('openPositionsSourceStatus');
+  const statusLabels = fxObservations.filter(v => v.status === 'unknown' || v.confirmedEmpty).map(v =>
+    `${displayAccountName(v.accountId)}：${v.confirmedEmpty ? `建玉なし（${v.snapshotAsOf.slice(5).replace('-','/')}時点）` : '未確認'}`);
+  if (sourceUnavailable) statusLabels.unshift('SBI VC：未確認');
+  status.textContent = statusLabels.join(' / ');status.hidden = !statusLabels.length;
+  const valuationHeader = document.getElementById('openPositionsValuationHeader');
+  if (valuationHeader) valuationHeader.textContent = fxRows.length ? '評価額 / 損益' : '評価額';
 
   if (primaryHeader) {
     primaryHeader.textContent = openPositionsView === 'merged' ? '集計' : '口座';
   }
 
   if (!rows.length) {
-    summary.textContent = '現在保有中の建玉はありません。';
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#aab5d0;">建玉がありません</td></tr>';
+    const unknown = sourceUnavailable || fxObservations.some(v => v.status === 'unknown');
+    summary.textContent = unknown ? '保有情報は未確認です。' : '現在保有中の建玉はありません。';
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#aab5d0;">${unknown ? '未確認' : '建玉がありません'}</td></tr>`;
     if (detail) detail.hidden = true;
     return;
   }
 
   if (openPositionsView === 'merged') {
-    summary.textContent = `統合表示: ${rows.length} 銘柄`; 
+    summary.textContent = `統合表示: ${rows.length} ${fxRows.length ? '件' : '銘柄'}`;
   } else {
     summary.textContent = `口座別表示: ${rows.length} 件`;
   }
 
   tbody.innerHTML = rows.map((position, idx) => {
+    if (position.holdingType === 'official-fx-observation') {
+      const number = window.TradeScopeTransactionDisplay.number;
+      const quote = position.quoteCurrency === 'JPY' ? '円' : position.quoteCurrency;
+      return `<tr class="open-position-row" data-open-position-index="${idx}">
+        <td data-label="口座">${escapeHtml(displayAccountName(position.account))}</td>
+        <td data-label="銘柄">${escapeHtml(position.symbol)}<span class="official-position-basis">${escapeHtml(position.snapshotAsOf.slice(5).replace('-','/'))}時点</span></td>
+        <td data-label="方向"><span class="${position.side === 'buy' ? 'tag-buy' : 'tag-sell'}">${position.side === 'buy' ? '買い' : '売り'}</span></td>
+        <td data-label="数量">${escapeHtml(position.quantityLabel)}</td>
+        <td data-label="平均建値"><small>平均建値</small>${number(position.acquisitionPrice)} ${escapeHtml(quote)}</td>
+        <td data-label="評価損益"><small>評価損益</small>${number(position.unrealizedPnl)} 円</td><td></td></tr>`;
+    }
     if (position.holdingType === 'spot-observation') {
       const decimal = positionView.decimalLabel;
       return `<tr class="open-position-row" data-open-position-index="${idx}">

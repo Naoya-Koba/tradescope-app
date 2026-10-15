@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current — 公式建玉はOpen Positions表示専用（v318）
+
+LIGHT／みんなのOpen Positionsだけが公式月末HoldingSnapshotを使う。保存原数量・建値・評価レート・価格評価損益・未決済swap・必要証拠金は変更しない。表示projectionはaccount×instrument×sideで数量・評価損益・未決済swap・必要証拠金を合計し、建値を数量加重平均する（exact decimal、循環小数の表示は小数18桁half-up）。評価レート不一致は平均せずnull。買／売をnettingしない。
+
+Lot表示のみ既存TransactionDisplay.getFxLotSizeを再利用（TRY等10,000、HUF100,000）。不明pairは原通貨数量のまま。currentは最新使用中月末の観測日を保持し、別月へpositionをcarryしない。fixed monthは当月のみ。account scalarへの評価損益再加算、calendar／monthly swapへの未決済swap転記はしない。Portfolio／Risk／Transaction History／Top・Allocation・Monthly・Annual・Trendの式と正本は変更しない。 以下の旧版記述は当時の工程境界。
+
 ## Current — 残高と月次aggregateの一括更新（v317）
 
 LIGHT／みんなの残高PDF更新確認後はmarketValue／価格unrealized／受渡日別monthly realized／deposit／withdrawalを今回のPDFへ一括切替え、既存月次式へ渡す。realizedはPDF aggregateであり、v3 transaction行合計ではない。独立manual sourceは確認が必要、旧revision専用補正は新revisionへ持ち越さない。新PDFの明示0は0、取得不能は拒否して旧状態を維持し0を捏造しない。

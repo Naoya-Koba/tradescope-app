@@ -277,6 +277,7 @@ body::before {
 }
 
 .open-positions td small { display: block; color: var(--muted); font-size: 10px; }
+.official-position-basis { display: block; color: var(--muted); font-size: 11px; }
 .open-position-detail { overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .open-positions .data-table { min-width: 0; }

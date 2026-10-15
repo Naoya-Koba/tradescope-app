@@ -1,5 +1,11 @@
 # Development Guide
 
+## Current — 公式FX建玉reader／Open Positions（v318）
+
+新しい`assets/official-fx-position-view.js`のresolve／accountsはread-onlyでraw個別Holdingを返し、projectだけが表示用集約・Lot換算を担当する。`history/history.js`のOpen Positions部分だけへ接続し、shared SBI VC reader／Portfolio／Risk／transaction consumerは変更しない。残高採用を再利用し、position専用採用は作らない。別タブ・BFCache・復帰時の再読込はOpen Positionsだけを更新し、未保存manual form／History filterを触らない。
+
+PWA v318、変更asset query 20261015-7、Backup v15維持。追加107件／全2514 tests、JS／MJS 154件＋inline 3件、precache 91件、全HTML local URL 261件と依存順を確認。匿名Storage／DOM／browser-global VMで両口座・新旧版切替・raw数量・TRY/HUF表示単位・買売別集約・empty／unknown・破損時非fallback・SBI VC/GMO・manual保持・更新後の旧詳細非表示・v15/v14往復と全体v1〜v14 restoreを検証する。実データ・実PDF・実Backup・production Storageは未操作。Chrome接続不可で390px／1280px・実Consoleと既定回帰は未実施、次回接続可能時に新実装より先に確認する。以下の旧版記述は当時の工程境界。
+
 ## Current — Traders残高再取り込み（v317）
 
 残高save serviceのprepare→純粋plan→Repository一回commitで、同月更新確認・同一PDF再確認・不足参照補完を共通実装する。旧native Input／State source参照はsourceHistoryの完全一致fingerprintで元の事実を維持する。新永続fieldやvalidation緩和は行わない。PDF aggregateの既存common headがある場合だけ同じ切替計画へ含め、native flow補正も同revisionのoverrideとして一括保存する。独立manual sourceは確認なしで変更しない。

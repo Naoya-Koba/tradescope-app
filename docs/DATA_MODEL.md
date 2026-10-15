@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — 公式FX建玉の非永続reader（v318）
+
+`official-fx-position-view.js`はLIGHT／みんなの現在使用中のaccount marketValue・unrealizedPnlのPDF参照が同じAccountSnapshotを指すことを検証し、そのSnapshot／ImportBatchに属するHoldingSnapshot v2だけを返す。旧native参照はfingerprint完全一致の履歴Snapshotへ解決する。manual・異版混在・stale／broken／conflictはunknownで、別PDFやmanual建玉へfallbackしない。
+
+完全性の根拠は、月末建玉sectionを必須とする既知importer `traders-monthly-v1`、検証済み公式Snapshot v2、同じaccount／month／as-of／Batchの建玉全件整合。0件はさらに価格評価損益・未決済swap・必要証拠金・注文必要証拠金0を要求し、単なる行不存在をconfirmed emptyとしない。未知importerはunknown。新position-set record／decision／schema／key／migrationなし、Backup v15維持。 以下の旧版記述は当時の工程境界。
+
 ## Current — Traders残高再取り込み（v317）
 
 同月PDFの更新確認は、残高Snapshot／Holdingと共通残高参照、PDF受渡日別aggregateのrealized／deposit／withdrawal、MonthlyAccountInput v2／State v4を一つのrevisionへ切替える。旧canonical・source・補正・採用履歴は保持。独立manual sourceは由来で識別して確認前は変更せず、native Input／Stateの補正は参照Snapshotに結び付く補正として別PDFへ自動継承しない。calendarの原入力・採用値（nullを含む）は独立して保持する。

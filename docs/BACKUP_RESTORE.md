@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — 公式FX建玉読取と固定v15（v318）
+
+公式建玉reader／表示projectionは非永続。既存ImportBatch／AccountSnapshot v2／HoldingSnapshot v2／monthly source・採用／native月次参照から導出する。Backup v15・12モデル・v1〜v14 restore契約を維持し、新key／schema／migration／position専用decisionは追加しない。
+
+旧PDFのSnapshot／Holdingは保持し、残高の使用元が新PDFへ切り替わればOpen Positionsも同じ版へ切り替わる。同一PDF再確認はcanonical reuseのままで二重表示しない。表示によるStorage／Backup書込みなし。Repository journal処理中は一時データを正式表示せず、完了・rollback後の再読込で更新する。 以下の旧版記述は当時の工程境界。
+
 ## Current — Traders残高再取り込みと固定v15（v317）
 
 Backup v15／既存12モデルを維持し、新key／schema／migrationはない。旧canonical、共通source／override／adoption、既存Input／State sourceHistoryをそのまま往復する。旧Input／State source参照は、保存済み履歴の金融事実fingerprint完全一致を条件に元の値として読む。一致しないstaleや欠損参照を修復した扱いにはしない。v1〜v14受理範囲・clear／preserve規則は変更しない。

@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current — LIGHT／みんなの公式Open Positions（v318）
+
+Open PositionsのLIGHT／みんなは、現在使用中の残高PDFに紐づく月末建玉を口座×通貨ペア×買／売で表示する。短い「09/30時点」を付け、リアルタイム建玉と誤認させない。建値・数量・評価損益を通常行、評価レート・未決済swap・必要証拠金を既存詳細panelで確認できる。注文番号や内部source用語は一覧へ増やさない。
+
+確認済み0件は「建玉なし」、不明は「未確認」。公式導入を示すcanonical／残高参照等がある口座はmanual再構築へ戻さない。根拠が一度も記録されていないlegacy口座だけ従来manual表示を暫定維持する。manual取引・メモ・戦略は削除しない。Portfolio・Risk・Transaction Historyは現状維持。 以下の旧版記述は当時の工程境界。
+
 ## Current — 残高PDFの再取り込み（v317）
 
 LIGHT／みんなで同じ月のPDFを再取り込みし「今回のPDFで更新する」を確認した場合、そのPDFが担当する残高・評価損益・月次決済損益・入金・出金をまとめて更新する。旧版は内部履歴に保持し、手入力calendar swap／manual取引／メモ等は保持する。旧PDF専用補正は新PDFへ自動継承しない。
