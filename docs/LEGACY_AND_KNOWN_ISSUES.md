@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known issue — reconciliation v2保存serviceまで（v321）
+
+正式serviceは明示判断のみ保存し、confirmedは現時点では双方unique候補に限定する。ambiguousの明示選択policy、本番確認UI、rejected候補のUI抑制、History dedupe／metadata併記は未実装。v319 projection・v320 readerの意味は変えない。複数タブの完全な排他lockは新設せず、直前再読込・expectedModels／最新manual生JSON・head／占有再確認・journal内postconditionで競合時に停止する。保存済みrequestのretryは操作の再実行ではなく既存記録の返却であり、後続解除やcollection変更を取り消さない。Backup v16、新key／schemaなし。以下の旧版記述は当時の工程境界。
+
 ## Current / Known issue — reconciliation v2契約の段階導入（v320）
 
 既存キー内v1／v2共存、1対1・append-only confirmed／rejected／revoked、専用reader、manual削除参照保護、payload横断検証、Backup v16を実装。v1／manual／ImportedTransactionのmigrationなし。v2判断保存UI・正式save service・History dedupe・metadata併記は未実装。manual日付精度／Number／legacy contractSize問題は解消しておらず、候補の自動confirmは禁止。旧PDFの関係は新PDFへ移植しない。複数タブの完全排他は既存Repository同様に保証せず、保存前後のguardと競合停止を維持する。

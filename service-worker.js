@@ -1,5 +1,6 @@
-const CACHE_NAME = 'tradescope-static-v320';
+const CACHE_NAME = 'tradescope-static-v321';
 const CORE_ASSETS = [
+  "./assets/reconciliation-v2-save.js?v=20261015-10",
   "./assets/transaction-reconciliation-v2.js?v=20261015-9",
   "./assets/fx-transaction-candidate-view.js?v=20261015-8",
   "./assets/official-fx-position-view.js?v=20261015-7",

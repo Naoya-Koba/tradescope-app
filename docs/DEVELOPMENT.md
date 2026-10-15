@@ -1,5 +1,15 @@
 # Development Guide
 
+## Current — reconciliation v2 save service（v321）
+
+`assets/reconciliation-v2-save.js`は既存Repository／journal、v2 reader、v319 candidate projectionを再利用する。HistoryページでAPIをロードするだけで本番UIへ接続しない。PWA v321、asset query 20261015-10、Backup v16維持。変更はservice・匿名test・ロード／precache登録・本文書のみ。
+
+APIの順序：`const api = TradeScopeReconciliationV2Save.createService(storage)` → `const prepared = api.prepare({operation:'confirmed', pair})` → 明示判断時のみ`api.save({draft:prepared.draft, requestId:prepared.requestId, explicitUserDecision:true})`。pairはaccountId／sourceProvider／manualId／importedTransactionId／transactionCollectionId。operationはconfirmed／rejected／revoked／reassignで、reassignのみfromPairを渡す。同じ操作のretryでは元draft／requestIdを再利用する（prepareをやり直さない）。追加nonceを使う場合もrequestIdForで一度だけ発行し保持する。
+
+保存時とcommit直前に金融fingerprint／使用中collection／head／占有／双方一意候補を再確認。metadataだけの変更は最新のmanual生JSONをguardし、コピーしない。判断解除は元bindingを保持し、旧confirmedのstale占有も明示解除できる。一括reassignは旧解除＋新確定を一つのenvelope／journalへまとめる。post-writeは正式readerのhead／decision／参照／fingerprint／全モデル不変を検証し、失敗rollback・不能時journal保持。API結果はready／saved／already-current／explicit-decision-required／invalid-request／request-conflict／stale-manual／collection-changed／occupied／conflict／broken-reference／invalid-candidate／failed。Repository自体の参照・形式破損はbroken-referenceで停止する。
+
+検証：追加86件／全2773 tests Pass。JS／MJS 160件＋inline 3件、precache 94件、全HTML local URL 272件、依存順・diff-checkを確認。v16の全判断・reassign chain往復とretry、全体suiteのv1〜v15 restore／GMO・SBI回帰を維持。computer-useによる内蔵ブラウザ390px／1280pxのHistory・Open Positionsで横overflowなし、Console Error／Warningなし。匿名serviceでconfirmedを保存してもmanual＋PDFは別行のままで、GMO v1／SBI VC v2／manual／LIGHT v3履歴6行と公式FX建玉を確認した。隔離localhostのStorage／SW／cache／tab／viewport／一時serverは清掃済み。本番Storage・実PDF・実Backupは未操作。実ブラウザPDF抽出は今回の対象外。
+
 ## Current — reconciliation v2／参照保護（v320）
 
 新`assets/transaction-reconciliation-v2.js`は既存decimal・identity helperとtransaction adoptionを再利用。v1 readerはrecord v1のみ受け、v2は独立read-only readerへdispatchする。新recordは既存Repositoryのappend-only／manual生JSON guard／再読込postcondition／journal／rollbackへ参加する。manual coreの保存前チェックはv2参照の欠落・重複を停止し、既存削除UIでは短い警告にする。保存service・確認UI・History統合は作らない。

@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — save serviceの判断履歴も既存v16で往復（v321）
+
+Backup v16・12モデル・v1〜v15 restore契約は変更しない。正式save serviceが作成したconfirmed／rejected／revoked／reassign chainを既存v2 recordとして完全往復する。操作IDは既存record IDに決定的に結び付き、復元後の同じrequest／draftのretryでも重複appendしない。新Storage key／field／schema／migrationは追加しない。保存・再読込検証失敗はRepository journal内でrollbackし、不能ならjournalを保持する。
+
 ## Current / Decided — reconciliation v2とBackup v16（v320）
 
 最新exportはv16。既存12モデルのままreconciliation record v1／v2共存を追加し、公開済みv1〜v15の受理範囲は固定する。v15はv2を受理しない。新key／migration／fake relationなし。v16は全判断・取消履歴とstale relationを欠落なく往復する。

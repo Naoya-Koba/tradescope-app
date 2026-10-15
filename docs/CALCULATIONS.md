@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Current — 明示判断の保存のみ（v321）
+
+reconciliation v2 save serviceは判断recordだけを既存キーへappendする。候補policy・正式readerの意味・manual金融原値／metadata・PDF原値は変更しない。保存前後で金融モデル不変を確認し、Historyはconfirmed後もmanual＋PDFを別行表示する。Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／calendar swap／deposit／withdrawalへは接続しない。以下の旧版記述は当時の工程境界。
+
 ## Current — reconciliation v2は金融集計へ未接続（v320）
 
 v2はユーザー判断の参照契約とreaderのみ。confirmedが匿名テストに存在してもHistoryはmanual＋PDFを従来どおり表示し、metadataを移植しない。候補projection、公式FX建玉、Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／calendar swap／deposit／withdrawalの式・正本は変更しない。manual金融値の編集は対応関係のstaleだけに反映し、memo／strategy変更では失効させない。金融値の複製保存・自動confirmはしない。

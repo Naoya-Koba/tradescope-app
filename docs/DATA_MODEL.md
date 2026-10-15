@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — reconciliation v2 save service（v321）
+
+`assets/reconciliation-v2-save.js`はLIGHT／みんな専用の明示判断保存API。`createService(storage).prepare({operation, pair, fromPair?})`で現在の参照・金融fingerprint・正式v2 readerのheadを含む非永続draftとrequestIdを返し、`save({draft, requestId, explicitUserDecision:true})`でconfirmed／rejected／revokedをappendする。reassignは旧confirmed（inactive／staleでも占有中のheadを含む）のrevoked＋新confirmedを同journalで保存する。解除は旧bindingを保持する。
+
+requestIdはprepare時にdraftの意味へ結び付ける。必要なら`requestIdFor(draft, nonce)`で操作IDを作成し、callerは同じdraft／requestIdをretry・再読込後も保持する。nonce自体はrequestIdではない。同じID・同じ内容は既存結果、異なる内容は拒否。no-write操作もIDとdraftの結合で異内容の再利用を拒否でき、operation recordや新fieldは不要。保存済み操作のretryは後続判断を復活させない。
+
+現在のmanual／v3 row／collectionからfingerprintを再生成し、使用中collection・account/provider・head・confirmed占有を再確認する。初期confirmed policyはv319の双方unique-candidateのみで、候補発見だけでは保存しない。rejectedは占有せず、同じ有効判断は書込みなし。新key／schema／migrationなし、Backup v16、History・metadata・金融consumerへの接続なし。以下の旧版記述は当時の工程境界。
+
 ## Current / Decided — reconciliation v2 / Backup v16（v320）
 
 `tradeScopeTransactionReconciliationsV1`はenvelope v1のままrecord v1／v2を共存する。v1原record・GMO／SBIの意味は維持し、version別dispatchでv2をv1 readerへ渡さない。v2はLIGHT／みんなのmanual 1件対ImportedTransaction v3 1件のみ。fieldはschemaVersion／id／createdAt／previousId／accountId／sourceProvider／manualId／importedTransactionId／transactionCollectionId／manualFactsFingerprint／importedRowFingerprint／collectionFingerprint／factsVersion／relationType(one-to-one)／decision／decisionMethod(user)。金融値・memo／strategyはコピーしない。

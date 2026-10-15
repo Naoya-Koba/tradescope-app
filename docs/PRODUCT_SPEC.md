@@ -1,5 +1,9 @@
 # Product Specification
 
+## Current — 明示判断save service、UI未接続（v321）
+
+LIGHT／みんなのmanual対PDF取引について、明示的なconfirmed／rejected／revokedと一括reassignを安全に保存する内部serviceを追加した。候補は確認済みではなく自動判断しない。保存時の金融値・PDF・判断履歴変更は再確認を要求し、memo／strategyだけの変更は妨げない。本番判断UI・candidate一覧・Historyの1行化・metadata併記は未実装。Open Positions／Portfolio／Risk／金融表示は維持、Backup v16のまま。
+
 ## Current — 確認・取消の保存契約のみ（v320）
 
 LIGHT／みんなのmanual対PDF v3を1対1で確認・拒否・取消できるreconciliation v2契約とBackup v16を追加。v1は共存・migrationなし。候補は確認済み取引ではなく自動confirmしない。対応履歴に参照されるmanualの削除・置換は簡潔な警告で停止し、履歴自体を削除しない。
