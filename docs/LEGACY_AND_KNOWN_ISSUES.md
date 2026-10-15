@@ -1,5 +1,13 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known boundary — SBI VC再取り込み（v314）
+
+旧採用互換で残高が正常でも月別表示がmissingになる接続差を解消。同一PDFのalready-importedは金融原値保存済みを意味し、明示再取り込み時は共通参照・使用値も検査する。正常canonicalは複製せず、別PDF・補正・manualは確認なしに置換しない。訂正旧原値／共通履歴を保持する。
+
+canonical内容の不一致・新normalizerによる再解析revision・深刻なRepository参照破損の一般復旧は対象外で、安全側で停止する。SBI VC canonical月次P/L・取得原価・cashflow・Transaction History契約は今回拡張しない。Backup v15維持。以下の旧版記述は当時の工程境界。
+
+実ブラウザ接続不可のため、v314月別表示／再取り込みUIの390px／1280px・Consoleと、v313 History指定10項目は実機未確認。匿名DOM／VM・全2087テストのPassを実ブラウザ結果としない。次回接続可能時、新実装前に回帰確認する。
+
 ## Current / Known limitation — FX v3 History reader（v313）
 
 共通adoption readerとv3 History projectionを接続。balance採用とは独立し、unknown／defer／正式空集合／stale／conflict／参照切れを区別する。v3は既存reconciliation v1と自動dedupeの対象外。GMO v1／SBI VC v2は旧active Batch互換を維持しmigrationなし。

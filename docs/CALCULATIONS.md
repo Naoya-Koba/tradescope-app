@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current — SBI VC固定月残高とperiod分離（v314）
+
+Monthly Summary／詳細は共通残高readerの指定月spot＋JPYを表示する。旧採用互換だけの月も残高を表示し、未取得P/Lは—。正式空集合は確認済み保有なし、0円は有効、missing成分は取得済み小計として区別し、reported total／担保を加算しない。
+
+月別用`accountMonth`／`month`と内部period経路を分離し、Annual Summary／Asset・Performance Trend／年間flow／既存ledger／Top期間値の計算を変えない。current carryを固定月に使わず、残高差から損益を作らない。同一PDFの正常再確認は金融値不変、使用値変更は明示確認したcomponentを同journalで共通採用へ接続する。
+
 ## Current / Decided — v3 Historyの表示境界（v313）
 
 HistoryのFX v3行は独立transaction adoption readerだけから取得する。日時はtradeDate／executedAtで、settlementDateによって取引月を変更しない。open／closeとbuy／sellを別軸で表示し、決済売をshort建玉と解釈しない。原数量は不変、確認済みprovider／pairのLot換算は既存presentationだけ。未知pairでは原通貨を表示する。

@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — SBI VC月別残高／再取り込み（v314）
+
+PWA v314、変更asset query 20261015-3、Backup v15維持。`sbivc-save.inspect(source,{balanceImport:true})`で明示取込用の再確認計画を返す。既存save APIの互換動作は維持し、Previewが渡すfingerprintと必要な更新確認をsaveで再検証する。same hashは原値再利用、別hashは新canonical。残高専用訂正は旧transaction active Batch／reconciliationを切り替えない。
+
+Repositoryの非永続`verifyModels`callbackは再読込後・journal除去前のdomain postcondition用。新永続契約ではない。monthly displayの固定月facadeだけ残高取得を広げ、内部period dashboard／series／flowを維持する。検証は匿名Memory／DOM／VMのみで実データを使わない。
+
+検証：追加64件／全2087 tests Pass。JS／MJS 144ファイル＋inline 3件、precache 85資産、local URL 250件・依存順・diff-check Pass。匿名Memoryで同一PDF再確認／不足参照補完／使用値確認／atomic rollback／journal保護／Backup v15往復、全体suiteで旧Backup restore・v313 Historyを回帰検証。実ブラウザは接続一覧が空でChromeも利用不可。390px／1280px・実Console・v313指定10項目の実ブラウザ回帰は未実施で、匿名DOM／VM Passと区別する。次回接続可能時、新実装前に確認する。匿名Memoryは検証プロセス終了で破棄し、production Storage・実PDF・実Backupは未操作。
+
 ## Current — FX v3 reader／History projection（v313）
 
 新共有moduleは`assets/transaction-adoption-view.js`。v312 contractの後、transaction-view／History UIより前にロードする。read-only・snapshot fingerprint保護付きで、stale／conflict／brokenは旧残高sourceへ戻さない。`transaction-view.projectV3`が状態と表示rowを返し、既存resolveは旧v1／v2／manualの照合終了後にv3を追加する。v3をreconciliation v1や自動dedupeへ渡さない。production parser／save hook・position consumerは変更しない。

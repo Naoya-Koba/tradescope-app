@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — SBI VC fixed-month／明示再取り込み（v314）
+
+固定月残高は既存`sbivc-balance-adoption.fixedObservation`から取得し、旧Input v3/v4互換も使用する。balanceの取得とperiod P/Lの成立は別で、empty holding set／JPY 0／missingを区別する。current carryを固定月へ使わない。
+
+同一PDFは既存Batch／Snapshot／Holdingを照合・再利用し、不足した共通source参照だけを追加できる。現在のmanual／別PDF／補正を使用している場合は更新確認が必要。新しい金融原値・schema・key・migrationは追加しない。同月別PDFは新canonicalと共通revision／採用履歴を保持する。残高専用の訂正は旧Inputのtransaction Batch採用を変更しない。
+
 ## Current / Decided — FX v3の非永続adoption reader／History projection（v313）
 
 `assets/transaction-adoption-view.js`はaccount／provider／month／transaction scopeの共通読取入口。v312の公開record／validator／Repository／Backup v15を変更せず、adopted／unknown／deferred-with-current／deferred-without-current／stale／conflict／broken-referenceを返す。採用なしはtransactions=null、正式complete empty採用だけtransactions=[]／confirmedEmpty=true。同一target内の候補・履歴参照、全member、事実fingerprintを検証し、不正なら通常rowを返さず、balance採用へfallbackしない。partialは候補のみ。別targetの異常を正常targetのsource選択へ混ぜない。

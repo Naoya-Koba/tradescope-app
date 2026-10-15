@@ -5,7 +5,7 @@
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
-  const version = 'monthly-display-v7';
+  const version = 'monthly-display-v8';
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -123,7 +123,7 @@
         confirmed: complete ? calculator.confirmed(year, month, key) : null,
         ...(explicitAsset?{assetBasis:'source-observation',ledgerAsset:complete?calculator.net(year,month,key):null}: {}) };
     }
-    function month(year, monthNumber) {
+    function periodMonth(year, monthNumber) {
       const rows = accounts.map(account => accountMonth(year, monthNumber, account));
       const hasData = rows.some(row => row.hasData);
       const provisional = hasData && rows.some(row => !row.complete);
@@ -136,6 +136,18 @@
         }
       }
       return { rows, hasData, provisional, total: knownSum([totals.realized, totals.swap]), ...totals };
+    }
+    // Monthly detail is a fixed-month balance consumer, NOT the annual/trend ledger.
+    function fixedAccountMonth(year,month,account){
+      const row=accountMonth(year,month,account);
+      if(account.key!=='sbivc')return row;
+      const observed=cryptoAdoption.fixedObservation(models,dateKey(year,month));if(!observed)return row;
+      return {...row,hasData:true,partial:!row.complete||!observed.complete,asset:numeric(observed.asset),
+        components:observed.components,assetBasis:'source-observation',ledgerAsset:row.ledgerAsset??(row.complete?row.asset:null)};
+    }
+    function month(year,monthNumber){
+      const period=periodMonth(year,monthNumber),rows=accounts.map(a=>fixedAccountMonth(year,monthNumber,a));
+      return {...period,rows,hasData:rows.some(r=>r.hasData),provisional:rows.some(r=>r.hasData)&&rows.some(r=>!r.complete)};
     }
     function fingerprint(year) {
       const dependencies = ['monthlyAccountStates', 'monthlyAccountInputs', 'accountSnapshots', 'holdingSnapshots', 'importBatches']
@@ -209,7 +221,7 @@
         sourceFingerprint: fingerprint(year) };
     }
     function yearlyTotals(year) {
-      const months = Array.from({length:12}, (_, i) => month(year, i + 1));
+      const months = Array.from({length:12}, (_, i) => periodMonth(year, i + 1));
       return Object.fromEntries([['realizedSum','realized'],['swapSum','swap'],['depositSum','deposit'],['withdrawSum','withdrawal']]
         .map(([name, field]) => [name, knownSum(months.filter(m => m.hasData).map(m => m[field]))]));
     }
@@ -258,7 +270,7 @@
       }
       return {componentKeys,observations,partitioned,monthlyComplete:history.at(-1)?.row.complete===true};
     }
-    return Object.freeze({ accountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint, balanceHistory });
+    return Object.freeze({ accountMonth:fixedAccountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint, balanceHistory });
   }
   const api = Object.freeze({ create, version, years });
   if (node) module.exports = api; else root.TradeScopeMonthlyDisplay = api;

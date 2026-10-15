@@ -4,6 +4,7 @@
   const storage=node?require('./data-model-storage.js'):root.TradeScopeDataStorage;
   const native=node?require('./observation-adoption.js'):root.TradeScopeObservationAdoption;
   const common=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
+  const decimal=node?require('../import/csv-core.js'):root.TradeScopeCSV;
   const accountId='acc_sbivc_crypto',scope='sbivc-monthly-assets',rows=(m,e)=>m?.[e]?.records||[];
   const blocked=v=>['stale','conflict','unresolved'].includes(v.status);
   const relevant=r=>r.accountId===accountId&&['holdings','cashBalance','marketValue'].includes(r.metric);
@@ -77,5 +78,18 @@
       blocked:!!(spot&&['stale','conflict','unresolved'].includes(spot.spotStatus)||cash&&['stale','conflict','unresolved'].includes(cash.cashStatus)),
       hasOverrides:!!(spot?.hasOverrides||cash?.hasOverrides)};
   }
-  const api=Object.freeze({resolve,latest,months,accountId,scope});if(node)module.exports=api;else root.TradeScopeSBIVCBalanceAdoption=api;
+  // Fixed-month observation only. No carry, ledger, income or statement-total inference.
+  function fixedObservation(models,targetMonth){
+    const value=resolve(models,targetMonth);if(!value)return null;
+    const holdings=value.holdings.map(h=>h.adopted),known=value.holdingSetKnown&&holdings.every(h=>h.quantity!==null);
+    const positive=holdings.filter(h=>h.quantity!==null&&!storage.equalDecimal(h.quantity,'0'));
+    const spot=known&&positive.every(h=>h.marketValue!==null)?positive.length?decimal.sum(positive.map(h=>h.marketValue)):'0':null;
+    const components=[{key:'spot',name:'現物保有',asset:spot,unrealized:null,id:value.holdingSource?.recordId??null,
+      snapshotAsOf:value.holdingSource?.snapshotAsOf??null,empty:value.emptyHoldingSet},
+      {key:'cash',name:'現金・預り金',asset:value.adopted.cashBalance,unrealized:null,id:value.cashSource?.recordId??null,
+        snapshotAsOf:value.cashSource?.snapshotAsOf??null}];
+    const amounts=components.map(c=>c.asset).filter(v=>v!==null);
+    return {targetMonth,components,asset:amounts.length?decimal.sum(amounts):null,complete:components.every(c=>c.asset!==null),blocked:value.blocked};
+  }
+  const api=Object.freeze({resolve,latest,months,fixedObservation,accountId,scope});if(node)module.exports=api;else root.TradeScopeSBIVCBalanceAdoption=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

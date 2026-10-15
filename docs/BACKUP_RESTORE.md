@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — SBI VC再取り込みと固定v15（v314）
+
+Backup v15・12モデル・既存record公開契約を維持。新key／field／migrationなし。同一PDFの再確認はcanonicalを複製せず、不足source参照と明示adoptionを既存monthlySourcesで保持する。同月別PDFは旧canonical／共通履歴を残す。
+
+変更は一回のRepository journalで保存し、再読込後の固定月残高postconditionまでjournal内で検証する。失敗はrollback、不能ならjournal保持。Repository validation自体が失敗する深刻な参照破損は通常再取り込みで修復せず停止する。原PDF・PII・実Backupは保存／検証に使用しない。
+
 ## Current — 非永続FX reader／projectionと固定v15（v313）
 
 Backup v15／12モデル／全公開record契約を維持。新key・schema・migrationなし。adoption readerの状態、fingerprint token、History projection／display quantityを永続化しない。v3の採用／defer／訂正履歴は既存v15のまま往復し、v1〜v14 Restore／clear・preserveを維持する。confirmed emptyとunknownは原collection／decisionから再解決する。reconciliation v2は追加しない。検証は匿名Memoryだけで、production Storage／実Backupは使用しない。

@@ -139,7 +139,11 @@ test('asset observations and manual overrides do not alter shared Top, allocatio
   holdings:prepared.holdings.map(h=>({holdingSnapshotId:h.holdingSnapshotId,instrumentId:h.instrumentId,values:h.adopted}))},{expectedModels:prepared.models});
  const added=model.readModels(s),merged=copy(f.models);for(const entity of Object.keys(model.keys))if(added[entity])merged[entity]={...added[entity],records:[...(merged[entity]?.records||[]),...added[entity].records]};
  const after=view(merged),amounts=d=>({month:d.month,net:d.net,confirmed:d.confirmed,netPnl:d.netPnl,accountData:d.accountData});
- assert.deepEqual(amounts(after.dashboard(2026)),amounts(before.dashboard(2026)));assert.deepEqual(after.month(2026,9),before.month(2026,9));
+ assert.deepEqual(amounts(after.dashboard(2026)),amounts(before.dashboard(2026)));
+ const oldMonth=before.month(2026,9),newMonth=after.month(2026,9);
+ assert.deepEqual(newMonth.rows.filter(r=>r.key!=='sbivc'),oldMonth.rows.filter(r=>r.key!=='sbivc'));
+ assert.equal(newMonth.rows.find(r=>r.key==='sbivc').asset,20126.375);
+ for(const k of ['realized','swap','unrealized','deposit','withdrawal','total'])assert.equal(newMonth[k],oldMonth[k]);
  assert.deepEqual(after.yearlyTotals(2026),before.yearlyTotals(2026));assert.deepEqual(after.series(2026).total,before.series(2026).total);
  assert.deepEqual(after.series(2026).performanceTotalSeries,before.series(2026).performanceTotalSeries);
 });

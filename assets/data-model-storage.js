@@ -587,6 +587,7 @@
   function createRepository(adapter, options = {}) {
     const clock = options.clock || (() => new Date().toISOString());
     function commit(changes, guard = {}) {
+      if(guard.verifyModels!==undefined&&typeof guard.verifyModels!=='function')fail();
       fields(changes, Object.keys(keys));
       if (!Object.keys(changes).length) fail();
       const models = readModels(adapter);
@@ -701,6 +702,8 @@
       transaction.apply(actions, adapter, () => {
         verified = readModels(adapter);
         if (JSON.stringify(verified) !== JSON.stringify(models)) fail();
+        // Optional domain postcondition while the SAME rollback journal is still protected.
+        if(guard.verifyModels&&guard.verifyModels(clone(verified))===false)fail();
         if (own(guard,'expectedManual') && adapter.getItem(reconciliation.manualKey)!==guard.expectedManual) fail();
         verifyLegacy();
       });

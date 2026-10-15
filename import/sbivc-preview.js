@@ -31,9 +31,9 @@
       $('read-status').textContent = ''; delete $('read-status').dataset.errorCode; delete $('read-status').dataset.stage;
     }
     function saveStatus(result){
-      inspected=result;$('save').hidden=!['ready','review-required','reconciliation-ready','confirmation-required'].includes(result.status);
-      $('save').textContent='保存';
-      $('save-status').textContent=['saved','already-imported'].includes(result.status)?(source?.preview.transactions.length?'資産・保有・取引情報を保存済み':'資産・保有情報を保存済み')
+      inspected=result;$('save').hidden=result.balanceVerified||!(['ready','review-required','reconciliation-ready','confirmation-required'].includes(result.status)||result.reimport);
+      $('save').textContent=result.reimport?'再取り込み':'保存';
+      $('save-status').textContent=result.balanceVerified?(result.repaired?'再取り込みしました':'保存内容を確認しました'):result.reimport?'保存内容を再確認できます':['saved','already-imported'].includes(result.status)?(source?.preview.transactions.length?'資産・保有・取引情報を保存済み':'資産・保有情報を保存済み')
         :result.status==='review-required'?'同じ月の保存内容を訂正します':result.status==='stale'?'保存情報が変更されています。解析内容を保持しています。再確認してください':result.status==='conflict'?'保存済みの情報と照合できませんでした':'';
     }
     function render(result) {
@@ -109,7 +109,7 @@
         viewer()?.setSource('sbivc', file);
         if(result.valid&&service){
           stage='storage';code='SBIVC_SAVE_INSPECTION_FAILED';
-          source={preview:result,fileHash,fileSize:file.size};const status=await service.inspect(source);if(current===sequence)saveStatus(status);
+          source={preview:result,fileHash,fileSize:file.size};const status=await service.inspect(source,{balanceImport:true});if(current===sequence)saveStatus(status);
         }
       } catch (failure) {
         if (current !== sequence || signal.aborted) return;
@@ -124,13 +124,15 @@
     }
     $('save').hidden=true;
     $('save').addEventListener('click',()=>{
-      if(saving||!source||!['ready','review-required','reconciliation-ready','confirmation-required'].includes(inspected?.status))return;
+      if(saving||!source||!(['ready','review-required','reconciliation-ready','confirmation-required'].includes(inspected?.status)||inspected?.reimport))return;
       $('confirm-summary').replaceChildren();
       metric($('confirm-summary'),'対象月',source.preview.report.targetMonth.replace('-','/'));
       metric($('confirm-summary'),'基準日',source.preview.report.snapshotAsOf.replaceAll('-','/'));
       metric($('confirm-summary'),'現物保有銘柄',`${inspected.holdingCount??source.preview.spotHoldings.length}件`);
       if(source.preview.transactions.length)metric($('confirm-summary'),'現物取引',`${source.preview.transactions.length}件`);
-      if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する原本情報を切り替えます');
+      if(inspected.balanceUpdateRequired)metric($('confirm-summary'),'確認',inspected.reimport?'現在使用中の値があります。今回のPDFで更新しますか？':'同じ月のデータがあります。今回のPDFで更新しますか？');
+      else if(inspected.status==='review-required')metric($('confirm-summary'),'訂正','保存する原本情報を切り替えます');
+      $('confirm-save').textContent=inspected.reimport?'再取り込み':'保存';
       comparison?.show(inspected.manualMatches);
       $('dialog').showModal();
     });
@@ -140,7 +142,7 @@
       if(saving||!source||!inspected)return;
       saving=true;$('confirm-save').disabled=true;$('cancel-save').disabled=true;$('file').disabled=true;$('close').disabled=true;$('save').disabled=true;
       $('save-status').textContent='保存中…';
-      try{saveStatus(await service.save(source,{...inspected,...(comparison?{transactionDecisions:comparison.decisions()}: {})}));}
+      try{saveStatus(await service.save(source,{...inspected,...(inspected.balanceUpdateRequired?{confirmBalanceUpdate:true}:{}),...(comparison?{transactionDecisions:comparison.decisions()}: {})}));}
       catch(_){$('save-status').textContent='保存できませんでした。保存内容を確認して再度お試しください';}
       finally{saving=false;$('confirm-save').disabled=false;$('cancel-save').disabled=false;$('file').disabled=false;$('close').disabled=false;$('save').disabled=false;$('dialog').close();}
     });

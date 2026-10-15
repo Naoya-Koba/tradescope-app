@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current — SBI VC月別表示／再取り込み（v314）
+
+月別のSBI VCは指定月の確認済み残高を表示し、未取得損益は—。口座別月次カードにも月末残高（欠損成分がある場合は取得済み残高）を表示する。確認済み保有なしとデータなしを区別する。
+
+同じPDFを再選択すると「再取り込み」で再確認可能。正常なら「保存内容を確認しました」、不足参照補完なら「再取り込みしました」。manual／別PDF／補正を使用中なら「現在使用中の値があります。今回のPDFで更新しますか？」、同月別PDFなら同月データの更新確認を行う。通常UIにcandidate／revision／stale等の内部説明を増やさない。大規模UI変更なし。
+
 ## Current — 独立採用FX v3のTransaction History表示（v313）
 
 採用済みcomplete collectionのFX v3だけを既存Historyへ表示する。候補だけ／採用なし／defer without currentは未確定、正式空collection採用は確認済み0件。訂正候補追加だけでは切替せず、明示採用した集合だけ表示する。stale／競合／参照切れで残高sourceへfallbackしない。v1 GMO／v2 SBI VC spot／manualの既存意味を維持し、v3と自動統合しない。

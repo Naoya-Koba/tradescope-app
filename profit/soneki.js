@@ -2022,18 +2022,19 @@ function monthlyDisplayTotals(year, month) {
 function monthlyComponentHtml(component) {
   const amount = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
   const cash = component.name === '現金・預り金';
-  return `<div class="detail-account-stats"><div class="item"><span class="k">${component.name} ${cash ? '残高' : '評価額'}</span><span class="v">${formatOptionalJPY(amount(component.asset))}</span></div>${cash ? '' : `<div class="item"><span class="k">${component.name} 評価損益</span><span class="v">${formatOptionalJPY(amount(component.unrealized))}</span></div>`}</div>`;
+    return `<div class="detail-account-stats"><div class="item"><span class="k">${component.name} ${cash ? '残高' : '評価額'}${component.empty?'（保有なしを確認済み）':''}</span><span class="v">${formatOptionalJPY(amount(component.asset))}</span></div>${cash ? '' : `<div class="item"><span class="k">${component.name} 評価損益</span><span class="v">${formatOptionalJPY(amount(component.unrealized))}</span></div>`}</div>`;
 }
 function hasMonthlyDisplayYear(year) {
   return hasStoredYearData(year) || Array.from({ length: 12 }, (_, index) => index + 1)
     .some(month => monthlyDisplayView().month(year, month).hasData);
 }
-function buildMonthlyCardHtml(month, { realized = null, swap = null, unrealized = null, total = null, provisional = false } = {}) {
+function buildMonthlyCardHtml(month, { realized = null, swap = null, unrealized = null, total = null, provisional = false, showBalance = false, balance = null, balancePartial = false } = {}) {
   const totalPnL = total;
   return `
     <div class="monthly-label">${month}月${provisional ? ' <small>暫定</small>' : ''}</div>
     <div class="monthly-total-label">合計</div>
     <div class="monthly-total-value"${optionalSignStyle(totalPnL)}>${formatOptionalJPY(totalPnL)}</div>
+    ${showBalance?`<div class="monthly-stat-row"><span class="monthly-stat">${balancePartial?'取得済み残高':'月末残高'}</span><span class="monthly-stat-value">${formatOptionalJPY(balance)}</span></div>`:''}
     <div class="monthly-breakdown">
       <div class="monthly-stat-row">
         <span class="monthly-stat">決済</span>
@@ -2114,7 +2115,7 @@ function renderMonthlyByAccount(accountKey) {
     card.className = 'monthly-card' + (m === currentMonth ? ' active' : '');
     card.dataset.month = m;
     card.innerHTML = buildMonthlyCardHtml(m, { realized, swap, unrealized,
-      total: view.total, provisional: view.partial });
+      total: view.total, provisional: view.partial,showBalance:account.key==='sbivc'&&view.hasData,balance:view.asset,balancePartial:view.components.some(c=>c.asset===null) });
 
     card.addEventListener('click', () => {
       selectMonth(m);
