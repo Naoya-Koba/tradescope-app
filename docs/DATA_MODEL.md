@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — Traders共通取引保存（v316）
+
+`traders-source-policy.js`でparser商品キー／provider／account／scopeを明示対応し、`traders-transactions-save.js`の同一処理をLIGHTとみんなのFXで使用する。みんなはminano／minna／acc_minna_fx／minna-fx-trades、normalizerはtraders-executions-v1/minna-v3-v1。LIGHTの既存normalizer／原値fingerprint／collection意味はv315のまま、旧APIは薄い互換入口として維持する。
+
+取引専用Batchのorigin（lightfx-executions／minna-executions）は残高sourceの存在を表さない。account／provider／hash／month／as-of／size／importer identityを検証し、balance-first／transaction-firstとも同じimmutable Batchを共有する。balance／transactionの使用判断は独立。新key／schema／migrationなし、Backup v15維持。以下の旧版記述は当時の工程境界。
+
 ## Current — LIGHT FX transaction v3保存（v315）
 
 LIGHTだけ`parseExecutions`→明示v3 adapter→既存validator→参照型collectionへ正式保存する。原通貨quantity／priceはdecimal string、open／closeとbuy／sellは別軸、実IDはstring／存在しないexecution IDはnull。tradeDateは約定日、targetMonthは帳票月、受渡日で月を変更しない。複数決済・同注文複数rowを統合しない。

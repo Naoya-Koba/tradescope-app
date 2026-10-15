@@ -6,6 +6,7 @@
   const resolver=node?require('./monthly-account-resolver.js'):root.TradeScopeMonthlyResolver;
   const sbi=node?require('./sbi-balance-adoption.js'):root.TradeScopeSbiBalanceAdoption;
   const crypto=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
+  const traders=node?require('./traders-source-policy.js'):root.TradeScopeTradersSourcePolicy;
   const version='monthly-progress-v1',rows=(m,e)=>m?.[e]?.records||[];
   const decimal=v=>v!==null&&v!==undefined&&(typeof v==='number'||typeof v==='string'&&v.trim()!=='')&&/^-?\d+(?:\.\d+)?$/.test(String(v));
   const zero=v=>decimal(v)&&/^-?0+(?:\.0+)?$/.test(String(v));
@@ -50,7 +51,7 @@
       let candidates=[],candidateReadFailed=false;
       try{candidates=common.candidates(models,{accountId:p.accountId,targetMonth});}catch(_){candidateReadFailed=true;}
       const sourceRecords=rows(models,'monthlySources').filter(r=>r.kind==='source'&&r.accountId===p.accountId&&r.targetMonth===targetMonth);
-      const physical=rows(models,'importBatches').filter(r=>r.accountId===p.accountId&&r.targetMonth===targetMonth&&r.importerId!=='lightfx-executions');
+      const physical=rows(models,'importBatches').filter(r=>r.accountId===p.accountId&&r.targetMonth===targetMonth&&!traders.isTransactionOnlyBatch(r));
       const legacy=key==='smbc'&&!heads.length||key==='sbivc'&&!heads.length&&!inputs.length||!!resolver.policies[key]&&targetMonth<resolver.policies[key].cutover;
       const legacyFields=key==='smbc'?['monthEndBalance']:key==='sbi'||key==='sbivc'?['realizedPnL','deposit','withdrawal']:['realizedPnL','swapPnL','unrealizedPnL','deposit','withdrawal'];
       const legacyDataAvailable=Object.values(old).some(v=>decimal(v))||old.__saved===true;

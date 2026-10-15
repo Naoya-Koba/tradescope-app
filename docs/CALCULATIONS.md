@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current — LIGHT／みんなの取引保存と非波及（v316）
+
+両商品のv3約定はHistory専用で、monthly realized／calendar swap／deposit／withdrawalへ転記しない。みんなのtransaction swap行合計と受渡集計の不一致はdiagnostic warningで、差額補完・按分をしない。新規のnullと決済の明示0を保持する。みんなのcomplete保存はrealized照合成立（または決済なし）を要求し、LIGHTのv315受理条件は維持する。
+
+共通policyで取引専用Batchを月別表示・詳細・進捗・残高表示対象年から除外し、実際のSnapshot／Holding等の存在は独立して認識する。2026-09残高cutoverは維持。過去取引はtransaction-onlyで、Top／Allocation／Annual／Trend／Portfolio／Open Positions／Riskの計算は変更しない。official position-setは別工程。以下の旧版記述は当時の工程境界。
+
 ## Current — LIGHT取引と金融計算の境界（v315）
 
 v3約定はHistory用eventで、realizedPnl／transactionSwap／feeを月次flowへ集計・転記しない。transaction swap != calendar swap。取引専用Batchを月次残高の入力有無／残高進捗／資産年一覧へ混入させず、既存Top／Allocation／Monthly・Annual／両Trendの式・値を維持する。残高保存の2026-09 cutoverは維持、過去月は取引だけ保存可能。

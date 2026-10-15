@@ -6,6 +6,7 @@
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
   const version = 'monthly-display-v8';
+  const traders=node?require('./traders-source-policy.js'):root.TradeScopeTradersSourcePolicy;
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
@@ -15,7 +16,7 @@
   };
   const strictSum = values => values.length && values.every(Number.isFinite) ? knownSum(values) : null;
   const years = models => [...new Set(['monthlyAccountStates', 'holdingSnapshots', 'accountSnapshots', 'importBatches','monthlySources']
-    .flatMap(entity => records(models, entity).filter(row => row.targetMonth&&!(entity==='importBatches'&&row.importerId==='lightfx-executions')).map(row => Number(row.targetMonth.slice(0, 4)))))];
+    .flatMap(entity => records(models, entity).filter(row => row.targetMonth&&!(entity==='importBatches'&&traders.isTransactionOnlyBatch(row))).map(row => Number(row.targetMonth.slice(0, 4)))))];
 
   // Shared display projection for Summary and trends; never feeds the canonical ledger or saves.
   function create(legacy, tradingData, initialFunds, initialUnrealized, models, accounts) {
@@ -25,7 +26,7 @@
       if(sources.heads(records(models,'monthlySources')).some(r=>r.accountId===ids[key]&&r.targetMonth===targetMonth))return true;
       const policy = resolver.policies[key];
       return policy && targetMonth >= policy.cutover && ['monthlyAccountStates', 'holdingSnapshots', 'accountSnapshots', 'importBatches']
-        .some(entity => records(models, entity).some(row => row.accountId === policy.accountId && row.targetMonth === targetMonth&&!(entity==='importBatches'&&row.importerId==='lightfx-executions')));
+        .some(entity => records(models, entity).some(row => row.accountId === policy.accountId && row.targetMonth === targetMonth&&!(entity==='importBatches'&&traders.isTransactionOnlyBatch(row))));
     }
     function observationExisting(key, targetMonth, resolved) {
       if (resolved.source === 'conflict') return { components: [], conflict: true };

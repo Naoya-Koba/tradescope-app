@@ -41,10 +41,13 @@
   <script defer src="import/gmo-save.js?v=20261013-1"></script>
   <script defer src="import/gmo-preview.js?v=20261013-1"></script>
   <script defer src="import/traders-parser.js?v=20261014-12"></script>
-  <script defer src="import/traders-save.js?v=20261015-4"></script>
-  <script defer src="import/lightfx-transactions-save.js?v=20261015-4"></script>
-  <script defer src="import/lightfx-transactions-ui.js?v=20261015-4"></script>
-  <script defer src="import/traders-preview.js?v=20261015-4"></script>
+  <script defer src="assets/traders-source-policy.js?v=20261015-5"></script>
+  <script defer src="import/traders-save.js?v=20261015-5"></script>
+  <script defer src="import/traders-transactions-save.js?v=20261015-5"></script>
+  <script defer src="import/lightfx-transactions-save.js?v=20261015-5"></script>
+  <script defer src="import/traders-transactions-ui.js?v=20261015-5"></script>
+  <script defer src="import/lightfx-transactions-ui.js?v=20261015-5"></script>
+  <script defer src="import/traders-preview.js?v=20261015-5"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
@@ -134,6 +137,7 @@
           <section id="minano-preview" hidden aria-label="みんなのFX月次データ">
             <div class="preview-heading"><h2>確認</h2><button id="minano-close" class="secondary">閉じる</button></div>
             <dl id="minano-summary"></dl><div id="minano-issues" aria-live="polite"></div>
+            <div class="save-actions"><p id="minano-transactions-status" class="muted" role="status"></p><button id="minano-transactions-save" class="primary" hidden>取引を取り込む</button></div>
             <label id="minano-swap-group" class="calendar-swap" hidden>スワップ損益<input id="minano-swap" type="text" inputmode="numeric" placeholder="—"><span class="muted">収益カレンダー「スワップ付与」月間合計</span></label>
             <div class="save-actions"><p id="minano-save-status" class="muted" role="status"></p><button id="minano-save" class="primary" hidden>保存</button></div>
           </section>
@@ -195,6 +199,10 @@
   <dialog id="lightfx-dialog" aria-labelledby="lightfx-confirm-title">
     <h2 id="lightfx-confirm-title">LIGHT FX</h2><dl id="lightfx-confirm-summary"></dl>
     <div class="dialog-actions"><button id="lightfx-cancel-save" class="secondary" autofocus>キャンセル</button><button id="lightfx-confirm-save" class="primary">保存</button></div>
+  </dialog>
+  <dialog id="minano-transactions-dialog" aria-labelledby="minano-transactions-title">
+    <h2 id="minano-transactions-title">みんなのFXの取引</h2><dl id="minano-transactions-summary"></dl>
+    <div class="dialog-actions"><button id="minano-transactions-cancel" class="secondary" autofocus>キャンセル</button><button id="minano-transactions-confirm" class="primary">取り込む</button></div>
   </dialog>
   <dialog id="lightfx-transactions-dialog" aria-labelledby="lightfx-transactions-title">
     <h2 id="lightfx-transactions-title">LIGHT FXの取引</h2><dl id="lightfx-transactions-summary"></dl>

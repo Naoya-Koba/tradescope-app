@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known boundary — LIGHT／みんな共通取引保存（v316）
+
+みんなのFXもv3 production取引保存を有効化。LIGHTのnormalizer identityを維持し、同一PDFはidempotent、訂正版・解析差は旧原値を保持して確認後に使用先を更新する。manualデータは保持し、reconciliation v2／official position-set／Portfolio・Open Positions移行は未実装。transaction-only Batchをmonthly sourceや年一覧に数えず、後日のbalance保存は既存Batchを検証して共有する。
+
+みんな実PDFで確認済みは新規買／決済売。新規売／決済買、同一注文multiple fillsはsynthetic検証の範囲、非ゼロfeeの意味は未検証で従来どおり保存停止。深刻な参照破損の強制修復はしない。ブラウザ未接続・PDF.js実経路未確認を残し、別抽出器でのread-only検証と区別する。Backup v15維持。以下の旧版記述は当時の工程境界。
+
 ## Current / Known boundary — LIGHT取引保存（v315）
 
 LIGHT v3 production保存と既存History表示を接続。2026-09以前はtransaction-only、残高cutover／legacy ledgerは変更しない。正常同一PDFはidempotent、候補追加だけでは使用collectionを切替えず、明示取込／更新確認のみで使用判断する。旧revisionは保持。

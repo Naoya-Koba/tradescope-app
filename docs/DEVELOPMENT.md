@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — Traders共通取引保存（v316）
+
+共通serviceは`import/traders-transactions-save.js`、小さな商品設定とBatch判定は`assets/traders-source-policy.js`、provider別UI bindingは`import/traders-transactions-ui.js`。LIGHT旧入口を維持し、v315の匿名golden planとbyte-identical、保存済みcollection再確認で変更0件を検証する。みんなもparseExecutions→v3→validator→pure buildChanges→Repositoryの一回のjournalを使用する。parser／永続契約／既存History readerは変更しない。
+
+PWA v316、asset query 20261015-5、Backup v15。追加106件／全2298テスト、JS／MJS 151件＋inline 3件、precache 90件、local HTML URL 259件・依存順を検証する。匿名Memory／DOM／VMで両provider、双方向Batch共有、transaction-only非波及、訂正／stale／rollback／journal保持、v15往復とv1〜v14 restoreを確認。production scriptのPDF選択→明示取込→History→再取込も匿名VMで通す（PDF抽出だけsyntheticへ差替え）。実みんな2025-04は7約定（新規買3・決済売4）・建玉照合3/3・realized一致・swap不一致警告、LIGHTは8／10約定をread-only planで確認。原本不変・保存0回、実ID／本文／PIIをfixtureへ入れない。
+
+Chrome接続不可で実ブラウザPDF抽出、390px／1280px、overflow、Console、既定History回帰は未実施。Node既存PDF.jsの0文字抽出も継続し、別のread-only抽出器によるplan成功をブラウザ成功と扱わない。次回接続可能時、新実装前に確認する。以下の旧版記述は当時の工程境界。
+
 ## Current — LIGHT transaction-only保存（v315）
 
 新moduleは`import/lightfx-transactions-save.js`と`lightfx-transactions-ui.js`。前者の純粋`buildChanges`へprospective canonical modelsを渡して、将来のSnapshot／scalar候補等と同じjournalへ合成可能。現UIでは月次保存と取引保存を分離。LIGHT previewだけparseExecutionsへ接続し、みんなは保存しない。既存取引専用Batchへ後から月次保存する場合もBatchを変更せず再利用し、旧collectionを壊さない。

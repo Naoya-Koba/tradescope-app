@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — Traders共通保存と固定Backup v15（v316）
+
+LIGHT／みんなのv3 rows・collection・decisionは既存v15で完全往復する。v14対象固定、v1〜v14 restoreのclear／preserve規則、新keyなし・schema変更なし・migrationなしを維持。provider configとUI bindingは非永続で、reconciliation v2／position-setは追加しない。
+
+取引保存はBatch／Instrument／rows／collection／使用決定を一回のRepository journalへ合成する。後日のbalance保存も別の一回のjournalで同Batchを再利用し、Batch自体を変更しない。再読込・fingerprint・reader／History件数・金融原値非変更を検証し、失敗はrollback、不能ならjournal保持。実PDFの計画は永続化しない。以下の旧版記述は当時の工程境界。
+
 ## Current — LIGHT取引の固定Backup v15（v315）
 
 既存ImportedTransaction v3／transactionSources v1だけでLIGHT保存に対応し、Backup v15・12モデル・v1〜v14受理範囲を維持。新key／schema／migrationなし。同一PDFはBatch／正常rows／collectionを再利用し、使用判断不足は明示操作で補える。訂正版・新解析は旧原値を削除せず追加し、確認後に使用collectionだけ切替える。

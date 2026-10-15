@@ -8,6 +8,7 @@
  const csv=node?require('./csv-core.js'):root.TradeScopeCSV;
  const light=node?require('../assets/lightfx-scalar-adoption.js'):root.TradeScopeLightScalarAdoption;
  const sourceService=node?require('../assets/monthly-source-service.js'):root.TradeScopeMonthlySourceService;
+ const transactionPolicy=node?require('../assets/traders-source-policy.js'):root.TradeScopeTradersSourcePolicy;
  const copy=v=>JSON.parse(JSON.stringify(v)),rows=(m,e)=>m[e]?.records||[];
  const valueNames=['cashBalance','requiredMargin','orderRequiredMargin','reportedAccountEvaluationPnl','netAssetValue','transferableAmount','maintenanceRate','unsettledAmount','unrealizedPnl','monthEndUnsettledSwap','realizedPnl','reportedSettledSwapPnl','deposit','withdrawal','fee','other'];
  const only=(v,names)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>names.includes(k));
@@ -50,13 +51,12 @@
    const same=rows(before,'importBatches').filter(r=>r.accountId===accountId&&r.sourceType==='pdf'&&r.sourceProvider===provider&&r.sourceFileMetadata?.hash===source.fileHash);
    let existingBatch=null;
    if(same.length){
-    if(broker!=='lightfx')return{status:'already-imported'};
     if(same.length!==1)return{status:'conflict',reason:'batch'};
-    const b=same[0],transactionOnly=broker==='lightfx'&&b.importerId==='lightfx-executions'
+    const b=same[0],transactionOnly=transactionPolicy.isTransactionOnlyBatch(b)
       &&rows(before,'transactionSources').some(c=>c.kind==='collection'&&c.importBatchId===b.id)
       &&!rows(before,'accountSnapshots').some(s=>s.importBatchId===b.id);
     if(!transactionOnly)return{status:'already-imported'};
-    if(b.targetMonth!==p.targetMonth||b.snapshotAsOf!==p.snapshotAsOf||b.sourceFileMetadata.size!==source.fileSize)return{status:'conflict',reason:'batch'};
+    if(!transactionPolicy.matches(b,source,p,transactionPolicy.get(broker),parser.version))return{status:'conflict',reason:'batch'};
     existingBatch=b;
    }
    const state=rows(before,'monthlyAccountStates').find(r=>r.accountId===accountId&&r.targetMonth===p.targetMonth);
