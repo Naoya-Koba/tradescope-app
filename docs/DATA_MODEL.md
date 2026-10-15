@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — LIGHT FX transaction v3保存（v315）
+
+LIGHTだけ`parseExecutions`→明示v3 adapter→既存validator→参照型collectionへ正式保存する。原通貨quantity／priceはdecimal string、open／closeとbuy／sellは別軸、実IDはstring／存在しないexecution IDはnull。tradeDateは約定日、targetMonthは帳票月、受渡日で月を変更しない。複数決済・同注文複数rowを統合しない。
+
+取引専用Batchは既存importerId fieldの`lightfx-executions`で識別し、Snapshot／Holding／月次Input／Stateは作らない。同一hash Batchは検証して再利用。collection／使用判断はbalance採用と独立、訂正は旧row／collectionを残して追加。公開record／Storage key／Backup v15契約は変更しない。
+
 ## Current — SBI VC fixed-month／明示再取り込み（v314）
 
 固定月残高は既存`sbivc-balance-adoption.fixedObservation`から取得し、旧Input v3/v4互換も使用する。balanceの取得とperiod P/Lの成立は別で、empty holding set／JPY 0／missingを区別する。current carryを固定月へ使わない。

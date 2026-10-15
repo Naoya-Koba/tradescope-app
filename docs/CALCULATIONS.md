@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current — LIGHT取引と金融計算の境界（v315）
+
+v3約定はHistory用eventで、realizedPnl／transactionSwap／feeを月次flowへ集計・転記しない。transaction swap != calendar swap。取引専用Batchを月次残高の入力有無／残高進捗／資産年一覧へ混入させず、既存Top／Allocation／Monthly・Annual／両Trendの式・値を維持する。残高保存の2026-09 cutoverは維持、過去月は取引だけ保存可能。
+
+残高側の採用、manual Trade History、Portfolio／Open Positions／Riskは変更しない。取引からpositionを生成せず、official position-setとmanual reconciliation v2は別工程。みんなのFXはparser read-onlyのままでproduction transaction保存は未実装。
+
 ## Current — SBI VC固定月残高とperiod分離（v314）
 
 Monthly Summary／詳細は共通残高readerの指定月spot＋JPYを表示する。旧採用互換だけの月も残高を表示し、未取得P/Lは—。正式空集合は確認済み保有なし、0円は有効、missing成分は取得済み小計として区別し、reported total／担保を加算しない。

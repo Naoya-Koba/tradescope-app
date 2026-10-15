@@ -47,7 +47,18 @@
    if(resolver.hasLegacyConflict(legacy,p.targetMonth,broker))return {status:'conflict',reason:'legacy'};
    const account=rows(before,'accounts').find(r=>r.id===accountId);
    if(account&&(!account.enabled||account.providerCode!==provider||account.accountType!=='fx'))return{status:'conflict',reason:'account'};
-   if(rows(before,'importBatches').some(r=>r.accountId===accountId&&r.sourceType==='pdf'&&r.sourceProvider===provider&&r.sourceFileMetadata?.hash===source.fileHash))return{status:'already-imported'};
+   const same=rows(before,'importBatches').filter(r=>r.accountId===accountId&&r.sourceType==='pdf'&&r.sourceProvider===provider&&r.sourceFileMetadata?.hash===source.fileHash);
+   let existingBatch=null;
+   if(same.length){
+    if(broker!=='lightfx')return{status:'already-imported'};
+    if(same.length!==1)return{status:'conflict',reason:'batch'};
+    const b=same[0],transactionOnly=broker==='lightfx'&&b.importerId==='lightfx-executions'
+      &&rows(before,'transactionSources').some(c=>c.kind==='collection'&&c.importBatchId===b.id)
+      &&!rows(before,'accountSnapshots').some(s=>s.importBatchId===b.id);
+    if(!transactionOnly)return{status:'already-imported'};
+    if(b.targetMonth!==p.targetMonth||b.snapshotAsOf!==p.snapshotAsOf||b.sourceFileMetadata.size!==source.fileSize)return{status:'conflict',reason:'batch'};
+    existingBatch=b;
+   }
    const state=rows(before,'monthlyAccountStates').find(r=>r.accountId===accountId&&r.targetMonth===p.targetMonth);
    const monthlyInput=rows(before,'monthlyAccountInputs').find(r=>r.accountId===accountId&&r.targetMonth===p.targetMonth);
    if(!state&&!monthlyInput&&rows(before,'accountSnapshots').some(r=>r.accountId===accountId&&r.targetMonth===p.targetMonth))return{status:'conflict',reason:'unadopted'};
@@ -57,7 +68,7 @@
     if(matches.length>1)return {status:'conflict',reason:'instrument'};
     if(matches.length)ids.set(symbol,matches[0].id);else instruments.push(symbol);}
    const sourceGuard=sourceService.createService(adapter).inspect();
-   return {status:state||monthlyInput?'review-required':'ready',reason:state||monthlyInput?'different-report':null,before,source,p,state,input:monthlyInput,account,swap,instruments,ids,sourceGuard};
+   return {status:state||monthlyInput?'review-required':'ready',reason:state||monthlyInput?'different-report':null,before,source,p,state,input:monthlyInput,account,swap,instruments,ids,sourceGuard,existingBatch};
   }
   const result=p=>({status:p.status,reason:p.reason||null,...(p.sourceGuard?{sourceFingerprint:p.sourceGuard.fingerprint}:{}),...(p.state||p.input?{stateId:p.state?.id||null,inputId:p.input?.id||null,adoptedSnapshotId:p.state?.adoptedAccountSnapshotId||p.input.adoptedAccountSnapshotId,
     calendarSwap:p.input?.adoptedValues.swapPnl??p.state?.swapPnl??p.swap}:{})});
@@ -68,13 +79,13 @@
      &&(!prepared.input||confirmation.inputId===prepared.input.id)&&confirmation.calendarSwap===result(prepared).calendarSwap;
    if(prepared.status!=='ready'&&!correction)return result(prepared);
    if(confirmation.sourceFingerprint!==undefined&&confirmation.sourceFingerprint!==prepared.sourceGuard.fingerprint)throw Error('STALE_MONTHLY_SOURCE_DRAFT');
-   const {before,source,p,state,input:oldInput,account,swap,ids}=prepared,now=clock(),batchId=model.newId('batch',cryptoApi),snapshotId=model.newId('as',cryptoApi),changes={};
+   const {before,source,p,state,input:oldInput,account,swap,ids}=prepared,now=clock(),batchId=prepared.existingBatch?.id??model.newId('batch',cryptoApi),snapshotId=model.newId('as',cryptoApi),changes={};
    const envelope=records=>({schemaVersion:1,records,updatedAt:now});
    if(!account)changes.accounts=envelope([...copy(rows(before,'accounts')),model.initialAccounts().find(r=>r.id===accountId)]);
    const newInstruments=prepared.instruments.map(symbol=>{const id=model.newId('ins',cryptoApi);ids.set(symbol,id);return{id,assetType:'FX',symbol,displayName:symbol,baseCurrency:symbol.slice(0,3),quoteCurrency:symbol.slice(4),enabled:true};});
    if(newInstruments.length)changes.instruments=envelope([...copy(rows(before,'instruments')), ...newInstruments]);
-   const batch={id:batchId,accountId,sourceType:'pdf',sourceProvider:provider,importedAt:now,targetMonth:p.targetMonth,snapshotAsOf:p.snapshotAsOf,importerId:'traders-monthly',importerVersion:parser.version,sourceFileMetadata:{hash:source.fileHash,size:source.fileSize}};
-   const provenance={accountId,targetMonth:p.targetMonth,snapshotAsOf:p.snapshotAsOf,importedAt:now,importBatchId:batchId,sourceMode:'imported',sourceScope:policy.sourceScope,observationType:'officialMonthEnd'};
+   const batch=prepared.existingBatch??{id:batchId,accountId,sourceType:'pdf',sourceProvider:provider,importedAt:now,targetMonth:p.targetMonth,snapshotAsOf:p.snapshotAsOf,importerId:'traders-monthly',importerVersion:parser.version,sourceFileMetadata:{hash:source.fileHash,size:source.fileSize}};
+   const provenance={accountId,targetMonth:p.targetMonth,snapshotAsOf:p.snapshotAsOf,importedAt:batch.importedAt,importBatchId:batchId,sourceMode:'imported',sourceScope:policy.sourceScope,observationType:'officialMonthEnd'};
    const snapshot={schemaVersion:2,id:snapshotId,...provenance,valuationCurrency:'JPY',cashBalance:p.values.cashBalance,netAssetValue:p.values.netAssetValue,unrealizedPnl:p.values.unrealizedPnl,reportedMonthlyRealizedPnl:p.values.realizedPnl,
     accountSpecific:Object.fromEntries(['requiredMargin','orderRequiredMargin','maintenanceRate','transferableAmount','unsettledAmount','reportedAccountEvaluationPnl','monthEndUnsettledSwap','reportedSettledSwapPnl'].map(k=>[k,p.values[k]]))};
    snapshot.accountSpecific.reportedDeposit=p.values.deposit;snapshot.accountSpecific.reportedWithdrawal=p.values.withdrawal;
@@ -87,7 +98,7 @@
    const monthlyInput={schemaVersion:2,id:oldInput?.id||model.newId('mai',cryptoApi),accountId,targetMonth:p.targetMonth,adoptedAccountSnapshotId:snapshotId,
      sourceValues:original,adoptedValues:adopted,fieldSources:fieldSources(),overrideFields:model.adoptionFields.filter(f=>differs(original[f],adopted[f])),overrideUpdatedAt:now,
      pdfObservations:{fee:p.values.fee,other:p.values.other},sourceHistory:oldInput?[...copy(oldInput.sourceHistory),inputRevision(oldInput)]:[]};
-   changes.importBatches=envelope([...copy(rows(before,'importBatches')),batch]);changes.accountSnapshots=envelope([...copy(rows(before,'accountSnapshots')),snapshot]);
+   if(!prepared.existingBatch)changes.importBatches=envelope([...copy(rows(before,'importBatches')),batch]);changes.accountSnapshots=envelope([...copy(rows(before,'accountSnapshots')),snapshot]);
    changes.holdingSnapshots=envelope([...copy(rows(before,'holdingSnapshots')), ...positions]);
    changes.monthlyAccountInputs=envelope([...copy(rows(before,'monthlyAccountInputs')).filter(r=>r.id!==monthlyInput.id),monthlyInput]);
    if(adopted.swapPnl!==null){const monthly=makeState(monthlyInput,state,oldSnapshot,now);

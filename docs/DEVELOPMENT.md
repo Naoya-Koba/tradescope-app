@@ -1,5 +1,15 @@
 # Development Guide
 
+## Current — LIGHT transaction-only保存（v315）
+
+新moduleは`import/lightfx-transactions-save.js`と`lightfx-transactions-ui.js`。前者の純粋`buildChanges`へprospective canonical modelsを渡して、将来のSnapshot／scalar候補等と同じjournalへ合成可能。現UIでは月次保存と取引保存を分離。LIGHT previewだけparseExecutionsへ接続し、みんなは保存しない。既存取引専用Batchへ後から月次保存する場合もBatchを変更せず再利用し、旧collectionを壊さない。
+
+PWA v315、変更asset query 20261015-4、Backup v15維持。新schema／key／migrationなし。取引保存のpostconditionは既存Repository verifyModelsを使用。テストは匿名synthetic／Memory／DOM／VMのみ。実PDFのread-only照合は原本・本文・実IDをfixture／Git／logsへ出さず、検証計画も永続化しない。
+
+検証：追加105件／全2192 tests Pass。JS／MJS 147ファイル＋inline 3件、precache 87資産、local URL 252件・依存順・diff-check Pass。匿名Memoryでv15往復／v1〜v14 restore、各保存段階rollback／journal保持、金融projection不変、匿名DOM／browser-global VMを確認。実LIGHT 2026-03は新規買8件・TRY／HUF・建玉8件、2025-12は決済売10件・同一新規参照の複数決済・建玉なしをread-onlyで既存parser→v3→complete collection検証し、保存0回。
+
+Node上の既存PDF.js抽出は対象2冊とも0文字となったため、実PDF計画検証は別のローカル文字抽出器を使用した。ブラウザPDF.js経路の成功確認ではなく、原因の断定・extractor変更は行わない。computer-use接続一覧は空、Chrome利用不可で390px／1280px・実Console・v313以降の指定回帰は未実施。次回接続可能時、新実装前に確認する。匿名検証プロセス終了でMemoryを破棄し、production Storage・実PDF・実Backupは未操作。
+
 ## Current — SBI VC月別残高／再取り込み（v314）
 
 PWA v314、変更asset query 20261015-3、Backup v15維持。`sbivc-save.inspect(source,{balanceImport:true})`で明示取込用の再確認計画を返す。既存save APIの互換動作は維持し、Previewが渡すfingerprintと必要な更新確認をsaveで再検証する。same hashは原値再利用、別hashは新canonical。残高専用訂正は旧transaction active Batch／reconciliationを切り替えない。

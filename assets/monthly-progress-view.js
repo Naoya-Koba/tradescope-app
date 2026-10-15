@@ -50,7 +50,7 @@
       let candidates=[],candidateReadFailed=false;
       try{candidates=common.candidates(models,{accountId:p.accountId,targetMonth});}catch(_){candidateReadFailed=true;}
       const sourceRecords=rows(models,'monthlySources').filter(r=>r.kind==='source'&&r.accountId===p.accountId&&r.targetMonth===targetMonth);
-      const physical=rows(models,'importBatches').filter(r=>r.accountId===p.accountId&&r.targetMonth===targetMonth);
+      const physical=rows(models,'importBatches').filter(r=>r.accountId===p.accountId&&r.targetMonth===targetMonth&&r.importerId!=='lightfx-executions');
       const legacy=key==='smbc'&&!heads.length||key==='sbivc'&&!heads.length&&!inputs.length||!!resolver.policies[key]&&targetMonth<resolver.policies[key].cutover;
       const legacyFields=key==='smbc'?['monthEndBalance']:key==='sbi'||key==='sbivc'?['realizedPnL','deposit','withdrawal']:['realizedPnL','swapPnL','unrealizedPnL','deposit','withdrawal'];
       const legacyDataAvailable=Object.values(old).some(v=>decimal(v))||old.__saved===true;

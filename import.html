@@ -41,8 +41,10 @@
   <script defer src="import/gmo-save.js?v=20261013-1"></script>
   <script defer src="import/gmo-preview.js?v=20261013-1"></script>
   <script defer src="import/traders-parser.js?v=20261014-12"></script>
-  <script defer src="import/traders-save.js?v=20261014-11"></script>
-  <script defer src="import/traders-preview.js?v=20261014-11"></script>
+  <script defer src="import/traders-save.js?v=20261015-4"></script>
+  <script defer src="import/lightfx-transactions-save.js?v=20261015-4"></script>
+  <script defer src="import/lightfx-transactions-ui.js?v=20261015-4"></script>
+  <script defer src="import/traders-preview.js?v=20261015-4"></script>
 </head>
 <body>
   <header><a href="index.html" aria-label="トップへ戻る">‹ TradeScope</a></header>
@@ -119,6 +121,7 @@
             <dl id="lightfx-summary"></dl><div id="lightfx-issues" aria-live="polite"></div>
             <label id="lightfx-swap-group" class="calendar-swap" hidden>スワップ損益<input id="lightfx-swap" type="text" inputmode="numeric" placeholder="—"><span class="muted">収益カレンダー「スワップ付与」月間合計</span></label>
             <div class="save-actions"><p id="lightfx-save-status" class="muted" role="status"></p><button id="lightfx-save" class="primary" hidden>保存</button></div>
+            <div class="save-actions"><p id="lightfx-transactions-status" class="muted" role="status"></p><button id="lightfx-transactions-save" class="primary" hidden>取引を取り込む</button></div>
           </section>
         </div>
       </details>
@@ -192,6 +195,10 @@
   <dialog id="lightfx-dialog" aria-labelledby="lightfx-confirm-title">
     <h2 id="lightfx-confirm-title">LIGHT FX</h2><dl id="lightfx-confirm-summary"></dl>
     <div class="dialog-actions"><button id="lightfx-cancel-save" class="secondary" autofocus>キャンセル</button><button id="lightfx-confirm-save" class="primary">保存</button></div>
+  </dialog>
+  <dialog id="lightfx-transactions-dialog" aria-labelledby="lightfx-transactions-title">
+    <h2 id="lightfx-transactions-title">LIGHT FXの取引</h2><dl id="lightfx-transactions-summary"></dl>
+    <div class="dialog-actions"><button id="lightfx-transactions-cancel" class="secondary" autofocus>キャンセル</button><button id="lightfx-transactions-confirm" class="primary">取り込む</button></div>
   </dialog>
   <dialog id="minano-dialog" aria-labelledby="minano-confirm-title">
     <h2 id="minano-confirm-title">みんなのFX</h2><dl id="minano-confirm-summary"></dl>

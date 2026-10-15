@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — LIGHT取引の固定Backup v15（v315）
+
+既存ImportedTransaction v3／transactionSources v1だけでLIGHT保存に対応し、Backup v15・12モデル・v1〜v14受理範囲を維持。新key／schema／migrationなし。同一PDFはBatch／正常rows／collectionを再利用し、使用判断不足は明示操作で補える。訂正版・新解析は旧原値を削除せず追加し、確認後に使用collectionだけ切替える。
+
+Batch／Instrument／v3 rows／collection／decisionを一回のRepository journalで保存する。再読込・reader／History件数・非取引金融record不変をjournal除去前に検証。失敗はrollback、不能ならjournal保持。深刻な参照破損を削除・validation回避で直さない。PII・原PDF本文・実注文番号fixtureは追加しない。
+
 ## Current — SBI VC再取り込みと固定v15（v314）
 
 Backup v15・12モデル・既存record公開契約を維持。新key／field／migrationなし。同一PDFの再確認はcanonicalを複製せず、不足source参照と明示adoptionを既存monthlySourcesで保持する。同月別PDFは旧canonical／共通履歴を残す。

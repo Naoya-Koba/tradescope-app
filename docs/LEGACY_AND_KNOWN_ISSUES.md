@@ -1,5 +1,13 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known boundary — LIGHT取引保存（v315）
+
+LIGHT v3 production保存と既存History表示を接続。2026-09以前はtransaction-only、残高cutover／legacy ledgerは変更しない。正常同一PDFはidempotent、候補追加だけでは使用collectionを切替えず、明示取込／更新確認のみで使用判断する。旧revisionは保持。
+
+みんなのFX production transaction保存、manual reconciliation v2、official position-set／Portfolio・Open Positions移行は未実装。深刻な参照破損は通常再取込で修復しない。非ゼロfeeの意味・同一注文multiple fillsは実データ未検証（後者の保存契約はsyntheticで検証）。以下の旧版記述は当時の工程境界。
+
+実ブラウザ接続不可で390px／1280px・Console・既定History回帰は未実施。実PDFのparser／v3計画検証にはローカル別抽出器を使用し、Node PDF.jsでは0文字だった。既存extractorや実ブラウザ経路の問題と断定せず未確認事項として保持する。productionデータは未操作。
+
 ## Current / Known boundary — SBI VC再取り込み（v314）
 
 旧採用互換で残高が正常でも月別表示がmissingになる接続差を解消。同一PDFのalready-importedは金融原値保存済みを意味し、明示再取り込み時は共通参照・使用値も検査する。正常canonicalは複製せず、別PDF・補正・manualは確認なしに置換しない。訂正旧原値／共通履歴を保持する。

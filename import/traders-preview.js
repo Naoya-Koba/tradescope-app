@@ -14,7 +14,7 @@
    for(const id of ['file','close','swap','confirm-save','cancel-save'])$(id).disabled=busy;
    $('swap').disabled=busy||['saved','already-imported'].includes(outcome?.status)||(correction&&outcome.calendarSwap!==null);
   }
-  function clear(){if(busy)return;globalThis.TradeScopePdfViewer?.setSource(broker,null);token++;controller?.abort();controller=null;source=null;outcome=null;confirmation=null;if($('dialog').open)$('dialog').close();$('preview').hidden=true;$('summary').replaceChildren();$('issues').replaceChildren();$('file').value='';$('swap').value='';$('read-status').textContent='';$('cancel-read').hidden=true;delete $('read-status').dataset.stage;delete $('read-status').dataset.errorCode;renderSave();}
+  function clear(){if(busy||broker==='lightfx'&&globalThis.TradeScopeLightTransactionsUI?.isBusy())return;if(broker==='lightfx')globalThis.TradeScopeLightTransactionsUI?.clear();globalThis.TradeScopePdfViewer?.setSource(broker,null);token++;controller?.abort();controller=null;source=null;outcome=null;confirmation=null;if($('dialog').open)$('dialog').close();$('preview').hidden=true;$('summary').replaceChildren();$('issues').replaceChildren();$('file').value='';$('swap').value='';$('read-status').textContent='';$('cancel-read').hidden=true;delete $('read-status').dataset.stage;delete $('read-status').dataset.errorCode;renderSave();}
   async function inspect(){if(!source)return;source={...source,calendarSwap:$('swap').value};const selected=source;try{const next=await api().inspect(selected);if(source===selected){outcome=next;renderSave();}}catch(_){if(source===selected){outcome=null;$('issues').replaceChildren(node('p','入力値と保存データを確認してください','issue error'));renderSave();}}}
   $('swap').addEventListener('input',()=>{if(busy)return;confirmation=null;$('issues').replaceChildren();void inspect();});
   $('file').addEventListener('change',async event=>{
@@ -27,9 +27,12 @@
     for(const[label,value]of metrics)$('summary').append(node('dt',label),node('dd',value));
     for(const issue of p.errors){const product=issue==='TRADERS_WRONG_PRODUCT'?parser.products[p.broker]?.name:null;
       $('issues').append(node('p',`${product?`このPDFは${product}の月次報告書です。${parser.products[broker].name}としては取り込めません。`:messages[issue]||'PDF内の読取値・合計が一致しません'}（${issue}）`,'issue error'));}
-    $('swap-group').hidden=!p.valid;
+    if(broker==='lightfx'&&globalThis.TradeScopeLightTransactionsUI)await globalThis.TradeScopeLightTransactionsUI.setSource({preview:parser.parseExecutions(extracted,'lightfx'),fileHash:hash,fileSize:file.size});
+    if(current!==token)return;
+    const transactionOnlyMonth=broker==='lightfx'&&p.targetMonth<'2026-09';
+    $('swap-group').hidden=!p.valid||transactionOnlyMonth;
     if(!p.valid){$('read-status').dataset.stage='validation';$('read-status').dataset.errorCode=p.errors[0];return;}
-    source={preview:p,fileHash:hash,fileSize:file.size,calendarSwap:''};await inspect();if(current===token){$('read-status').dataset.stage='preview';$('read-status').dataset.errorCode='TRADERS_PREVIEW_READY';}
+    source={preview:p,fileHash:hash,fileSize:file.size,calendarSwap:''};if(transactionOnlyMonth){outcome=null;renderSave();}else await inspect();if(current===token){$('read-status').dataset.stage='preview';$('read-status').dataset.errorCode='TRADERS_PREVIEW_READY';}
    }catch(failure){if(current===token&&!signal.aborted){if(['PDF_INVALID_FILE','PDF_WORKER_INIT_FAILED','PDF_DOCUMENT_LOAD_FAILED','PDF_TEXT_EXTRACTION_FAILED'].includes(failure?.code)){code=failure.code;stage=failure.stage;}$('read-status').dataset.stage=stage;$('read-status').dataset.errorCode=code;source=null;outcome=null;$('preview').hidden=false;$('swap-group').hidden=true;$('issues').replaceChildren(node('p',`PDFを読み取れませんでした（${code}）`,'issue error'));renderSave();}}
    finally{if(current===token){controller=null;$('read-status').textContent='';$('cancel-read').hidden=true;}}
   });
