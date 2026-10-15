@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — Traders残高再取り込み（v317）
+
+同月PDFの更新確認は、残高Snapshot／Holdingと共通残高参照、PDF受渡日別aggregateのrealized／deposit／withdrawal、MonthlyAccountInput v2／State v4を一つのrevisionへ切替える。旧canonical・source・補正・採用履歴は保持。独立manual sourceは由来で識別して確認前は変更せず、native Input／Stateの補正は参照Snapshotに結び付く補正として別PDFへ自動継承しない。calendarの原入力・採用値（nullを含む）は独立して保持する。
+
+同一PDFはmetadata／全金融値／Holding集合を照合してcanonicalを再利用し、不足candidate／使用判断だけを補完する。既存Input／State参照はsourceHistoryの旧Snapshot・sourceValuesから元の事実fingerprintが完全一致する場合だけ解決し、現在pointerの値へ読み替えない。公開field／record／key追加・migrationなし、Backup v15維持。 以下の旧版candidate-only等の記述は当時の工程境界。
+
 ## Current — Traders共通取引保存（v316）
 
 `traders-source-policy.js`でparser商品キー／provider／account／scopeを明示対応し、`traders-transactions-save.js`の同一処理をLIGHTとみんなのFXで使用する。みんなはminano／minna／acc_minna_fx／minna-fx-trades、normalizerはtraders-executions-v1/minna-v3-v1。LIGHTの既存normalizer／原値fingerprint／collection意味はv315のまま、旧APIは薄い互換入口として維持する。

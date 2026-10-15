@@ -7,12 +7,12 @@
  for(const broker of Object.keys(parser.products)){
   const $=id=>document.getElementById(`${broker}-${id}`);let source=null,service=null,outcome=null,controller=null,token=0,busy=false,opening=false,confirmation=null;
   const api=()=>service??=TradeScopeTradersSave.createService(TradeScopeDataStorage.localStorageAdapter(localStorage),broker);
-  function renderSave(){const correction=outcome?.status==='review-required'&&outcome.reason==='different-report';
-   if(correction&&outcome.calendarSwap!==null)$('swap').value=outcome.calendarSwap;
-   $('save').hidden=!source?.preview.valid||!(outcome?.status==='ready'||correction);$('save').disabled=busy||opening;$('save').textContent=correction?'訂正する':'保存';
-   $('save-status').textContent=busy?'保存中…':['saved','already-imported'].includes(outcome?.status)?'保存済み':correction?'同じ月の報告書が保存されています':outcome?.status==='missing-swap'?'':outcome?.reason==='legacy'?'この月には従来入力が保存されています':outcome?.reason==='instrument'?'同じ通貨ペアの銘柄が複数あります':outcome?.status==='conflict'?'保存データを確認してください':'';
+  function renderSave(){const correction=outcome?.status==='review-required';
+   if(correction||outcome?.samePDF)$('swap').value=outcome.calendarSwap??'';
+   $('save').hidden=!source?.preview.valid||outcome?.verified||!(outcome?.status==='ready'||outcome?.status==='already-imported'||correction);$('save').disabled=busy||opening;$('save').textContent=correction?'更新する':outcome?.samePDF?'再取り込み':'保存';
+   $('save-status').textContent=busy?'保存中…':outcome?.verified&&outcome.unchanged?'保存内容を確認しました':['saved','already-imported'].includes(outcome?.status)?'保存済み':correction?'同じ月のデータがあります':outcome?.reason==='legacy'?'この月には従来入力が保存されています':outcome?.reason==='instrument'?'同じ通貨ペアの銘柄が複数あります':outcome?.status==='conflict'?'保存データを確認してください':'';
    for(const id of ['file','close','swap','confirm-save','cancel-save'])$(id).disabled=busy;
-   $('swap').disabled=busy||['saved','already-imported'].includes(outcome?.status)||(correction&&outcome.calendarSwap!==null);
+   $('swap').disabled=busy||['saved','already-imported'].includes(outcome?.status)||correction||outcome?.samePDF;
   }
   const transactionUI=()=>globalThis.TradeScopeTradersTransactionsUI?.[broker];
   function clear(){if(busy||transactionUI()?.isBusy())return;transactionUI()?.clear();globalThis.TradeScopePdfViewer?.setSource(broker,null);token++;controller?.abort();controller=null;source=null;outcome=null;confirmation=null;if($('dialog').open)$('dialog').close();$('preview').hidden=true;$('summary').replaceChildren();$('issues').replaceChildren();$('file').value='';$('swap').value='';$('read-status').textContent='';$('cancel-read').hidden=true;delete $('read-status').dataset.stage;delete $('read-status').dataset.errorCode;renderSave();}
@@ -39,11 +39,11 @@
   });
   $('close').addEventListener('click',clear);$('cancel-read').addEventListener('click',clear);$('provider').addEventListener('toggle',()=>{if(!$('provider').open)clear();});
   window.addEventListener('pagehide',clear);
-  $('save').addEventListener('click',async()=>{if(busy||opening||$('dialog').open||!source?.preview.valid)return;opening=true;renderSave();const selected=source;try{const next=await api().inspect(selected);if(selected!==source)return;outcome=next;renderSave();const correction=outcome.status==='review-required'&&outcome.reason==='different-report';if(outcome.status!=='ready'&&!correction)return;confirmation=correction?{stateId:outcome.stateId,inputId:outcome.inputId,adoptedSnapshotId:outcome.adoptedSnapshotId,calendarSwap:outcome.calendarSwap}:{};
+  $('save').addEventListener('click',async()=>{if(busy||opening||$('dialog').open||!source?.preview.valid)return;opening=true;renderSave();const selected=source;try{const next=await api().inspect(selected);if(selected!==source)return;outcome=next;renderSave();const correction=outcome.status==='review-required';if(!['ready','already-imported'].includes(outcome.status)&&!correction)return;confirmation=correction?{stateId:outcome.stateId,inputId:outcome.inputId,adoptedSnapshotId:outcome.adoptedSnapshotId,calendarSwap:outcome.calendarSwap,replaceCurrent:outcome.replaceCurrent}:{};
     if(outcome.sourceFingerprint)confirmation.sourceFingerprint=outcome.sourceFingerprint;
-    $('confirm-summary').replaceChildren();for(const[label,value]of [['対象月',source.preview.targetMonth.replace('-','/')],['スワップ損益',amount(correction?outcome.calendarSwap:TradeScopeTradersSave.calendarValue(source.calendarSwap))]])$('confirm-summary').append(node('dt',label),node('dd',value));
-    if(correction&&['lightfx','minano'].includes(broker))$('confirm-summary').append(node('p','訂正版を候補として追加します。現在の採用・月次flowは維持し、残高sourceは月次Inputで選択できます。'));
-    $('confirm-save').textContent=correction?'訂正して保存':'保存';$('dialog').showModal();
+    $('confirm-summary').replaceChildren();for(const[label,value]of [['対象月',source.preview.targetMonth.replace('-','/')],['スワップ損益',amount(correction||outcome.samePDF?outcome.calendarSwap:TradeScopeTradersSave.calendarValue(source.calendarSwap))]])$('confirm-summary').append(node('dt',label),node('dd',value));
+    if(correction)$('confirm-summary').append(node('p',outcome.reason==='current-values'?'現在使用中の値があります。今回のPDFで更新しますか？':'同じ月のデータがあります。今回のPDFで更新しますか？'));
+    $('confirm-save').textContent=correction?'今回のPDFで更新する':outcome.samePDF?'再取り込み':'保存';$('dialog').showModal();
    }catch(_){$('issues').replaceChildren(node('p','保存データを確認できません','issue error'));}finally{opening=false;renderSave();}});
   $('cancel-save').addEventListener('click',()=>{if(!busy)$('dialog').close();});$('dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault();});
   $('confirm-save').addEventListener('click',async()=>{if(busy||!$('dialog').open||!source||confirmation===null)return;busy=true;renderSave();try{outcome=await api().save(source,confirmation);}catch(_){outcome=null;$('issues').replaceChildren(node('p','保存できませんでした。入力値・容量・保存権限を確認してください','issue error'));}finally{busy=false;confirmation=null;$('dialog').close();renderSave();}});

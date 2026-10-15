@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current — 残高再取り込み整合（v317）
+
+LIGHT／みんなの旧candidate-only訂正を置換し、確認後はPDF残高と受渡aggregateを一括更新する。同一PDFの不足candidate／使用判断はcanonical再利用で補完可能。manual calendar／独立manual原値は保護し、旧PDF補正は履歴に残して新PDFへ持ち越さない。由来を特定できない場合やRepository参照破損は停止し、validator回避／record削除による復旧をしない。同一hashで金融事実が異なる再解析も上書きせず停止する。
+
+Backup v15維持。transaction保存／History／manual reconciliation／official position-set／Portfolio・Open Positions移行／Riskは今回変更しない。Chrome接続不可のため実ブラウザPDF経路、390px／1280px・overflow・Consoleと既定History回帰は未確認。匿名DOM／VMの成功と実ブラウザ確認を区別する。 以下の旧版candidate-only等の記述は当時の工程境界。
+
 ## Current / Known boundary — LIGHT／みんな共通取引保存（v316）
 
 みんなのFXもv3 production取引保存を有効化。LIGHTのnormalizer identityを維持し、同一PDFはidempotent、訂正版・解析差は旧原値を保持して確認後に使用先を更新する。manualデータは保持し、reconciliation v2／official position-set／Portfolio・Open Positions移行は未実装。transaction-only Batchをmonthly sourceや年一覧に数えず、後日のbalance保存は既存Batchを検証して共有する。

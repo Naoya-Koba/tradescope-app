@@ -1,5 +1,11 @@
 # Development Guide
 
+## Current — Traders残高再取り込み（v317）
+
+残高save serviceのprepare→純粋plan→Repository一回commitで、同月更新確認・同一PDF再確認・不足参照補完を共通実装する。旧native Input／State source参照はsourceHistoryの完全一致fingerprintで元の事実を維持する。新永続fieldやvalidation緩和は行わない。PDF aggregateの既存common headがある場合だけ同じ切替計画へ含め、native flow補正も同revisionのoverrideとして一括保存する。独立manual sourceは確認なしで変更しない。
+
+PWA v317、変更asset query 20261015-6、Backup v15維持。追加109件／全2407テスト、JS／MJS 152件＋inline 3件、precache 90件、全HTML local URL 259件と依存順を検証する。匿名Memory／DOM／VMで両口座の5項目切替／calendar・manual保持／旧補正非継承／same PDF無書込み・参照補完／履歴原値／stale停止／各変更段階・再読込・fingerprint失敗時rollback／不能時journal保持／v15往復とv1〜v14 restoreを確認。実データ・実PDF・実Backup・production Storageは未操作。Chrome接続不可で実ブラウザ390px／1280px・Console・既定History回帰は未実施。次回接続可能時、新実装前に確認する。以下の旧版candidate-only等の記述は当時の工程境界。
+
 ## Current — Traders共通取引保存（v316）
 
 共通serviceは`import/traders-transactions-save.js`、小さな商品設定とBatch判定は`assets/traders-source-policy.js`、provider別UI bindingは`import/traders-transactions-ui.js`。LIGHT旧入口を維持し、v315の匿名golden planとbyte-identical、保存済みcollection再確認で変更0件を検証する。みんなもparseExecutions→v3→validator→pure buildChanges→Repositoryの一回のjournalを使用する。parser／永続契約／既存History readerは変更しない。

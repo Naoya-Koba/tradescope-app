@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current — 残高と月次aggregateの一括更新（v317）
+
+LIGHT／みんなの残高PDF更新確認後はmarketValue／価格unrealized／受渡日別monthly realized／deposit／withdrawalを今回のPDFへ一括切替え、既存月次式へ渡す。realizedはPDF aggregateであり、v3 transaction行合計ではない。独立manual sourceは確認が必要、旧revision専用補正は新revisionへ持ち越さない。新PDFの明示0は0、取得不能は拒否して旧状態を維持し0を捏造しない。
+
+manual calendar swap（未入力nullも含む）・独立manualデータは保持し、settlement／transaction／unsettled swapで上書きしない。固定月は当月revisionのみ、current carry規則と2026-09 cutoverは変更しない。取引／History／Portfolio／Open Positions／Riskは変更しない。 以下の旧版candidate-only等の記述は当時の工程境界。
+
 ## Current — LIGHT／みんなの取引保存と非波及（v316）
 
 両商品のv3約定はHistory専用で、monthly realized／calendar swap／deposit／withdrawalへ転記しない。みんなのtransaction swap行合計と受渡集計の不一致はdiagnostic warningで、差額補完・按分をしない。新規のnullと決済の明示0を保持する。みんなのcomplete保存はrealized照合成立（または決済なし）を要求し、LIGHTのv315受理条件は維持する。

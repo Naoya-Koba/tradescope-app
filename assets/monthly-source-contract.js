@@ -85,7 +85,7 @@
     if(value.schemaVersion!==1||!Array.isArray(value.records)||!timestamp(value.updatedAt)||value.recordCount!==value.records.length||value.recordsFingerprint!==hash(value.records))fail();
     const ids=new Set();for(const r of value.records){validateRecord(r);if(ids.has(r.id))fail();ids.add(r.id);}
   }
-  function sourceValue(r,models){
+  function rawSourceValue(r,models){
     if(!r.reference)return r.value;
     const ref=r.reference,record=rows(models,ref.entity).find(v=>v.id===ref.id);
     if(!record||record.accountId!==r.accountId||record.targetMonth!==r.targetMonth)fail();
@@ -114,7 +114,7 @@
     if(component!==null&&r.component!==component)fail();
     return ref.field.split('.').reduce((value,k)=>value?.[k],record)??null;
   }
-  function facts(r,models){
+  function rawFacts(r,models){
     const record=r.reference?rows(models,r.reference.entity).find(v=>v.id===r.reference.id):null;
     const snapshot=rows(models,'accountSnapshots').find(v=>v.id===record?.adoptedAccountSnapshotId);
     const batch=rows(models,'importBatches').find(v=>v.id===(r.reference?.entity==='importBatches'?record?.id:record?.importBatchId??snapshot?.importBatchId));
@@ -123,12 +123,30 @@
     const anchor=record?Object.fromEntries(observationFields.filter(k=>Object.hasOwn(record,k)).map(k=>[k,record[k]])):null;
     const holdings=r.reference?.entity==='importBatches'?rows(models,'holdingSnapshots').filter(h=>h.importBatchId===record.id&&h.sourceScope===r.reference.sourceScope)
       .map(h=>Object.fromEntries(['id','accountSnapshotId','instrumentId','quantity','marketPrice','marketValue','unrealizedPnl','currency'].map(k=>[k,h[k]??null]))).sort((a,b)=>a.id.localeCompare(b.id)):null;
-    return {...target(r),sourceId:r.sourceId,sourceType:r.sourceType,reference:r.reference,value:sourceValue(r,models),
+    return {...target(r),sourceId:r.sourceId,sourceType:r.sourceType,reference:r.reference,value:rawSourceValue(r,models),
       anchor,holdings,metadata:batch?{id:batch.id,provider:batch.sourceProvider,sourceType:batch.sourceType,targetMonth:batch.targetMonth??null,
         snapshotAsOf:batch.snapshotAsOf??null,importedAt:batch.importedAt,importerId:batch.importerId??null,importerVersion:batch.importerVersion??null,
         hash:batch.sourceFileMetadata?.hash??null,size:batch.sourceFileMetadata?.size??null}:null};
   }
-  const sourceFingerprint=(r,models)=>hash(facts(r,models));
+  // Released Traders Input/State references remain immutable even when their
+  // current pointer advances. Only an EXACT original fact fingerprint can select
+  // an existing history entry; never infer a date, value or replacement source.
+  function referenceModels(r,models){
+    const ref=r.reference;
+    if(!ref||!['monthlyAccountInputs','monthlyAccountStates'].includes(ref.entity)
+      ||!['acc_lightfx_fx','acc_minna_fx'].includes(r.accountId)||r.fingerprint==='0'.repeat(64))return models;
+    const record=rows(models,ref.entity).find(v=>v.id===ref.id);
+    if(!record||!Array.isArray(record.sourceHistory))return models;
+    try{if(hash(rawFacts(r,models))===r.fingerprint)return models;}catch(_){}
+    for(const history of record.sourceHistory){
+      const old={...record,adoptedAccountSnapshotId:history.adoptedAccountSnapshotId,sourceValues:history.sourceValues};
+      const historical={...models,[ref.entity]:{...models[ref.entity],records:rows(models,ref.entity).map(v=>v.id===record.id?old:v)}};
+      try{if(hash(rawFacts(r,historical))===r.fingerprint)return historical;}catch(_){}
+    }
+    return models; // A genuinely stale/broken reference still fails normally.
+  }
+  const sourceValue=(r,models)=>rawSourceValue(r,referenceModels(r,models));
+  const sourceFingerprint=(r,models)=>hash(rawFacts(r,referenceModels(r,models)));
   function effective(decision,all){while(decision?.decision==='defer')decision=all.find(r=>r.id===decision.previousId);return decision??null;}
   function heads(all){const used=new Set(all.map(r=>r.previousId));return all.filter(r=>r.kind==='adoption'&&!used.has(r.id));}
   function comparison(a,b,models){

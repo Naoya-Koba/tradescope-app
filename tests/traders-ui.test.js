@@ -52,7 +52,7 @@ test('Preview signed zero -> confirm -> verified save -> saved, exact reimport/r
  const n=preview(h.adapter),before=h.adapter.snapshot();await n.upload();assert.equal(n.el('save-status').textContent,'保存済み');assert.deepEqual(n.adapter.snapshot(),before);
 });
 test('Preview cross-product blocks LIGHT PDF in Minna slot with no persistence',async()=>{const h=preview();await h.upload('minano','lightfx');assert.equal(h.el('save','minano').hidden,true);assert.ok(h.el('issues','minano').children.some(e=>e.textContent.includes('LIGHT FX')&&e.textContent.includes('みんなのFXとしては取り込めません')));assert.equal(h.adapter.writes,0);});
-test('PDF correction requires second explicit confirmation, retains earlier observation',async()=>{const h=preview();await h.upload();await h.swap('13');await h.el('save').fire('click');await h.el('confirm-save').fire('click');const before=h.adapter.snapshot();await h.upload('lightfx','lightfx',[37,80,68,70,45,49,46,55,2]);await h.swap('14');assert.equal(h.el('save').textContent,'訂正する');assert.deepEqual(h.adapter.snapshot(),before);await h.el('save').fire('click');await h.el('confirm-save').fire('click');assert.equal(storage.readModels(h.adapter).accountSnapshots.records.length,2);assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records.length,1);});
+test('PDF correction requires second explicit confirmation, retains earlier observation',async()=>{const h=preview();await h.upload();await h.swap('13');await h.el('save').fire('click');await h.el('confirm-save').fire('click');const before=h.adapter.snapshot();await h.upload('lightfx','lightfx',[37,80,68,70,45,49,46,55,2]);await h.swap('14');assert.equal(h.el('save').textContent,'更新する');assert.deepEqual(h.adapter.snapshot(),before);await h.el('save').fire('click');await h.el('confirm-save').fire('click');assert.equal(storage.readModels(h.adapter).accountSnapshots.records.length,2);assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records.length,1);});
 test('malformed extraction exposes only safe stage/code, never source exception text',async()=>{const h=preview();h.context.extractor.extract=async()=>{throw Object.assign(Error('PRIVATE PII'),{code:'PDF_TEXT_EXTRACTION_FAILED',stage:'text'});};await h.upload();assert.match(h.el('issues').children[0].textContent,/PDF_TEXT_EXTRACTION_FAILED/);assert.doesNotMatch(h.el('issues').children[0].textContent,/PRIVATE/);assert.equal(h.adapter.writes,0);});
 test('UI URLs/load order/PWA and historic forms remain separate; no direct writes/network/logging',()=>{const html=fs.readFileSync(require.resolve('../import.html'),'utf8'),profit=fs.readFileSync(require.resolve('../profit/soneki.js'),'utf8');
  for(const b of ['lightfx','minano'])assert.match(html,new RegExp(`id="${b}-file"[^>]+accept=".pdf,application/pdf"`));
@@ -70,5 +70,28 @@ for(const broker of ['lightfx','minano'])test(`${broker}: Preview PDF-only save 
 test('corrected PDF displays retained calendar value, not a silently ignored new entry',async()=>{
  const h=preview();await h.upload();await h.swap('13');await h.el('save').fire('click');await h.el('confirm-save').fire('click');
  await h.upload('lightfx','lightfx',[37,80,68,70,45,49,46,55,9]);assert.equal(h.el('swap').value,'13');assert.equal(h.el('swap').disabled,true);await h.el('save').fire('click');
- assert.ok(h.el('confirm-summary').children.some(e=>e.textContent==='13円'));assert.match(h.el('confirm-summary').children.at(-1).textContent,/候補として追加/);await h.el('confirm-save').fire('click');assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records[0].swapPnl,'13');
+ assert.ok(h.el('confirm-summary').children.some(e=>e.textContent==='13円'));assert.match(h.el('confirm-summary').children.at(-1).textContent,/今回のPDFで更新しますか/);await h.el('confirm-save').fire('click');assert.equal(storage.readModels(h.adapter).monthlyAccountStates.records[0].swapPnl,'13');
+});
+for(const broker of ['lightfx','minano'])test(`${broker}: same PDF remains recheckable and completes without writes`,async()=>{
+ const h=preview();await h.upload(broker);await h.swap('13',broker);await h.el('save',broker).fire('click');await h.el('confirm-save',broker).fire('click');
+ const old=h.adapter.snapshot(),writes=h.adapter.writes;await h.upload(broker);assert.equal(h.el('save',broker).hidden,false);assert.equal(h.el('save',broker).textContent,'再取り込み');
+ await h.el('save',broker).fire('click');assert.equal(h.el('dialog',broker).open,true);assert.equal(h.el('swap',broker).value,'13');assert.equal(h.el('swap',broker).disabled,true);assert.ok(h.el('confirm-summary',broker).children.some(e=>e.textContent==='13円'));await h.el('confirm-save',broker).fire('click');
+ assert.equal(h.el('save-status',broker).textContent,'保存内容を確認しました');assert.deepEqual(h.adapter.snapshot(),old);assert.equal(h.adapter.writes,writes);
+});
+for(const broker of ['lightfx','minano'])test(`${broker}: missing candidates repair through the unchanged minimal preview`,async()=>{
+ const h=preview();await h.upload(broker);await h.swap('13',broker);await h.el('save',broker).fire('click');await h.el('confirm-save',broker).fire('click');
+ h.adapter.removeItem(storage.keys.monthlySources);const old=storage.readModels(h.adapter);await h.upload(broker);assert.equal(h.el('save',broker).hidden,false);
+ await h.el('save',broker).fire('click');await h.el('confirm-save',broker).fire('click');const m=storage.readModels(h.adapter);
+ for(const key of ['importBatches','accountSnapshots','holdingSnapshots'])assert.deepEqual(m[key],old[key]);assert.equal(m.monthlySources.records.length,2);
+});
+for(const broker of ['lightfx','minano'])test(`${broker}: independent value is protected until simple update confirmation`,async()=>{
+ const h=preview();await h.upload(broker);await h.swap('13',broker);await h.el('save',broker).fire('click');await h.el('confirm-save',broker).fire('click');
+ const core=require('../assets/monthly-source-contract.js'),sources=require('../assets/monthly-source-service.js'),account=broker==='lightfx'?'acc_lightfx_fx':'acc_minna_fx';
+ const r=core.descriptor({accountId:account,targetMonth:'2026-09',asOf:'2026-09-30'},'marketValue','777',{id:'ui_independent',sourceId:'ui_independent',sourceType:'manual'}),api=sources.createService(h.adapter,{newId:()=>crypto.randomUUID()});
+ api.operate({sources:[r],adoptions:[{revisionId:r.id}]},{expectedFingerprint:api.inspect().fingerprint});const old=h.adapter.snapshot();
+ await h.upload(broker);await h.el('save',broker).fire('click');assert.match(h.el('confirm-summary',broker).children.at(-1).textContent,/現在使用中の値があります/);
+ assert.doesNotMatch(h.el('confirm-summary',broker).children.map(e=>e.textContent).join(' '),/candidate|revision|source|adoption|fingerprint/);
+ await h.el('cancel-save',broker).fire('click');assert.deepEqual(h.adapter.snapshot(),old);await h.el('save',broker).fire('click');await h.el('confirm-save',broker).fire('click');
+ assert.equal(require('../assets/lightfx-scalar-adoption.js').forBroker(broker).resolve(storage.readModels(h.adapter),'2026-09').observedAsset,'1006');
+ assert.ok(storage.readModels(h.adapter).monthlySources.records.some(v=>v.id===r.id));
 });

@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current — Traders残高再取り込みと固定v15（v317）
+
+Backup v15／既存12モデルを維持し、新key／schema／migrationはない。旧canonical、共通source／override／adoption、既存Input／State sourceHistoryをそのまま往復する。旧Input／State source参照は、保存済み履歴の金融事実fingerprint完全一致を条件に元の値として読む。一致しないstaleや欠損参照を修復した扱いにはしない。v1〜v14受理範囲・clear／preserve規則は変更しない。
+
+確認済み更新はBatch／Snapshot／Holding／共通sourceと使用判断／Input／Stateを一回のRepository journalで保存する。再読込後に5項目・calendar保持・取引store不変を確認し、失敗はrollback、不能ならjournal保持。同一PDF正常時は書込み0回、不足参照だけはcanonicalを再利用して補う。 以下の旧版candidate-only等の記述は当時の工程境界。
+
 ## Current — Traders共通保存と固定Backup v15（v316）
 
 LIGHT／みんなのv3 rows・collection・decisionは既存v15で完全往復する。v14対象固定、v1〜v14 restoreのclear／preserve規則、新keyなし・schema変更なし・migrationなしを維持。provider configとUI bindingは非永続で、reconciliation v2／position-setは追加しない。
