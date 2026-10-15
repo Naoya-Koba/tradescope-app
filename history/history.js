@@ -1,6 +1,7 @@
 const historyCore = window.TradeScopeHistory;
 const displayAccountName = window.TradeScopeAccountUI.displayAccountName;
 let transactionHistory = null;
+let transactionConfirmation = null;
 
 const ACCOUNTS = ['GMO', 'Light FX', 'みんなのFX', 'SBI', 'SBI VC', '三井住友銀行'];
 const ASSET_TYPES = ['FX', '証券', '暗号資産', 'その他'];
@@ -247,15 +248,20 @@ function buildBaseSelectOptions() {
   strategySelect.innerHTML = STRATEGIES.map((v) => toOptionHtml(v, STRATEGY_LABELS[v] || v, v === '')).join('');
 }
 
-function buildFilters(entries) {
-  transactionHistory ||= window.TradeScopeTransactionUI.create(document);
+function buildFilters(entries, options = {}) {
+  transactionConfirmation ||= window.TradeScopeReconciliationV2UI.create({document,
+    storage:window.TradeScopeDataStorage.localStorageAdapter(localStorage),onRefresh:settings=>buildFilters(undefined,settings)});
+  transactionHistory ||= window.TradeScopeTransactionUI.create(document,{decorateDetail:transactionConfirmation.decorate});
   try {
     // Raw manual facts: do not infer quantity units/contract size from legacy defaults.
     const manual = JSON.parse(localStorage.getItem('tradeScopeTradeHistoryV1') || '[]');
     if (!Array.isArray(manual)) throw new Error('INVALID_HISTORY');
     const models = window.TradeScopeDataStorage.readModels(window.TradeScopeDataStorage.localStorageAdapter(localStorage));
-    transactionHistory.refresh(manual, models);
-  } catch (_) { transactionHistory.fail(); }
+    transactionConfirmation.update(manual,models);
+    if(options.preserveDetail)transactionHistory.refresh(manual,models,options);
+    else transactionHistory.refresh(manual, models);
+    return true;
+  } catch (_) { transactionHistory.fail(); return false; }
 }
 
 // Position observation refresh is independent of History and never touches forms.

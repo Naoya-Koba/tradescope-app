@@ -1,5 +1,11 @@
 # Data Model
 
+## Current — LIGHT／Minna明示判断UI（v322）
+
+`history/reconciliation-v2-ui.js`が使用中PDF取引の詳細に限りv319候補projectionとv320 readerを読み、双方unique-candidateのみ確認操作を表示する。confirmed／rejectedは同じ事実の再質問を抑え、取消は既存save serviceでrevokedをappendする。「後で」は非永続。表示時の金融fingerprint／headとprepare結果の一致を確認し、押下時も元draft／requestIdを保持してv321 serviceへ明示判断を渡す。
+
+保存後はreader／projection／Historyを再読込するが、manual＋PDFは別行のまま。metadataを移さず、candidate policy／v2契約／save serviceは変更しない。ambiguous選択／reassign UI／1対多対応は未実装。Backup v16・Storage key／schema不変。以下の旧版記述は当時の工程境界。
+
 ## Current / Decided — reconciliation v2 save service（v321）
 
 `assets/reconciliation-v2-save.js`はLIGHT／みんな専用の明示判断保存API。`createService(storage).prepare({operation, pair, fromPair?})`で現在の参照・金融fingerprint・正式v2 readerのheadを含む非永続draftとrequestIdを返し、`save({draft, requestId, explicitUserDecision:true})`でconfirmed／rejected／revokedをappendする。reassignは旧confirmed（inactive／staleでも占有中のheadを含む）のrevoked＋新confirmedを同journalで保存する。解除は旧bindingを保持する。

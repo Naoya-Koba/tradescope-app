@@ -1,5 +1,11 @@
 # Product Specification
 
+## Current — LIGHT／みんなの簡潔な取引確認（v322）
+
+双方一意な手入力との対応があるPDF取引の詳細に「同じ取引」「別の取引」「後で」を表示する。明示判断だけを保存し、有効な判断は短い確認済み表示と「対応を解除」に置換する。後回しは保存せず、取消後は条件が合えば再確認できる。内部用語の説明・大きなカードは追加しない。
+
+確認後もHistoryはmanual＋PDFの別行を維持し、metadata併記／1行化は未実装。ambiguousは選択できず、未一致・比較不能も促さない。GMO／SBIのv1、公式Open Positions／Portfolio／Risk／金融集計は維持。Backup v16。以下の旧版記述は当時の工程境界。
+
 ## Current — 明示判断save service、UI未接続（v321）
 
 LIGHT／みんなのmanual対PDF取引について、明示的なconfirmed／rejected／revokedと一括reassignを安全に保存する内部serviceを追加した。候補は確認済みではなく自動判断しない。保存時の金融値・PDF・判断履歴変更は再確認を要求し、memo／strategyだけの変更は妨げない。本番判断UI・candidate一覧・Historyの1行化・metadata併記は未実装。Open Positions／Portfolio／Risk／金融表示は維持、Backup v16のまま。

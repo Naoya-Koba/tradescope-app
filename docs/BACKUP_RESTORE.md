@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — UI判断も既存v16契約へ保存（v322）
+
+LIGHT／みんなの確認UIは既存v321 serviceだけを呼び、confirmed／rejected／revokedを既存reconciliationキーへ保存する。UI専用stateや「後で」は永続化しない。Backup v16維持、新key／schema／migrationなし。UI経由の判断・取消履歴もv16で往復し、v1〜v15 restore契約は変更しない。
+
 ## Current — save serviceの判断履歴も既存v16で往復（v321）
 
 Backup v16・12モデル・v1〜v15 restore契約は変更しない。正式save serviceが作成したconfirmed／rejected／revoked／reassign chainを既存v2 recordとして完全往復する。操作IDは既存record IDに決定的に結び付き、復元後の同じrequest／draftのretryでも重複appendしない。新Storage key／field／schema／migrationは追加しない。保存・再読込検証失敗はRepository journal内でrollbackし、不能ならjournalを保持する。

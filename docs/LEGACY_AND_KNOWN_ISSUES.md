@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known issue — 明示判断UIの限定接続（v322）
+
+LIGHT／みんなの使用中PDF取引詳細へunique候補の確認／拒否と有効判断の取消だけを接続した。候補・v2 reader／save serviceの意味は不変。History dedupe、metadata併記、ambiguous選択、one-to-many／many-to-one、reassign UIは未実装。旧PDFのconfirmedが占有する対象は新PDFへ自動移植・解除せず、serviceの競合結果を短い再確認表示へ変換する。複雑な付け替えUIは後続工程。
+
+manualの削除参照保護、金融原値・metadata、Portfolio／Risk／公式建玉は維持する。Backup v16、新key／schemaなし。以下の旧版記述は当時の工程境界。
+
 ## Current / Known issue — reconciliation v2保存serviceまで（v321）
 
 正式serviceは明示判断のみ保存し、confirmedは現時点では双方unique候補に限定する。ambiguousの明示選択policy、本番確認UI、rejected候補のUI抑制、History dedupe／metadata併記は未実装。v319 projection・v320 readerの意味は変えない。複数タブの完全な排他lockは新設せず、直前再読込・expectedModels／最新manual生JSON・head／占有再確認・journal内postconditionで競合時に停止する。保存済みrequestのretryは操作の再実行ではなく既存記録の返却であり、後続解除やcollection変更を取り消さない。Backup v16、新key／schemaなし。以下の旧版記述は当時の工程境界。

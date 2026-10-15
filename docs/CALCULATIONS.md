@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Current — 判断UIは履歴の表示補助のみ（v322）
+
+LIGHT／みんなのPDF取引詳細から、unique候補のconfirmed／rejected／revokedを正式save serviceへ渡す。判断後もmanualとPDFを別行表示し、memo／strategyはmanual行だけに保持する。Historyの金融値・行の正本、公式Open Positions、Portfolio／Risk、Top／Allocation／Monthly／Annual／Trends、realized／calendar swap／入出金は変更しない。自動confirm／History dedupeなし。
+
 ## Current — 明示判断の保存のみ（v321）
 
 reconciliation v2 save serviceは判断recordだけを既存キーへappendする。候補policy・正式readerの意味・manual金融原値／metadata・PDF原値は変更しない。保存前後で金融モデル不変を確認し、Historyはconfirmed後もmanual＋PDFを別行表示する。Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／calendar swap／deposit／withdrawalへは接続しない。以下の旧版記述は当時の工程境界。

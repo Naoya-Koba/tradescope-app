@@ -7,7 +7,7 @@
   const asset = value => ({ Stock: '証券', ETF: 'ETF', MutualFund: '投資信託', Crypto: '暗号資産' })[value] || value;
   const category = r => r.marketType==='spot'?'現物':({ new: '新規', add: '追加', partial_close: '一部決済', full_close: '全決済' })[r.category] || (r.type === 'open' ? '新規' : r.type === 'close' ? '決済' : r.category || 'その他');
   const side = r => r.side === 'buy' ? '買' : r.side === 'sell' ? '売' : null;
-  function create(document) {
+  function create(document, enhancements = {}) {
     const $ = id => document.getElementById(id);
     let records = [], context = null, limit = 50, failed = false, opened = null, expandedId = null;
     let currentModels=null,currentManual=[],readFingerprint=null;
@@ -39,6 +39,7 @@
       addAudit('原取引区分', raw.transactionType || p.facts.original.rawTransactionType);
       fragment.append(node('h3', '取引詳細', 'transaction-detail-title'), dl, node('h3', '原本・監査情報', 'transaction-detail-title transaction-audit-title'), audit);
       if (r.manualId) { const b = node('button', '手入力を編集', 'edit-btn memo-edit-btn'); b.type = 'button'; b.dataset.entryId = r.manualId; fragment.append(b); }
+      enhancements.decorateDetail?.(r,fragment,{onDismiss:()=>{const button=opened?.button;closeOpened();button?.focus();}});
       return fragment;
     }
     function closeOpened() { if (!opened) return; opened.button.setAttribute('aria-expanded', 'false'); opened.panel.hidden = true; opened.panel.replaceChildren(); opened = null; expandedId = null; }
@@ -69,7 +70,7 @@
       if ($('historyFilterLabel')) $('historyFilterLabel').textContent = '絞り込み' + (count ? ` ${count}` : '');
       return { total: filtered.length, visible: visible.length };
     }
-    function refresh(manual, models) {
+    function refresh(manual, models, {preserveDetail=false} = {}) {
       currentModels=models;currentManual=manual;readFingerprint=adoption.fingerprint(models);
       failed = false; records = view.resolve(manual, models); context = display.createContext(manual, models);
       const pairs = key => [...new Map(records.map(r => [r[key], r[key]])).entries()].filter(([v]) => v).sort((a, b) => a[1].localeCompare(b[1], 'ja'));
@@ -78,7 +79,10 @@
       options('filterSymbol', [['', 'すべて'], ...[...new Map(records.map(r => [r.instrumentKey || r.symbol, r.symbol])).entries()]]);
       options('filterStrategy', [['', 'すべて'], ...pairs('strategy')]); options('filterCategory', [['', 'すべて'], ['open', '新規'], ['close', '決済'], ['spot-buy','現物 買'], ['spot-sell','現物 売'], ['other', 'その他']]);
       options('filterSource', [['', 'すべて'], ['manual', '手入力'], ['sbi', 'SBI CSV'], ['gmo', 'GMO PDF'], ['sbivc','SBI VC PDF'],
-        ...[['lightfx','LIGHT FX PDF'],['minna','みんなのFX PDF']].filter(([kind])=>records.some(r=>r.sources.some(s=>s.kind===kind)))]); return render();
+        ...[['lightfx','LIGHT FX PDF'],['minna','みんなのFX PDF']].filter(([kind])=>records.some(r=>r.sources.some(s=>s.kind===kind)))]);
+      const result=render(!preserveDetail);
+      if(preserveDetail)opened?.panel.querySelector?.('.transaction-confirmation-status')?.focus();
+      return result;
     }
     function fail() { failed = true; records = []; render(); }
     $('historyMore').addEventListener('click', () => { limit += 50; render(false); }); return Object.freeze({ refresh, render, fail });

@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — reconciliation v2の最小確認UI（v322）
+
+新`history/reconciliation-v2-ui.js`をv321 serviceの後へロードし、transaction-uiの任意detail decoratorから使用する。PDF v3のLIGHT／Minnaだけを対象に、候補・有効判断・表示事実を照合する。GMO／SBI／manualの既存詳細は変更しない。confirmed／rejected／revokedはserviceへ明示操作で保存し、「後で」は保存しない。ambiguous選択・reassign UI・History dedupe・metadata併記は追加しない。
+
+保存中lockと複数click event抑止、元request／draftを維持するretry、内部結果から短い日本語へのmapping、失敗時の再確認操作を追加。成功・already-currentではHistoryだけ再読込し、filter／開いた詳細を維持して状態へfocusを戻す。Open Positions再計算・未保存manual formの更新は行わない。PWA v322／asset query 20261015-11、Backup v16、key／schema不変。
+
+検証：追加60件／全2833 tests Pass。JS／MJS 162件＋inline 3件、precache 95件、全HTML local URL 273件、依存順／HTML-precache URL一致／diff-checkを確認。正式service／v2 reader／v1、v16往復・v1〜v15 restore回帰を維持。computer-useで内蔵ブラウザ390px／1280pxを使い、匿名LIGHT／Minnaの確認・拒否・取消・再表示、後回し、再読込後の判断保持を確認した。History8行／Open Positions5行を維持、横overflowなし、操作button高さ44px以上、Console Error／Warningなし。匿名localhostのStorage／SW／cache／tab／viewport／一時serverは清掃済み。production Storage・実PDF・実Backupは未操作。
+
 ## Current — reconciliation v2 save service（v321）
 
 `assets/reconciliation-v2-save.js`は既存Repository／journal、v2 reader、v319 candidate projectionを再利用する。HistoryページでAPIをロードするだけで本番UIへ接続しない。PWA v321、asset query 20261015-10、Backup v16維持。変更はservice・匿名test・ロード／precache登録・本文書のみ。

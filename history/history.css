@@ -892,6 +892,12 @@ body.drawer-open {
 .transaction-detail-grid dt { color: var(--muted); }
 .transaction-detail-grid dd { min-width: 0; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .transaction-detail-content .memo-edit-btn { margin-top: 12px; min-height: 40px; padding: 8px 12px; }
+.transaction-confirmation { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); min-width: 0; }
+.transaction-confirmation-status { margin: 0 0 8px; font-size: 12px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
+.transaction-confirmation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.transaction-confirmation-actions button { min-height: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: rgba(255,255,255,.07); color: var(--text); font: inherit; font-size: 12px; white-space: normal; cursor: pointer; }
+.transaction-confirmation-actions button:disabled { opacity: .5; cursor: wait; }
+.transaction-confirmation-actions button:focus-visible, .transaction-confirmation-status:focus { outline: 2px solid var(--green); outline-offset: 3px; }
 .history-empty { color: var(--muted); font-size: 13px; }
 #historyMore { margin-top: 12px; }
 @media (min-width: 701px) {
