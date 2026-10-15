@@ -45,7 +45,7 @@
  const evidence=s=>JSON.stringify([s.entity,s.record.sourceProvider,s.record.providerExecutionId||s.record.externalTransactionId||null,s.record.providerOrderId||null,
    s.record.executedAt||null,s.record.side||s.record.transactionType,decimals(s.record.quantity),decimals(s.record.price),decimals(s.record.fee),s.record.feeCurrency||null,s.record.feeSemantics||null,decimals(s.record.realizedPnl),s.record.currency||null]);
  const evidenceSet=sources=>JSON.stringify(sources.map(evidence).sort());
- function candidates(manual,m,sources){const known=new Set(rows(m,'transactionReconciliations').filter(r=>r.decision!=='defer').map(r=>r.manualId)),groups=grouped(sources,m),result=[];
+ function candidates(manual,m,sources){const known=new Set(rows(m,'transactionReconciliations').filter(r=>r.schemaVersion===1&&r.decision!=='defer').map(r=>r.manualId)),groups=grouped(sources,m),result=[];
   for(const r of manual){if(typeof r?.id!=='string'||!r.id||known.has(r.id))continue;const f=facts('manual',r,m);if(!f)continue;
    const matches=groups.filter(g=>JSON.stringify(g.facts)===JSON.stringify(f)
      &&(!r.executedAt||g.members.every(s=>s.record.executedAt===r.executedAt))
@@ -65,7 +65,7 @@
     .filter(g=>JSON.stringify(g.facts)===JSON.stringify(r.facts));
   return groups.length===1&&complete.length===1&&complete[0].members.length===r.members.length&&JSON.stringify(groups[0].facts)===JSON.stringify(r.facts)&&groups[0].sourceType===r.sourceType;
  }
- function statuses(manual,m,activeSources){const groups=grouped(activeSources,m);return rows(m,'transactionReconciliations').map(r=>{
+ function statuses(manual,m,activeSources){const groups=grouped(activeSources,m);return rows(m,'transactionReconciliations').filter(r=>r.schemaVersion===1).map(r=>{
   const original=manual.filter(x=>x.id===r.manualId),unchanged=original.length===1&&JSON.stringify(facts('manual',original[0],m))===JSON.stringify(r.facts);
   const originalSources=r.members.map(member=>({entity:member.entity,record:rows(m,member.entity).find(t=>t.id===member.id)}));
   const matches=groups.filter(g=>JSON.stringify(g.facts)===JSON.stringify(r.facts)&&originalSources.every(s=>s.record)&&evidenceSet(g.members)===evidenceSet(originalSources));
@@ -89,7 +89,7 @@
   if(decisions.length&&!list.length)throw Error('手入力データが変更されています。再確認してください');
   if(new Set(list.map(c=>c.manualId)).size!==list.length&&decisions.some(d=>d.decision==='replace'))throw Error('一致する取引を一意に確認できませんでした');
   const added=[];for(const c of list){if(added.some(r=>r.manualId===c.manualId))continue;
-   const pending=rows(before,'transactionReconciliations').find(r=>r.manualId===c.manualId&&r.decision==='defer');
+   const pending=rows(before,'transactionReconciliations').find(r=>r.schemaVersion===1&&r.manualId===c.manualId&&r.decision==='defer');
    added.push({schemaVersion:1,id:pending?.id||newId(),manualId:c.manualId,decision:decisions.find(d=>d.key===c.key).decision,sourceType:c.sourceType,facts:c.facts,members:c.members,confirmedAt:now});}
   if(added.length)changes.transactionReconciliations={schemaVersion:1,records:[...rows(before,'transactionReconciliations').filter(r=>!added.some(a=>a.id===r.id)),...added],updatedAt:now};
   return{status:'ready',expectedManual:manual.raw};

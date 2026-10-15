@@ -113,7 +113,7 @@ test('FX and SBI securities Portfolio aggregation/display remains unchanged',asy
 });
 test('projection/reload/render leave all Storage and Backup v13 byte identical',async()=>{
  const s=await seed(),before=s.snapshot(),payload=copy(backup(s).build()),h=setup(s);h.run();h.render();h.detail(cryptoRows(h.run())[0]);setup(s).render();
- assert.equal(s.snapshot(),before);assert.equal(payload.backupVersion,15);assert.deepEqual(copy(backup(s).build()),payload);assert.equal(s.getItem(storage.keys.monthlyAccountStates),null);
+ assert.equal(s.snapshot(),before);assert.equal(payload.backupVersion,16);assert.deepEqual(copy(backup(s).build()),payload);assert.equal(s.getItem(storage.keys.monthlyAccountStates),null);
 });
 test('Portfolio modules, responsive styles, null-safe display and canonical refresh remain scoped',()=>{
  const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('top/style.css','utf8');

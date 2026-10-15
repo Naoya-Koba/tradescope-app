@@ -1,5 +1,15 @@
 # Data Model
 
+## Current / Decided — reconciliation v2 / Backup v16（v320）
+
+`tradeScopeTransactionReconciliationsV1`はenvelope v1のままrecord v1／v2を共存する。v1原record・GMO／SBIの意味は維持し、version別dispatchでv2をv1 readerへ渡さない。v2はLIGHT／みんなのmanual 1件対ImportedTransaction v3 1件のみ。fieldはschemaVersion／id／createdAt／previousId／accountId／sourceProvider／manualId／importedTransactionId／transactionCollectionId／manualFactsFingerprint／importedRowFingerprint／collectionFingerprint／factsVersion／relationType(one-to-one)／decision／decisionMethod(user)。金融値・memo／strategyはコピーしない。
+
+`assets/transaction-reconciliation-v2.js`がvalidator・append helper・read-only readerを提供する。confirmed／rejected／revokedはpair別previousId chainへappend-only。分岐・循環・欠損・別pair参照を拒否し、時刻／ID順でheadを選ばない。confirmed headはstale／inactiveでも他対応のために自動解放せず、別対応は旧revoke→新confirmを同journalで合成する。元recordは保持する。id同一・同内容retryはno-op、異内容は拒否。
+
+manual fingerprintは固定`fx-manual-facts-v1`で正式account／provider／一意Instrument／元category／action／side／decimal数量／明示contractSize／rate／dateをhash化。memo／strategy／登録時刻を除外し、金融値変更はstale。PDF row／collectionは既存fingerprintと原参照を検証。不明・破損を確認済みにしない。使用collection変更時は旧関係を移植せず、新候補の再確認が必要。readerはadoptionを優先し、inactive／stale／broken／conflictの取引を復活させない。
+
+候補projection・History dedupe・metadata併記・判断保存UI／正式save serviceは未接続。新key／migrationなし、Backup v16。v2履歴が参照するmanualの物理削除・参照破壊を停止する。
+
 ## Current — v3/manual重複候補projection（v319）
 
 `assets/fx-transaction-candidate-view.js`の`project(rawManual, models, options)`は非永続・read-only。LIGHT／みんなの使用中transaction collectionだけを既存adoption readerで読み、account／provider／一意Instrument／action／side／比較用原通貨数量／decimal価格／tradeDateから候補を導出する。manualを保存用normalizerへ通さず、原record・未知metadataを変更しない。結果はmanual／imported別のID参照、matchingFields、status、reasonとsource状態。unique-candidateは日付精度の双方一意候補であり確認済み同一取引ではない。ambiguousは自動選択しない。全未一致集合の数量合計だけが一致する場合はaggregate-onlyの要確認とし、部分集合探索・価格平均はしない。参照不良sourceは比較対象外で、該当月manualも比較不能とする。

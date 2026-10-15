@@ -1,5 +1,13 @@
 # Backup and Restore Specification
 
+## Current / Decided — reconciliation v2とBackup v16（v320）
+
+最新exportはv16。既存12モデルのままreconciliation record v1／v2共存を追加し、公開済みv1〜v15の受理範囲は固定する。v15はv2を受理しない。新key／migration／fake relationなし。v16は全判断・取消履歴とstale relationを欠落なく往復する。
+
+`data.transactions`のmanualと`data.models`のv2をpayload横断検証する。manual ID一意・存在、v3 row／collection／membership／account／provider／fingerprint、previous chain、one-to-one制約を確認する。manual金融fingerprint不一致は編集によるstaleとして保持可能。PDF immutable原値・collection不一致、欠損参照、不正chain、未知record／Backup versionは復元前に拒否。
+
+v2〜v12完全復元は従来のreconciliation clear、v13〜v15は収録v1で置換しv2を残さない。v1／legacy部分復元は既存preserve範囲を維持するが、preserveされるv2の参照先を壊す操作はcommit前に停止する。全操作を既存journalで保存し、再読込後も横断検証、失敗は元の生文字列・キー不在へrollback、不能ならjournal保持。旧Backup／参照履歴を推測修復しない。
+
 ## Current — 非永続FX候補はBackup対象外（v319）
 
 v3/manual candidate projectionはread-onlyで毎回導出し、関係・候補・metadataを保存しない。Backup v15／既存12モデル／v1〜v14 restoreを維持し、Storage key／schema／migration追加なし。reconciliation v1は変更せず、reconciliation v2／Backup v16は未実装。

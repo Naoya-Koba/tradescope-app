@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known issue — reconciliation v2契約の段階導入（v320）
+
+既存キー内v1／v2共存、1対1・append-only confirmed／rejected／revoked、専用reader、manual削除参照保護、payload横断検証、Backup v16を実装。v1／manual／ImportedTransactionのmigrationなし。v2判断保存UI・正式save service・History dedupe・metadata併記は未実装。manual日付精度／Number／legacy contractSize問題は解消しておらず、候補の自動confirmは禁止。旧PDFの関係は新PDFへ移植しない。複数タブの完全排他は既存Repository同様に保証せず、保存前後のguardと競合停止を維持する。
+
 ## Current / Known issue — FX重複候補のみ（v319）
 
 LIGHT／みんなのv3/manual候補をread-onlyで導出可能。manualは日付のみ・Number保存であり、双方一意でも確認済み同一取引ではない。ZAR／MXN等のlegacy contractSize不整合は修正せずincomparable。数量・価格許容差、時刻近似、部分集合の自動対応は行わない。通常Historyはmanual＋使用中PDFを引き続き別行表示し、metadata統合・reconciliation v2・undo永続契約は後続工程。Backup v15維持。Chrome接続不可につき実ブラウザ回帰は未確認。

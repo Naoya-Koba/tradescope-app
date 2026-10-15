@@ -9,6 +9,7 @@
     ? require('./transaction-reconciliation.js') : root.TradeScopeTransactionReconciliation;
   const transactionSources = typeof module !== 'undefined' && module.exports
     ? require('./transaction-source-contract.js') : root.TradeScopeTransactionSourceContract;
+  const reconciliationV2=()=>typeof module!=='undefined'&&module.exports?require('./transaction-reconciliation-v2.js'):root.TradeScopeReconciliationV2;
   // Released Backup schemas are fixed lists, not derived from current Repository keys.
   const backupModelEntities = Object.freeze({
     2: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots']),
@@ -24,7 +25,8 @@
     12: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions']),
     13: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations']),
     14: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations', 'monthlySources']),
-    15: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations', 'monthlySources', 'transactionSources'])
+    15: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations', 'monthlySources', 'transactionSources']),
+    16: Object.freeze(['accounts', 'instruments', 'importBatches', 'rawTransactions', 'holdingSnapshots', 'accountSnapshots', 'monthlyAccountStates', 'monthlyAccountInputs', 'importedTransactions', 'transactionReconciliations', 'monthlySources', 'transactionSources'])
   });
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -185,6 +187,7 @@
     }
   };
   function validateRecord(entity, record) {
+    if(entity==='transactionReconciliations'&&record?.schemaVersion===2){assertJson(record);reconciliationV2().validateRecord(record);return;}
     if(entity==='monthlySources'){assertJson(record);monthlySources.validateRecord(record);return;}
     if(entity==='transactionSources'){assertJson(record);transactionSources.validateRecord(record);return;}
     if(entity==='importedTransactions'&&record?.schemaVersion===3){assertJson(record);transactionSources.validateRow(record);return;}
@@ -251,10 +254,11 @@
     transactionSources.validateSet(models);
     const records = entity => models[entity]?.records || [];
     const manualIds=new Set(),replacedMembers=new Set();
-    for(const r of records('transactionReconciliations')){
+    for(const r of records('transactionReconciliations').filter(r=>r.schemaVersion===1)){
       if(manualIds.has(r.manualId)||!reconciliation.validateRelation(r,models))fail();manualIds.add(r.manualId);
       const seen=new Set();for(const member of r.members){const key=member.entity+':'+member.id;if(seen.has(key)||r.decision==='replace'&&replacedMembers.has(key))fail();seen.add(key);if(r.decision==='replace')replacedMembers.add(key);}
     }
+    if(records('transactionReconciliations').some(r=>r.schemaVersion===2))reconciliationV2().validateSet(models);
     const accounts = new Map(records('accounts').map(item => [item.id, item]));
     const instruments = new Set(records('instruments').map(item => item.id));
     const batches = new Map(records('importBatches').map(item => [item.id, item]));
@@ -567,10 +571,14 @@
     if(version<11&&(models?.monthlyAccountInputs?.records||[]).some(r=>r.schemaVersion===4))fail();
     if(version<12&&(models?.importedTransactions?.records||[]).some(r=>r.schemaVersion===2))fail();
     if(version<15&&(models?.importedTransactions?.records||[]).some(r=>r.schemaVersion===3))fail();
+    if(version<16&&(models?.transactionReconciliations?.records||[]).some(r=>r.schemaVersion!==1))fail();
     if(version>=14)monthlySources.validateSet(models,{strictStale:true});
     return validateModelSet(models, entities);
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function validateReconciliationReferences(models,manual){
+    if(models?.transactionReconciliations?.records?.some(r=>r.schemaVersion===2))reconciliationV2().validateManualReferences(models,manual);
+  }
   function localStorageAdapter(storage) {
     // Explicit injection only: loading this module never reads/seeds real browser data.
     return Object.freeze({ getItem: key => storage.getItem(key), setItem: (key, value) => storage.setItem(key, value),
@@ -627,7 +635,11 @@
         }
         if(entity==='transactionReconciliations')for(const old of models[entity]?.records||[]){
           const next=value.records.find(r=>r.id===old.id);
-          if(!next||next.manualId!==old.manualId||old.decision!=='defer'&&JSON.stringify(next)!==JSON.stringify(old))fail();
+          if(!next||next.schemaVersion!==old.schemaVersion||next.manualId!==old.manualId||(old.schemaVersion===2||old.decision!=='defer')&&JSON.stringify(next)!==JSON.stringify(old))fail();
+        }
+        if(entity==='transactionReconciliations'){
+          const old=(models[entity]?.records||[]).filter(r=>r.schemaVersion===2),next=value.records.filter(r=>r.schemaVersion===2);
+          if(JSON.stringify(next.slice(0,old.length))!==JSON.stringify(old))fail();
         }
         if (entity === 'accounts' && (models.accounts?.records || []).some(record => !value.records.some(item => item.id === record.id))) fail();
         if (['monthlyAccountStates', 'monthlyAccountInputs'].includes(entity) && (models[entity]?.records || []).some(record => value.records.some(item =>
@@ -696,6 +708,9 @@
       for(const batch of transactionAnchors)if(JSON.stringify(models.importBatches?.records.find(b=>b.id===batch.id))!==JSON.stringify(batch))fail();
       for(const {source,fingerprint} of registeredSourceFacts)if(monthlySources.sourceFingerprint(source,models)!==fingerprint)fail();
       validateModels(models);
+      const hasV2=models.transactionReconciliations?.records.some(r=>r.schemaVersion===2);
+      const protectedManual=hasV2?adapter.getItem(reconciliation.manualKey):null;
+      if(hasV2)validateReconciliationReferences(models,JSON.parse(protectedManual??'[]'));
       const actions = Object.entries(changes).map(([entity, value]) => ({ type: 'set', storageKey: keys[entity], rawValue: JSON.stringify(value) }));
       if (guard.invalidateTopSummary === true) actions.push({ type: 'remove', storageKey: 'tradeScopeTopSummarySnapshotV1' });
       let verified;
@@ -704,6 +719,7 @@
         if (JSON.stringify(verified) !== JSON.stringify(models)) fail();
         // Optional domain postcondition while the SAME rollback journal is still protected.
         if(guard.verifyModels&&guard.verifyModels(clone(verified))===false)fail();
+        if(hasV2){if(adapter.getItem(reconciliation.manualKey)!==protectedManual)fail();validateReconciliationReferences(verified,JSON.parse(protectedManual??'[]'));}
         if (own(guard,'expectedManual') && adapter.getItem(reconciliation.manualKey)!==guard.expectedManual) fail();
         verifyLegacy();
       });
@@ -752,7 +768,7 @@
     return { version: 1, kind: 'facts-candidate', key: await hashBytes(new TextEncoder().encode(JSON.stringify(facts)), cryptoApi),
       automaticMerge: false };
   }
-  const api = Object.freeze({ keys, backupModelEntities, adoptionFields, adoptedValues, equalDecimal, assertJson, validateRecord, validateEnvelope, validateModels, validateBackupModels,
+  const api = Object.freeze({ keys, backupModelEntities, adoptionFields, adoptedValues, equalDecimal, assertJson, validateRecord, validateEnvelope, validateModels, validateBackupModels, validateReconciliationReferences,
     readModels, createRepository, localStorageAdapter, initialAccounts, newId, hashBytes, dedupeCandidate });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TradeScopeDataStorage = api;

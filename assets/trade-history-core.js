@@ -151,6 +151,14 @@
     const normalized = (entries || [])
       .map((entry, idx) => normalizeEntry(entry, idx))
       .filter(Boolean);
+    const relationRaw=localStorage.getItem('tradeScopeTransactionReconciliationsV1');
+    if(relationRaw!==null){
+      const relations=JSON.parse(relationRaw);
+      if(relations?.records?.some(r=>r.schemaVersion!==1)){
+        if(!window.TradeScopeReconciliationV2)throw Error('対応情報を確認できません。再読み込みしてください。');
+        window.TradeScopeReconciliationV2.protectManualChange(localStorage,normalized);
+      }
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   }

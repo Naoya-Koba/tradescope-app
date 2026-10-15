@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Current — reconciliation v2は金融集計へ未接続（v320）
+
+v2はユーザー判断の参照契約とreaderのみ。confirmedが匿名テストに存在してもHistoryはmanual＋PDFを従来どおり表示し、metadataを移植しない。候補projection、公式FX建玉、Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／calendar swap／deposit／withdrawalの式・正本は変更しない。manual金融値の編集は対応関係のstaleだけに反映し、memo／strategy変更では失効させない。金融値の複製保存・自動confirmはしない。
+
 ## Current — FX取引候補比較のみ（v319）
 
 候補projectionはmanual数量×明示contractSizeを既存decimal演算で比較するだけで原値へ書き戻さない。Lot定義は既存TransactionDisplayを再利用し、TRY10,000／HUF100,000、単位不明・legacy contractSize矛盾はincomparable。末尾0を正規化するが価格・数量許容差はない。manual.dateとPDF.tradeDateを比較し、createdAt／executedAt時刻／受渡日／realized／swap／fee／注文番号をkeyにしない。unique candidateは確認済み一致ではない。Historyの行数・metadata、official Open Positions、Portfolio／Risk、Top／Allocation／Monthly／Annual／Trends／swap／入出金の正本・計算は変更しない。

@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — reconciliation v2／参照保護（v320）
+
+新`assets/transaction-reconciliation-v2.js`は既存decimal・identity helperとtransaction adoptionを再利用。v1 readerはrecord v1のみ受け、v2は独立read-only readerへdispatchする。新recordは既存Repositoryのappend-only／manual生JSON guard／再読込postcondition／journal／rollbackへ参加する。manual coreの保存前チェックはv2参照の欠落・重複を停止し、既存削除UIでは短い警告にする。保存service・確認UI・History統合は作らない。
+
+PWA v320、変更asset query 20261015-9、Backup v16。既存12モデル・Storage key不変。公開v15 validatorを固定し、最新exportの期待versionだけ既存testへ反映する。匿名testでmixed v1/v2・chain・fingerprint・stale／broken・全旧版restore・部分復元参照保護・rollbackを検証し、production Storage／実PDF／実Backupは使わない。内蔵ブラウザを第一候補とし、隔離localhostの匿名データで実装前後の390px／1280px表示回帰を行う。
+
+検証：追加98件／全2687 tests Pass。JS／MJS 158件＋inline 3件、precache 93件、全HTML local URL 271件、依存順・diff-checkを確認。内蔵ブラウザで実装前後のTop／Monthly／History／Open Positionsを390px／1280pxで確認し、横overflowなし、History本文一致、Console Error／Warningなし。GMO v1／SBI VC v2／manual／LIGHT v3履歴とLIGHT／みんなの公式建玉を匿名データで表示した。Storage／SW／cache／tab／viewport／一時serverはcleanup済み。これは実PDF抽出の確認ではない。
+
 ## Current — FX transaction candidate projection（v319）
 
 `assets/fx-transaction-candidate-view.js`を既存adoption／transaction-view／transaction-displayの後にHistoryページでロードする。内部`TradeScopeFxTransactionCandidateView.project(rawManual, models, options)`のみ提供し、History rendererや金融計算からは呼ばない。decimal正規化／合計の純粋helperだけ既存reconciliationから再利用し、v3をv1照合へ流さず保存用manual normalizerも使わない。新asset query 20261015-8、PWA v319／Backup v15。

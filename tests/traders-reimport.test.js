@@ -162,7 +162,7 @@ for(const b of ['lightfx','minano']){
  });
  test(`${b}: Backup v15 roundtrip includes exact old native source facts without schema changes`,async()=>{
   const s=await seed(b),old=reference(s,b,'deposit');await update(s,b);const h=backupHarness(),payload=h.TradeScopeBackupExport.buildPayload(s,'http://localhost',now),dest=new MemoryStorage();
-  assert.equal(payload.backupVersion,15);const inspection=h.TradeScopeBackupFormat.inspectValue(payload);assert.equal(inspection.ok,true);h.TradeScopeBackupRestore.execute(inspection.restorePlan,dest);
+  assert.equal(payload.backupVersion,16);const inspection=h.TradeScopeBackupFormat.inspectValue(payload);assert.equal(inspection.ok,true);h.TradeScopeBackupRestore.execute(inspection.restorePlan,dest);
   assert.deepEqual(read(dest),read(s));assert.equal(core.sourceValue(old,read(dest)),'20');assert.equal(resolved(dest,b).deposit,'40');
  });
  test(`${b}: adopted independent manual calendar source is never changed`,async()=>{

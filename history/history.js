@@ -879,7 +879,8 @@ function bindEvents() {
     const entryId = deleteHistoryItemBtn.dataset.entryId;
     if (!entryId) return;
     if (!confirm('この履歴を削除しますか？')) return;
-    historyCore.removeEntry(entryId);
+    try { historyCore.removeEntry(entryId); }
+    catch (_) { alert('対応情報のある取引は削除できません。'); return; }
     closeHistoryModal();
     renderAll();
   });
