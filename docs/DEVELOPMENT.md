@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — reconciliation current occupancy（v323）
+
+`transaction-reconciliation-v2.js`の履歴head計算から排他を分離し、正式readerが採用状態・manual金融fingerprintを確認してcurrent effective confirmedを一元算出する。共通`occupies` predicateをsave serviceも使用する。context付きappend／Repository commit前後／Backup v16のraw manual横断validationは同readerで現在の衝突・利用不能状態を停止する。モデルだけのvalidatorは履歴整合性、完全な現在検証にはraw manual必須。新schema／key／migrationなし。
+
+PWA v323／変更module query 20261015-12、Backup v16維持。UI・candidate・History金融projection・公式Open Positions・Portfolio／Risk・金融計算は変更しない。旧版でinactiveも排他とした5件の期待を新契約へ更新し、正常inactive／manual staleの解放とcurrent conflict／破損の停止を匿名データで検証する。以下の旧版記述は当時の工程境界。
+
+検証：追加66件／全2899 tests Pass。JS／MJS 163件＋inline 3件、precache 95件、HTML local URL 273件、依存順／module URL／diff-checkを確認。旧＋新confirmedのv16往復・再採用、重複effective／破損の拒否、v1〜v15 restore／v1照合／v321保存／v322 UI回帰を維持。computer-useによる内蔵ブラウザでCSS実幅390px／1280pxを確認し、LIGHT／Minnaの新PDF確認が成功、履歴8行・建玉5行を維持。匿名監査画面で旧confirmed2件・新confirmed2件・revoked0件・旧履歴不変を確認、横overflow／アプリConsole Error・Warningなし。準備ページが既存Storageを検知したoriginには投入せず、空の別originへ分離した。使用した匿名localhostのStorage／SW／cache／tab／viewport／一時serverは清掃済み。production Storage／実PDF／実Backupは未操作。
+
 ## Current — reconciliation v2の最小確認UI（v322）
 
 新`history/reconciliation-v2-ui.js`をv321 serviceの後へロードし、transaction-uiの任意detail decoratorから使用する。PDF v3のLIGHT／Minnaだけを対象に、候補・有効判断・表示事実を照合する。GMO／SBI／manualの既存詳細は変更しない。confirmed／rejected／revokedはserviceへ明示操作で保存し、「後で」は保存しない。ambiguous選択・reassign UI・History dedupe・metadata併記は追加しない。

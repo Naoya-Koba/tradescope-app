@@ -27,16 +27,11 @@
    ||r.relationType!=='one-to-one'||!['confirmed','rejected','revoked'].includes(r.decision)||r.decisionMethod!=='user')fail();
  }
  function heads(models){
-  const result=new Map(),seen=new Set(),manual=new Map(),imported=new Map();
+  const result=new Map(),seen=new Set();
   for(const r of records(models)){
    validateRecord(r);const pair=pairKey(r),old=result.get(pair);
    if(seen.has(r.id)||r.previousId!==(old?.id??null)||r.previousId!==null&&!seen.has(r.previousId))fail();
    if(r.decision==='revoked'&&(!old||old.decision==='revoked'||['manualFactsFingerprint','importedRowFingerprint','collectionFingerprint','factsVersion'].some(f=>r[f]!==old[f])))fail();
-   if(old?.decision==='confirmed'){manual.delete(old.manualId);imported.delete(old.importedTransactionId);}
-   if(r.decision==='confirmed'){
-    if(manual.has(r.manualId)||imported.has(r.importedTransactionId))fail();
-    manual.set(r.manualId,r.id);imported.set(r.importedTransactionId,r.id);
-   }
    seen.add(r.id);result.set(pair,r);
   }
   return [...result.values()];
@@ -76,34 +71,53 @@
  }
  function validateManualReferences(models,manual){
   if(!records(models).length)return;
-  validateSet(models);if(!Array.isArray(manual))fail();
-  for(const r of records(models))if(manual.filter(m=>m?.id===r.manualId).length!==1)fail();
+  // Full persistence/restore validation needs raw manual facts. A models-only
+  // historical validator cannot decide whether a manual binding is now stale.
+  if(read(manual,models).status!=='ok')fail();
  }
+ const occupies=r=>r.effective===true&&r.decision?.decision==='confirmed';
  function read(manual,models){
   const all=records(models),broken=()=>({status:'broken',results:all.map(r=>({id:r.id,manualId:r.manualId,importedTransactionId:r.importedTransactionId,status:'broken',effective:false}))});
   try{
-   validateManualReferences(models,manual);const current=validateSet(models),adopted=adoption.readAll(models);
-   return {status:'ok',results:current.map(r=>{
+   const current=validateSet(models);if(!Array.isArray(manual))fail();
+   for(const r of all)if(manual.filter(m=>m?.id===r.manualId).length!==1)fail();
+   const adopted=adoption.readAll(models);let unavailable=false;
+   const results=current.map(r=>{
     const m=manual.find(m=>m.id===r.manualId),c=rows(models,'transactionSources').find(c=>c.id===r.transactionCollectionId);
     const active=adopted.results.find(s=>source.targetKey(s.target)===source.targetKey(c));
+    // Only a valid adopted collection (possibly a different revision) proves
+    // inactivity. Unknown/unusable adoption is not permission to release slots.
+    if(!active?.usable)unavailable=true;
     let status=r.decision;
     if(r.decision!=='revoked'){
-     if(active&&['broken-reference','conflict'].includes(active.status))status='broken';
+     if(active&&['broken-reference','conflict','stale'].includes(active.status))status='broken';
      else if(!active?.usable||active.collection.id!==c.id||manualFingerprint(m,models,r.factsVersion)!==r.manualFactsFingerprint)status='stale';
     }
     return {id:r.id,manualId:r.manualId,importedTransactionId:r.importedTransactionId,transactionCollectionId:c.id,
      status,effective:['confirmed','rejected'].includes(status),decision:JSON.parse(JSON.stringify(r)),
      reason:status==='stale'?(manualFingerprint(m,models,r.factsVersion)!==r.manualFactsFingerprint?'MANUAL_FACTS_CHANGED':'COLLECTION_NOT_CURRENT'):null,
      history:all.filter(d=>pairKey(d)===pairKey(r)).map(d=>JSON.parse(JSON.stringify(d)))};
-   })};
+   });
+   if(unavailable)return {status:'broken',results:results.map(r=>({...r,effective:false}))};
+   const manualSlots=new Set(),importedSlots=new Set();
+   for(const r of results.filter(occupies)){
+    if(manualSlots.has(r.manualId)||importedSlots.has(r.importedTransactionId))
+     return {status:'conflict',results:results.map(r=>({...r,status:'conflict',effective:false,reason:'CURRENT_OCCUPANCY_CONFLICT'}))};
+    manualSlots.add(r.manualId);importedSlots.add(r.importedTransactionId);
+   }
+   return {status:'ok',results};
   }catch(_){return broken();}
  }
- function append(envelope,decision,at=decision.createdAt){
+ function append(envelope,decision,at=decision.createdAt,context=null){
   validateRecord(decision);const existing=envelope?.records||[],old=existing.find(r=>r.id===decision.id);
   if(envelope&&(envelope.schemaVersion!==1||!Array.isArray(envelope.records))||existing.some(r=>![1,2].includes(r?.schemaVersion)))fail();
-  if(old){if(common.hash(old)!==common.hash(decision))fail();return envelope;}
-  const next={schemaVersion:1,records:[...existing,JSON.parse(JSON.stringify(decision))],updatedAt:at};
-  heads({transactionReconciliations:next});return next;
+  if(old&&common.hash(old)!==common.hash(decision))fail();
+  const next=old?envelope:{schemaVersion:1,records:[...existing,JSON.parse(JSON.stringify(decision))],updatedAt:at};
+  // Without the canonical context append validates history only; Repository and
+  // Backup always add the full reader-based current occupancy validation.
+  heads({transactionReconciliations:next});
+  if(context)validateManualReferences({...context.models,transactionReconciliations:next},context.manual);
+  return next;
  }
  function protectManualChange(adapter,next){
   const raw=adapter.getItem(key);if(raw===null)return;
@@ -114,6 +128,6 @@
   for(const r of refs){validateRecord(r);if(!Array.isArray(next)||next.filter(m=>m?.id===r.manualId).length!==1)
    throw Error('対応情報のある取引は削除・置き換えできません。');}
  }
- const api=Object.freeze({factsVersion,fields,records,pairKey,validateRecord,validateSet,validateManualReferences,manualFingerprint,read,append,protectManualChange});
+ const api=Object.freeze({factsVersion,fields,records,pairKey,validateRecord,validateSet,validateManualReferences,manualFingerprint,read,occupies,append,protectManualChange});
  if(node)module.exports=api;else root.TradeScopeReconciliationV2=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current — inactive旧confirmedによる永久占有を解消（v323）
+
+旧PDF confirmedがreader上inactive／非effectiveでも保存service・履歴validatorが占有を維持していたv322の不整合を修正。現在effectiveなconfirmedだけが占有し、正常inactiveは事前revoke不要。manual金融事実の変更によるstaleも永久占有しないが、再確認時の最新candidate／fingerprint検証は維持する。broken／conflict／adoption不明は非占有として無視せず停止する。
+
+再採用・manual金融事実の再変更で現在有効な対応が衝突する場合はconflictで停止する。同じactive内の付け替えは明示解除／reassignが必要で、v321のunique-only policyやv322のUI範囲は広げない。History dedupe・metadata統合・ambiguous選択は引き続き未実装。以下の旧版記述は当時の工程境界。
+
 ## Current / Known issue — 明示判断UIの限定接続（v322）
 
 LIGHT／みんなの使用中PDF取引詳細へunique候補の確認／拒否と有効判断の取消だけを接続した。候補・v2 reader／save serviceの意味は不変。History dedupe、metadata併記、ambiguous選択、one-to-many／many-to-one、reassign UIは未実装。旧PDFのconfirmedが占有する対象は新PDFへ自動移植・解除せず、serviceの競合結果を短い再確認表示へ変換する。複雑な付け替えUIは後続工程。

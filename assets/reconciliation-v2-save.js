@@ -23,7 +23,7 @@
   if(storage.getItem(journal.journalKey)!==null)stop('conflict');
   const models=model.readModels(storage),raw=storage.getItem(manualKey),manual=JSON.parse(raw??'[]');
   if(!Array.isArray(manual))stop('broken-reference');
-  const read=relation.read(manual,models);if(read.status!=='ok')stop('broken-reference');
+  const read=relation.read(manual,models);if(read.status!=='ok')stop(read.status==='conflict'?'conflict':'broken-reference');
   return {models,manual,raw,read};
  }
  function binding(s,p,requireActive){
@@ -63,7 +63,7 @@
   if(expected.importedRowFingerprint!==actual.importedRowFingerprint||expected.collectionFingerprint!==actual.collectionFingerprint)stop('collection-changed');
  }
  function occupied(s,p,releasing){
-  return s.read.results.some(r=>r.decision?.decision==='confirmed'&&r.id!==releasing
+  return s.read.results.some(r=>relation.occupies(r)&&r.id!==releasing
    &&relation.pairKey(r.decision)!==relation.pairKey(p)
    &&(r.manualId===p.manualId||r.importedTransactionId===p.importedTransactionId));
  }
@@ -132,7 +132,7 @@
      if(!uniquePolicy(s,target))stop('invalid-candidate');
     }
     let envelope=s.models.transactionReconciliations;
-    for(const r of planned)envelope=relation.append(envelope,r,at);
+    for(const r of planned)envelope=relation.append(envelope,r,at,{models:s.models,manual:s.manual});
     const expected={...s.models,transactionReconciliations:envelope};
     model.validateModels(expected);model.validateReconciliationReferences(expected,s.manual);
     // Fresh read immediately before the Repository guard. Metadata-only edits are

@@ -1,5 +1,13 @@
 # Data Model
 
+## Current / Decided — historical relationとcurrent occupancyの分離（v323）
+
+過去confirmedは監査履歴であり、現在の占有そのものではない。履歴のschema／previousId chain／pair／immutable reference検証を維持し、現在占有は正式v2 readerの`effective === true && decision.decision === confirmed`だけで判断する。正常なactive collectionが別revisionを指す旧relation、およびmanual金融事実が変わったstale relationは占有しない。旧recordを削除・変更・自動revoked化せず、新activeとの確認を別relationとして明示保存できる。
+
+`validateSet(models)`とcontextなしappendは履歴整合性を検証する。現在占有の完全検証にはraw manualが必要で、`validateManualReferences(models, rawManual)`が同じ正式readerを使う。正式saveはappendへ`{models, manual}` contextも渡し、Repository commit前後・Backup v16 payload横断validationもこの検証を必須とする。adoption不明／利用不能・broken／conflictは「空き」とみなさず停止し、複数effective confirmedをconflictにする。
+
+同じactive内の有効対応変更は引き続きoccupiedで、明示解除／適切なreassignが必要。旧PDFを再採用しfactsが一致すれば旧relationが再びeffectiveとなり、新しいinactive側は占有しない。rejected／revokedは非占有。v2 record field／key／Backup v16は不変、migrationなし。以下の旧版記述は当時の工程境界。
+
 ## Current — LIGHT／Minna明示判断UI（v322）
 
 `history/reconciliation-v2-ui.js`が使用中PDF取引の詳細に限りv319候補projectionとv320 readerを読み、双方unique-candidateのみ確認操作を表示する。confirmed／rejectedは同じ事実の再質問を抑え、取消は既存save serviceでrevokedをappendする。「後で」は非永続。表示時の金融fingerprint／headとprepare結果の一致を確認し、押下時も元draft／requestIdを保持してv321 serviceへ明示判断を渡す。

@@ -1,5 +1,11 @@
 # Backup and Restore Specification
 
+## Current / Decided — v16の履歴保持と現在占有検証（v323）
+
+Backup v16／v2 record schemaは維持。旧inactive confirmed＋新active confirmedが同じmanualに存在する履歴を受理し、raw manualとモデルを合わせた正式v2 readerで現在effectiveなconfirmedの1対1だけを検証する。同じmanual／imported rowに複数current effectiveがあれば拒否。broken参照／fingerprint／chain／adoption異常も拒否し、「inactive」と推測して通さない。モデルだけの履歴validationを完全なpayload横断validationの代わりにしない。
+
+全旧履歴・元manual・取込原値を往復し、再採用時も現在active側だけが占有する。v1〜v15のrestore範囲・clear／preserve規則は不変、fake relation／migrationなし。既存journal／rollback・再読込validationを使用する。以下の旧版記述は当時の工程境界。
+
 ## Current — UI判断も既存v16契約へ保存（v322）
 
 LIGHT／みんなの確認UIは既存v321 serviceだけを呼び、confirmed／rejected／revokedを既存reconciliationキーへ保存する。UI専用stateや「後で」は永続化しない。Backup v16維持、新key／schema／migrationなし。UI経由の判断・取消履歴もv16で往復し、v1〜v15 restore契約は変更しない。

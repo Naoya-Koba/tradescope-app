@@ -1,5 +1,9 @@
 # Calculation Specification
 
+## Current — current occupancy限定修正（v323）
+
+履歴confirmedと現在の排他を分け、占有は現在effectiveなconfirmedだけから導出する。inactive旧relationは監査用に残し、新activeの明示確認を妨げない。candidateの金融比較・manual／PDF原値・Historyの別行表示・metadataは変更しない。Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／swap／deposit／withdrawalへの接続・計算変更なし。
+
 ## Current — 判断UIは履歴の表示補助のみ（v322）
 
 LIGHT／みんなのPDF取引詳細から、unique候補のconfirmed／rejected／revokedを正式save serviceへ渡す。判断後もmanualとPDFを別行表示し、memo／strategyはmanual行だけに保持する。Historyの金融値・行の正本、公式Open Positions、Portfolio／Risk、Top／Allocation／Monthly／Annual／Trends、realized／calendar swap／入出金は変更しない。自動confirm／History dedupeなし。
