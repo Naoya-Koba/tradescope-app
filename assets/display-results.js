@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
   const node=typeof module!=='undefined'&&module.exports;
-  const version='display-results-v2';
+  const version='display-results-v3';
   const finite=v=>Number.isFinite(v);
   // Period comparison eligibility, not a return formula or a current-balance selector.
   function periodComparison(period,{initialKnown=true}={}){
@@ -39,10 +39,11 @@
     const swap={prevMonth:last,prevMonthSwap:last?months[last-1].swap:null,prevMonthBreakdown:breakdown,
       cumulativeSwap,enteredMonthCount:count,estimatedYearSwap:count&&finite(cumulativeSwap)?cumulativeSwap+(cumulativeSwap/count)*Math.max(0,12-count):null};
     const storedNumber=v=>v!==null&&v!==undefined&&!(typeof v==='string'&&!v.trim())&&Number.isFinite(Number(v));
-    const initialKnown=!initialSources||period.rows.every(r=>storedNumber(initialSources.funds?.[year]?.[r.key])
-      &&(r.bankOnly||storedNumber(initialSources.unrealized?.[year]?.[r.key])));
+    const initialKnownFor=(sourceYear,rows)=>!initialSources||rows.every(r=>storedNumber(initialSources.funds?.[sourceYear]?.[r.key])
+      &&(r.bankOnly||storedNumber(initialSources.unrealized?.[sourceYear]?.[r.key])));
+    const initialKnown=initialKnownFor(year,period.rows);
     let current=currentFactory?currentFactory(period,display):null;
-    if(current&&!initialKnown)current={...current,netPeriodComparison:{...current.netPeriodComparison,comparable:false,
+    if(current&&!initialKnownFor(current.year??year,current.rows))current={...current,netPeriodComparison:{...current.netPeriodComparison,comparable:false,
       reasons:[...current.netPeriodComparison.reasons,{reason:'initial-unknown'}],delta:null,growth:null}};
     return {version,year,period,annual,swap,months,netComparison:periodComparison(period,{initialKnown}),current,
       fingerprint:version+'-'+display.fingerprint(year),basis:'period-dashboard',readFailed};

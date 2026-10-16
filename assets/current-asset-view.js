@@ -5,7 +5,8 @@
   const adoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
   const balances=node?require('./balance-view.js'):root.TradeScopeBalanceView;
   const csv=node?require('../import/csv-core.js'):root.TradeScopeCSV;
-  const version='current-assets-v4';
+  const monthly=node?require('./monthly-display-view.js'):null;
+  const version='current-assets-v5';
   const knownSum=values=>values.length?csv.sum(values.map(String)):null;
   const number=value=>value==null||value===''?null:Number.isFinite(Number(value))?Number(value):null;
   function sbivc(models,year){
@@ -139,6 +140,23 @@
       unknownComponents:rows.some(row=>row.balance?.unknownComponents||row.metrics.net.value===null),
       sourceFingerprint:`${version}-${(hash>>>0).toString(16)}`};
   }
-  const api=Object.freeze({create,sbivc,version});
+  // Canonical CURRENT projection. UI-selected years/months are deliberately not inputs.
+  // Keep create() year-scoped for callers that explicitly request a historical view.
+  function latest(display,models,{tradingData={},readFailed=false}={}){
+    const sourceYears=[...new Set([...Object.keys(tradingData).map(Number),
+      ...(monthly||root.TradeScopeMonthlyDisplay).years(models)])]
+      .filter(y=>Number.isInteger(y)&&y>0&&y<=9999).sort((a,b)=>b-a);
+    let dashboard;
+    for(const year of sourceYears){
+      const candidate=display.dashboard(year);
+      if(candidate.month||sbivc(models,year).hasSource){dashboard=candidate;break;}
+    }
+    dashboard??=display.dashboard(1970);
+    if(readFailed)dashboard={...dashboard,month:null,rows:dashboard.rows.map(row=>({...row,
+      metrics:Object.fromEntries(Object.entries(row.metrics).map(([key,m])=>[key,{...m,value:null,status:'unavailable'}]))}))};
+    const result=create(dashboard,readFailed?null:models,dashboard.year,readFailed?{}:{balanceHistory:display.balanceHistory});
+    return {...result,metric:'current-net-assets',basis:'current-balance',effectiveTime:result.targetMonth};
+  }
+  const api=Object.freeze({create,latest,sbivc,version});
   if(node)module.exports=api;else root.TradeScopeCurrentAssets=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

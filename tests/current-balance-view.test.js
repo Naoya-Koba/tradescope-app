@@ -130,8 +130,11 @@ test('repeat balance projections do not write Storage or change Backup v13',asyn
  for(const month of [2,3,4])assets.create({year:2031,month,rows:[{key:'sbivc',metrics:{}}]},model.readModels(s),2031);
  assert.equal(s.snapshot(),before);assert.deepEqual(vc.copy(vc.backup(s).build()),b);assert.equal(b.backupVersion,16);
 });
-test('Risk, Portfolio and Open Positions stay on their original source; no production carry consumer outside Top',()=>{
+test('Risk, Portfolio and Open Positions stay on their original source; only current-asset cards consume current carry',()=>{
  const top=fs.readFileSync('top/script.js','utf8');assert.match(top,/const cryptoAccount = \(topSeries\.accountData/);
- for(const file of ['profit/soneki.js','history/history.js'])assert.doesNotMatch(fs.readFileSync(file,'utf8'),/balanceHistory|TradeScopeBalanceView|TradeScopeCurrentAssets/);
+ assert.doesNotMatch(fs.readFileSync('history/history.js','utf8'),/balanceHistory|TradeScopeBalanceView|TradeScopeCurrentAssets/);
+ const profit=fs.readFileSync('profit/soneki.js','utf8');
+ assert.match(profit,/currentFactory:.*TradeScopeCurrentAssets\.latest/);
+ assert.doesNotMatch(profit.slice(profit.indexOf('function monthlyDisplayTotals'),profit.indexOf('function monthlyComponentHtml')),/TradeScopeCurrentAssets|balanceHistory/);
  for(const file of ['assets/balance-view.js','assets/current-asset-view.js'])assert.doesNotMatch(fs.readFileSync(file,'utf8'),/setItem|removeItem|\.commit\(|fetch\(|console\./);
 });

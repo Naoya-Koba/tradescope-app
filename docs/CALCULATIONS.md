@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## 現在純資産の共通表示（2026-10-16）
+
+**Current / Decided**：Home、損益管理の「現在純資産」、Home Allocationは `CurrentAssets.latest` のcurrent projectionを共用する。選択年・選択月を入力にせず、保存済み月次データ／採用観測の最新対象年を選び、既存の `CurrentAssets.create`、`balanceHistory`、口座別adopted readerで構成する。空の将来年や年初資金の設定だけでcurrent対象年を切り替えない。観測が欠けた成分は既存のcarry／unknownルールに従い、nullを0にしない。
+
+**Current**：SBI VCの現物＋JPY現金は公式採用観測から取得し、実現／評価損益がnullでも取得済み資産を表示する。期間計算の完全月fallbackはcurrent資産へ適用しない。現在カードの増減／増減率は同current resultの比較可否とその対象年の既知年初値に従う。Annual／Monthly／確定資産／期間損益／固定月資産／年初資産は従来のperiod projectionを維持する。保存・Backup v16・migrationは変更しない。
+
 ## Current / Decided — account flowと銀行観測（v325）
 
 口座deposit／withdrawalは相手先未分類のaccount-scope値。Monthly／Annualの合計は口座別gross totalで、TradeScope全体の外部流入／流出を推定しない。SMBCの明示月末残高を資産額へ直接使用し、残高増減や旧保存差額を追加加算しない。過去月修正後も後月の明示残高は不変、隣接月増減だけ再導出する。前月なし／月抜けはunknown、12月→1月は両観測があれば導出可能。前年度12月も表示fingerprintへ含める。

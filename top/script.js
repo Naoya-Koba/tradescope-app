@@ -907,7 +907,7 @@ function buildSharedResults(year) {
   return window.TradeScopeDisplayResults.create(display, year, {
     readFailed:fresh.failed,
     initialSources:{funds:fresh.yearInitialFunds,unrealized:fresh.yearInitialUnrealized},
-    currentFactory: dashboard => window.TradeScopeCurrentAssets.create(dashboard,fresh.failed?null:fresh.models,year,fresh.failed?{}:{balanceHistory:display.balanceHistory})
+    currentFactory: () => window.TradeScopeCurrentAssets.latest(display,fresh.models,{tradingData:fresh.tradingData,readFailed:fresh.failed})
   });
 }
 let latestResults = buildSharedResults(topSeries.year);
@@ -1013,9 +1013,7 @@ function updateKPIs() {
   }
   const summaryElements = [
     'kpiRealized',
-    'deltaTotal',
     'deltaNet',
-    'growthTotal',
     'growthNet',
     'annualNetPnL',
     'annualConfirmedPnL',
@@ -1025,6 +1023,25 @@ function updateKPIs() {
   const elTotal = document.getElementById('kpiTotal');
   elTotal.textContent = Number.isFinite(currentAssetView.net.value) ? fmtJPY(currentAssetView.net.value) : '—';
   elTotal.dataset && (elTotal.dataset.basis='current-balance');
+
+  const fmtDeltaNumber = (value) => {
+    const abs = Math.round(Math.abs(value)).toLocaleString();
+    if (value > 0) return `+${abs}`;
+    if (value < 0) return `-${abs}`;
+    return '0';
+  };
+  const totalAssetDelta = currentAssetView.netPeriodComparison.delta;
+  const annualGrowthRate = currentAssetView.netPeriodComparison.growth;
+  const elTotalDelta = document.getElementById('deltaTotal');
+  if (elTotalDelta) {
+    elTotalDelta.textContent = Number.isFinite(totalAssetDelta) ? fmtDeltaNumber(totalAssetDelta) : '—';
+    setSignClass(elTotalDelta, totalAssetDelta);
+  }
+  const elTotalGrowth = document.getElementById('growthTotal');
+  elTotalGrowth.textContent = Number.isFinite(annualGrowthRate)
+    ? `${annualGrowthRate >= 0 ? '+' : ''}${annualGrowthRate.toFixed(1)}%`
+    : '—';
+  setSignClass(elTotalGrowth, annualGrowthRate);
 
   if (!latestDashboard.hasData) {
     summaryElements.forEach((el) => {
@@ -1036,12 +1053,6 @@ function updateKPIs() {
   }
 
   const rLast = latestDashboard.confirmed.value;
-  const fmtDeltaNumber = (value) => {
-    const abs = Math.round(Math.abs(value)).toLocaleString();
-    if (value > 0) return `+${abs}`;
-    if (value < 0) return `-${abs}`;
-    return '0';
-  };
 
   const elReal = document.getElementById('kpiRealized');
   elReal.textContent = Number.isFinite(rLast) ? fmtJPY(rLast) : '—';
@@ -1050,9 +1061,7 @@ function updateKPIs() {
   const yearStartTotalActual = latestDashboard.initialNet;
   const yearStartConfirmedActual = latestDashboard.initialConfirmed;
 
-  const totalAssetDelta = currentAssetView.netPeriodComparison.delta;
   const confirmedAssetDelta = latestDashboard.confirmedDelta;
-  const annualGrowthRate = currentAssetView.netPeriodComparison.growth;
   const confirmedAnnualGrowthRate = latestDashboard.confirmedGrowth;
 
   const annualNetPnL = latestDashboard.netPnl.value;
@@ -1060,12 +1069,7 @@ function updateKPIs() {
   const annualNetPnLGrowth = latestDashboard.netPnlGrowth;
   const annualConfirmedPnLGrowth = latestDashboard.confirmedPnlGrowth;
 
-  const elTotalDelta = document.getElementById('deltaTotal');
   const elNetDelta = document.getElementById('deltaNet');
-  if (elTotalDelta) {
-    elTotalDelta.textContent = Number.isFinite(totalAssetDelta) ? fmtDeltaNumber(totalAssetDelta) : '—';
-    setSignClass(elTotalDelta, totalAssetDelta);
-  }
   if (elNetDelta) {
     elNetDelta.textContent = Number.isFinite(confirmedAssetDelta) ? fmtDeltaNumber(confirmedAssetDelta) : '—';
     setSignClass(elNetDelta, confirmedAssetDelta);
@@ -1075,12 +1079,6 @@ function updateKPIs() {
     ? `${confirmedAnnualGrowthRate >= 0 ? '+' : ''}${confirmedAnnualGrowthRate.toFixed(1)}%`
     : '—';
   setSignClass(elNet, confirmedAnnualGrowthRate);
-
-  const elTotalGrowth = document.getElementById('growthTotal');
-  elTotalGrowth.textContent = Number.isFinite(annualGrowthRate)
-    ? `${annualGrowthRate >= 0 ? '+' : ''}${annualGrowthRate.toFixed(1)}%`
-    : '—';
-  setSignClass(elTotalGrowth, annualGrowthRate);
 
   const elAnnualNetPnL = document.getElementById('annualNetPnL');
   const elAnnualConfirmedPnL = document.getElementById('annualConfirmedPnL');
