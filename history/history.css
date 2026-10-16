@@ -911,3 +911,8 @@ body.drawer-open {
  .transaction-history .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
  .transaction-history .filter-item select, .transaction-history .filter-item input { min-height: 40px; }
 }
+.transaction-metadata { margin-top: 12px; }
+.transaction-metadata-form { display: grid; gap: 12px; margin-top: 12px; min-width: 0; }
+.transaction-metadata-form label { display: grid; gap: 6px; min-width: 0; }
+.transaction-metadata-form select, .transaction-metadata-form textarea { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; font: inherit; }
+.transaction-metadata > button { min-height: 44px; max-width: 100%; white-space: normal; }

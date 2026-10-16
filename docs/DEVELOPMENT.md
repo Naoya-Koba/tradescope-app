@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — History List projectionとmetadata編集（v324）
+
+`assets/history-list-view.js`は既存transaction-view結果と正式v2 readerを合成するHistory専用非永続projection。PDFのID／金融原値／原本参照を保持し、現在有効なconfirmedだけでmanual表示行を除外する。manual／relation／model変更を表示fingerprintへ含め、既存storage／再表示refreshから再構成する。transaction-view・v1・candidate・v2 reader／saveの意味は変更しない。
+
+`assets/manual-metadata-save.js`はraw manualのmemo／strategy限定更新を既存journalで保護する。全record hashと金融fingerprint・有効関係を再検証、未知field保持、保存後再読込とrollback／不能時journal保持。`history/manual-metadata-ui.js`は統合行の詳細に2項目だけの編集を提供し、連打lock・競合時再確認・Historyのみrefreshする。既存通常編集／削除とは別経路。PWA v324／変更資産query 20261016-1、Backup v16維持。以下の旧版記述は当時の工程境界。
+
+検証：追加83件／全2,982 tests Pass。JS 165／MJS 2／inline 3の構文、precache 98資産、主要4ページのlocal URL 186、依存順、diff-check、Backup v16往復／旧v1〜v15 restore回帰を確認。内蔵ブラウザの隔離localhost・匿名MemoryStorageでLIGHT／みんなの2→1行、metadata編集後1行維持、解除後即2行、取得元両filter、統合後51件の50件区切り、390px／1280px横overflowなし、Console Error／Warningなしを確認。production Storage・実PDF・実Backupは未操作。実iPhone Safari／PWAは未確認。
+
 ## Current — reconciliation current occupancy（v323）
 
 `transaction-reconciliation-v2.js`の履歴head計算から排他を分離し、正式readerが採用状態・manual金融fingerprintを確認してcurrent effective confirmedを一元算出する。共通`occupies` predicateをsave serviceも使用する。context付きappend／Repository commit前後／Backup v16のraw manual横断validationは同readerで現在の衝突・利用不能状態を停止する。モデルだけのvalidatorは履歴整合性、完全な現在検証にはraw manual必須。新schema／key／migrationなし。

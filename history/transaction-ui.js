@@ -3,7 +3,7 @@
   const nodeModule = typeof module !== 'undefined' && module.exports;
   const view = nodeModule ? require('../assets/transaction-view.js') : root.TradeScopeTransactionView;
   const display = nodeModule ? require('../assets/transaction-display.js') : root.TradeScopeTransactionDisplay;
-  const adoption = nodeModule ? require('../assets/transaction-adoption-view.js') : root.TradeScopeTransactionAdoptionView;
+  const list = nodeModule ? require('../assets/history-list-view.js') : root.TradeScopeHistoryListView;
   const asset = value => ({ Stock: '証券', ETF: 'ETF', MutualFund: '投資信託', Crypto: '暗号資産' })[value] || value;
   const category = r => r.marketType==='spot'?'現物':({ new: '新規', add: '追加', partial_close: '一部決済', full_close: '全決済' })[r.category] || (r.type === 'open' ? '新規' : r.type === 'close' ? '決済' : r.category || 'その他');
   const side = r => r.side === 'buy' ? '買' : r.side === 'sell' ? '売' : null;
@@ -38,7 +38,8 @@
       for (const [key, label] of [['custody', '預り区分'], ['market', '市場'], ['settlementDate', '受渡日']]) add(label, raw[key]);
       addAudit('原取引区分', raw.transactionType || p.facts.original.rawTransactionType);
       fragment.append(node('h3', '取引詳細', 'transaction-detail-title'), dl, node('h3', '原本・監査情報', 'transaction-detail-title transaction-audit-title'), audit);
-      if (r.manualId) { const b = node('button', '手入力を編集', 'edit-btn memo-edit-btn'); b.type = 'button'; b.dataset.entryId = r.manualId; fragment.append(b); }
+      if (r.manualMetadata) enhancements.decorateMetadata?.(r,fragment);
+      else if (r.manualId) { const b = node('button', '手入力を編集', 'edit-btn memo-edit-btn'); b.type = 'button'; b.dataset.entryId = r.manualId; fragment.append(b); }
       enhancements.decorateDetail?.(r,fragment,{onDismiss:()=>{const button=opened?.button;closeOpened();button?.focus();}});
       return fragment;
     }
@@ -53,11 +54,11 @@
       if (p.pnl !== null) bottom.append(node('span', p.pnl, 'transaction-pnl ' + p.pnlSign));
       const chevron = node('span', '›', 'transaction-chevron'); chevron.setAttribute('aria-hidden', 'true'); button.append(top, main, bottom, chevron);
       const open = () => { closeOpened(); panel.replaceChildren(detail(r, p)); panel.hidden = false; button.setAttribute('aria-expanded', 'true'); opened = { button, panel }; expandedId = r.id; };
-      button.addEventListener('click', () => {if(adoption.fingerprint(currentModels)!==readFingerprint){render(false);return;}opened?.panel === panel ? closeOpened() : open();}); article.append(button, panel);
+      button.addEventListener('click', () => {if(list.fingerprint(currentManual,currentModels)!==readFingerprint){render(false);return;}opened?.panel === panel ? closeOpened() : open();}); article.append(button, panel);
       if (expandedId === r.id) open(); return article;
     }
     function render(reset = true) {
-      if(!failed&&adoption.fingerprint(currentModels)!==readFingerprint){records=view.resolve(currentManual,currentModels);context=display.createContext(currentManual,currentModels);readFingerprint=adoption.fingerprint(currentModels);expandedId=null;}
+      if(!failed&&list.fingerprint(currentManual,currentModels)!==readFingerprint){records=list.resolve(currentManual,currentModels);context=display.createContext(currentManual,currentModels);readFingerprint=list.fingerprint(currentManual,currentModels);expandedId=null;}
       if (reset) { limit = 50; expandedId = null; } opened = null;
       const selected = selection(), filtered = view.filter(records, selected), visible = filtered.slice(0, limit), body = $('historyBody');
       const states=!failed&&!visible.length?view.projectV3(currentModels).states.filter(r=>r.target.targetMonth===selected.month&&(!selected.account||r.target.accountId===selected.account)&&(!selected.source||r.target.sourceProvider===selected.source)):[];
@@ -71,8 +72,8 @@
       return { total: filtered.length, visible: visible.length };
     }
     function refresh(manual, models, {preserveDetail=false} = {}) {
-      currentModels=models;currentManual=manual;readFingerprint=adoption.fingerprint(models);
-      failed = false; records = view.resolve(manual, models); context = display.createContext(manual, models);
+      currentModels=models;currentManual=manual;readFingerprint=list.fingerprint(manual,models);
+      failed = false; records = list.resolve(manual, models); context = display.createContext(manual, models);
       const pairs = key => [...new Map(records.map(r => [r[key], r[key]])).entries()].filter(([v]) => v).sort((a, b) => a[1].localeCompare(b[1], 'ja'));
       if (!$('filterMonth').value) $('filterMonth').value = records[0]?.date.slice(0, 7) || view.projectV3(models).states.map(r=>r.target.targetMonth).sort().at(-1) || new Date().toISOString().slice(0, 7);
       options('filterAccount', [['', 'すべて'], ...[...new Map(records.filter(r => r.accountId).map(r => [r.accountId, r.account])).entries()]]);

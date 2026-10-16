@@ -251,7 +251,9 @@ function buildBaseSelectOptions() {
 function buildFilters(entries, options = {}) {
   transactionConfirmation ||= window.TradeScopeReconciliationV2UI.create({document,
     storage:window.TradeScopeDataStorage.localStorageAdapter(localStorage),onRefresh:settings=>buildFilters(undefined,settings)});
-  transactionHistory ||= window.TradeScopeTransactionUI.create(document,{decorateDetail:transactionConfirmation.decorate});
+  transactionHistory ||= window.TradeScopeTransactionUI.create(document,{decorateDetail:transactionConfirmation.decorate,
+    decorateMetadata:window.TradeScopeManualMetadataUI.create({document,strategies:STRATEGIES,
+      storage:window.TradeScopeDataStorage.localStorageAdapter(localStorage),onRefresh:settings=>buildFilters(undefined,settings)}).decorate});
   try {
     // Raw manual facts: do not infer quantity units/contract size from legacy defaults.
     const manual = JSON.parse(localStorage.getItem('tradeScopeTradeHistoryV1') || '[]');

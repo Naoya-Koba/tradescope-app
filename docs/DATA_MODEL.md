@@ -1,5 +1,11 @@
 # Data Model
 
+## Current / Decided — History表示統合とmetadata限定編集（v324）
+
+LIGHT／みんなのみ、正式v2 readerが正常で現在effectiveなconfirmed 1対1関係をHistory専用projectionで1行表示する。金融表示・日時・原本参照はPDF v3が正本、manualから参照するのはmemo／strategyだけ。manual／PDF／relation原recordは保持し、表示結果を永続化しない。rejected／revoked／stale／inactive／broken／conflictは統合せず、無効PDFを復活させない。旧collection再採用は正式readerのeffective判定に従う。
+
+限定編集は既存manual生recordのmemo／strategyだけを更新し、未知field・金融値・IDを保持する。開始時record hash・金融fingerprint・有効relationを保存前に再検証し、既存manual keyとjournalで保存／再読込検証／rollbackする。金融fingerprintとconfirmedはmetadata編集で変化しない。新key／schema／migration／position-set保存なし、Backup v16維持。以下の旧版記述は当時の工程境界。
+
 ## Current / Decided — historical relationとcurrent occupancyの分離（v323）
 
 過去confirmedは監査履歴であり、現在の占有そのものではない。履歴のschema／previousId chain／pair／immutable reference検証を維持し、現在占有は正式v2 readerの`effective === true && decision.decision === confirmed`だけで判断する。正常なactive collectionが別revisionを指す旧relation、およびmanual金融事実が変わったstale relationは占有しない。旧recordを削除・変更・自動revoked化せず、新activeとの確認を別relationとして明示保存できる。

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>匿名 History List検証</title>
+<link rel="icon" href="../assets/icon-192.png"><link rel="stylesheet" href="../history/history.css?v=20261016-1">
+<script defer src="../import/csv-core.js"></script>
+<script defer src="../assets/storage-transaction.js"></script>
+<script defer src="../assets/transaction-reconciliation.js"></script>
+<script defer src="../assets/monthly-source-contract.js"></script>
+<script defer src="../assets/transaction-source-contract.js"></script>
+<script defer src="../assets/transaction-adoption-view.js"></script>
+<script defer src="../assets/transaction-reconciliation-v2.js"></script>
+<script defer src="../assets/data-model-storage.js"></script>
+<script defer src="../assets/transaction-view.js"></script>
+<script defer src="../assets/history-list-view.js"></script>
+<script defer src="../assets/transaction-display.js"></script>
+<script defer src="../assets/fx-transaction-candidate-view.js"></script>
+<script defer src="../assets/reconciliation-v2-save.js"></script>
+<script defer src="../assets/manual-metadata-save.js"></script>
+<script defer src="../history/reconciliation-v2-ui.js"></script>
+<script defer src="../history/manual-metadata-ui.js"></script>
+<script defer src="../history/transaction-ui.js"></script>
+<script defer src="fx-history-fixture.js"></script><script defer src="history-list-browser.js"></script></head>
+<body><main class="container"><h1>匿名 History List検証</h1><p>架空データ・メモリ内保存のみ</p>
+<div class="transaction-confirmation-actions"><button id="light" type="button">LIGHT FX</button><button id="minna" type="button">みんなのFX</button><button id="pagination" type="button">51件のPDFで検証</button></div>
+<section class="section glass"><h2>取引履歴</h2>
+<div class="form-grid"><label class="form-group"><span>月</span><input type="month" id="filterMonth" value="2034-04"></label><label class="form-group"><span>口座</span><select id="filterAccount"></select></label></div>
+<details class="history-advanced"><summary id="historyFilterLabel">絞り込み</summary><div class="form-grid"><label class="form-group"><span>銘柄</span><select id="filterSymbol"></select></label><label class="form-group"><span>区分</span><select id="filterCategory"></select></label><label class="form-group"><span>出典</span><select id="filterSource"></select></label><label class="form-group"><span>戦略</span><select id="filterStrategy"></select></label><label class="form-group"><span>並び順</span><select id="sortOrder"><option value="newest">新しい順</option><option value="oldest">古い順</option></select></label></div></details>
+<div id="historyBody" class="transaction-list" role="list"></div><div class="history-list-footer"><span id="historyCount"></span><button id="historyMore" type="button">もっと見る</button></div></section></main></body></html>

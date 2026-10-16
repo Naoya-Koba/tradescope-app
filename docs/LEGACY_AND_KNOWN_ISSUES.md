@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known issue — Historyの確認済み表示統合（v324）
+
+LIGHT／みんなのeffective confirmedだけ1行化し、PDF金融値＋manual memo／strategyを表示する。解除は2行復帰、元record・監査履歴・manual削除参照保護を保持。統合行はmetadata限定編集のみで削除不可。GMO／SBIのv1、Open Positions／Portfolio／Risk／金融計算は不変、Backup v16。ambiguous選択・one-to-many／many-to-one・reassign UIは未対応。複数タブの完全mutexは新設せず、保存直前guard／postconditionと競合停止を維持する。以下の旧版記述は当時の工程境界。
+
 ## Current — inactive旧confirmedによる永久占有を解消（v323）
 
 旧PDF confirmedがreader上inactive／非effectiveでも保存service・履歴validatorが占有を維持していたv322の不整合を修正。現在effectiveなconfirmedだけが占有し、正常inactiveは事前revoke不要。manual金融事実の変更によるstaleも永久占有しないが、再確認時の最新candidate／fingerprint検証は維持する。broken／conflict／adoption不明は非占有として無視せず停止する。

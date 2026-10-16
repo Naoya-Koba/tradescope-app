@@ -1,5 +1,8 @@
-const CACHE_NAME = 'tradescope-static-v323';
+const CACHE_NAME = 'tradescope-static-v324';
 const CORE_ASSETS = [
+  "./assets/history-list-view.js?v=20261016-1",
+  "./assets/manual-metadata-save.js?v=20261016-1",
+  "./history/manual-metadata-ui.js?v=20261016-1",
   "./history/reconciliation-v2-ui.js?v=20261015-11",
   "./assets/reconciliation-v2-save.js?v=20261015-12",
   "./assets/transaction-reconciliation-v2.js?v=20261015-12",
@@ -75,9 +78,9 @@ const CORE_ASSETS = [
   "./assets/trade-history-core.js?v=20261015-9",
   "./top/style.css?v=20261013-4",
   "./top/script.js?v=20261015-9",
-  "./history/history.css?v=20261015-11",
-  "./history/history.js?v=20261015-11",
-  "./history/transaction-ui.js?v=20261015-11",
+  "./history/history.css?v=20261016-1",
+  "./history/history.js?v=20261016-1",
+  "./history/transaction-ui.js?v=20261016-1",
   "./profit/soneki.html",
   "./profit/soneki.css?v=20261014-7",
   "./profit/soneki.js?v=20261015-3",

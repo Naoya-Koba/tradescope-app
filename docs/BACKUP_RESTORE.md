@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — History統合はBackup v16から再構成（v324）
+
+Backup v16を維持し、新key／schema／migrationなし。表示統合rowは保存しない。既存manualのmemo／strategy、PDF v3、collection／decision、reconciliation v2を復元後に読み、現在effectiveなconfirmedだけから同じ1行表示を再構成する。限定編集はmanual原recordの他fieldを保持する。v1〜v15 restoreの既存規則は変更しない。以下の旧版記述は当時の工程境界。
+
 ## Current / Decided — v16の履歴保持と現在占有検証（v323）
 
 Backup v16／v2 record schemaは維持。旧inactive confirmed＋新active confirmedが同じmanualに存在する履歴を受理し、raw manualとモデルを合わせた正式v2 readerで現在effectiveなconfirmedの1対1だけを検証する。同じmanual／imported rowに複数current effectiveがあれば拒否。broken参照／fingerprint／chain／adoption異常も拒否し、「inactive」と推測して通さない。モデルだけの履歴validationを完全なpayload横断validationの代わりにしない。

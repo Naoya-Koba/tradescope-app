@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current — History Listだけを1行化（v324）
+
+LIGHT／みんなの現在effectiveなconfirmedだけを件数／filter／50件paginationより前に表示統合する。日時・口座・銘柄・action／side・数量・価格・個別損益・swap・fee・受渡日はPDF基準、nullをmanual値で補完しない。memo／strategyはmanual参照、戦略filterはそのmetadataを使う。取得元はPDF／手入力の双方に同一行が1回だけ該当する。解除成功後は即2行に戻る。
+
+既存transaction resolver／v1 reconciliation／candidate比較／金融正本は変更しない。Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／calendar swap／入出金への接続・式変更なし。以下の旧版記述は当時の工程境界。
+
 ## Current — current occupancy限定修正（v323）
 
 履歴confirmedと現在の排他を分け、占有は現在effectiveなconfirmedだけから導出する。inactive旧relationは監査用に残し、新activeの明示確認を妨げない。candidateの金融比較・manual／PDF原値・Historyの別行表示・metadataは変更しない。Top／Allocation／Monthly／Annual／Trends／Portfolio／Open Positions／Risk、realized／swap／deposit／withdrawalへの接続・計算変更なし。
