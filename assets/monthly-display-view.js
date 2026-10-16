@@ -5,7 +5,8 @@
   const csv = node ? require('../import/csv-core.js') : root.TradeScopeCSV;
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
-  const version = 'monthly-display-v8';
+  const cashflow=node?require('./cashflow-view.js'):root.TradeScopeCashflowView;
+  const version = 'monthly-display-v9';
   const traders=node?require('./traders-source-policy.js'):root.TradeScopeTradersSourcePolicy;
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
@@ -117,10 +118,13 @@
       const asset = complete && !explicitAsset ? calculator.net(year, month, key) : knownSum(observed.components.map(item => item.asset));
       const unrealized = complete || resolved.source === 'legacy' || resolved.sourceAdoptions?.length&&numeric(resolved.unrealizedPnl)!==null ? read('unrealizedPnL')
         : knownSum(observed.components.map(item => item.unrealized));
+      const flows=cashflow.account({accountKey:key,targetMonth,values:{deposit:read('deposit')===null?null:adoptedRow.deposit,
+        withdrawal:read('withdrawal')===null?null:adoptedRow.withdrawal},resolved,input,models,tradingData});
       return { key, targetMonth, sourceMonth: targetMonth, hasData, complete, partial,
         conflict: resolved.source === 'conflict' || observed.conflict&&!balanceOnly, ...(balanceOnly?{assetConflict:observed.conflict}:{}), components: observed.components,
         realized: read('realizedPnL'), swap: read('swapPnL'), unrealized,
-        deposit: read('deposit'), withdrawal: read('withdrawal'), asset,
+        deposit:numeric(flows.deposit),withdrawal:numeric(flows.withdrawal),cashflow:flows,asset,
+        ...(key==='smbc'?{balanceBasis:flows.observation.kind==='bank-balance-observation'?'bank-balance-observation':'legacy-ledger'}:{}),
         confirmed: complete ? calculator.confirmed(year, month, key) : null,
         ...(explicitAsset?{assetBasis:'source-observation',ledgerAsset:complete?calculator.net(year,month,key):null}: {}) };
     }

@@ -6,7 +6,8 @@
   const sbiBalances = typeof module !== 'undefined' && module.exports ? require('./sbi-balance-adoption.js') : root.TradeScopeSbiBalanceAdoption;
   const sbiPeriod = typeof module !== 'undefined' && module.exports ? require('./sbi-period-input.js') : root.TradeScopeSbiPeriodInput;
   const lightScalars = typeof module !== 'undefined' && module.exports ? require('./lightfx-scalar-adoption.js') : root.TradeScopeLightScalarAdoption;
-  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v3';
+  const cashflow = typeof module !== 'undefined' && module.exports ? require('./cashflow-view.js') : root.TradeScopeCashflowView;
+  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v4';
   const policyVersion = 'monthly-policies-v3';
   const sourceAdapterVersion='monthly-source-adapter-v8';
   const policies = Object.freeze({
@@ -247,6 +248,7 @@
       return null;
     }
     function monthlyFieldTotal(year, month, keys, field) {
+      if (['deposit','withdrawal'].includes(field)) keys=cashflow.accountKeys(keys);
       if (!monthEntered(year, month, keys)) return null;
       for (const key of keys.filter(key => usesCanonical(year, month, key))) {
         const resolved = read(year, month, key);
@@ -257,8 +259,11 @@
     }
     function confirmed(year, month, key) {
       if(key==='smbc'){
-        const values=sourceValues(models,monthKey(year,month),key),cash=values.find(v=>v.metric==='cashBalance'&&v.currency==='JPY');
-        return cash?cash.status==='adopted'?number(cash.value):null:legacy.calculateAccountConfirmedAssets(tradingData,initialFunds,year,month,key);
+        const observation=cashflow.bankObservation(tradingData,models,monthKey(year,month));
+        // Explicit balances, including zero, are authoritative. No cumulative stale deltas.
+        if(observation.explicit)return number(observation.value);
+        // Read-only compatibility for old periods with no explicit observation.
+        return legacy.calculateAccountConfirmedAssets(tradingData,initialFunds,year,month,key);
       }
       if (!usesCanonical(year, month, key)) return legacy.calculateAccountConfirmedAssets(tradingData, initialFunds, year, month, key);
       const [cutoverYear,cutoverMonth]=(policies[key]?.cutover??`${year}-12`).split('-').map(Number);
@@ -286,7 +291,7 @@
     }
     function flows(year, month, keys) {
       let deposit = 0, withdrawal = 0;
-      for (let m = 1; m <= month; m++) for (const key of keys) {
+      for (let m = 1; m <= month; m++) for (const key of cashflow.accountKeys(keys)) {
         const resolved=read(year,m,key);
         if (usesCanonical(year, m, key) && resolved.source!=='legacy' && !resolved.completeness.monthly) return { deposit: null, withdrawal: null };
         const data = row(year, m, key);
@@ -317,7 +322,8 @@
       return result;
     }
     function fingerprint(year) {
-      const source = JSON.stringify([legacy.createYearSourceFingerprint(tradingData, initialFunds, initialUnrealized, year), dependencies(models, year, enabledKeys), models === null]);
+      const source = JSON.stringify([legacy.createYearSourceFingerprint(tradingData, initialFunds, initialUnrealized, year), dependencies(models, year, enabledKeys), models === null,
+        cashflow.version,cashflow.bank(tradingData,models,monthKey(year,1))]);
       let hash = 2166136261;
       for (let index = 0; index < source.length; index++) { hash ^= source.charCodeAt(index); hash = Math.imul(hash, 16777619); }
       return `${calculationVersion}-${(hash >>> 0).toString(16)}`;

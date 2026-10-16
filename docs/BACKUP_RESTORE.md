@@ -1,5 +1,9 @@
 # Backup and Restore Specification
 
+## Current — cashflowは既存原値から再構成（v325）
+
+Backup v16維持、新Storage key／schema／migrationなし。SMBCの明示月末残高と旧deposit／withdrawalをそのまま往復し、復元後readerだけが観測残高と隣接月増減を解決する。旧差額を削除・書換せず、実cashflowやTransferへ変換しない。v1〜v15の復元・preserve規則は変更しない。
+
 ## Current — History統合はBackup v16から再構成（v324）
 
 Backup v16を維持し、新key／schema／migrationなし。表示統合rowは保存しない。既存manualのmemo／strategy、PDF v3、collection／decision、reconciliation v2を復元後に読み、現在effectiveなconfirmedだけから同じ1行表示を再構成する。限定編集はmanual原recordの他fieldを保持する。v1〜v15 restoreの既存規則は変更しない。以下の旧版記述は当時の工程境界。

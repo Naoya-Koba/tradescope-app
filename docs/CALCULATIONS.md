@@ -1,5 +1,11 @@
 # Calculation Specification
 
+## Current / Decided — account flowと銀行観測（v325）
+
+口座deposit／withdrawalは相手先未分類のaccount-scope値。Monthly／Annualの合計は口座別gross totalで、TradeScope全体の外部流入／流出を推定しない。SMBCの明示月末残高を資産額へ直接使用し、残高増減や旧保存差額を追加加算しない。過去月修正後も後月の明示残高は不変、隣接月増減だけ再導出する。前月なし／月抜けはunknown、12月→1月は両観測があれば導出可能。前年度12月も表示fingerprintへ含める。
+
+銀行は投資運用成績から除外する既存方針を維持。投資口座のPerformanceは当該口座deposit／withdrawalを引き続き資金調整に使い、SMBC→SBI等を利益にしない。片側未入力の移動中資金・内部振替・income／feeを推測生成しない。History／Open Positions／Portfolio／Risk／Allocationの定義は変更しない。
+
 ## Current — History Listだけを1行化（v324）
 
 LIGHT／みんなの現在effectiveなconfirmedだけを件数／filter／50件paginationより前に表示統合する。日時・口座・銘柄・action／side・数量・価格・個別損益・swap・fee・受渡日はPDF基準、nullをmanual値で補完しない。memo／strategyはmanual参照、戦略filterはそのmetadataを使う。取得元はPDF／手入力の双方に同一行が1回だけ該当する。解除成功後は即2行に戻る。
@@ -422,15 +428,16 @@ Monthly P/L = 当月決済損益 + 当月スワップ損益
 
 ## 8. 銀行口座
 
-**Current**：月末残高と前月末残高の差を入出金へ変換し、決済損益、スワップ、評価損益を0にする。
+**Current / v325**：明示月末残高を資産観測として読み、0と欠損を区別する。新しいdeposit／withdrawalは生成しない。両隣接月に明示観測がある場合だけ表示用残高増減を求め、月別詳細に「残高増減」と表示する。
 
 ```text
-差額 = 当月末残高 - 前月末残高
-差額 > 0: 入金 = 差額
-差額 < 0: 出金 = abs(差額)
+残高増減 = 当月末残高 - 直前月末残高
+片方の観測がない: unknown（0やcarryから作らない）
 ```
 
 **Decided**：銀行は総資産に含め、投資運用成績から除外する原則を維持する。
+
+**Legacy compatibility**：明示残高観測がない旧期間だけ旧ledger互換を維持し、観測値とは区別する。過去に保存された差額由来deposit／withdrawalをmigrationしないが、月次／年間の口座入出金集計からは除外する。
 
 **Under consideration**：利息を単純入金と分離する将来分類。
 

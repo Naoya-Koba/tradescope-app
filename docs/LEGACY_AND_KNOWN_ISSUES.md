@@ -1,5 +1,9 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known boundary — cashflow（v325）
+
+account-scope入出金とSMBC残高観測／増減を分離済み。銀行の明示残高がある月は旧差額の陳腐化で資産がずれず、観測なしの旧期間はlegacy ledger互換として表示する。月次／年次入出金から銀行差額を除外するが、全体外部flowは未確定のまま。内部振替pairing・銀行明細・crypto transfer・新income／移動feeは将来工程。未分類・片側未入力・観測時点差を自動補完しない。延期済みSBI国内保有接続、Portfolio／Open Positions／Risk／Allocation再設計は⑤以降。以下の旧版記述は当時の工程境界。
+
 ## Current / Known issue — Historyの確認済み表示統合（v324）
 
 LIGHT／みんなのeffective confirmedだけ1行化し、PDF金融値＋manual memo／strategyを表示する。解除は2行復帰、元record・監査履歴・manual削除参照保護を保持。統合行はmetadata限定編集のみで削除不可。GMO／SBIのv1、Open Positions／Portfolio／Risk／金融計算は不変、Backup v16。ambiguous選択・one-to-many／many-to-one・reassign UIは未対応。複数タブの完全mutexは新設せず、保存直前guard／postconditionと競合停止を維持する。以下の旧版記述は当時の工程境界。

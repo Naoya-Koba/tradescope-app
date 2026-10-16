@@ -1,5 +1,9 @@
 # Data Model
 
+## Current / Decided — cashflow意味分離（v325）
+
+`cashflow-view.js`は非永続reader。deposit／withdrawalは口座境界の月次aggregateであり、internal／external未分類、全体外部flowはnot-derived。PDF原値・manual採用／補正を区別し、SBI VC previewの入出庫／報酬を永続flowへ昇格しない。SMBCの`tradingData[year][month].smbc.monthEndBalance`は明示残高観測（0有効）、隣接月の両観測がある時だけ残高増減をread-time導出する。保存済み旧deposit／withdrawalは削除せず、実cashflowの集計対象にはしない。新key／schema／migration／Transfer recordなし、Backup v16維持。
+
 ## Current / Decided — History表示統合とmetadata限定編集（v324）
 
 LIGHT／みんなのみ、正式v2 readerが正常で現在effectiveなconfirmed 1対1関係をHistory専用projectionで1行表示する。金融表示・日時・原本参照はPDF v3が正本、manualから参照するのはmemo／strategyだけ。manual／PDF／relation原recordは保持し、表示結果を永続化しない。rejected／revoked／stale／inactive／broken／conflictは統合せず、無効PDFを復活させない。旧collection再採用は正式readerのeffective判定に従う。

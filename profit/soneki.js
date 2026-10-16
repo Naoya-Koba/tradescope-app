@@ -741,13 +741,6 @@ function calculateAccountConfirmedAssets(year, month, accountKey) {
   return monthlyCalculator().confirmed(year, month, accountKey);
 }
 
-function getBankMonthEndBalance(year, month, accountKey) {
-  const row = tradingData?.[year]?.[month]?.[accountKey] || {};
-  const stored = getStoredNumber(row, 'monthEndBalance');
-  if (Number.isFinite(stored)) return stored;
-  return calculateAccountNetAssets(year, month, accountKey);
-}
-
 function applyBankBalanceInputsForMonth(year, month) {
   ensureLegacyDraftMonth(year, month);
 
@@ -756,19 +749,13 @@ function applyBankBalanceInputsForMonth(year, month) {
     const monthEndBalance = getStoredNumber(row, 'monthEndBalance');
     if (!Number.isFinite(monthEndBalance)) return;
 
-    const prevBalance = month === 1
-      ? (Number(yearInitialFunds?.[year]?.[account.key]) || 0)
-      : getBankMonthEndBalance(year, month - 1, account.key);
-
-    const diff = monthEndBalance - (Number.isFinite(prevBalance) ? prevBalance : 0);
-
     row.monthEndBalance = monthEndBalance;
     row.realizedPnL = 0;
     row.swapPnL = 0;
     row.unrealizedPnL = 0;
     row.unrealizedLegs = [];
-    row.deposit = diff > 0 ? diff : 0;
-    row.withdrawal = diff < 0 ? Math.abs(diff) : 0;
+    // A balance is an observation, not a cashflow. Preserve released legacy fields
+    // without generating new deltas; the read-only projection derives adjacent changes.
   });
 }
 
@@ -2151,21 +2138,14 @@ function renderMonthlyDetailPane(month = currentMonth) {
             <span class="detail-account-name" data-month-status="${view.status}"><span class="detail-account-dot" style="background:${account.color}"></span>${displayAccountName(account.key)}</span>
           </div>
           <div class="detail-account-summary">
-            <div class="detail-account-summary-label">月末残高</div>
+            <div class="detail-account-summary-label">${view.balanceBasis==='legacy-ledger'&&Number.isFinite(netAssets)?'残高（旧データ）':'月末残高'}</div>
             <div class="detail-account-total"${optionalSignStyle(netAssets)}>${formatOptionalJPY(netAssets)}</div>
           </div>
           <div class="detail-account-cashflow">
             <div class="detail-account-cashflow-head">
-              <span class="k">入出金合計</span>
-              <span class="v"${optionalSignStyle(accountCashflow)}>${formatOptionalJPY(accountCashflow)}</span>
+              <span class="k">残高増減</span>
+              <span class="v"${optionalSignStyle(view.cashflow?.balanceChange?.value==null?null:Number(view.cashflow.balanceChange.value))}>${formatOptionalJPY(view.cashflow?.balanceChange?.value==null?null:Number(view.cashflow.balanceChange.value))}</span>
             </div>
-            <details class="detail-account-cashflow-details">
-              <summary class="detail-account-cashflow-toggle">入出金内訳</summary>
-              <div class="detail-account-cashflow-list">
-                <div class="item"><span class="k">入金</span><span class="v">${formatOptionalJPY(deposit)}</span></div>
-                <div class="item"><span class="k">出金</span><span class="v"${optionalSignStyle(Number.isFinite(withdrawal) ? -withdrawal : null)}>${formatOptionalJPY(withdrawal)}</span></div>
-              </div>
-            </details>
           </div>
         </div>
       `;

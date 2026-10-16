@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
   const node=typeof module!=='undefined'&&module.exports;
-  const version='display-results-v1';
+  const version='display-results-v2';
   const finite=v=>Number.isFinite(v);
   // Period comparison eligibility, not a return formula or a current-balance selector.
   function periodComparison(period,{initialKnown=true}={}){
@@ -24,7 +24,7 @@
     const rows=raw.rows.map(row=>{
       const status=readFailed?'read-failure':row.conflict?'conflict':!row.hasData?'missing':row.partial?'partial':'complete';
       if(!['missing','conflict','read-failure'].includes(status))return {...row,status,total:display.monthlyPnl(year,number,[row]).total};
-      return {...row,status,total:null,asset:null,confirmed:null,realized:null,swap:null,unrealized:null,deposit:null,withdrawal:null,components:[]};
+      return {...row,status,total:null,asset:null,confirmed:null,realized:null,swap:null,unrealized:null,deposit:null,withdrawal:null,cashflow:null,components:[]};
     });
     return readFailed?{...raw,rows,hasData:false,provisional:false,total:null,realized:null,swap:null,unrealized:null,deposit:null,withdrawal:null}:{...raw,rows};
   }

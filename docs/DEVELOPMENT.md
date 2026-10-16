@@ -1,5 +1,13 @@
 # Development Guide
 
+## Current — cashflow projection／SMBC観測（v325）
+
+`cashflow-view.js`をCSV／monthly-source-contractの後、monthly-account-resolverの前にロードする。純粋account flow／bank observation／adjacent balance changeと、not-derivedな全体外部flowを提供する。共有resolverはSMBCの明示観測を優先し、観測なし旧期間だけlegacy互換。投資口座のledger／Performance資金調整は維持。monthly-displayのbank flowはnull、読込失敗時はdisplay-resultsで派生情報も隠す。保存UIは新たな銀行差額を生成せず、旧値を保持する。
+
+PWA v325／変更asset query 20261016-2、Backup v16。匿名unit／DOM／Memoryのcashflow testsに旧Backup v1〜v16復元を含む。`tests/cashflow-server.cjs`は127.0.0.1だけにbindし、公開precache資産＋匿名cashflow harnessだけを配信する（実PDF／Backup／任意パスは不可）。harnessは空originのみ準備可能、検証後はその匿名Storage／SW／cacheとserverを清掃する。productionデータを使用しない。
+
+検証：追加74件／全3,056 tests Pass。JS 169／MJS 4／CJS 1＋主要HTML inline 3の構文、precache 99資産、主要4ページのlocal URL 189、依存順、diff-checkを確認。内蔵ブラウザの隔離localhostで通常入力・保存により2月残高120万円→110万円へ修正し、1月100万円／2月110万円／3月130万円、残高増減は初月—／2月10万円／3月20万円を確認。旧保存depositは保持、Annual口座入出金合計へ銀行差額を含めず、Top／Asset Trendも確認。390px／1280pxで横overflowなし、Console Error／Warningなし。検証用Storage／SW／cache／tab／viewport／serverは清掃済み。production Storage・実PDF・実Backupは未操作。実iPhone Safari／PWAは未確認。
+
 ## Current — History List projectionとmetadata編集（v324）
 
 `assets/history-list-view.js`は既存transaction-view結果と正式v2 readerを合成するHistory専用非永続projection。PDFのID／金融原値／原本参照を保持し、現在有効なconfirmedだけでmanual表示行を除外する。manual／relation／model変更を表示fingerprintへ含め、既存storage／再表示refreshから再構成する。transaction-view・v1・candidate・v2 reader／saveの意味は変更しない。
