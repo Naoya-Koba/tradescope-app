@@ -1,5 +1,9 @@
 # Development Guide
 
+## Planned — 次の中心工程は大型アップデートの一括実装
+
+⑧・⑨の全項目完了後に⑩へ進む旧順序を変更し、⑦完了後はホーム／運用／取引履歴／設定をまとめて動作させる実装を中心工程にする。専用ブランチ・隔離originでmainとproduction Storageを保護する。テスト・commitは論理単位で分ける。完全Backupだけに依存せず、保存形式・復元互換・必要な移行と失敗時保護を事前に確認する。一括実装後は実画面を見て段階的に改善する。本⑦-Bで大型UIは開始しない。
+
 ## Current — ⑦-B 計算整合性（v328）
 
 currentは有効採用対象月・成分別年跨ぎ参照、月間P/LはMonthlyDisplay共通coverage、確定ledgerはrequired flow完全性とnet独立fallbackを使用する。保存契約は不変。時点・coverage・既知小計／完全値はCALCULATIONS.mdを参照。PWA v328、変更asset query 20261016-5、Backup v16・12モデル・Storage key不変。schema／migration／importer／収益event／大型UIは追加しない。
