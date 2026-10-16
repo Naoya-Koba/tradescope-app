@@ -10,6 +10,12 @@
  }
  document.getElementById('prepare').onclick=()=>seed(true).catch(e=>result.textContent=e.message);
  document.getElementById('restore').onclick=()=>seed(false).catch(e=>result.textContent=e.message);
+ for(const button of document.querySelectorAll('[data-scenario]'))button.onclick=async()=>{
+  if(localStorage.getItem(marker)!=='synthetic-only')return;
+  const response=await fetch('calculation-integrity-fixture.json?scenario='+button.dataset.scenario);if(!response.ok)return;
+  const data=await response.json();for(const [key,value]of Object.entries(data))if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);
+  result.textContent='架空シナリオ：'+button.textContent;
+ };
  document.getElementById('corrupt').onclick=()=>{
   if(localStorage.getItem(marker)!=='synthetic-only')return;
   localStorage.setItem('yearInitialFunds','broken');result.textContent='架空の年初資金JSONだけを破損しました。';

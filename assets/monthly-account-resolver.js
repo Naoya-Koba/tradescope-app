@@ -8,7 +8,7 @@
   const lightScalars = typeof module !== 'undefined' && module.exports ? require('./lightfx-scalar-adoption.js') : root.TradeScopeLightScalarAdoption;
   const cashflow = typeof module !== 'undefined' && module.exports ? require('./cashflow-view.js') : root.TradeScopeCashflowView;
   const initialView = typeof module !== 'undefined' && module.exports ? require('./year-initial-view.js') : root.TradeScopeYearInitial;
-  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v5';
+  const accountId = 'acc_sbi_sec', cutover = '2026-09', calculationVersion = 'monthly-ledger-v6';
   const policyVersion = 'monthly-policies-v3';
   const sourceAdapterVersion='monthly-source-adapter-v8';
   const policies = Object.freeze({
@@ -145,7 +145,7 @@
     const bad=values.some(v=>['stale','conflict','unresolved'].includes(v.status));
     const assetRows=sources.assetComponents(values.filter(v=>v.currency==='JPY'));
     if(!values.some(v=>sources.flowMetrics.includes(v.metric)||v.metric==='unrealizedPnl'))return {...base,
-      ...(bad&&key!=='sbivc'?{source:'conflict',confirmed:false,completeness:{monthly:false,observation:false,complete:false}}:{}),sourceAdoptions:values,
+      ...(bad?{assetConflict:true,completeness:{...base.completeness,observation:false,complete:false}}:{}),sourceAdoptions:values,
       ...(key==='sbivc'?{balanceOnlyAdoption:true}:{}),
       observedAsset:assetRows.length?sum(assetRows.map(v=>v.value)):base.observedAsset??null};
     const old=base.source==='legacy'?tradingData?.[Number(targetMonth.slice(0,4))]?.[Number(targetMonth.slice(5))]?.[key]??{}:base;
@@ -163,9 +163,10 @@
       else adopted[metric]=base.source==='legacy'?(number(old[legacyField])===null||number(old[legacyField])===0&&old.__saved!==true?null:String(old[legacyField])):old[metric]??null;
     }
     const balances=sources.assetComponents(values.filter(v=>v.currency==='JPY')),asset=sum(balances.map(v=>v.value));
-    const monthly=!bad&&(key==='smbc'?decimal(asset):['realizedPnl','swapPnl','deposit','withdrawal'].every(f=>decimal(adopted[f])));
+    const flowBlocked=values.some(v=>sources.flowMetrics.includes(v.metric)&&['stale','conflict','unresolved'].includes(v.status));
+    const monthly=!flowBlocked&&(key==='smbc'?decimal(asset):['realizedPnl','swapPnl','deposit','withdrawal'].every(f=>decimal(adopted[f])));
     const observation=!bad&&(key==='smbc'?decimal(asset):decimal(adopted.unrealizedPnl));
-    return {...base,...adopted,source:bad?'conflict':'canonical',sourceAdoptions:values,observedAsset:balances.length?asset:base.observedAsset??null,
+    return {...base,...adopted,source:flowBlocked?'conflict':'canonical',sourceAdoptions:values,observedAsset:balances.length?asset:base.observedAsset??null,
       confirmed:monthly,completeness:{monthly,observation,complete:monthly&&observation}};
   }
 
@@ -224,6 +225,7 @@
     const failed=key=>initialView.failed(options.readState,key);
     const opening=(year,keys)=>initialView.create(initialFunds,initialUnrealized,year,keys,{readState:options.readState});
     const legacyFunds=(year,key)=>({[year]:{[key]:opening(year,[key]).funds.value}});
+    const applicableMonth=(year,month,key)=>{const p=options.accountPeriods?.[key],m=monthKey(year,month);return !(p?.startMonth&&m<p.startMonth||p?.endMonth&&m>p.endMonth);};
     const explicitMonths=(year,key)=>sources.heads(records(models,'monthlySources')).filter(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth.startsWith(`${year}-`)
       &&(sources.flowMetrics.includes(r.metric)||r.metric==='unrealizedPnl')).map(r=>Number(r.targetMonth.slice(5)));
     const usesCanonical = (year, month, key) => (enabledKeys.includes(key) && policies[key] && monthKey(year, month) >= policies[key].cutover)
@@ -235,9 +237,22 @@
       if(failed('models'))return {};
       const resolved = read(year, month, key);
       if (resolved.source === 'legacy') return failed('tradingData')?{}:oldRow(year, month, key);
-      if (resolved.source !== 'canonical') return {};
+      if (resolved.source !== 'canonical') {
+        if(resolved.source==='conflict')return {};
+        const input=records(models,'monthlyAccountInputs').find(r=>r.accountId===sourceAccountIds[key]&&r.targetMonth===monthKey(year,month));
+        if(input?.schemaVersion===2)return {realizedPnL:input.adoptedValues.realizedPnl,swapPnL:input.adoptedValues.swapPnl,deposit:input.adoptedValues.deposit,withdrawal:input.adoptedValues.withdrawal,unrealizedPnL:input.adoptedValues.unrealizedPnl};
+        if(input?.schemaVersion===1&&key==='sbi')return {realizedPnL:input.realizedPnl,swapPnL:0,deposit:input.deposit,withdrawal:input.withdrawal};
+        return {};
+      }
       return { realizedPnL: resolved.realizedPnl, swapPnL: resolved.swapPnl, deposit: resolved.deposit,
         withdrawal: resolved.withdrawal, unrealizedPnL: resolved.unrealizedPnl };
+    }
+    function confirmedInputs(year,month,key){
+      const r=read(year,month,key),data=row(year,month,key);
+      // Released legacy SBI/VC nonzero swap values remain explicit historical inputs.
+      const swapOptional=['sbi','sbivc'].includes(key)&&number(data.swapPnL)===null;
+      const values=['realizedPnL','deposit','withdrawal',...(swapOptional?[]:['swapPnL'])].map(f=>number(data[f]));
+      return r.source!=='conflict'&&!failed('models')&&!(r.source==='legacy'&&(failed('tradingData')||!legacy.isAccountMonthEntered(yearData(year),month,key)))&&values.every(Number.isFinite);
     }
     function entered(year, month, key) {
       if(failed('models'))return false;
@@ -274,6 +289,10 @@
         return failed('tradingData')||!opening(year,[key]).funds.complete?null:legacy.calculateAccountConfirmedAssets(tradingData,legacyFunds(year,key),year,month,key);
       }
       if(failed('tradingData')||!opening(year,[key]).funds.complete)return null;
+      // No gaps or null required flows may be silently treated as zero. Empty
+      // months stay unknown until an explicit lifecycle/context excludes them.
+      if(!applicableMonth(year,month,key))return null;
+      for(let m=1;m<=month;m++)if(applicableMonth(year,m,key)&&!confirmedInputs(year,m,key))return null;
       if (!usesCanonical(year, month, key)) return legacy.calculateAccountConfirmedAssets(tradingData, legacyFunds(year,key), year, month, key);
       const [cutoverYear,cutoverMonth]=(policies[key]?.cutover??`${year}-12`).split('-').map(Number);
       const start=Math.min(Number(year)===cutoverYear?cutoverMonth:1,...explicitMonths(year,key));
@@ -282,19 +301,20 @@
       const derivedInput=key==='sbi'&&read(year,month,key).periodInput?.flowSource?.entity==='monthlyAccountInputs';
       if((explicitMonths(year,key).length||derivedInput)&&!Number.isFinite(value))return null;
       for (let m = start; m <= month; m++) {
+        if(!applicableMonth(year,m,key))continue;
         const resolved = read(year, m, key);
         if(resolved.source==='legacy'){
           const data=oldRow(year,m,key);value+=(number(data.realizedPnL)??0)+(number(data.swapPnL)??0)+(number(data.deposit)??0)-(number(data.withdrawal)??0);continue;
         }
-        if (!resolved.completeness.monthly || resolved.source !== 'canonical') return null;
-        value += Number(resolved.realizedPnl) + Number(resolved.swapPnl) + Number(resolved.deposit) - Number(resolved.withdrawal);
+        const data=row(year,m,key);
+        value += number(data.realizedPnL) + (number(data.swapPnL)??0) + number(data.deposit) - number(data.withdrawal);
       }
       return Number.isFinite(value) ? value : null;
     }
     function net(year, month, key) {
       if (key === 'smbc') return confirmed(year, month, key);
       if(failed('models')||failed('tradingData')||!opening(year,[key]).funds.complete)return null;
-      if (!usesCanonical(year, month, key)) return legacy.calculateAccountNetAssets(tradingData, legacyFunds(year,key), year, month, key);
+      if (!usesCanonical(year, month, key)) return confirmed(year,month,key)===null?null:legacy.calculateAccountNetAssets(tradingData, legacyFunds(year,key), year, month, key);
       const value = confirmed(year, month, key), resolved = read(year, month, key);
       const unrealized=resolved.source==='legacy'?number(oldRow(year,month,key).unrealizedPnL):number(resolved.unrealizedPnl);
       return Number.isFinite(value)&&unrealized!==null ? value+unrealized:null;
@@ -303,8 +323,9 @@
       if(failed('tradingData')||failed('models'))return {deposit:null,withdrawal:null};
       let deposit = 0, withdrawal = 0;
       for (let m = 1; m <= month; m++) for (const key of cashflow.accountKeys(keys)) {
+        if(!applicableMonth(year,m,key))continue;
         const resolved=read(year,m,key);
-        if (usesCanonical(year, m, key) && resolved.source!=='legacy' && !resolved.completeness.monthly) return { deposit: null, withdrawal: null };
+        if (number(row(year,m,key).deposit)===null||number(row(year,m,key).withdrawal)===null) return { deposit: null, withdrawal: null };
         const data = row(year, m, key);
         deposit += number(data.deposit) ?? 0; withdrawal += number(data.withdrawal) ?? 0;
       }

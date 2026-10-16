@@ -1,5 +1,36 @@
 # Calculation Specification
 
+## Current / Decided — 残存計算整合性（⑦-B、v328）
+
+**F1**：`CurrentAssets.latest`は有効な採用観測と正式legacy入力だけから対象月を選ぶ。未採用Batch／Snapshot／source候補や空年はcurrentを進めない。口座・成分ごとに年を跨いで最後の有効採用値を参照する。順序は採用契約のtargetMonthであり、取込日・採用日だけで更新しない。観測日を対象月へ書き換えず、有効期限を恣意的に設けない。stale／conflict／明示0／終了・不明保有集合の停止を維持し、過去の正数量を復活させない。`create`の固定年参照・fixed-month・periodへ年跨ぎcurrent carryを流さない。
+
+**F2**：MonthlyDisplayの口座月coverageと同じaggregateをMonthly Summary／MONTH DETAIL／グラフ／口座別／全口座／Annualが共用する。cutover前の独自集計は使用しない。月間合計は決済＋Swapであり、評価損益・資産観測・配当・stakingは加算しない。Inputも同じ正式sourceを参照する。共通採用がある旧Input欄は共通値をread-only表示し、legacyへコピー・重複保存しない。
+
+**F3**：通常サマリーは既知金額の数値小計を維持する。内部はvalue／knownSubtotal、completeValue、complete、status、itemsを分け、known（明示0を含む）／null／missing／invalid／not-applicable／not-implemented／read-failure／conflict／未到来／開設前／終了後を区別する。部分小計を完全な分子・分母へ流さず、率は必要な入力・対象口座がそろった場合だけ返す。新badge・強調・発光は今回追加しない。
+
+FX Swapは必要入力。SBI証券・SBI VCのSwapは対象外だが、過去legacyに明示保存された非0 Swapは既存の金融事実として維持する。SMBCは残高観測で、投資P/L・口座gross flowの対象外。SBIの自動決済損益、SBI VC損益・原価・stakingの未実装をユーザーの入力漏れと同一視せず、手入力・正式採用済みの値は有効に扱う。
+
+現行Accountには開設・終了月の永続fieldがない。最初の取込月やcreatedAtから推測しない。読み取りcontext `accountPeriods`の明示startMonth／endMonthだけを対象外判定に使い、不明ならunknown-lifecycleと理由を保持する。保存・migrationは行わない。calendarCutoffより後の未取得月はnot-due。明示された正式値を将来月という理由だけでは捨てない。年間coverageは小計と完全性を保持する。
+
+年間coverage.complete（未到来を除く集計範囲の完全性）とcalendarYearComplete（暦年全体の完全性）も分ける。calculationCutoffは選択年12月、calendarCutoffは端末ローカル日付による未到来判定の現在月contextであり、両者を同一視しない。
+
+**F4**：年初資金と期間内の決済・必要Swap・入出金が既知なら、評価損益不明でも確定資産・確定Performanceは算出可能。netと別に直近完全月を選ぶ。必要flowのnull／欠損・未確認0・期間gapを0で通過させない。年初不明は⑦-Aのまま計算不可。銀行明示残高は独立。口座別fallbackを含む既存の期間式・比較定義は維持する。
+
+### F7 非永続の時点契約
+
+| 項目 | 意味 |
+| --- | --- |
+| displayMonth | consumerの表示対象月。実観測日ではない |
+| sourceMonth / fallbackMonths | 選んだ口座・成分・metricの月。currentは年跨ぎ、periodは既存の年内fallback |
+| observedAt / snapshotAsOf | 原観測の日付。不明はnullで、月末日・取込日から補完しない |
+| importedAt | 取込日時。観測日・採用日とは別 |
+| importPeriod | 原資料の対象期間。現行sourceに未保持ならnullで、対象月から推定しない |
+| adoptedAt | 明示採用またはnative State／Input確認日時。取得不能な旧互換はnull |
+| calculationCutoff | 計算対象の上限月。fallback月を書き換えない |
+| calendarCutoff | 未到来判定の暦月context。正式値を消す根拠にしない |
+
+current.effectiveTimeは最新有効採用対象月の表示cutoffで、全口座の同時観測を意味しない。口座time／成分observationsを保持し、`simultaneousSnapshot:false`を返す。periodもmetric別fallbackとtimeを返す。既存の口座別直近完全値による年初比を、厳密な同時点観測や時間加重収益率へ再定義しない。最終UIは大型アップデートへ送る。
+
 ## Current / Decided — 年初readerとsource別読込状態（⑦-A、v327）
 
 同じmetric・effective time・basis・scopeでは値だけでなく欠損状態と計算可能性も共有する。`assets/year-initial-view.js`は既存のCSV／balance decimal契約を使う非永続readerで、年初資金・年初評価損益を独立して読み、必要な両入力から年初純資産を返す。数値と有効な数値文字列を同じ金額として扱い、保存値は変換しない。明示0、null、missing、不正値、読込失敗、銀行の評価損益not-applicableを区別する。対象口座に欠損があれば完全合計はnullとし、取得済み小計は`knownSubtotal`として分離する。
@@ -12,11 +43,11 @@ Home／損益管理／Annual Summary／年初グラフ点／成長率／設定�
 
 設定で明示保存した空欄は、既存項目ではnull、元から存在しない項目はmissingを維持する。欠損時の既存の前年末候補は既知の値だけを入力候補にし、保存前の正式年初値にはしない。読込失敗中は入力カードのsource-service描画も停止し、表示集計の継続を妨げる例外を防ぐ。更新画面のatomic save契約は変更しない。新Storage key／migration／Backup schema変更はない（v16）。
 
-**Known issue / 対象外**：F1 latest年selector、F2月間P/L consumer、F3年間coverage、F4確定資産のmetric別完全性、F7観測時点・対象月・fallbackは後続工程。今回、最新年選択や完全月選択・年間部分集計の方針を変更しない。SBI収益・stakingの将来案を正式計算へ接続しない。
+⑦-AではF1／F2／F3／F4／F7を対象外に維持した。現行契約は上記⑦-B節。SBI収益・stakingの将来案は接続していない。
 
 ## 現在純資産の共通表示（2026-10-16）
 
-**Current / Decided**：Home、損益管理の「現在純資産」、Home Allocationは `CurrentAssets.latest` のcurrent projectionを共用する。選択年・選択月を入力にせず、保存済み月次データ／採用観測の最新対象年を選び、既存の `CurrentAssets.create`、`balanceHistory`、口座別adopted readerで構成する。空の将来年や年初資金の設定だけでcurrent対象年を切り替えない。観測が欠けた成分は既存のcarry／unknownルールに従い、nullを0にしない。
+**Current / Decided**：Home、損益管理の「現在純資産」、Home Allocationは `CurrentAssets.latest` のcurrent projectionを共用する。選択年・選択月を入力にせず、有効採用観測／正式legacy入力の最新対象月を選び、balanceHistoryと口座別adopted readerで成分別の年跨ぎcurrentを構成する。固定年createは独立する。空の将来年や年初資金の設定だけでcurrent対象年を切り替えない。観測が欠けた成分は既存のcarry／unknownルールに従い、nullを0にしない。
 
 **Current**：SBI VCの現物＋JPY現金は公式採用観測から取得し、実現／評価損益がnullでも取得済み資産を表示する。期間計算の完全月fallbackはcurrent資産へ適用しない。現在カードの増減／増減率は同current resultの比較可否とその対象年の既知年初値に従う。Annual／Monthly／確定資産／期間損益／固定月資産／年初資産は従来のperiod projectionを維持する。保存・Backup v16・migrationは変更しない。
 
@@ -152,9 +183,9 @@ SBI VCのbalance-only判断の未解決／競合を既存period flowの欠損へ
 
 ## Current / Decided — SBI VC残高の採用入口（v304）
 
-Open Positions、Portfolio、current-asset-view、Top／Allocationは共通SBI VC balance adoption resolverを使う。保有集合の最新対象月と現金の最新対象月を独立して保持し、全年最新（Position／Portfolio）と選択年内最新（Top／Allocation）の時点差を維持する。positive採用保有の公式marketValue＋採用cashBalanceを一度だけ合算し、reportedAssetTotal・レバレッジ担保・旧source・legacy取引は加算しない。空集合／数量0は過去positiveを復活させず、不明数量も過去数量で補完しない。
+Open Positions、Portfolio、current-asset-view、Top／Allocationは共通SBI VC balance adoption resolverを使う。保有集合の最新対象月と現金の最新対象月を独立して保持し、Position／Portfolioの既存全年最新選定は維持し、Top／Allocation／損益管理のcurrent latestも成分別に年を跨いで有効採用値を参照する。固定年createは年内に限定する。positive採用保有の公式marketValue＋採用cashBalanceを一度だけ合算し、reportedAssetTotal・レバレッジ担保・旧source・legacy取引は加算しない。空集合／数量0は過去positiveを復活させず、不明数量も過去数量で補完しない。
 
-balance-viewの現在表示だけ同一年内の未確認評価額／現金をcarryできる。固定月resolverはcarryせず、historical flow／P&L、期間ledger、Annual／両Trend／Riskは今回変更しない。quick deposit、JPY出金、crypto移動、settlement legs、staking、signed feeを月次deposit／swap／損益／原価へ接続しない。月次損益不明を0へ変換しない。取引source adoptionと残高adoptionは別責務。
+balance-viewは固定年createでは年内だけ、current latestでは年を跨いで未確認評価額／現金をcarryできる。固定月resolverはcarryせず、historical flow／P&L、期間ledger、Annual／両Trend／Riskは今回変更しない。quick deposit、JPY出金、crypto移動、settlement legs、staking、signed feeを月次deposit／swap／損益／原価へ接続しない。月次損益不明を0へ変換しない。取引source adoptionと残高adoptionは別責務。
 
 
 ## Current / Decided — 採用済みsourceと共通計算
@@ -173,7 +204,7 @@ balanceだけをbalance-viewへ渡し過去確認値のcurrent carryを許可す
 
 `assets/display-results.js`はmonthly-displayのdashboard／yearlyTotals／monthlyPnlを読み、その共通結果をTopと損益管理へ渡す。net／confirmed／netPnl／confirmedPnlと年間realized／swap／deposit／withdrawalを画面側で再計算しない。Top swap内訳・累計・既存推定も同じ結果から生成する。計算式・正本・canonical resolverのcomplete／missing／conflictは変更しない。
 
-現在純資産のcurrent balanceと、内部dashboardの期間純資産（月次集計）は別指標。v326以降、HomeとAnnual Summary内の「現在純資産」カードは両方currentを表示し、その他のAnnual期間値はperiodを使用する。current carryは月次詳細・Annual期間損益・Performance Trend・過去Asset Trend・Risk・確定資産ledgerへ流さない。月次詳細は選択月の共通結果だけを使用し、6口座のmissing／conflict／読込失敗行は数値nullで保持する。既知項目のみの既存暫定合計を維持し、全未入力合計はnull、明示0だけを0表示する。
+現在純資産のcurrent balanceと、内部dashboardの期間純資産（月次集計）は別指標。v326以降、HomeとAnnual Summary内の「現在純資産」カードは両方currentを表示し、その他のAnnual期間値はperiodを使用する。current carryは月次詳細・Annual期間損益・Performance Trend・過去Asset Trend・Risk・確定資産ledgerへ流さない。月次詳細は選択月の共通結果だけを使用し、6口座のmissing／conflict／読込失敗は依存するmetricをnullで保持する。資産sourceの競合だけでは既知の月次flowを消さない。既知項目のみの既存暫定合計を維持し、全未入力合計はnull、明示0だけを0表示する。
 
 内部の期間純資産の比較可否は`display-results.periodComparison`が判定する（v326以前の年間純資産カードで使用）。全口座でnet／completeNetが有限・完全・非conflict、同年・同sourceMonth・同period-ledger basisである場合のみ、既存年初比delta／growthを返す。別basisの金額が偶然一致しても不可。partial／unknown／別月なら両方null、initialNetが不明なら比較不可、0以下ならgrowthのみnull。現在のHome／損益管理の現在純資産カードは共通current resultのnetPeriodComparisonを使い、この期間判定とは分離する。金額を比較基準に合わせて変更せず、観測との差を利益・損失へ逆算しない。
 
@@ -181,11 +212,11 @@ balanceだけをbalance-viewへ渡し過去確認値のcurrent carryを許可す
 
 ## Current / Decided — 現在残高の確認月と一時利用
 
-Topと損益管理の現在純資産／Asset Allocationは採用済み残高を非永続`balance-view`で解決する。当月未確認ならcurrent対象年内の直近確認値を一時表示できるが当月正本へコピーしない。componentのvalue／sourceMonth／snapshotAsOf／出所／currentConfirmed／carried／missing／explicitZeroを保持する。明示0は旧positiveへのfallbackを止め、競合・曖昧な採用は停止する。入力元の種類で優先順位を決めず、既存adoption policyが選んだ観測だけを共通処理へ渡す。
+Topと損益管理の現在純資産／Asset Allocationは採用済み残高を非永続`balance-view`で解決する。latestの当月未確認成分は年跨ぎで直近の有効採用値を一時表示できるが当月正本へコピーしない。componentのvalue／sourceMonth／snapshotAsOf／出所／currentConfirmed／carried／missing／explicitZeroを保持する。明示0は旧positiveへのfallbackを止め、競合・曖昧な採用は停止する。入力元の種類で優先順位を決めず、既存adoption policyが選んだ観測だけを共通処理へ渡す。
 
 SBI証券は国内証券（株・投信の一括Batch）／外国証券（JPY評価）／現金・預り金ごとに採用値と確認月を解決し、前月の部分観測も利用可能。legacy口座合計は内訳へ安全に分解できないためcanonical内訳と加算しない。国内株・投信の別更新、外貨現金の独立sourceは未対応。GMO／LIGHT／みんなは口座一括値：有限の完全ledger額を維持し、ledger不足時は正式な口座観測を表示専用に使用できる。
 
-SBI VCの保有集合はcurrent対象年内最新の採用sourceが正本。0／不明数量・終了／省略された銘柄を過去positiveから復活させない。最新の正数量保有の評価額・現金がnullなら同じ年の以前の月の採用値を参照可能。同月訂正前sourceは候補にしない。Portfolio／Open Positionsへcarryを流さず、帳票合計・担保評価は加算しない。
+latestのSBI VC保有集合は年を跨ぐ最新の有効採用sourceが正本。0／不明数量・終了／省略された銘柄を過去positiveから復活させない。latestで最新の正数量保有の評価額・現金がnullなら、終了・不明・staleによる停止を尊重して前年以前の有効採用値も参照可能。同月訂正前sourceは候補にしない。Portfolio／Open Positionsへcarryを流さず、帳票合計・担保評価は加算しない。
 
 knownTotalは取得済み小計。全残高component既知のcomplete、partial、hasCarried、unknownComponents、当月全成分確認済みのcurrentCompleteを別に返す。残高completeは月次State complete／完全NAVではない。Home／損益管理の現在純資産とAllocationへ同じ口座額を渡し、正額のみの配分という既存差は維持する。
 

@@ -14,6 +14,13 @@ if(currentQA)for(const p of ['tests/current-net-assets-browser.html','tests/curr
 if(calculationQA)for(const p of ['tests/calculation-foundation-browser.html','tests/calculation-foundation-browser.js'])allowed.add(p);
 http.createServer((req,res)=>{
  let name;try{name=decodeURIComponent(new URL(req.url,'http://localhost').pathname).slice(1)||'index.html';}catch(_){res.writeHead(400);res.end();return;}
+ if(calculationQA&&name==='tests/calculation-integrity-fixture.json'){
+  const scenario=new URL(req.url,'http://localhost').searchParams.get('scenario')??'normal';
+  require('./calculation-integrity-fixture.js').integrityFixture(scenario).then(f=>{
+   const data=Object.fromEntries([...['tradingData','yearInitialFunds','yearInitialUnrealized'],...Object.values(require('../assets/data-model-storage.js').keys)].map(k=>[k,f.store.getItem(k)]));
+   res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));
+  }).catch(()=>{res.writeHead(400);res.end();});return;
+ }
  if((currentQA||calculationQA)&&name==='tests/current-net-assets-fixture.json'){
   anonymousSeed.then(data=>{res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(data);}).catch(()=>{res.writeHead(500);res.end();});return;
  }

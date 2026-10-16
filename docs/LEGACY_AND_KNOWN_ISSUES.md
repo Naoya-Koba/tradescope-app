@@ -1,5 +1,11 @@
 # Legacy, Experimental, and Known Issues
 
+## Current / Known boundary — ⑦-B
+
+F1 latest候補混入・年跨ぎ、F2月間P/L経路、F3既知小計とcoverage、F4確定資産の独立性を修正し、F7時点契約をCALCULATIONS.mdへ記録した。口座開設／終了月の永続情報と原資料期間の未保持はunknownであり、ユーザーの入力漏れと決めつけない。最終UIは大型アップデートへ送る。
+
+SBI証券の国内外実現／決済損益の取得範囲と接続は引き続き調査対象。SBI VCのPDFには報酬日・報酬対象月・評価レート・円評価額が存在しparser／Previewは対応済みだが、staking永続化と月次・年間接続は未完成。収益計上・取得原価方式は未決定で、今回算入しない。新規importerは作らない。Chart.js連続年切替の既知例外は本変更と関係がなければ対象外。Portfolio／Position／Riskの統合は大型アップデートで範囲を決定する。
+
 ## Current / Known boundary — cashflow（v325）
 
 account-scope入出金とSMBC残高観測／増減を分離済み。銀行の明示残高がある月は旧差額の陳腐化で資産がずれず、観測なしの旧期間はlegacy ledger互換として表示する。月次／年次入出金から銀行差額を除外するが、全体外部flowは未確定のまま。内部振替pairing・銀行明細・crypto transfer・新income／移動feeは将来工程。未分類・片側未入力・観測時点差を自動補完しない。延期済みSBI国内保有接続、Portfolio／Open Positions／Risk／Allocation再設計は⑤以降。以下の旧版記述は当時の工程境界。

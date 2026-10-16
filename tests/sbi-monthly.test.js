@@ -31,7 +31,7 @@ function fixture(month = '2026-09') {
     snapshotAsOf: '2026-10-04', importedAt: now, sourceMode: 'imported', sourceScope: 'sbi-domestic-holdings', importBatchId: 'batch_anon', marketValue: '123.45', unrealizedPnl: '3.45' }]);
   return models;
 }
-function seed(models = fixture(), legacy = { 2026: { 8: { sbi: { realizedPnL: 5, deposit: 2, unrealizedPnL: 1 } } } }) {
+function seed(models = fixture(), legacy = require('./complete-legacy-fixture.js').completeLegacy({2026:{8:{sbi:{realizedPnL:5,deposit:2,unrealizedPnL:1}}}},['sbi'])) {
   return new Storage({ tradingData: JSON.stringify(legacy), yearInitialFunds: '{"2026":{"sbi":100}}', yearInitialUnrealized: '{}',
     tradeScopeTradeHistoryV1: '[]', tradeScopeMemos: '[]', tradeScopeSymbolListV1: '[]', tradeScopeTopSummarySnapshotV1: '{"stale":true}',
     ...Object.fromEntries(Object.entries(models).filter(([, value]) => value !== null).map(([entity, value]) => [model.keys[entity], JSON.stringify(value)])) });

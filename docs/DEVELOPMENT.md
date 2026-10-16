@@ -1,5 +1,15 @@
 # Development Guide
 
+## Current — ⑦-B 計算整合性（v328）
+
+currentは有効採用対象月・成分別年跨ぎ参照、月間P/LはMonthlyDisplay共通coverage、確定ledgerはrequired flow完全性とnet独立fallbackを使用する。保存契約は不変。時点・coverage・既知小計／完全値はCALCULATIONS.mdを参照。PWA v328、変更asset query 20261016-5、Backup v16・12モデル・Storage key不変。schema／migration／importer／収益event／大型UIは追加しない。
+
+正常ledgerテストは未記載だった過去月・required fieldを明示0の匿名fixtureにして従来の数値期待を維持し、欠損は別回帰でunknownを要求する。source変更でtime／adoptedAtだけが変わる場合は金融値不変と分けて確認する。
+
+検証：追加33件、全3,141 tests成功・失敗0。構文181ファイル＋主要HTML inline 3件、precache 100件、local URL 196件、依存順6ページとdiff-checkを確認。実Backup v16はread-onlyで、2025／2026年の期間資産・損益・成長率・月間P/L・グラフ系列・現在口座額が開始HEADと一致。原本ハッシュ不変・復元／書込0回。個人値をfixtureへ複製しない。
+
+内蔵ブラウザの隔離originで1280pxの未採用翌年Batchによるcurrent不変、年跨ぎ後のHome／損益管理一致、GMO部分損益10／全体22のSummary・MONTH DETAIL・Input一致を確認。390pxでも評価損益不明時の確定資産110・確定損益10が両画面に独立表示され、横overflowなし。新規タブの単独表示ではConsole Error／Warningなし。複数シナリオの連続切替では既知Chart.js null save例外を再現したが、依頼どおり対象外とする。既存Node PDF.jsの任意canvas未導入警告は残る。実iPhone Safari／PWAは未確認。架空fixture・SW／cache・検証tab／viewport／serverは清掃した。
+
 ## Current / Decided — ⑦-A 計算基盤と設計書管理（v327）
 
 継続開発はルートAGENTS.mdと既存設計書を基準にする。正式決定と提案を分け、重要な仕様判断はAGENTS.mdの独立評価・ユーザー承認手順へ進む。承認済みの単純な修正では不要な確認を増やさない。コード・テスト・対応する設計書を同じ変更セットで更新し、監査のみの依頼では書き換えない。恒久ルールの実質変更には明示承認が必要。

@@ -1,5 +1,9 @@
 # Data Model
 
+## Current — ⑦-Bの非永続projection
+
+CurrentAssets.latestの口座・成分別currentは年跨ぎ参照を許可し、固定年create／固定月／periodは独立する。coverage、knownSubtotal／completeValue、時点metadata、accountPeriodsは読み取り時の情報で、Storage・Backupへ追加保存しない。現行Accountに開設・終了月はなく、作成日・初回取込から推測しない。原資料の対象期間が永続sourceに未保持ならnullとし、将来の保存契約は別途決定する。詳細はCALCULATIONS.mdの⑦-B節。既存12モデル／Backup v16は不変。
+
 ## Current / Decided — cashflow意味分離（v325）
 
 `cashflow-view.js`は非永続reader。deposit／withdrawalは口座境界の月次aggregateであり、internal／external未分類、全体外部flowはnot-derived。PDF原値・manual採用／補正を区別し、SBI VC previewの入出庫／報酬を永続flowへ昇格しない。SMBCの`tradingData[year][month].smbc.monthEndBalance`は明示残高観測（0有効）、隣接月の両観測がある時だけ残高増減をread-time導出する。保存済み旧deposit／withdrawalは削除せず、実cashflowの集計対象にはしない。新key／schema／migration／Transfer recordなし、Backup v16維持。
@@ -187,17 +191,17 @@ componentはaccount／domestic／foreign／cash／spot。balance／flow／holdin
 
 ## Current / Decided — 非永続の残高確認状態
 
-`balance-view`のcomponentはvalue（decimal／null）、sourceMonth、snapshotAsOf、source、currentConfirmed、carried、missing、explicitZeroを持つ表示属性。確認月は対象月と区別し、出所と採用判断を分離する。全成分既知／小計のみ／過去確認値あり／不明成分ありを同時に判定できる。旧値は表示対象年内の参照に限りInput／State／Snapshotへ保存しない。新model／Storage key／record schema／Backup変更はなくv13を維持する。
+`balance-view`のcomponentはvalue（decimal／null）、sourceMonth、snapshotAsOf、source、currentConfirmed、carried、missing、explicitZeroを持つ表示属性。確認月は対象月と区別し、出所と採用判断を分離する。全成分既知／小計のみ／過去確認値あり／不明成分ありを同時に判定できる。固定年createの旧値参照は年内に限定し、v328のcurrent latestだけは年跨ぎを許可する。Input／State／Snapshotへコピー保存しない。新model／Storage key／record schema／Backup変更はなくv13を維持する。
 
 SBI国内／外国／現金は現行source単位、FXは口座一括単位。SBI VC保有集合は最新採用sourceのみで、正数量保有の評価額・現金だけ必要時に以前の月の採用値を参照できる。最新0／不明数量・保有終了を補完しない。同月訂正前source・取引履歴・帳票資産合計・担保を加算しない。残高completeはMonthlyAccountState確定ではない。以下のSBI VC最新source契約は保有集合について維持し、Top／Allocationの未確認残高には本節の参照状態を追加する。
 
 ## Current / Decided — SBI VC選択年資産View
 
-Top純資産／Asset AllocationはMonthlyAccountInput v3／v4 → 採用AccountSnapshot → Batch → HoldingSnapshotを共通helperで解決し、active補正後の正数量保有の既知円評価額＋JPY現金を使用する。選択年内最新targetMonthのみ採用し、別年・legacyへfallbackしない。source存在・sourceMonth・holdings・cashBalance・knownAssetTotal・不明成分・観測成分completenessはメモリ上のView属性であり、新しい永続fieldではない。観測成分が既知でもMonthlyAccountState確定や完全NAVを意味しない。帳票合計・担保・取引を追加せず、永続schema・キー・Backup v13は不変。Portfolio／Open Positionsの全年横断選択は維持する。
+Top純資産／Asset AllocationはMonthlyAccountInput v3／v4 → 採用AccountSnapshot → Batch → HoldingSnapshotを共通helperで解決し、active補正後の正数量保有の既知円評価額＋JPY現金を使用する。固定年createでは年内targetMonthだけを参照する。current latestの年跨ぎ契約は本書冒頭とCALCULATIONS.mdの⑦-B節に従う。source存在・sourceMonth・holdings・cashBalance・knownAssetTotal・不明成分・観測成分completenessはメモリ上のView属性であり、新しい永続fieldではない。観測成分が既知でもMonthlyAccountState確定や完全NAVを意味しない。帳票合計・担保・取引を追加せず、永続schema・キー・Backup v13は不変。Portfolio／Open Positionsの全年横断選択は維持する。
 
 ## Current / Decided — SBI VC現在保有と取引履歴
 
-Open Positions／PortfolioのSBI VC現在保有は、最新対象月のMonthlyAccountInput v3／v4 → 明示採用AccountSnapshot → ImportBatch → 同じsourceのHoldingSnapshotを正本とする。共通observation-adoptionでquantity／marketPrice／marketValueのactive補正を解決し、正の採用数量だけ表示する。最新が0／不明なら過去の正数量へ戻さず、訂正前source・未保有0列挙を混ぜない。ImportedTransaction／legacy手入力は売買履歴であり現在保有を再計算する根拠にしない。原価・損益・レバレッジ建玉を推測せず、担保評価を別資産へ加算しない。Portfolioの現金明細は同じ採用Snapshotの補正後cashBalanceのみ。assetValueは帳票観測として保持し、明細合計へ重複加算しない。採用sourceが空／不明／エラーでもlegacy SBI VC保有を復活させない。これらは非永続projectionであり、永続schema／Backup v13は不変。Top純資産／Asset Allocationは上記の選択年資産Viewを使用する。Risk／月次計算は変更しない。
+Open Positions／PortfolioのSBI VC現在保有は、最新対象月のMonthlyAccountInput v3／v4 → 明示採用AccountSnapshot → ImportBatch → 同じsourceのHoldingSnapshotを正本とする。共通observation-adoptionでquantity／marketPrice／marketValueのactive補正を解決し、正の採用数量だけ表示する。最新が0／不明なら過去の正数量へ戻さず、訂正前source・未保有0列挙を混ぜない。ImportedTransaction／legacy手入力は売買履歴であり現在保有を再計算する根拠にしない。原価・損益・レバレッジ建玉を推測せず、担保評価を別資産へ加算しない。Portfolioの現金明細は同じ採用Snapshotの補正後cashBalanceのみ。assetValueは帳票観測として保持し、明細合計へ重複加算しない。採用sourceが空／不明／エラーでもlegacy SBI VC保有を復活させない。これらは非永続projectionであり、永続schema／Backup v13は不変。Top純資産／Asset Allocationは上記のcurrent latestを使用し、固定年createと分離する。Risk／月次計算は変更しない。
 
 ## Current / Decided — 手入力と取込取引の確認統合
 

@@ -14,7 +14,7 @@ test('GMO read/Preview inspection does not seed or mutate any storage', async ()
   const t = new MemoryStorage(), before = t.snapshot(); assert.equal((await service(t).inspect(source())).status, 'ready'); assert.deepEqual(t.snapshot(), before);
 });
 test('one verified save creates minimal Batch/Snapshot/State and invalidates cache, not legacy data', async () => {
-  const t = new MemoryStorage({ tradingData:'{"2026":{"8":{"__saved":true,"gmo":{"realizedPnL":0,"swapPnL":0,"unrealizedPnL":0}}}}', tradeScopeTopSummarySnapshotV1:'{"old":true}' }), legacy = t.getItem('tradingData');
+  const t = new MemoryStorage({ tradingData:JSON.stringify(require('./complete-legacy-fixture.js').completeLegacy()), tradeScopeTopSummarySnapshotV1:'{"old":true}' }), legacy = t.getItem('tradingData');
   assert.equal((await service(t).save(source())).status, 'saved'); const m = model.readModels(t);
   assert.equal(m.accounts.records.length, 1); assert.equal(m.instruments, null); assert.equal(m.rawTransactions, null);
   assert.equal(m.importBatches.records.length, 1); assert.equal(m.accountSnapshots.records.length, 1); assert.equal(m.monthlyAccountStates.records.length, 1);

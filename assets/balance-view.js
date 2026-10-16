@@ -19,9 +19,9 @@
   }
   // Inputs are already adopted observations. Source provenance does not rank inputs.
   // This projection neither writes carried values nor supplies a monthly ledger.
-  function resolve(observations,{targetMonth,componentKeys}){
+  function resolve(observations,{targetMonth,componentKeys,crossYear=false}){
     if(!month(targetMonth)||!Array.isArray(componentKeys)||new Set(componentKeys).size!==componentKeys.length)throw Error('INVALID_BALANCE_REQUEST');
-    const eligible=observations.filter(o=>month(o.sourceMonth)&&o.sourceMonth.startsWith(targetMonth.slice(0,4)+'-')&&o.sourceMonth<=targetMonth);
+    const eligible=observations.filter(o=>month(o.sourceMonth)&&(crossYear||o.sourceMonth.startsWith(targetMonth.slice(0,4)+'-'))&&o.sourceMonth<=targetMonth);
     const components=componentKeys.map(key=>{
       const rows=eligible.filter(o=>o.key===key).sort((a,b)=>b.sourceMonth.localeCompare(a.sourceMonth));
       let chosen=null,blocked=false;

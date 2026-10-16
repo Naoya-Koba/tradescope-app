@@ -34,12 +34,12 @@ for(const value of [null,undefined,'bad'])test('unknown opening '+String(value)+
  const f={2026:{gmo:100}};if(value!==undefined)f[2026].sbi=value;
  const {d,c}=legacy(f),p=d.dashboard(2026);assert.equal(p.initialNet,null);assert.equal(p.initialConfirmed,null);
  for(const key of ['netDelta','confirmedDelta','netGrowth','confirmedGrowth','netPnlGrowth','confirmedPnlGrowth'])assert.equal(p[key],null);
- assert.equal(p.netPnl.value,null);assert.equal(p.confirmedPnl.value,null);assert.equal(c.confirmed(2026,1,'sbi'),null);
+ assert.equal(p.netPnl.value,10);assert.equal(p.netPnl.completeValue,null);assert.equal(p.confirmedPnl.value,10);assert.equal(p.confirmedPnl.completeValue,null);assert.equal(c.confirmed(2026,1,'sbi'),null);
  assert.equal(d.monthlyPnl(2026,1).total,20);assert.equal(d.yearlyTotals(2026).realizedSum,20);
 });
 test('missing opening unrealized blocks net performance only; confirmed performance stays known',()=>{
  const {d}=legacy(amounts,{2026:{gmo:0}}),p=d.dashboard(2026);
- assert.equal(p.initialNet,null);assert.equal(p.initialConfirmed,300);assert.equal(p.netPnl.value,null);assert.equal(p.netPnlGrowth,null);
+ assert.equal(p.initialNet,null);assert.equal(p.initialConfirmed,300);assert.equal(p.netPnl.value,10);assert.equal(p.netPnl.completeValue,null);assert.equal(p.netPnlGrowth,null);
  assert.equal(p.confirmedPnl.value,20);assert.equal(p.confirmedPnlGrowth,20/300*100);
  assert.equal(d.series(2026).performanceTotalSeries[0],null);assert.equal(d.series(2026).performanceConfirmedSeries[0],0);
 });

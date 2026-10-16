@@ -46,7 +46,7 @@ test('null within a domestic group does not become a partial invented group tota
 test('multiple domestic batches stop display rather than selecting latest or summing',()=>{
  const f=fixture();f.models.importBatches.records.push({...f.models.importBatches.records[1],id:'other'});
  f.models.holdingSnapshots.records.push({...f.models.holdingSnapshots.records[0],id:'other_hs',importBatchId:'other'});
- const s=view(f).month(2026,9).rows.find(r=>r.key==='sbi');assert.equal(s.conflict,true);assert.equal(s.asset,null);
+ const s=view(f).month(2026,9).rows.find(r=>r.key==='sbi');assert.equal(s.assetConflict,true);assert.equal(s.asset,null);
 });
 test('execution batch and another month never enter domestic asset sum',()=>{
  const f=fixture();f.models.importBatches.records.push({...f.models.importBatches.records[1],id:'execution'});
@@ -112,7 +112,7 @@ test('September asset point exactly matches latest Summary, with no future inven
 });
 test('known September P/L is displayed and accumulated despite missing SBI State',()=>{
  const f=fixture(),d=view(f),p=d.monthlyPnl(2026,9),annual=d.yearlyTotals(2026);
- assert.deepEqual(p,{realized:10,swap:5,total:15});
+ assert.deepEqual({realized:p.realized,swap:p.swap,total:p.total},{realized:10,swap:5,total:15});assert.equal(p.coverage.total.complete,false);
  assert.equal(annual.realizedSum,view(f).yearlyTotals(2026).realizedSum);
  assert.equal(annual.realizedSum,50);assert.equal(annual.swapSum,85);
  assert.equal(d.monthlyPnl(2026,10).total,null);
@@ -131,7 +131,7 @@ test('partial P/L keeps known realized even when swap is missing',()=>{
  const f=fixture();f.models.monthlyAccountStates=null;f.models.accountSnapshots=null;
  // SBI VC remains legacy in September; Traders now deliberately rejects post-cutover legacy inputs.
  f.tradingData[2026][9]={sbivc:{realizedPnL:7,swapPnL:null,unrealizedPnL:1}};
- assert.deepEqual(view(f).monthlyPnl(2026,9),{realized:7,swap:null,total:7});
+ const p=view(f).monthlyPnl(2026,9);assert.deepEqual({realized:p.realized,swap:p.swap,total:p.total},{realized:7,swap:null,total:7});assert.equal(p.coverage.swap.items.find(r=>r.accountKey==='sbivc').status,"not-applicable");assert.equal(p.coverage.swap.complete,false);
 });
 test('display source code keeps all Summary and trend consumers on the shared projection',()=>{
  const top=fs.readFileSync(require.resolve('../top/script.js'),'utf8'),profit=fs.readFileSync(require.resolve('../profit/soneki.js'),'utf8');

@@ -724,13 +724,8 @@ function ensureYearMonth(year, month) {
 }
 
 function calculateMonthlyTotals(year, month) {
-  const calc = monthlyCalculator(), keys = ACCOUNTS.map(account => account.key);
-  return { isEntered: calc.monthEntered(year, month, keys),
-    realizedSum: calc.monthlyFieldTotal(year, month, keys, 'realizedPnL'),
-    swapSum: calc.monthlyFieldTotal(year, month, keys, 'swapPnL'),
-    unrealizedSum: calc.monthlyFieldTotal(year, month, keys, 'unrealizedPnL'),
-    depositSum: calc.monthlyFieldTotal(year, month, keys, 'deposit'),
-    withdrawSum: calc.monthlyFieldTotal(year, month, keys, 'withdrawal') };
+  const value=monthlyDisplayTotals(year,month);
+  return {...value,isEntered:value.hasData};
 }
 
 function calculateYearlyTotals(year) {
@@ -2307,6 +2302,17 @@ function selectMonth(month) {
   }
 }
 
+function renderAdoptedLegacyFields(card,account){
+  const resolved=monthlyCalculator().resolve(currentYear,currentMonth,account.key);
+  if(!resolved.sourceAdoptions?.some(v=>['realizedPnl','swapPnl','unrealizedPnl','deposit','withdrawal'].includes(v.metric)))return false;
+  const row=monthlyDisplayView().accountMonth(currentYear,currentMonth,account);
+  const fields={realizedPnL:'realized',swapPnL:'swap',unrealizedPnL:'unrealized',deposit:'deposit',withdrawal:'withdrawal',netAssets:'asset'};
+  for(const input of card.querySelectorAll('.input-account')){
+    if(!fields[input.dataset.field])continue;
+    const value=row[fields[input.dataset.field]];input.value=Number.isFinite(value)?String(value):'';input.readOnly=true;
+  }
+  return true;
+}
 function renderAccountInputs() {
   const container = document.getElementById('accountInputGrid');
   container.innerHTML = '';
@@ -2432,6 +2438,7 @@ function renderAccountInputs() {
     
     container.appendChild(card);
     const saveButton=card.querySelector('[data-save-account]'), saveError=card.querySelector('[data-save-error]');
+    if(renderAdoptedLegacyFields(card,account))saveButton.disabled=true;
     const expectedRow=JSON.parse(JSON.stringify(tradingData?.[currentYear]?.[currentMonth]?.[account.key]||{}));
     saveButton.addEventListener('click',()=>{
       if(saveButton.disabled)return;
