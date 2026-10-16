@@ -6,7 +6,7 @@ const resolver = require('../assets/monthly-account-resolver.js');
 const { fixture, copy } = require('./gmo-support.js');
 const enabledKeys = ['gmo'];
 function metrics() { const window = {}; vm.runInNewContext(fs.readFileSync(require.resolve('../assets/profit-metrics.js'), 'utf8'), { window }); return window.TradeScopeProfitMetrics; }
-function calc(models = fixture(), legacy = {}) { return resolver.createCalculator(metrics(), legacy, { 2026: { gmo: 100 } }, {}, models, { enabledKeys }); }
+function calc(models = fixture(), legacy = {}) { return resolver.createCalculator(metrics(), legacy, { 2026: { gmo: 100 } }, {2026:{gmo:0}}, models, { enabledKeys }); }
 test('GMO production adapter is enabled, August legacy / September missing', () => {
   assert.equal(resolver.resolve(fixture(), {}, '2026-09', 'gmo').source, 'canonical');
   assert.equal(resolver.resolve(fixture(), {}, '2026-08', 'gmo', enabledKeys).source, 'legacy');

@@ -1,5 +1,19 @@
 # Development Guide
 
+## Current / Decided — ⑦-A 計算基盤と設計書管理（v327）
+
+継続開発はルートAGENTS.mdと既存設計書を基準にする。正式決定と提案を分け、重要な仕様判断はAGENTS.mdの独立評価・ユーザー承認手順へ進む。承認済みの単純な修正では不要な確認を増やさない。コード・テスト・対応する設計書を同じ変更セットで更新し、監査のみの依頼では書き換えない。恒久ルールの実質変更には明示承認が必要。
+
+F5／F6は`year-initial-view.js`と既存のDisplayReadState／MonthlyResolver／MonthlyDisplay／DisplayResultsに限定した整理。CSVとbalance-viewの後、resolverの前に年初readerをロードする。年初入力の独立性・完全性、source別読込状態とconsumer依存範囲はCALCULATIONS.mdを参照。raw legacy helperと保存値は互換用に維持し、新しい永続モデルやmigrationは作らない。import.htmlの変更は共有resolverの依存script追加だけでimporterロジックは変更しない。
+
+PWA v327、変更asset query 20261016-4、年初readerをprecacheへ追加。Backup v16・Storage key・復元契約は不変。`tests/year-initial-read.test.js`は匿名値とread-only Memory adapter、production関数を使う回帰テスト。既存の正常値テストで年初評価損益を未指定にしていたものは明示0を設定し、既存の数値期待を維持する。欠損のケースは別テストで不明を要求する。
+
+`TRADESCOPE_QA_MODE=calculation`のlocalhost harnessは公開資産と架空fixtureだけを配信する。専用の空originでのみ準備し、年初JSON破損・再計算・年切替を確認する。実Backupやproduction Storageを復元しない。F1／F2／F3／F4／F7、Portfolio／Position／Risk、収益event・importer・atomic save・navigationは後続工程として維持する。
+
+検証：追加42件、全3,108 tests成功・失敗0。構文178ファイル＋主要HTML inline 3件、precache 100件の存在、local URL 196件、依存順6ページとdiff-checkを確認。実Backup v16はread-onlyで検証し、2025／2026年の正常な期間資産・損益・成長率・グラフ系列、現在口座額が開始時HEADと一致、原本ハッシュ不変・復元0回・書込0回。個人値はfixture／ログへ複製しない。
+
+内蔵ブラウザの隔離originで390px／1280pxのHome／損益管理、年初資金700→750の保存後再計算、2025↔2026切替、破損JSON時の独立指標保持・年初欄空白・保存停止・原JSON保持を確認。横overflowなし。破損時のsource-service描画例外は読込失敗時の入力欄停止で解消し、新規タブの正常／破損確認でConsole Error／Warningなし。連続年切替中の既知Chart.js null save例外は1回再現し、今回固有の因果関係は未確認のため、依頼どおり今回の対象外に維持する。Node PDF.jsの任意canvas未導入警告は既存のままでテストは成功。実iPhone Safari／PWAは未確認。
+
 ## Current — cashflow projection／SMBC観測（v325）
 
 `cashflow-view.js`をCSV／monthly-source-contractの後、monthly-account-resolverの前にロードする。純粋account flow／bank observation／adjacent balance changeと、not-derivedな全体外部flowを提供する。共有resolverはSMBCの明示観測を優先し、観測なし旧期間だけlegacy互換。投資口座のledger／Performance資金調整は維持。monthly-displayのbank flowはnull、読込失敗時はdisplay-resultsで派生情報も隠す。保存UIは新たな銀行差額を生成せず、旧値を保持する。

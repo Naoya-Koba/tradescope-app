@@ -4,7 +4,7 @@ const win={};vm.runInNewContext(fs.readFileSync(require.resolve('../assets/profi
 const metrics=win.TradeScopeProfitMetrics,empty=()=>Object.fromEntries(Object.keys(model.keys).map(k=>[k,null]));
 const bank=balance=>({monthEndBalance:balance,realizedPnL:0,swapPnL:0,unrealizedPnL:0,deposit:900,withdrawal:800,__saved:true});
 function fixture(){return {tradingData:{2026:{1:{smbc:bank(1000000)},2:{smbc:bank(1200000)},3:{smbc:bank(1300000)}}},initialFunds:{2026:{smbc:1000000,sbi:0}},models:empty()};}
-const calc=f=>resolver.createCalculator(metrics,f.tradingData,f.initialFunds,{},f.models);
+const calc=f=>resolver.createCalculator(metrics,f.tradingData,f.initialFunds,{2026:{sbi:0}},f.models);
 for(const month of [1,2,3])test(`SMBC month ${month} uses explicit balance, not stored deltas`,()=>{const f=fixture(),c=calc(f);assert.equal(c.net(2026,month,'smbc'),f.tradingData[2026][month].smbc.monthEndBalance);assert.equal(c.confirmed(2026,month,'smbc'),c.net(2026,month,'smbc'));});
 test('past correction leaves later asset equal to explicit observation',()=>{const f=fixture();f.tradingData[2026][2].smbc.monthEndBalance=1100000;const before=JSON.stringify(f),c=calc(f);assert.deepEqual([1,2,3].map(m=>c.net(2026,m,'smbc')),[1000000,1100000,1300000]);assert.equal(flow.bank(f.tradingData,f.models,'2026-03').balanceChange.value,'200000');assert.equal(JSON.stringify(f),before);});
 test('zero does not fallback to initial funds or old delta',()=>{const f=fixture();f.tradingData[2026][2].smbc.monthEndBalance=0;assert.equal(calc(f).net(2026,2,'smbc'),0);});

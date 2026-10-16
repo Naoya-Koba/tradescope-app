@@ -100,7 +100,8 @@ test('unadopted official observation with non-month-end date is not silently use
  assert.equal(view(f).dashboard(2026).rows.find(r=>r.key==='gmo').metrics.net.value,null);
 });
 test('shared Summary supplies all four metrics, deltas and rates for both screens',()=>{
- const d=view(fixture()),top=d.dashboard(2026),annual=d.series(2026).summary;
+ const f=fixture();f.initialUnrealized={2026:Object.fromEntries(f.accounts.map(a=>[a.key,0]))};
+ const d=view(f),top=d.dashboard(2026),annual=d.series(2026).summary;
  assert.deepEqual(top,annual);
  for(const field of ['netGrowth','confirmedGrowth','netPnlGrowth','confirmedPnlGrowth'])assert.ok(Number.isFinite(top[field]));
 });

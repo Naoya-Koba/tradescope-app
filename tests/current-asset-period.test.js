@@ -64,7 +64,7 @@ test('real partial monthly projection keeps calculator, annual/period metrics an
 function render(d){
   const elements=new Map();const document={getElementById(id){if(!elements.has(id))elements.set(id,{textContent:'',classList:{remove(){},add(){}}});return elements.get(id);}};
   const code=fs.readFileSync('top/script.js','utf8').replace(/\r\n/g,'\n').match(/function updateKPIs\(\) \{[\s\S]*?\n}\nupdateKPIs\(\);/)[0];
-  vm.runInNewContext(code,{document,window:{},currentAssetView:view(d),latestDashboard:d,topSeries:{year:2032},
+  vm.runInNewContext(code,{document,window:{},currentAssetView:view(d),latestDashboard:d,latestResults:{readFailed:false},topSeries:{year:2032},
     linkedCalculator:()=>({warning:()=>''}),portfolioMonthLabel:m=>m,fmtJPY:v=>String(v),
     setSignClass:(el,value)=>el.signValue=value});
   return elements;

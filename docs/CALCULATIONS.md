@@ -1,5 +1,19 @@
 # Calculation Specification
 
+## Current / Decided — 年初readerとsource別読込状態（⑦-A、v327）
+
+同じmetric・effective time・basis・scopeでは値だけでなく欠損状態と計算可能性も共有する。`assets/year-initial-view.js`は既存のCSV／balance decimal契約を使う非永続readerで、年初資金・年初評価損益を独立して読み、必要な両入力から年初純資産を返す。数値と有効な数値文字列を同じ金額として扱い、保存値は変換しない。明示0、null、missing、不正値、読込失敗、銀行の評価損益not-applicableを区別する。対象口座に欠損があれば完全合計はnullとし、取得済み小計は`knownSubtotal`として分離する。
+
+Home／損益管理／Annual Summary／年初グラフ点／成長率／設定の保存値表示は、MonthlyDisplay.initial → 共通readerを使う。確定ベースは年初資金、純資産ベースは年初資金＋年初評価損益を必要とし、投資Performanceは銀行除外の同じscopeで分母を確認する。不明な分母・分子や対象範囲の不一致を既知小計で代用しない。0以下の分母の率は従来どおりnullとし、率の式・符号・丸めを変更しない。
+
+`profit-metrics.js`のraw legacy helperは互換用として維持する。共有resolverは年初資金の完全性を確認し、読み取り時だけ正規化した金額をlegacy式へ渡す。これにより、legacyの0補完を完全な年初基準と誤認しない。年初評価損益だけ不明でも既知の確定ベース値は保持する。SMBCの明示残高や採用済み公式current観測は年初基準と独立して表示できる。現在値と固定月値、観測とledgerを相互補完しない。
+
+`display-read-state.js`はsource別にready／empty／missing／invalid-json／invalid-schema／read-failureを返す。従来の全体failedも警告用に保持するが、Home Trend／Summary／損益管理／Annual／グラフは依存するsourceの失敗だけを計算不可にする。年初JSON破損なら年初基準のledger・成長率は不明、独立した月次損益・年初評価損益・公式残高・銀行観測は保持する。モデル読込失敗は採用判定ができないためその依存計算を停止する。破損JSONの削除・自動修復・保存・復元は行わない。設定の保存も読込失敗中は停止し、未保存draftは保持する。
+
+設定で明示保存した空欄は、既存項目ではnull、元から存在しない項目はmissingを維持する。欠損時の既存の前年末候補は既知の値だけを入力候補にし、保存前の正式年初値にはしない。読込失敗中は入力カードのsource-service描画も停止し、表示集計の継続を妨げる例外を防ぐ。更新画面のatomic save契約は変更しない。新Storage key／migration／Backup schema変更はない（v16）。
+
+**Known issue / 対象外**：F1 latest年selector、F2月間P/L consumer、F3年間coverage、F4確定資産のmetric別完全性、F7観測時点・対象月・fallbackは後続工程。今回、最新年選択や完全月選択・年間部分集計の方針を変更しない。SBI収益・stakingの将来案を正式計算へ接続しない。
+
 ## 現在純資産の共通表示（2026-10-16）
 
 **Current / Decided**：Home、損益管理の「現在純資産」、Home Allocationは `CurrentAssets.latest` のcurrent projectionを共用する。選択年・選択月を入力にせず、保存済み月次データ／採用観測の最新対象年を選び、既存の `CurrentAssets.create`、`balanceHistory`、口座別adopted readerで構成する。空の将来年や年初資金の設定だけでcurrent対象年を切り替えない。観測が欠けた成分は既存のcarry／unknownルールに従い、nullを0にしない。
@@ -159,29 +173,29 @@ balanceだけをbalance-viewへ渡し過去確認値のcurrent carryを許可す
 
 `assets/display-results.js`はmonthly-displayのdashboard／yearlyTotals／monthlyPnlを読み、その共通結果をTopと損益管理へ渡す。net／confirmed／netPnl／confirmedPnlと年間realized／swap／deposit／withdrawalを画面側で再計算しない。Top swap内訳・累計・既存推定も同じ結果から生成する。計算式・正本・canonical resolverのcomplete／missing／conflictは変更しない。
 
-Top現在純資産のcurrent balanceと、年間サマリー純資産（月次集計）は別指標。前者のcarryは後者・月次詳細・Annual期間損益・Performance Trend・過去Asset Trend・Risk・確定資産ledgerへ流さない。月次詳細は選択月の共通結果だけを使用し、6口座のmissing／conflict／読込失敗行は数値nullで保持する。既知項目のみの既存暫定合計を維持し、全未入力合計はnull、明示0だけを0表示する。
+現在純資産のcurrent balanceと、内部dashboardの期間純資産（月次集計）は別指標。v326以降、HomeとAnnual Summary内の「現在純資産」カードは両方currentを表示し、その他のAnnual期間値はperiodを使用する。current carryは月次詳細・Annual期間損益・Performance Trend・過去Asset Trend・Risk・確定資産ledgerへ流さない。月次詳細は選択月の共通結果だけを使用し、6口座のmissing／conflict／読込失敗行は数値nullで保持する。既知項目のみの既存暫定合計を維持し、全未入力合計はnull、明示0だけを0表示する。
 
-年間純資産カードの比較可否は`display-results.periodComparison`が判定する。全口座でnet／completeNetが有限・完全・非conflict、同年・同sourceMonth・同period-ledger basisである場合のみ、既存年初比delta／growthを表示する。別basisの金額が偶然一致しても不可。partial／unknown／別月なら両方null、initialNetが不明なら比較不可、0以下ならgrowthのみnull。この適格性判定はTop用current比較を流用せず、期間カードの責務として分離する。金額を比較基準に合わせて変更せず、観測との差を利益・損失へ逆算しない。
+内部の期間純資産の比較可否は`display-results.periodComparison`が判定する（v326以前の年間純資産カードで使用）。全口座でnet／completeNetが有限・完全・非conflict、同年・同sourceMonth・同period-ledger basisである場合のみ、既存年初比delta／growthを返す。別basisの金額が偶然一致しても不可。partial／unknown／別月なら両方null、initialNetが不明なら比較不可、0以下ならgrowthのみnull。現在のHome／損益管理の現在純資産カードは共通current resultのnetPeriodComparisonを使い、この期間判定とは分離する。金額を比較基準に合わせて変更せず、観測との差を利益・損失へ逆算しない。
 
 2026年1〜8月の6口座legacy計算は維持する。9月canonical／current carryから過去月へfallbackしない。同じ過去月の観測を正式採用する一般契約は次のsource／adoption基盤で整理する。下記の従来Annual指標維持とは期間式の維持であり、本節の比較不能時の「—」表示を優先する。
 
 ## Current / Decided — 現在残高の確認月と一時利用
 
-Top純資産／Asset Allocationだけは採用済み残高を非永続`balance-view`で解決する。当月未確認なら選択年内の直近確認値を一時表示できるが当月正本へコピーしない。componentのvalue／sourceMonth／snapshotAsOf／出所／currentConfirmed／carried／missing／explicitZeroを保持する。明示0は旧positiveへのfallbackを止め、競合・曖昧な採用は停止する。入力元の種類で優先順位を決めず、既存adoption policyが選んだ観測だけを共通処理へ渡す。
+Topと損益管理の現在純資産／Asset Allocationは採用済み残高を非永続`balance-view`で解決する。当月未確認ならcurrent対象年内の直近確認値を一時表示できるが当月正本へコピーしない。componentのvalue／sourceMonth／snapshotAsOf／出所／currentConfirmed／carried／missing／explicitZeroを保持する。明示0は旧positiveへのfallbackを止め、競合・曖昧な採用は停止する。入力元の種類で優先順位を決めず、既存adoption policyが選んだ観測だけを共通処理へ渡す。
 
 SBI証券は国内証券（株・投信の一括Batch）／外国証券（JPY評価）／現金・預り金ごとに採用値と確認月を解決し、前月の部分観測も利用可能。legacy口座合計は内訳へ安全に分解できないためcanonical内訳と加算しない。国内株・投信の別更新、外貨現金の独立sourceは未対応。GMO／LIGHT／みんなは口座一括値：有限の完全ledger額を維持し、ledger不足時は正式な口座観測を表示専用に使用できる。
 
-SBI VCの保有集合は選択年内最新の採用sourceが正本。0／不明数量・終了／省略された銘柄を過去positiveから復活させない。最新の正数量保有の評価額・現金がnullなら同じ年の以前の月の採用値を参照可能。同月訂正前sourceは候補にしない。Portfolio／Open Positionsへcarryを流さず、帳票合計・担保評価は加算しない。
+SBI VCの保有集合はcurrent対象年内最新の採用sourceが正本。0／不明数量・終了／省略された銘柄を過去positiveから復活させない。最新の正数量保有の評価額・現金がnullなら同じ年の以前の月の採用値を参照可能。同月訂正前sourceは候補にしない。Portfolio／Open Positionsへcarryを流さず、帳票合計・担保評価は加算しない。
 
-knownTotalは取得済み小計。全残高component既知のcomplete、partial、hasCarried、unknownComponents、当月全成分確認済みのcurrentCompleteを別に返す。残高completeは月次State complete／完全NAVではない。TopとAllocationへ同じ口座額を渡し、正額のみの配分という既存差は維持する。
+knownTotalは取得済み小計。全残高component既知のcomplete、partial、hasCarried、unknownComponents、当月全成分確認済みのcurrentCompleteを別に返す。残高completeは月次State complete／完全NAVではない。Home／損益管理の現在純資産とAllocationへ同じ口座額を渡し、正額のみの配分という既存差は維持する。
 
-確定資産・月次／年間損益・年間成長率・Annual Summary・Performance Trend・過去Asset Trend・Riskは従来の期間projectionを維持する。carryを期間計算へ入力せず、純資産カードの比較可否もcarry／unknown／観測根拠があれば「—」。月次flowは前月から引き継がない。以下の旧dashboardの当月部分額／直近完全月policyは期間consumer向けとして維持し、Top現在純資産だけ本節のViewで置換する。
+確定資産・月次／年間損益・その成長率・Annual Summaryの期間値・Performance Trend・過去Asset Trend・Riskは従来の期間projectionを維持する。carryを期間計算へ入力せず、純資産カードの比較可否もcarry／unknown／観測根拠があれば「—」。月次flowは前月から引き継がない。以下の旧dashboardの当月部分額／直近完全月policyは期間consumer向けとして維持し、Homeと損益管理の現在純資産は本節のViewで置換する（v326以降）。
 
 ## Current / Decided — Top純資産カードの期間比較可否
 
-純資産額はcurrent asset observationを含む表示View、年初比変動額と年間成長率の原値は既存monthly dashboardの直近完全値である。この異なる根拠を同じカードへ無条件に並べない。`current-asset-view.netPeriodComparison`が表示可否・理由・口座別比較sourceを非永続で返し、Topは受け取った値を描画するだけとする。
+純資産額はcurrent asset observationを含む表示View、年初比変動額と年間成長率の原値は既存monthly dashboardの直近完全値である。この異なる根拠を同じカードへ無条件に並べない。`current-asset-view.netPeriodComparison`が表示可否・理由・口座別比較sourceを非永続で返し、Homeと損益管理の現在純資産カードは受け取った値を描画するだけとする。
 
-比較可能条件は、選択年が一致し、全口座のnet／completeNetが有限・完全・非conflictで、口座ごとのsourceMonthと値が一致すること。previous complete同士は同じ口座月を参照する限り可とし、口座間の混在月を今回一律禁止しない。SBI VCのcurrent-asset-observationは期間値と異なる根拠のため、同月・同額・全成分既知でも比較不可。unknown／partial／根拠差／対象月差のどれかがあれば、このカードの変動額と年間成長率だけ「—」にする。明示0や負の比較可能な期間値は従来どおり表示する。分母が0以下等で率の原値がnullなら、比較可能でも率は「—」のまま。
+比較可能条件は、current対象年が一致し、全口座のnet／completeNetが有限・完全・非conflictで、口座ごとのsourceMonthと値が一致すること。previous complete同士は同じ口座月を参照する限り可とし、口座間の混在月を今回一律禁止しない。SBI VCのcurrent-asset-observationは期間値と異なる根拠のため、同月・同額・全成分既知でも比較不可。unknown／partial／根拠差／対象月差のどれかがあれば、このカードの変動額と年間成長率だけ「—」にする。明示0や負の比較可能な期間値は従来どおり表示する。分母が0以下等で率の原値がnullなら、比較可能でも率は「—」のまま。
 
 これは表示適格性の局所修正であり、変動額＝直近完全純資産合計−年初純資産、成長率＝変動額÷年初純資産×100という既存式を変更しない。資産観測から新しい損益・入出金・成長率を逆算しない。確定資産・純損益・確定損益のカード、Annual Summary、両Trend、Allocation、Portfolio、Riskの既存計算・source選択は維持する。
 
@@ -240,11 +254,11 @@ Topの純資産額だけはこの資産観測Viewを使用する。既存dashboa
 
 ## Current / Decided — 部分取込の表示用View
 
-`assets/monthly-display-view.js`は共有月次calculatorとは別の、非永続・読み取り専用の表示層である。既存dashboard／seriesは同一年内の新方式データが存在する最新月を基準とし、当月完全値、当月取得済み成分だけの暫定額、当月データがない場合だけ直近完全確定月を使用する。これら期間consumerへ前月componentを補完しない。Topの現在純資産／Allocationは上記「現在残高」に従い、追加APIのbalanceHistoryとcurrent-asset-viewで未確認残高だけ以前の確認値を参照する。既知成分をdecimal合計し表示時だけNumberへ変換する。nullを正本の0へ変換しない。
+`assets/monthly-display-view.js`は共有月次calculatorとは別の、非永続・読み取り専用の表示層である。既存dashboard／seriesは同一年内の新方式データが存在する最新月を基準とし、当月完全値、当月取得済み成分だけの暫定額、当月データがない場合だけ直近完全確定月を使用する。これら期間consumerへ前月componentを補完しない。Home／損益管理の現在純資産／Allocationは上記「現在残高」に従い、追加APIのbalanceHistoryとcurrent-asset-viewで未確認残高だけ以前の確認値を参照する。既知成分をdecimal合計し表示時だけNumberへ変換する。nullを正本の0へ変換しない。
 
 Top純資産・口座一覧・円グラフは同一current projectionの口座額を使う。確定資産、純損益、確定損益、年初比・成長率の計算自体は口座別の直近完全確定値と既存calculatorから維持し、各metricにsourceMonthとcurrent complete／current partial／previous complete／unavailableを保持する。必要な完全値がなければそのmetricはunknown。純資産カードの期間指標は上記比較条件を満たす場合だけ表示する。混在月・部分取込・過去残高使用は「最新値・一部暫定」とする。観測純資産をledgerへ加算しない。
 
-年間Summaryは既存`dashboard(year)`の期間指標を表示する。Topの確定資産・損益はその結果を維持するが、現在純資産／Allocationはcurrent残高Viewで置換し、期間比較は比較可能時に限る。Asset Trendの各月点は既存`dashboard(year, throughMonth)`、Performanceも同じ指標別の完全値由来の結果を使用する。実データが存在しない月はnull点で、未来月・欠損月を補間しない。月次確定とledgerは従来の厳密calculatorを維持し、表示projectionを保存入力へ戻さない。
+年間Summaryの確定資産・損益等は既存`dashboard(year)`の期間指標を表示する。Topの確定資産・損益もその結果を維持する。両画面の現在純資産／Allocationはcurrent残高Viewを使い、現在カードの比較は同current resultで比較可能な場合に限る。Asset Trendの各月点は既存`dashboard(year, throughMonth)`、Performanceも同じ指標別の完全値由来の結果を使用する。実データが存在しない月はnull点で、未来月・欠損月を補間しない。月次確定とledgerは従来の厳密calculatorを維持し、表示projectionを保存入力へ戻さない。
 
 Monthly Summary／Monthly P/Lは選択月だけを見る。State未確定でも取得済み国内保有等を表示し、未入力は「—」。月間決済・swapは既知値のみ集計し、年間決済・swap・入出金も既知月の値を積み上げる。他口座の欠損で既知値を非表示にせず、未完成合計は暫定とする。前月fallback・0永続化は行わない。
 

@@ -7,10 +7,10 @@ const bundle=(f,year)=>{const d=view(f);return results.create(d,year,{initialSou
 const source=file=>fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n');
 function render(f,year){
  const elements=new Map(),document={getElementById(id){if(!elements.has(id))elements.set(id,{textContent:'',dataset:{},classList:{remove(){},add(){}}});return elements.get(id);}};
- const r=bundle(f,year),ctx={document,window:{},currentAssetView:r.current,latestDashboard:r.period,topSeries:{year},
+ const r=bundle(f,year),ctx={document,window:{},currentAssetView:r.current,latestDashboard:r.period,latestResults:r,topSeries:{year},
   linkedCalculator:()=>({warning:()=>''}),portfolioMonthLabel:m=>m,fmtJPY:v=>'¥'+Math.round(v).toLocaleString(),setSignClass(){},
   sharedDisplayResults:()=>r,displayReadFailed:false,monthlyCalculator:()=>({warning:()=>''}),currentYear:year,
-  displayAccountName:k=>k,calculateInitialCapital:()=>600,ACCOUNTS:f.accounts,GROWTH_TARGET_ACCOUNTS:f.accounts.filter(a=>!a.bankOnly),yearInitialUnrealized:f.initialUnrealized};
+  displayAccountName:k=>k,monthlyDisplayView:()=>view(f),calculateInitialCapital:()=>600,ACCOUNTS:f.accounts,GROWTH_TARGET_ACCOUNTS:f.accounts.filter(a=>!a.bankOnly),yearInitialUnrealized:f.initialUnrealized};
  vm.createContext(ctx);
  const profit=source('profit/soneki.js');
  vm.runInContext(profit.slice(profit.indexOf('function formatOptionalJPY'),profit.indexOf('function optionalSignStyle')),ctx);

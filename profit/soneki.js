@@ -139,12 +139,13 @@ const UNREALIZED_HELPER_ACCOUNTS = new Set(['lightfx', 'minano']);
 const GROWTH_TARGET_ACCOUNTS = ACCOUNTS.filter((account) => !account.bankOnly);
 const profitMetrics = window.TradeScopeProfitMetrics || {};
 let monthlyModels = null;
+let displayReadState = null;
 function refreshMonthlyModels() {
-  try { monthlyModels = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); }
-  catch (_) { monthlyModels = null; }
+  displayReadState=window.TradeScopeDisplayReadState.read(localStorage);
+  monthlyModels=displayReadState.models;displayReadFailed=displayReadState.failed;
 }
 function monthlyCalculator() {
-  return window.TradeScopeMonthlyResolver.createCalculator(profitMetrics, tradingData, yearInitialFunds, yearInitialUnrealized, monthlyModels);
+  return window.TradeScopeMonthlyResolver.createCalculator(profitMetrics, tradingData, yearInitialFunds, yearInitialUnrealized, monthlyModels,{readState:displayReadState});
 }
 
 function getUnrealizedLegs(year, month, accountKey) {
@@ -616,6 +617,7 @@ function saveToStorage() {
 function loadFromStorage() {
   sbiInputDrafts.clear();
   const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  displayReadState=fresh;
   tradingData = fresh.tradingData; monthlyModels=fresh.models; displayReadFailed=fresh.failed;
   legacyInputData = JSON.parse(JSON.stringify(tradingData));
   yearInitialFunds = fresh.yearInitialFunds;
@@ -624,9 +626,11 @@ function loadFromStorage() {
 
 function refreshExternalDisplay() {
   const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  displayReadState=fresh;
   if(!fresh.failed)legacyInputData=window.TradeScopeDisplayReadState.mergeDrafts(legacyInputData,fresh.tradingData,dirtyAccountDrafts);
   tradingData=fresh.tradingData;yearInitialFunds=fresh.yearInitialFunds;yearInitialUnrealized=fresh.yearInitialUnrealized;
   monthlyModels=fresh.models;displayReadFailed=fresh.failed;
+  if(displayReadFailed)document.getElementById('saveInitialCapital').disabled=true;
   updateYearSelect();renderAnnualSummary();renderPerformanceChart();renderMonthlySection();renderMonthTabs();
   if(monthlyDetailPane.classList.contains('open'))renderMonthlyDetailPane(currentMonth);
   // Preserve live controls and their original save guards while any account is editing.
@@ -768,14 +772,7 @@ function calculateTotalConfirmedAssets(year, month) {
 }
 
 function calculateInitialCapital(year, accountsFilter = null) {
-  const targetAccounts = accountsFilter || ACCOUNTS;
-  let total = 0;
-  if (yearInitialFunds[year]) {
-    targetAccounts.forEach(a => {
-      total += yearInitialFunds[year][a.key] || 0;
-    });
-  }
-  return total;
+  return monthlyDisplayView().initial(year,accountsFilter||ACCOUNTS).funds.value;
 }
 
 function hasMeaningfulMonthData(year, month) {
@@ -1430,7 +1427,7 @@ function renderPerformanceChart(options = {}) {
   const pnlEmpty = document.getElementById('pnlBarEmpty');
   if (!assetsCanvas || !pnlCanvas || typeof Chart === 'undefined') return;
 
-  if (displayReadFailed || !hasMonthlyDisplayYear(currentYear)) {
+  if (!hasMonthlyDisplayYear(currentYear)) {
     if (renderAssets) {
       if (assetsTrendChart) {
         assetsTrendChart.destroy();
@@ -1477,18 +1474,13 @@ function renderPerformanceChart(options = {}) {
     ? GROWTH_TARGET_ACCOUNTS.filter(a => a.key === accountFilter)
     : GROWTH_TARGET_ACCOUNTS;
   
-  const yearStartUnrealizedTotal = targetAccounts.reduce((sum, a) => {
-    return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
-  }, 0);
-  const confirmedTrendData = [calculateInitialCapital(currentYear, targetAccounts)];
-  const assetsTrendData = [calculateInitialCapital(currentYear, targetAccounts) + yearStartUnrealizedTotal];
-
-  // Performanceは年初比の差分表示に統一するため、年初基準点を0固定
-  const performanceConfirmedTrendData = [0];
-  const performanceAssetsTrendData = [0];
+  const display=monthlyDisplayView(),opening=display.initial(currentYear,targetAccounts),growthOpening=display.initial(currentYear,targetGrowthAccounts);
+  const confirmedTrendData = [opening.funds.value];
+  const assetsTrendData = [opening.net.value];
+  const performanceConfirmedTrendData = [growthOpening.funds.complete?0:null];
+  const performanceAssetsTrendData = [growthOpening.net.complete?0:null];
 
   for (let m = 1; m <= 12; m++) {
-    const display = monthlyDisplayView();
     const hasData = targetAccounts.some(account => display.accountMonth(currentYear, m, account).hasData);
     const monthly = display.monthlyPnl(currentYear, m, targetAccounts);
     const summary = hasData ? display.dashboard(currentYear, m, targetAccounts) : null;
@@ -1501,6 +1493,12 @@ function renderPerformanceChart(options = {}) {
     performanceAssetsTrendData.push(performance?.netPnl.value ?? null);
     performanceConfirmedTrendData.push(performance?.confirmedPnl.value ?? null);
   }
+
+  if(renderAssets){
+    const known=confirmedTrendData.some(Number.isFinite)||assetsTrendData.some(Number.isFinite)||performanceAssetsTrendData.some(Number.isFinite);
+    assetsCanvas.hidden=!known;if(assetsEmpty)assetsEmpty.hidden=known;
+  }
+  if(renderPnl){const known=totalPnlData.some(Number.isFinite);pnlCanvas.hidden=!known;if(pnlEmpty)pnlEmpty.hidden=known;}
 
   // 口座別表示時はPerformanceビューを強制、全体表示時はユーザー選択を尊重
   const effectiveAssetTrendView = (accountFilter && accountFilter !== 'total') ? 'performance' : assetTrendView;
@@ -1863,8 +1861,11 @@ function renderAnnualSummary() {
   if (warning) { warning.textContent = displayReadFailed?'既存の月次データを確認できません':monthlyCalculator().warning(currentYear); warning.hidden = !warning.textContent; }
   const result = sharedDisplayResults();
   const summary = result.period;
-  const latestMonth = summary.month;
   const current = result.current;
+  const opening=result.initial;
+  document.getElementById('yearInitialCapital').textContent=formatOptionalJPY(opening.funds.value);
+  document.getElementById('yearInitialUnrealizedTotal').textContent=formatOptionalJPY(opening.unrealized.value);
+  setSignClass(document.getElementById('yearInitialUnrealizedTotal'),opening.unrealized.value);
   const assetElement = document.getElementById('totalAssets');
   assetElement.dataset.basis=current.basis;
   assetElement.title=current.hasData?current.rows.map(row=>displayAccountName(row.key)+' '+(row.metrics.net.sourceMonth??'未取得')+(row.metrics.net.status==='current partial'?'・暫定':'')).join('\n'):'';
@@ -1875,34 +1876,9 @@ function renderAnnualSummary() {
   deltaElement.textContent=Number.isFinite(currentDelta)?`${currentDelta>0?'+':currentDelta<0?'-':''}${Math.round(Math.abs(currentDelta)).toLocaleString()}`:'—';
   growthElement.textContent=Number.isFinite(currentGrowth)?`${currentGrowth>=0?'+':''}${currentGrowth.toFixed(1)}%`:'—';
   setSignClass(deltaElement,currentDelta);setSignClass(growthElement,currentGrowth);
-  if (!summary.hasData || !latestMonth) {
-    [
-      'yearRealizedSum',
-      'yearSwapSum',
-      'yearInitialCapital',
-      'yearInitialUnrealizedTotal',
-      'yearDepositSum',
-      'yearWithdrawSum',
-      'yearNetCashFlow',
-      'confirmedAssets',
-      'confirmedAssetsDelta',
-      'confirmedYearGrowthRate',
-      'yearNetPnL',
-      'yearConfirmedPnL',
-      'yearNetPnLGrowthRate',
-      'yearConfirmedPnLGrowthRate'
-    ].map((id) => document.getElementById(id)).filter(Boolean).forEach((el) => {
-      el.textContent = '—';
-      el.classList.remove('positive', 'negative');
-      el.classList.add('neutral');
-    });
-    return;
-  }
-
   const yearly = result.annual;
   const initialCapital = calculateInitialCapital(currentYear);
   const confirmedAssets = summary.confirmed.value;
-  const growthAccounts = GROWTH_TARGET_ACCOUNTS;
 
   const fmtDeltaNumber = (value) => {
     const abs = Math.round(Math.abs(value)).toLocaleString();
@@ -1911,22 +1887,10 @@ function renderAnnualSummary() {
     return '0';
   };
 
-  const initialUnrealizedTotal = ACCOUNTS.reduce((sum, a) => {
-    return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
-  }, 0);
+  const initialUnrealizedTotal = opening.unrealized.value;
 
-  const yearStartTotal = initialCapital + initialUnrealizedTotal;
-  const yearStartConfirmed = initialCapital;
   const confirmedAssetsDelta = summary.confirmedDelta;
   const confirmedGrowthRate = summary.confirmedGrowth;
-
-  // 純損益/確定損益は投資口座のみ（bankOnly除外）でトップページと定義を一致させる
-  const growthStartInitial = calculateInitialCapital(currentYear, growthAccounts);
-  const growthStartUnrealized = growthAccounts.reduce((sum, a) => {
-    return sum + (Number(yearInitialUnrealized?.[currentYear]?.[a.key]) || 0);
-  }, 0);
-  const growthYearStartTotal = growthStartInitial + growthStartUnrealized;
-  const growthYearStartConfirmed = growthStartInitial;
 
   const yearNetPnL = summary.netPnl.value;
   const yearConfirmedPnL = summary.confirmedPnl.value;
@@ -1938,8 +1902,8 @@ function renderAnnualSummary() {
 
   document.getElementById('yearRealizedSum').textContent = formatOptionalJPY(yearly.realizedSum);
   document.getElementById('yearSwapSum').textContent = formatOptionalJPY(yearly.swapSum);
-  document.getElementById('yearInitialCapital').textContent = fmtJPY(initialCapital);
-  document.getElementById('yearInitialUnrealizedTotal').textContent = fmtJPY(initialUnrealizedTotal);
+  document.getElementById('yearInitialCapital').textContent = formatOptionalJPY(initialCapital);
+  document.getElementById('yearInitialUnrealizedTotal').textContent = formatOptionalJPY(initialUnrealizedTotal);
   document.getElementById('yearDepositSum').textContent = formatOptionalJPY(yearly.depositSum);
   document.getElementById('yearWithdrawSum').textContent = formatOptionalJPY(yearly.withdrawSum);
   document.getElementById('yearNetCashFlow').textContent = formatOptionalJPY(netCashFlowYear);
@@ -1990,13 +1954,13 @@ function getStoredNumber(row, field) {
 
 function monthlyDisplayView() {
   return window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData, yearInitialFunds,
-    yearInitialUnrealized, monthlyModels, ACCOUNTS);
+    yearInitialUnrealized, monthlyModels, ACCOUNTS,{readState:displayReadState});
 }
 function sharedDisplayResults(){
   const display=monthlyDisplayView();
   return window.TradeScopeDisplayResults.create(display,currentYear,{readFailed:displayReadFailed,
     initialSources:{funds:yearInitialFunds,unrealized:yearInitialUnrealized},
-    currentFactory:()=>window.TradeScopeCurrentAssets.latest(display,monthlyModels,{tradingData,readFailed:displayReadFailed})});
+    currentFactory:()=>window.TradeScopeCurrentAssets.latest(display,monthlyModels,{tradingData,readFailed:window.TradeScopeDisplayReadState.failed(displayReadState,'models')})});
 }
 function monthlyDisplayTotals(year, month) {
   const view = window.TradeScopeDisplayResults.month(monthlyDisplayView(),year,month,{readFailed:displayReadFailed});
@@ -2347,6 +2311,10 @@ function renderAccountInputs() {
   const container = document.getElementById('accountInputGrid');
   container.innerHTML = '';
   refreshMonthlyModels();
+  if(displayReadFailed){
+    container.innerHTML='<p class="hint">保存データの一部を確認できません。入力を再開する前に保存データを確認してください。</p>';
+    return;
+  }
   sbiInputView = sbiInput.load(localStorage, inputTargetMonth());
   
   ACCOUNTS.forEach(account => {
@@ -2919,9 +2887,6 @@ function bindInitialCapitalInputBehavior() {
 }
 
 function renderInitialCapitalForm() {
-  const currentInitialFunds = yearInitialFunds?.[currentYear] || {};
-  const currentInitialUnrealized = yearInitialUnrealized?.[currentYear] || {};
-
   updateYearSelect();
 
   const accountKeys = {
@@ -2942,27 +2907,19 @@ function renderInitialCapitalForm() {
 
   const prevYear = currentYear - 1;
 
-  // 年初確定資金（未設定時は前年度12月の確定資産をデフォルト）
-  for (const [elemId, accountKey] of Object.entries(accountKeys)) {
-    let val = currentInitialFunds[accountKey];
-    if (typeof val !== 'number') {
-      val = calculateAccountConfirmedAssets(prevYear, 12, accountKey);
-    }
-    document.getElementById(elemId).value = Number(val) || 0;
+  const opening=monthlyDisplayView().initial(currentYear);
+  for(const [elemId,key]of Object.entries(accountKeys)){
+    const field=opening.accounts.find(a=>a.key===key).funds;
+    const fallback=field.status==='missing'?calculateAccountConfirmedAssets(prevYear,12,key):null;
+    document.getElementById(elemId).value=field.status==='known'?String(field.value):Number.isFinite(fallback)?String(fallback):'';
   }
-
-  // 年初評価損益（前年度年末の評価損益をデフォルト）
-  for (const [elemId, accountKey] of Object.entries(unrealizedKeys)) {
-    let val = currentInitialUnrealized[accountKey];
-    if (typeof val !== 'number') {
-      // 前年度年末12月の評価損益
-      val = 0;
-      if (tradingData?.[prevYear]?.[12]?.[accountKey]?.unrealizedPnL != null) {
-        val = Number(tradingData[prevYear][12][accountKey].unrealizedPnL) || 0;
-      }
-    }
-    document.getElementById(elemId).value = val;
+  for(const [elemId,key]of Object.entries(unrealizedKeys)){
+    const field=opening.accounts.find(a=>a.key===key).unrealized;
+    const fallback=field.status==='missing'?window.TradeScopeYearInitial.decimal(tradingData?.[prevYear]?.[12]?.[key]?.unrealizedPnL):null;
+    document.getElementById(elemId).value=field.status==='known'?String(field.value):fallback??'';
   }
+  const invalid=opening.accounts.some(a=>[a.funds,a.unrealized].some(f=>f.status==='invalid'));
+  document.getElementById('saveInitialCapital').disabled=displayReadFailed||invalid;
 
   bindInitialCapitalInputBehavior();
   updateInitialCapitalStatus();
@@ -3025,6 +2982,7 @@ document.getElementById('initialCapitalToggle').addEventListener('click', (e) =>
 });
 
 document.getElementById('saveInitialCapital').addEventListener('click', () => {
+  if(displayReadFailed)return;
   const year = Number(document.getElementById('yearSelect').value);
   if (!yearInitialFunds[year]) yearInitialFunds[year] = {};
   if (!yearInitialUnrealized[year]) yearInitialUnrealized[year] = {};
@@ -3046,10 +3004,14 @@ document.getElementById('saveInitialCapital').addEventListener('click', () => {
   };
 
   for (const [elemId, accountKey] of Object.entries(accountKeys)) {
-    yearInitialFunds[year][accountKey] = Number(document.getElementById(elemId).value) || 0;
+    const value=window.TradeScopeYearInitial.decimal(document.getElementById(elemId).value);
+    if(value!==null)yearInitialFunds[year][accountKey]=Number(value);
+    else if(Object.hasOwn(yearInitialFunds[year],accountKey))yearInitialFunds[year][accountKey]=null;
   }
   for (const [elemId, accountKey] of Object.entries(unrealizedKeys)) {
-    yearInitialUnrealized[year][accountKey] = Number(document.getElementById(elemId).value) || 0;
+    const value=window.TradeScopeYearInitial.decimal(document.getElementById(elemId).value);
+    if(value!==null)yearInitialUnrealized[year][accountKey]=Number(value);
+    else if(Object.hasOwn(yearInitialUnrealized[year],accountKey))yearInitialUnrealized[year][accountKey]=null;
   }
 
   saveToStorage();

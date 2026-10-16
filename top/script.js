@@ -880,34 +880,27 @@ function createEmptyTopSeries(year = TOP_BASE_YEAR) {
 }
 
 function buildTopLinkedData(selectedYear = null) {
-  const tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const initialFunds = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
-  const initialUnrealized = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
-  let models = null;
-  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
-  const sourceYears = [...new Set([...getNumericYears(tradingData), ...getNumericYears(initialFunds),
-    ...getNumericYears(initialUnrealized), ...window.TradeScopeMonthlyDisplay.years(models)])].sort((a,b) => a-b);
-  const year = selectedYear || sourceYears[sourceYears.length - 1];
-  if (!year) return null;
-  const fresh = window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData, initialFunds, initialUnrealized, models, LINKED_ACCOUNTS).series(year);
-  return fresh.hasData ? fresh : null;
+  const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  const sourceYears=[...new Set([...getNumericYears(fresh.tradingData),...getNumericYears(fresh.yearInitialFunds),
+    ...getNumericYears(fresh.yearInitialUnrealized),...window.TradeScopeMonthlyDisplay.years(fresh.models)])].sort((a,b)=>a-b);
+  const year=selectedYear||sourceYears.at(-1);
+  if(!year)return null;
+  const series=linkedDisplay(undefined,fresh).series(year);
+  return series.hasData?series:null;
 }
 
 const linkedTopData = buildTopLinkedData();
 let topSeries = linkedTopData || createEmptyTopSeries();
-function linkedDisplay(tradingData = parseStoredJson(PROFIT_STORAGE_KEY_TRADING)) {
-  let models = null;
-  try { models = window.TradeScopeDataStorage.createRepository({ getItem: key => localStorage.getItem(key) }).read(); } catch (_) {}
-  return window.TradeScopeMonthlyDisplay.create(profitMetrics, tradingData,
-    parseStoredJson(PROFIT_STORAGE_KEY_INITIAL), parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED), models, LINKED_ACCOUNTS);
+function linkedDisplay(tradingData, fresh=window.TradeScopeDisplayReadState.read(localStorage)) {
+  return window.TradeScopeMonthlyDisplay.create(profitMetrics,tradingData??fresh.tradingData,
+    fresh.yearInitialFunds,fresh.yearInitialUnrealized,fresh.models,LINKED_ACCOUNTS,{readState:fresh});
 }
 function buildSharedResults(year) {
-  const fresh=window.TradeScopeDisplayReadState.read(localStorage);
-  const display=window.TradeScopeMonthlyDisplay.create(profitMetrics,fresh.tradingData,fresh.yearInitialFunds,fresh.yearInitialUnrealized,fresh.models,LINKED_ACCOUNTS);
-  return window.TradeScopeDisplayResults.create(display, year, {
+  const fresh=window.TradeScopeDisplayReadState.read(localStorage),display=linkedDisplay(undefined,fresh);
+  return window.TradeScopeDisplayResults.create(display,year,{
     readFailed:fresh.failed,
     initialSources:{funds:fresh.yearInitialFunds,unrealized:fresh.yearInitialUnrealized},
-    currentFactory: () => window.TradeScopeCurrentAssets.latest(display,fresh.models,{tradingData:fresh.tradingData,readFailed:fresh.failed})
+    currentFactory: () => window.TradeScopeCurrentAssets.latest(display,fresh.models,{tradingData:fresh.tradingData,readFailed:window.TradeScopeDisplayReadState.failed(fresh,'models')})
   });
 }
 let latestResults = buildSharedResults(topSeries.year);
@@ -991,7 +984,7 @@ function updateRiskSection() {
 // ===== KPI =====
 function updateKPIs() {
   const warning = document.getElementById('topMonthlyWarning');
-  if (warning) { warning.textContent = linkedCalculator().warning(topSeries.year); warning.hidden = !warning.textContent; }
+  if (warning) { warning.textContent = latestResults.readFailed?'保存データの一部を確認できません':linkedCalculator().warning(topSeries.year); warning.hidden = !warning.textContent; }
   const status = document.getElementById('topLatestStatus');
   if (status) {
     status.hidden = !currentAssetView.hasData || !currentAssetView.provisional;
@@ -1511,8 +1504,8 @@ function renderPerformanceChart() {
   const monthLabels = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const perfLabels = ['年初', ...monthLabels];
   const latestMonth = topSeries.month || 12;
-  const netBalanceSeries = [topSeries.chartStartTotal || topSeries.realized[0] || 0];
-  const totalEquitySeries = [(topSeries.chartStartTotalWithUnrealized ?? topSeries.chartStartTotal) || topSeries.total[0] || 0];
+  const netBalanceSeries = [topSeries.chartStartTotal ?? null];
+  const totalEquitySeries = [topSeries.chartStartTotalWithUnrealized ?? null];
 
   for (let month = 1; month <= 12; month += 1) {
     netBalanceSeries.push(topSeries.realized[month - 1] ?? null);
@@ -2399,9 +2392,8 @@ function resolveTopSeriesForYear(selectedYear) {
 }
 
 function initializeYearSelector() {
-  const tradingDataMap = parseStoredJson(PROFIT_STORAGE_KEY_TRADING);
-  const initialFundsMap = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL);
-  const initialUnrealizedMap = parseStoredJson(PROFIT_STORAGE_KEY_INITIAL_UNREALIZED);
+  const fresh=window.TradeScopeDisplayReadState.read(localStorage);
+  const tradingDataMap=fresh.tradingData,initialFundsMap=fresh.yearInitialFunds,initialUnrealizedMap=fresh.yearInitialUnrealized;
   const yearSelect = document.getElementById('topYearSelect');
 
   if (!yearSelect) return;

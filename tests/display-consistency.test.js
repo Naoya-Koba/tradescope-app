@@ -17,7 +17,7 @@ test('period and current asset results are explicitly separate even within one s
  assert.notEqual(v.current.net.value,v.period.net.value);assert.equal(v.basis,'period-dashboard');assert.equal(JSON.stringify(f),before);
 });
 test('same complete period basis exposes delta and growth',()=>{
- const p=view(fixture()).dashboard(2026,8),c=result.periodComparison(p);assert.equal(c.comparable,true);assert.equal(c.delta,p.netDelta);assert.equal(c.growth,p.netGrowth);
+ const f=fixture();f.initialUnrealized={2026:Object.fromEntries(f.accounts.map(a=>[a.key,0]))};const p=view(f).dashboard(2026,8),c=result.periodComparison(p);assert.equal(c.comparable,true);assert.equal(c.delta,p.netDelta);assert.equal(c.growth,p.netGrowth);
 });
 for(const change of [p=>p.rows[0].metrics.net.basis='observation',p=>p.rows[0].metrics.net.sourceMonth='2026-07',p=>p.rows[0].metrics.net.status='current partial',p=>p.rows[0].metrics.net.value=null,p=>p.rows[0].conflict=true])test('different/incomplete comparison basis hides period delta and growth',()=>{
  const p=view(fixture()).dashboard(2026,8);change(p);const c=result.periodComparison(p);assert.equal(c.comparable,false);assert.equal(c.delta,null);assert.equal(c.growth,null);
@@ -35,7 +35,8 @@ for(const missing of ['funds','unrealized'])test('missing '+missing+' source can
  assert.equal(v.netComparison.growth,null);assert.equal(v.netComparison.delta,null);assert.equal(v.current.netPeriodComparison.growth,null);assert.equal(v.current.netPeriodComparison.delta,null);
 });
 test('explicit initial zero is known; a positive total can be compared without a guessed missing component',()=>{
- const f=fixture(),d=view(f),period=d.dashboard(2026,8),initialSources={funds:f.initialFunds,unrealized:{2026:Object.fromEntries(f.accounts.filter(a=>!a.bankOnly).map(a=>[a.key,0]))}};
+ const f=fixture();f.initialUnrealized={2026:Object.fromEntries(f.accounts.map(a=>[a.key,0]))};
+ const d=view(f),period=d.dashboard(2026,8),initialSources={funds:f.initialFunds,unrealized:f.initialUnrealized};
  initialSources.funds[2026].gmo=0;const v=result.create({...d,dashboard:()=>period},2026,{initialSources});assert.equal(v.netComparison.comparable,true);
 });
 for(const key of ['gmo','lightfx','minano','sbi','sbivc','smbc'])test(key+' August legacy numbers are unchanged by September canonical data',()=>{
@@ -97,12 +98,12 @@ test('external refresh/BFCache wiring preserves live Draft controls and does not
 // Execute the production handlers against read-only, anonymous Storage and DOM stubs.
 const profitSource=fs.readFileSync('profit/soneki.js','utf8');
 function refreshHarness(){
- const f=fixture(),store=adapter(f),calls={},events={};
+ const f=fixture();f.initialUnrealized={2026:Object.fromEntries(f.accounts.map(a=>[a.key,0]))};const store=adapter(f),calls={},events={};
  const context={window:{TradeScopeDisplayReadState:read,addEventListener:(name,fn)=>events[name]=fn},localStorage:store,
   tradingData:f.tradingData,legacyInputData:structuredClone(f.tradingData),yearInitialFunds:f.initialFunds,yearInitialUnrealized:f.initialUnrealized,
   monthlyModels:f.models,displayReadFailed:false,currentYear:2026,currentMonth:8,ACCOUNTS:f.accounts,
   dirtyAccountDrafts:new Set(),sourceAccountDrafts:new Set(),dirtyInitialDrafts:new Set(),inputTargetMonth:()=> '2026-08',
-  monthlyDetailPane:{classList:{contains:()=>true}},
+  monthlyDetailPane:{classList:{contains:()=>true}},document:{getElementById:()=>calls.saveButton??=( {disabled:false})},
   sbiInputDrafts:{retain:fn=>calls.sbi=fn},gmoMonthlyUI:{retainDrafts:fn=>calls.gmo=fn},tradersMonthlyUI:{retainDrafts:fn=>calls.traders=fn}};
  for(const name of ['updateYearSelect','renderAnnualSummary','renderPerformanceChart','renderMonthlySection','renderMonthTabs','renderMonthlyDetailPane','renderAccountInputs','renderInitialCapitalForm'])context[name]=()=>calls[name]=(calls[name]??0)+1;
  vm.createContext(context);
@@ -142,6 +143,12 @@ test('source adoption Draft survives canonical storage events and BFCache withou
 test('read failure refresh preserves Draft and marks display unknown without Storage writes',()=>{
  const h=refreshHarness(),before=JSON.stringify(h.context.legacyInputData);h.store.data.set('tradingData','broken');const storageBefore=JSON.stringify([...h.store.data]);
  h.events.storage({key:'tradingData'});assert.equal(h.context.displayReadFailed,true);assert.equal(JSON.stringify(h.context.legacyInputData),before);assert.equal(JSON.stringify([...h.store.data]),storageBefore);
+ assert.equal(h.calls.saveButton.disabled,true);
+});
+test('read failure disables opening save even while preserving dirty opening controls',()=>{
+ const h=refreshHarness();h.context.dirtyInitialDrafts.add(2026);h.store.data.set('yearInitialFunds','broken');
+ h.events.storage({key:'yearInitialFunds'});assert.equal(h.calls.renderInitialCapitalForm,undefined);assert.equal(h.calls.saveButton.disabled,true);
+ assert.equal(h.store.getItem('yearInitialFunds'),'broken');
 });
 function detailHtml(f,month,readFailed=false){
  const m=result.month(view(f),2026,month,{readFailed}),body={innerHTML:'',querySelector:()=>null};

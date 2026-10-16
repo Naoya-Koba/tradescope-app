@@ -6,7 +6,8 @@
   const sources=node?require('./monthly-source-contract.js'):root.TradeScopeMonthlySourceContract;
   const cryptoAdoption=node?require('./sbivc-balance-adoption.js'):root.TradeScopeSBIVCBalanceAdoption;
   const cashflow=node?require('./cashflow-view.js'):root.TradeScopeCashflowView;
-  const version = 'monthly-display-v9';
+  const initialView=node?require('./year-initial-view.js'):root.TradeScopeYearInitial;
+  const version = 'monthly-display-v10';
   const traders=node?require('./traders-source-policy.js'):root.TradeScopeTradersSourcePolicy;
   const records = (models, entity) => models?.[entity]?.records || [];
   const dateKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
@@ -20,8 +21,9 @@
     .flatMap(entity => records(models, entity).filter(row => row.targetMonth&&!(entity==='importBatches'&&traders.isTransactionOnlyBatch(row))).map(row => Number(row.targetMonth.slice(0, 4)))))];
 
   // Shared display projection for Summary and trends; never feeds the canonical ledger or saves.
-  function create(legacy, tradingData, initialFunds, initialUnrealized, models, accounts) {
-    const calculator = resolver.createCalculator(legacy, tradingData, initialFunds, initialUnrealized, models);
+  function create(legacy, tradingData, initialFunds, initialUnrealized, models, accounts,{readState}={}) {
+    const calculator = resolver.createCalculator(legacy, tradingData, initialFunds, initialUnrealized, models,{readState});
+    const initial=(year,selectedAccounts=accounts)=>calculator.opening(year,selectedAccounts);
     function present(key, targetMonth) {
       const ids={sbi:'acc_sbi_sec',gmo:'acc_gmo_fx',lightfx:'acc_lightfx_fx',minano:'acc_minna_fx',sbivc:'acc_sbivc_crypto',smbc:'acc_smbc_bank'};
       if(sources.heads(records(models,'monthlySources')).some(r=>r.accountId===ids[key]&&r.targetMonth===targetMonth))return true;
@@ -121,6 +123,7 @@
       const flows=cashflow.account({accountKey:key,targetMonth,values:{deposit:read('deposit')===null?null:adoptedRow.deposit,
         withdrawal:read('withdrawal')===null?null:adoptedRow.withdrawal},resolved,input,models,tradingData});
       return { key, targetMonth, sourceMonth: targetMonth, hasData, complete, partial,
+        readFailure:initialView.failed(readState,'models')||isLegacy&&initialView.failed(readState,'tradingData'),
         conflict: resolved.source === 'conflict' || observed.conflict&&!balanceOnly, ...(balanceOnly?{assetConflict:observed.conflict}:{}), components: observed.components,
         realized: read('realizedPnL'), swap: read('swapPnL'), unrealized,
         deposit:numeric(flows.deposit),withdrawal:numeric(flows.withdrawal),cashflow:flows,asset,
@@ -200,11 +203,11 @@
       const accountData = rows.filter(row => Number.isFinite(row.metrics.net.value) && row.metrics.net.value > 0)
         .map(row => ({ label: row.name, color: row.color, amount: row.metrics.net.value, sourceMonth: row.metrics.net.sourceMonth, status: row.metrics.net.status }));
       const rate = (value, initial) => Number.isFinite(value) && initial > 0 ? value / initial * 100 : null;
-      const netDelta = aggregate('completeNet').value === null ? null : aggregate('completeNet').value - calculator.initial(year, keys, true);
-      const confirmedDelta = confirmed.value === null ? null : confirmed.value - calculator.initial(year, keys);
+      const netDelta = aggregate('completeNet').value === null || calculator.initial(year,keys,true)===null ? null : aggregate('completeNet').value - calculator.initial(year, keys, true);
+      const confirmedDelta = confirmed.value === null || calculator.initial(year,keys)===null ? null : confirmed.value - calculator.initial(year, keys);
       return { year, month: baseline, hasData: net.value !== null, rows, accountData, net, confirmed, netPnl, confirmedPnl,
         netDelta,
-        confirmedDelta: confirmed.value === null ? null : confirmed.value - calculator.initial(year, keys),
+        confirmedDelta,
         netGrowth: rate(netDelta, calculator.initial(year, keys, true)),
         confirmedGrowth: rate(confirmedDelta, calculator.initial(year, keys)),
         netPnlGrowth: rate(netPnl.value, calculator.initial(year, growthKeys, true)),
@@ -220,8 +223,8 @@
       });
       return { year, month: latest.month, hasData: latest.hasData, summary: latest,
         realized: points.map(p => p?.confirmed.value ?? null), total: points.map(p => p?.net.value ?? null),
-        performanceConfirmedSeries: [0, ...points.map(p => p?.confirmedPnl.value ?? null)],
-        performanceTotalSeries: [0, ...points.map(p => p?.netPnl.value ?? null)], accountData: latest.accountData,
+        performanceConfirmedSeries: [initial(year,selectedAccounts.filter(a=>!a.bankOnly)).funds.complete?0:null, ...points.map(p => p?.confirmedPnl.value ?? null)],
+        performanceTotalSeries: [initial(year,selectedAccounts.filter(a=>!a.bankOnly)).net.complete?0:null, ...points.map(p => p?.netPnl.value ?? null)], accountData: latest.accountData,
         chartStartTotal: calculator.initial(year, keys), chartStartTotalWithUnrealized: calculator.initial(year, keys, true),
         sourceFingerprint: fingerprint(year) };
     }
@@ -275,7 +278,7 @@
       }
       return {componentKeys,observations,partitioned,monthlyComplete:history.at(-1)?.row.complete===true};
     }
-    return Object.freeze({ accountMonth:fixedAccountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint, balanceHistory });
+    return Object.freeze({ accountMonth:fixedAccountMonth, month, dashboard, series, yearlyTotals, monthlyPnl, fingerprint, balanceHistory,initial,readState });
   }
   const api = Object.freeze({ create, version, years });
   if (node) module.exports = api; else root.TradeScopeMonthlyDisplay = api;
